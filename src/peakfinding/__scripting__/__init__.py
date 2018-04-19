@@ -231,18 +231,6 @@ def detailed(self, ibead, precision: float = None) -> Union[Iterator[Detailed], 
 
 class PeaksTracksDictOperator(TracksDictOperator, peaks = TracksDict):
     "Add dataframe method to tracksdict"
-    def _dictview(self) -> TracksDict:
-        """
-        Return the cloned TracksDict corresponding to the current selected items
-        """
-        tracks = self._items[self._keys] if self._keys else self._items
-        if self._beads:
-            tracks = tracks.clone()
-            sel    = Tasks.selection(selected = list(self._beads))
-            for i in tracks.values():
-                i.tasks.selection = sel
-        return tracks
-
     def dataframe(self, *tasks, transform = None, assign = None, **kwa):
         """
         Concatenates all dataframes obtained through *track.peaks.dataframe*

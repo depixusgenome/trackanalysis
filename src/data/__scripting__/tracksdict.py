@@ -127,7 +127,14 @@ class TracksDict(_TracksDict):
                          i.count('c') + i.count('g') == cnt[1])
         return super().__getitem__([i for i in self if fcn(i.lower())])
 
-    def __getitem__(self, key):
+    def __getitem__(self, key): # pylint: disable=too-many-return-statements
+        if isinstance(key, list) and all(isinstance(i, int) for i in key):
+            tracks = self.clone()
+            sel    = Tasks.selection(selected = list(key))
+            for i in tracks.values():
+                i.tasks.selection = sel
+            return tracks
+
         if isinstance(key, list) or isellipsis(key):
             return super().__getitem__(key)
 
@@ -136,6 +143,13 @@ class TracksDict(_TracksDict):
 
         if isinstance(key, tuple) and all(isinstance(i, (Task, Tasks)) for i in key):
             return self.apply(*key)
+
+        if isinstance(key, tuple):
+            tracks = self.clone()
+            for i in key:
+                if not isellipsis(i):
+                    tracks = tracks[i]
+            return tracks
 
         if (callable(getattr(key, 'match', None)) or
                 (key in ('clean', '~clean') and key not in self)):
@@ -249,19 +263,19 @@ class TracksDict(_TracksDict):
                 return out
 
             ind = out.index.names
-            out = (out
+            out = out.reset_index()
+            out = out[[i for i in out.columns if i != 'index']]
+            mod = self.basedataframe()[['key', 'modification']].set_index('key')
+            cnt = (out.groupby(['bead', 'track']).peakposition.first()
                    .reset_index()
-                   .set_index('track')
-                   .join(self
-                         .dataframe()[['key', 'modification']]
-                         .rename(columns = dict(key = 'track'))
-                         .set_index('track'))
-                   .reset_index('track')
-                   .sort_values(['modification'])
-                  )
-            if 'index' in out.columns:
-                del out['index']
-            return out.assign(bead = out.bead.astype(int)).set_index(ind)
+                   .groupby('bead').track.count()
+                   .rename('trackcount'))
+            return (out
+                    .join(mod, on = ['track'])
+                    .join(cnt, on = ['bead'])
+                    .sort_values(['modification'])
+                    .assign(bead = out.bead.astype(int))
+                    .set_index(ind))
         return par
 
     def dataframe(self, *tasks,
@@ -345,6 +359,12 @@ class TracksDictOperator:
             keys -= {i for i in keys if getattr(self, i) == getattr(self.__class__, i)}
 
         return {i[1:]: deepcopy(getattr(self, i)) for i in keys}
+
+    def _dictview(self) -> TracksDict:
+        """
+        Return the cloned TracksDict corresponding to the current selected items
+        """
+        return self._items[self._keys, self._beads]
 
     def __call__(self: Self, **opts) -> Self:
         default = self.__class__(self._items).config()
