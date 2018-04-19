@@ -12,7 +12,7 @@ from utils          import StreamUnion, initdefaults
 from sequences      import read as _read, peaks as _peaks
 from ._core         import cost as _cost, match as _match # pylint: disable=import-error
 from ._base         import (Distance, GriddedOptimization, PointwiseOptimization,
-                            DEFAULT_BEST, OptimizationParams, Symmetry,
+                            DEFAULT_BEST, OptimizationParams, Symmetry, Pivot,
                             chisquare, chisquarevalue)
 
 class HairpinFitter(OptimizationParams):
@@ -80,6 +80,7 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
 
         1 - R(X, Y)/sqrt(R(X, X) R(Y, Y))
     """
+    pivot     = Pivot.bottom
     precision = 15.
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -97,9 +98,15 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
             args  = self.optimconfig(symmetry = self.symmetry is Symmetry.both,
                                      noise = self.precision)
 
-            hpin  = self.expectedpeaks
-            delta = peaks[0]
-            peaks = (peaks - peaks[0])[None if self.firstpeak else 1:]
+            hpdelta = self.peaks[-2] if self.pivot == Pivot.top else 0
+            hpin    = self.expectedpeaks - hpdelta
+
+            delta = (peaks[0] if self.pivot == Pivot.bottom   else
+                     0        if self.pivot == Pivot.absolute else
+                     peaks[-1])
+            peaks = (peaks - delta)[None if self.firstpeak else 1:]
+
+
             for vals in self.grid:
                 args.update(rng('stretch', vals[0], self.stretch.step))
                 if self.bias.center is None:
@@ -113,7 +120,7 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
                 else:
                     if out[0] < best[0]:
                         best = out
-        return Distance(best[0], best[1], delta-best[2]/best[1])
+        return Distance(best[0], best[1], delta-(best[2]+hpdelta)/best[1])
 
     def value(self, peaks: np.ndarray, stretch, bias) -> Tuple[float, float, float]:
         "computes the cost value at a given stretch and bias as well as derivates"

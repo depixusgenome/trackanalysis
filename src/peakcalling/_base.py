@@ -38,6 +38,13 @@ class Distance(NamedTuple): # pylint: disable=missing-docstring
     stretch: float
     bias:    float
 
+class Pivot(Enum):
+    "The position of the pivot in the fit"
+    absolute = 'absolute'
+    top      = 'top'
+    bottom   = 'bottom'
+
+
 class Symmetry(Enum):
     "Which side to consider"
     both  = 'both'

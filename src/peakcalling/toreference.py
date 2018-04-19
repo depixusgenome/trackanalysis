@@ -6,7 +6,6 @@ Matching experimental peaks to one another
 from    typing                      import (Sequence, NamedTuple, Tuple, Union,
                                             Iterator, cast)
 from    abc                         import ABC, abstractmethod
-from    enum                        import Enum
 from    functools                   import partial
 from    scipy.interpolate           import interp1d
 from    scipy.optimize              import fmin_cobyla
@@ -20,7 +19,7 @@ from    peakfinding.probabilities   import Probability
 from    peakfinding.selector        import PeakSelectorDetails
 from    ._base                      import (GriddedOptimization, CobylaParameters,
                                             Distance, Range, chisquare, chisquarevalue,
-                                            Symmetry, DEFAULT_BEST)
+                                            Symmetry, Pivot, DEFAULT_BEST)
 
 class HistogramFitData(NamedTuple): # pylint: disable=missing-docstring
     fcn:   interp1d
@@ -36,11 +35,6 @@ class ChiSquareData(NamedTuple): # pylint: disable=missing-docstring
     peaks: np.ndarray
 
 FitData  = Union[HistogramFitData, ChiSquareData]
-class Pivot(Enum):
-    "The position of the pivot in the fit"
-    absolute = 'absolute'
-    top      = 'top'
-    bottom   = 'bottom'
 
 class ReferenceFit(ABC):
     "Abstract class for reference fitting"
