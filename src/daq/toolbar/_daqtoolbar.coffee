@@ -79,8 +79,9 @@ export class DpxDAQToolbarView extends WidgetView
         ttips = ['Manual mode' ,
                  'Start ramp cycles',
                  'Start probing cycles',
-                 'Start protocol',
-                 'Stop protocol']
+                 'Start recording',
+                 'Stop recording',
+                 'Change the network configuration']
 
         html = "<label>Z magnet</label><input id='dpx-tb-zmag'"+
                    " class='dpx-tb-manual-input bk-widget-form-input'"+
@@ -97,7 +98,8 @@ export class DpxDAQToolbarView extends WidgetView
                @make_btn('stop', 'Stop', ttips[4], '')+
                "<div id='dpx-tb-message' class='bk-markup'>"+
                    "#{mdl.message}</div>"+
-               "#{quit}"
+               "#{quit}"+
+               @make_btn('network', 'Network', ttips[5])
 
         elem = $(@el)
         elem.html(html)
@@ -109,6 +111,7 @@ export class DpxDAQToolbarView extends WidgetView
         elem.find('#dpx-tb-record').click(() => @model.record = @model.record+1)
         elem.find('#dpx-tb-stop').click(() => @model.stop = @model.stop+1)
         elem.find('#dpx-tb-quit').click(() => @model.quit = @model.quit+1)
+        elem.find('#dpx-tb-network').click(() => @model.network = @model.network+1)
 
         @on_change_protocol()
         return @
@@ -136,6 +139,7 @@ export class DpxDAQToolbar extends Widget
         record:     [p.Number,  -1]
         stop:       [p.Number,  -1]
         quit:       [p.Number,  -1]
+        network:    [p.Number,  -1]
         message:    [p.String,  '']
         hasquit:    [p.Bool,    false]
         zmagmin:    [p.Number,   0.0]

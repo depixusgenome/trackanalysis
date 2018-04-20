@@ -172,7 +172,8 @@ class TextOption(Option):
 
     def replace(self, model, body:str) -> str:
         "replaces a pattern by an html tag"
-        def _replace(key, size, tpe):
+        def _replace(info, size, tpe):
+            key = info['name']
             assert len(key), "keys must have a name"
             opt  = (''          if size is None   else
                     'step=1'    if int(size) == 0 else
@@ -181,15 +182,17 @@ class TextOption(Option):
             val  = self.getvalue(model, key, None)
             if val is not None:
                 opt += ' value="{}"'.format(val)
+            if info.get('width', None):
+                opt += f' style="width: {info["width"]}px;"'
 
             inpt = '<input class="bk-widget-form-input" type="{}" name="{}" {}>'
             return inpt.format(tpe, key, opt)
 
         tpe = 'text' if self._cnv is str else 'number'
         if callable(self._step):
-            fcn = lambda i: _replace(i.group('name'), self._step(i), tpe)
+            fcn = lambda i: _replace(i.groupdict(), self._step(i), tpe)
         else:
-            fcn = lambda i: _replace(i.group('name'), self._step, tpe)
+            fcn = lambda i: _replace(i.groupdict(), self._step, tpe)
         return self._patt.sub(fcn, body)
 
 class CSVOption(Option):
@@ -227,7 +230,7 @@ class DpxModal(Model):
     __OPTIONS          = (CheckOption(),
                           TextOption(int,   _OPT+r'[id]',    0),
                           TextOption(float, _PREC+_OPT+r'f', lambda i: i.group('prec')),
-                          TextOption(str,   _OPT+r's',       None),
+                          TextOption(str,   _OPT+r'(?P<width>\d*)s',       None),
                           CSVOption(int,    _OPT+r'csv[id]'),
                           CSVOption(float,  _OPT+r'csvf'),
                           CSVOption(str,    _OPT+r'csv'),

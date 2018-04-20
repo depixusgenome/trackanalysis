@@ -7,7 +7,8 @@ import bokeh.layouts as layouts
 from utils          import initdefaults
 from view.base      import threadmethod, spawn
 from view.dialog    import BaseFileDialog
-from ._protocol     import DAQProbeButton, DAQRampButton, DAQManualButton
+from ._protocol     import (DAQProbeButton, DAQRampButton,
+                            DAQManualButton, DAQNetworkButton)
 from ._daqtoolbar   import DpxDAQToolbar
 from ._messages     import DAQMessagesView
 
@@ -65,6 +66,7 @@ class DAQToolbar:
         self._ramp     = DAQRampButton      (**_)
         self._probing  = DAQProbeButton     (**_)
         self._manual   = DAQManualButton    (**_)
+        self._network  = DAQNetworkButton   (**_)
         self._record   = DAQRecordFileDialog(**_)
         self._widget   = None
 
@@ -78,6 +80,7 @@ class DAQToolbar:
         self._probing .addtodoc(ctrl, doc, self._widget, "probing")
         self._manual  .addtodoc(ctrl, doc, self._widget, "manual")
         self._record  .addtodoc(ctrl, doc, self._widget, "record")
+        self._network .addtodoc(ctrl, doc, self._widget, "network")
         self._widget.on_change("stop", lambda attr, old, new: ctrl.daq.record(False))
 
         mods = dict(height      = 50,
@@ -91,6 +94,7 @@ class DAQToolbar:
         self._probing .observe(ctrl)
         self._manual  .observe(ctrl)
         self._record  .observe(ctrl)
+        self._network .observe(ctrl)
 
         @ctrl.daq.observe("record", "updateprotocol")
         def _onstoprecording(**_):

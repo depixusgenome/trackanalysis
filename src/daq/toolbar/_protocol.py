@@ -33,7 +33,6 @@ class DAQProtocolTheme(ConfigObject):
                  "%(phases[{index}].duration)of",
                 ]]
     firstwidth = 250
-    height     = 20
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -79,6 +78,21 @@ class DAQManualConfig(ConfigObject):
 
 PROTOCOL = TypeVar('PROTOCOL', bound = Union[DAQProtocol, 'DAQManualConfig'])
 
+def _strbody(theme, body: Tuple[Tuple[str,...]]) -> str:
+    first = (f"<div><p style='margin: 0px; width:{theme.firstwidth}px;'><b>"
+             +"{}</b>{}</p></div>")
+    txt   = ""
+    for i in body:
+        if '(' in i[0]:
+            ind  = i[0].rfind('(')
+            txt +=  "<div class='dpx-span'>" + first.format(i[0][:ind], i[0][ind:])
+        else:
+            txt +=  "<div class='dpx-span'>" + first.format(i[0], '')
+        txt += ''.join(f"<div><p style='margin: 0px;'>{j}</p></div>" for j in i[1:])
+        txt += '</div>'
+    return txt
+
+
 class BaseProtocolButton(Generic[PROTOCOL]):
     "A button to access the modal dialog"
     _model: Union[DAQProtocol, DAQManualConfig]
@@ -111,25 +125,10 @@ class BaseProtocolButton(Generic[PROTOCOL]):
             return dialog(doc,
                           context = _context,
                           title   = self._theme.title,
-                          body    = self._strbody(self._body(ctrl)),
+                          body    = _strbody(self._theme, self._body(ctrl)),
                           model   = transient,
                           always  = True)
         tbar.on_change(name, _onclick_cb)
-
-    def _strbody(self, body: Tuple[Tuple[str,...]]) -> str:
-        theme = self._theme
-        first = (f"<div><p style='margin: 0px; width:{theme.firstwidth}px;'><b>"
-                 +"{}</b>{}</p></div>")
-        txt   = ""
-        for i in body:
-            if '(' in i[0]:
-                ind  = i[0].rfind('(')
-                txt +=  "<div class='dpx-span'>" + first.format(i[0][:ind], i[0][ind:])
-            else:
-                txt +=  "<div class='dpx-span'>" + first.format(i[0], '')
-            txt += ''.join(f"<div><p style='margin: 0px;'>{j}</p></div>" for j in i[1:])
-            txt += '</div>'
-        return txt
 
     @staticmethod
     @abstractmethod
@@ -286,3 +285,76 @@ class DAQManualButton(BaseProtocolButton[DAQManualConfig]):
         zmag = self._model.zmag.move(moveup)
         if zmag != self._model.zmag.value:
             ctrl.daq.updateprotocol(self._model.new(zmag = zmag))
+
+class DAQNetworkButton:
+    "View the DAQ Manual tools"
+    _TITLE = "Network Settings"
+    _BODY  = [["Commands",  "%(websocket)250s"],
+              ["Data feeds",
+               "<p style='width: 250px'>address</p>",
+               "<p style='width: 80px'>port</p>",
+               "<p style='width: 120px'>multicast</p>"],
+              ["Teensy", "%(fov.address[0])250s",   "%(fov.address[1])d",
+               "%(fov.multicast)120s"],
+              ["Bead",   "%(beads.address[0])250s", "%(beads.address[1])d",
+               "%(beads.multicast)120s"]]
+    def __init__(self, **kwa):
+        self._theme = DAQProtocolTheme(name       = "networktheme",
+                                       body       = self._BODY,
+                                       title      = self._TITLE,
+                                       firstwidth = 120, **kwa)
+    @staticmethod
+    def _model(ctrl):
+        return ctrl.daq.config.network
+
+    def _body(self, ctrl) -> Tuple[Tuple[str, ...]]:
+        mdl = self._model(ctrl)
+        dfl = ctrl.theme.model(self._model, True)
+
+        cnt = list(self._theme.body[0])
+        if mdl.cyclecount != dfl.cyclecount:
+            cnt = [cnt[0]+f" ({dfl.cyclecount})", cnt[1]]
+        fra = list(self._theme.body[1])
+        if mdl.framerate != dfl.framerate:
+            fra = [fra[0]+f" ({dfl.framerate})", fra[1]]
+
+        assert len(mdl.phases) == len(dfl.phases)
+
+        body = [cnt, fra, *(i for i in self._theme.body[2:-1])]
+        for i, j in enumerate(dfl.phases):
+            body.append([j.format(index = i) for j in self._theme.body[-1]])
+            if j != mdl.phases[i]:
+                body[-1][0] += f' ({round(j.zmag,3)}, {round(j.speed,3)}, {round(j.duration,3)})'
+
+        return cast(Tuple[Tuple[str, ...]], tuple(tuple(i) for i in body))
+
+    def observe(self, ctrl):
+        "observe the controller"
+        if self._theme not in ctrl.theme:
+            ctrl.theme.add(self._theme)
+
+    def addtodoc(self, ctrl, doc, tbar, name):
+        "add action to the toolbar"
+        transient = deepcopy(self._model(ctrl))
+
+        @contextmanager
+        def _context(_):
+            yield
+            diff = transient.diff(self._model(ctrl))
+            if diff:
+                with ctrl.action:
+                    vals = ctrl.daq.data.fovstarted, ctrl.daq.data.beadsstarted
+                    ctrl.daq.listen(False, False)
+                    ctrl.daq.updatenetwork(**diff)
+                    ctrl.daq.listen(*vals)
+
+        def _onclick_cb(attr, old, new):
+            "method to trigger the modal dialog"
+            transient.__dict__.update(deepcopy(self._model(ctrl).__dict__))
+            return dialog(doc,
+                          context = _context,
+                          title   = self._theme.title,
+                          body    = _strbody(self._theme, self._theme.body),
+                          model   = transient,
+                          always  = True)
+        tbar.on_change(name, _onclick_cb)

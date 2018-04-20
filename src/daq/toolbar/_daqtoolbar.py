@@ -19,6 +19,7 @@ class DpxDAQToolbar(Widget):
     record      = props.Int(-1)
     stop        = props.Int(-1)
     quit        = props.Int(-1)
+    network     = props.Int(-1)
     message     = props.String("")
     hasquit     = props.Bool(False)
     zmagmin     = props.Float(0.)
