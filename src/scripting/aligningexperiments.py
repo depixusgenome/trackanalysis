@@ -8,6 +8,7 @@ import pandas                               as     pd
 import numpy                                as     np
 import holoviews                            as     hv # pylint: disable=import-error
 
+from   utils                               import initdefaults
 from   peakcalling.toreference             import (Range, # pylint: disable=unused-import
                                                    CorrectedHistogramFit, Pivot)
 from   peakcalling.tohairpin               import ChiSquareFit, matchpeaks
@@ -22,19 +23,35 @@ class PeaksAlignment:
     """
     Align beads or tracks
     """
-    def __init__(self, individually = False, **kwa):
-        self.hpalign      = kwa.get('hpalign',      ChiSquareFit(**kwa))
-        self.refalign     = kwa.get('refalign',     CorrectedHistogramFit(**kwa))
-        self.peakflagger  = kwa.get('peakflagger',  PeakFlagger(mincount = 1, window = 15))
-        self.peakselector = kwa.get('peakselector', Tasks.peakselector())
-        self.singlestrand = kwa.get('singlestrand', Tasks.singlestrand())
-        self.individually = individually
+    refalign     = CorrectedHistogramFit(pivot     = Pivot.absolute,
+                                         firstpeak = False,
+                                         stretch   = Range(1., .15, .03),
+                                         bias      = Range(0., .008, .002))
+    hpalign      = ChiSquareFit         (pivot     = Pivot.top,
+                                         firstpeak = False,
+                                         bias      = Range(None, .01,  .005))
+    hprefalign   = ChiSquareFit         (pivot     = Pivot.top,
+                                         firstpeak = False,
+                                         stretch   = Range(1.,   .05, .01),
+                                         bias      = Range(None, .01, .005))
+    peakflagger  = PeakFlagger          (mincount = 1, window = 15)
+    peakselector = Tasks.peakselector()
+    singlestrand = Tasks.singlestrand()
+    individually = False
 
-        if self.refalign and 'pivot' not in kwa:
-            self.refalign.pivot = Pivot.absolute
+    @initdefaults(frozenset(locals()),
+                  hppeaks = lambda self, val: self.sethppeaks(val))
+    def __init__(self, **kwa):
+        pass
 
-        if self.hpalign and 'firstpeak' not in kwa:
-            self.hpalign.firstpeak = False
+    def sethppeaks(self, peaks) -> 'PeaksAlignment':
+        "sets hairpin peaks"
+        if self.hpalign:
+            self.hpalign.peaks = peaks
+
+        if self.hprefalign.peaks:
+            self.hprefalign.peaks = peaks
+        return self
 
     def peaks(self, tracks) -> pd.DataFrame:
         """
@@ -139,18 +156,23 @@ class PeaksAlignment:
         if not self.hpalign:
             return corr
 
-        align = lambda x: self.hpalign.optimize(np.sort(x.peakposition.unique()))
+        pos = {i: np.sort(j.peakposition.unique()) for i, j in data}
         if self.individually:
-            data = [(i, j.assign(peakposition = (j.peakposition-corr[i][2])*corr[i][1]))
-                    for i, j in data]
-            new  = {i: align(j) for i, j in data}
+            pos = {i: (j-corr[i][2])*corr[i][1] for i, j in pos.items()}
+            new = {i: self.hpalign.optimize(j)  for i, j in pos.items()}
             return {i: (j[0], j[1]*new[i][1], j[1]*j[2]+new[i][2]/j[1]) for i, j in corr.items()}
 
         elif self.refalign is not None:
-            out = align(next(j for i, j in data if i == ref))
-            return {i: (j[0], j[1]*out[1], j[1]*j[2]+out[2]/j[1]) for i, j in corr.items()}
+            out  = self.hpalign.optimize(pos[ref])
+            corr = {i: (j[0], j[1]*out[1], j[1]*j[2]+out[2]/j[1]) for i, j in corr.items()}
+            if self.hprefalign and len(self.hprefalign.peaks):
+                pos  = {i: (j-corr[i][2])*corr[i][1] for i, j in pos.items()}
+                new  = {i: self.hprefalign.optimize(j)  for i, j in pos.items()}
+                corr = {i: (j[0], j[1]*new[i][1], j[1]*j[2]+new[i][2]/j[1])
+                        for i, j in corr.items()}
+            return corr
 
-        return {i: align(j) for i, j in data}
+        return {i: self.hpalign.optimize(j) for i, j in pos.items()}
 
     def correct(self, data, ref):
         """

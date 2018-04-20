@@ -98,7 +98,7 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
             args  = self.optimconfig(symmetry = self.symmetry is Symmetry.both,
                                      noise = self.precision)
 
-            hpdelta = self.peaks[-2] if self.pivot == Pivot.top else 0
+            hpdelta = self.peaks[-2] if len(self.peaks) > 2 and self.pivot == Pivot.top else 0
             hpin    = self.expectedpeaks - hpdelta
 
             delta = (peaks[0] if self.pivot == Pivot.bottom   else
