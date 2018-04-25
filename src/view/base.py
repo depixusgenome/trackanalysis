@@ -4,11 +4,11 @@
 from typing               import Callable, Set, TYPE_CHECKING # pylint: disable=unused-import
 from abc                  import ABC
 from concurrent.futures   import ThreadPoolExecutor
+from asyncio              import wrap_future
 
 from bokeh.document       import Document
 
 from tornado.ioloop           import IOLoop
-from tornado.platform.asyncio import to_tornado_future
 from control.action           import ActionDescriptor
 
 if TYPE_CHECKING:
@@ -68,7 +68,7 @@ async def threadmethod(fcn, *args, pool = None, **kwa):
     "threads a method"
     if pool is None:
         pool = POOL
-    return await to_tornado_future(pool.submit(fcn, *args, **kwa))
+    return await wrap_future(pool.submit(fcn, *args, **kwa))
 
 def spawn(fcn, *args, loop = None, **kwa):
     "spawns method"

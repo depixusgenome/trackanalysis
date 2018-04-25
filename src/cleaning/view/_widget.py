@@ -27,7 +27,7 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         css.lines.order.default   = ('population', 'hfsigma', 'extent', 'aberrant',
                                      'pingpong', 'saturation', 'good')
         css.columns.width.default = 65
-        css.height.default        = 500
+        css.height.default        = 420
         css.columns.default       = [['cycle',      u'Cycle',       '0'],
                                      ['population', u'% good',      '0.'],
                                      ['hfsigma',    u'σ[HF]',       '0.0000'],
