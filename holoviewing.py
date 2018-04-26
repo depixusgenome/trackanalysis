@@ -24,6 +24,9 @@ def _display_hook(item):
     if isinstance(disp, pd.DataFrame):
         return _display(disp)
 
+    if type(disp).__module__.startswith('holoviews'):
+        return hv.ipython.display(disp)
+
     shell = get_ipython()
     if shell is not None:
         fmt   = shell.display_formatter.formatters['text/html']
