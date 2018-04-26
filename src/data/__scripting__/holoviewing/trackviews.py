@@ -71,6 +71,8 @@ class Display(BasicDisplay): # pylint: disable=abstract-method
 
         if not any(isinstance(i, hv.Text) for i in crvs): # dummy text for warnings
             for i in crvs:
+                if isinstance(i.data, pd.DataFrame):
+                    continue
                 val = next(((j[0], j[1]) for j in i.data if np.isnan(j).sum() == 0), None)
                 if val is not None:
                     break
