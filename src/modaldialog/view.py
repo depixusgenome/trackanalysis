@@ -38,7 +38,7 @@ class AdvancedWidgetMixin(ABC):
     def _args(self, **kwa) -> Dict[str, Any]:
         model = kwa.get('model', self)
         def _default(keys):
-            desc = getattr(model.__class__, keys[0], None)
+            desc = getattr(model.__class__, keys[0].split('|')[0], None)
             if hasattr(desc, 'getdefault'):
                 mdl = desc.getdefault(model)
                 for key in keys[1:]:
@@ -49,7 +49,7 @@ class AdvancedWidgetMixin(ABC):
         def _value(keys):
             mdl = model
             for key in keys:
-                mdl = getattr(mdl, key)
+                mdl = getattr(mdl, key.split('|')[0])
             return mdl
 
         def _add(title, val):
@@ -58,10 +58,13 @@ class AdvancedWidgetMixin(ABC):
             if not found or dflt == _value(keys):
                 return title, '', val
 
-            disp = (' ' if dflt is None  else
-                    '✓' if dflt is True  else
-                    '▢' if dflt is False else
-                    ('%'+val[val.rfind(')')+1:]) % dflt)
+            if '|' in val:
+                disp = val[val.find('(')+1:val.rfind(')')].split('|')[1+dflt].split(':')[1]
+            else:
+                disp = (' ' if dflt is None  else
+                        '✓' if dflt is True  else
+                        '▢' if dflt is False else
+                        ('%'+val[val.rfind(')')+1:]) % dflt)
 
             return title, f'({disp})', val
 

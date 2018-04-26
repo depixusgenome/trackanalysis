@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Widgets for configuration"
 
-from    typing                  import TypeVar
+from    typing                  import TypeVar, Tuple
 from    bokeh.models            import CheckboxGroup, RadioButtonGroup
 
 from    view.plots              import GroupWidget
@@ -32,6 +32,37 @@ class AlignmentWidget(GroupWidget[ModelType]):
         active = 0 if val is None else self.__ORDER.index(AlignmentTactic(val))
         return dict(active = active)
 
+class AlignmentModalDescriptor:
+    "for use with modal dialogs"
+    __ORDER = (None, AlignmentTactic.pull, AlignmentTactic.onlyinitial,
+               AlignmentTactic.onlypull)
+    __NAMES = 'ø','best', 'Φ1', 'Φ3'
+
+    @classmethod
+    def line(cls, name) -> Tuple[str, str]:
+        "return the modal dialog line"
+        vals = '|'.join(f'{i}:{j}' for i, j in enumerate(cls.__NAMES))
+        return ('Cycle alignment strategy', f' %({name}|{vals})c')
+
+    def getdefault(self,inst)->int:
+        "returns default peak finder"
+        val = getattr(getattr(inst, '_model').alignment.configtask.default, 'phase', None)
+        return self.__ORDER.index(val)
+
+    def __get__(self,inst,owner):
+        if inst is None:
+            return self
+        val = getattr(getattr(inst, '_model').alignment.task, 'phase', None)
+        return self.__ORDER.index(val)
+
+    def __set__(self,inst,value):
+        value     = int(value)
+        alignment = getattr(inst, '_model').alignment
+        if value == 0:
+            alignment.remove()
+        else:
+            alignment.update(phase = self.__ORDER[value])
+
 class EventDetectionWidget(GroupWidget[ModelType]):
     "Allows displaying only events"
     INPUT = CheckboxGroup
@@ -48,4 +79,5 @@ class EventDetectionWidget(GroupWidget[ModelType]):
             self._model.eventdetection.remove()
 
     def _data(self) -> dict:
-        return dict(active = [] if self._model.eventdetection.task is None else [0])
+        task = getattr(self._model, 'eventdetection').task
+        return dict(active = [] if task is None else [0])

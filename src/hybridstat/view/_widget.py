@@ -17,6 +17,7 @@ from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
 from peakfinding.groupby        import ByEM, ByHistogram
 from utils.gui                  import startfile
 from excelreports.creation      import writecolumns
+from eventdetection.view        import AlignmentModalDescriptor
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
 from view.plots                 import DpxNumberFormatter, WidgetCreator
@@ -120,17 +121,18 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
                         'title.openhairpin': u' & open hairpin',
                         'title.orientation': u'-+ ',
                         'style': {'padding-top': '40px'},
-                        'lines': [['css:title.stretch', '.3f'],
+                        'lines': [['cycles',            '.0f'],
+                                  ['css:title.stretch', '.3f'],
                                   ['css:title.bias',    '.4f'],
-                                  [u'σ[HF] (µm)',       '.4f'],
-                                  [u'σ[Peaks] (µm)',    '.4f'],
-                                  [u'Average Skew ',    '.2f'],
-                                  [u'Peak count',       '.0f'],
-                                  [u'Events per Cycle', '.1f'],
-                                  [u'Down Time Φ₅ (s)', '.1f'],
-                                  [u'Sites found',      ''],
-                                  [u'Silhouette',       '.1f'],
-                                  [u'reduced χ²',       '.1f']]}
+                                  ['σ[HF] (µm)',       '.4f'],
+                                  ['σ[Peaks] (µm)',    '.4f'],
+                                  ['Average Skew ',    '.2f'],
+                                  ['Peak count',       '.0f'],
+                                  ['Events per Cycle', '.1f'],
+                                  ['Down Time Φ₅ (s)', '.1f'],
+                                  ['Sites found',      ''],
+                                  ['Silhouette',       '.1f'],
+                                  ['reduced χ²',       '.1f']]}
 
     def create(self, *_) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
@@ -159,18 +161,19 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
             if mdl.track is None:
                 return
 
-            self.values[2] = rawprecision(mdl.track, mdl.bead)
+            self.values[0] = mdl.track.ncycles
+            self.values[3] = rawprecision(mdl.track, mdl.bead)
             if len(mdl.peaks['z']):
-                self.values[3] = mdl.peaks['sigma']
-            self.values[4] = mdl.peaks['skew']
-            self.values[5] = max(0, len(mdl.peaks['z']) - 1)
-            self.values[6] = 0.     if self.values[5] < 1 else mdl.peaks['count'][1:]/100.
-            self.values[7] = np.NaN if self.values[5] < 1 else mdl.peaks['duration'][0]
+                self.values[4] = mdl.peaks['sigma']
+            self.values[5] = mdl.peaks['skew']
+            self.values[6] = max(0, len(mdl.peaks['z']) - 1)
+            self.values[7] = 0.     if self.values[6] < 1 else mdl.peaks['count'][1:]/100.
+            self.values[8] = np.NaN if self.values[6] < 1 else mdl.peaks['duration'][0]
 
         def sequencedependant(self, mdl, dist, key):
             "all sequence dependant stats"
-            self.values[0] = dist[key].stretch
-            self.values[1] = dist[key].bias
+            self.values[1] = dist[key].stretch
+            self.values[2] = dist[key].bias
 
             task      = mdl.identification.task
             tmp       = task.match[key].peaks
@@ -180,11 +183,11 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
             else:
                 nrem   = 0
             nfound         = np.isfinite(mdl.peaks[key+'id']).sum()-nrem
-            self.values[8] = f'{nfound}/{len(task.match[key].hybridisations)}'
+            self.values[9] = f'{nfound}/{len(task.match[key].hybridisations)}'
             if nrem == 2:
-                self.values[8] += self.openhp
+                self.values[9] += self.openhp
 
-            self.values[9] = PeakGridFit.silhouette(dist, key)
+            self.values[10] = PeakGridFit.silhouette(dist, key)
 
             if nfound > 2:
                 stretch         = dist[key].stretch
@@ -425,8 +428,10 @@ class _IdAccessor:
         mdl.identification.resetmodel(mdl)
 
 class _PeakDescriptor:
-    def getdefault(self,inst)->bool: # pylint: disable=no-self-use
+    def getdefault(self,inst):
         "returns default peak finder"
+        if inst is None:
+            return self
         return not isinstance(getattr(inst, '_model').peakselection.configtask.default().finder,
                               ByHistogram)
 
@@ -448,7 +453,8 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
 
     @staticmethod
     def _body() -> T_BODY:
-        return (('Minimum frame count per event',    ' %(_framecount)d'),
+        return (AlignmentModalDescriptor.line('_alignment'),
+                ('Minimum frame count per event',    ' %(_framecount)d'),
                 ('Minimum event count per peak',     ' %(_eventcount)d'),
                 ('Align cycles using peaks',         ' %(_align5)b'),
                 ('Peak kernel size (blank ⇒ auto)',  ' %(_precision)of'),
@@ -472,9 +478,9 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
         "creates the widget"
         return AdvancedTaskMixin.create(self, action)
 
+    _alignment  = AlignmentModalDescriptor()
     _framecount = AdvancedTaskMixin.attr('eventdetection.events.select.minlength')
-    #_eventcount = AdvancedTaskMixin.attr('peakselection.finder.grouper.mincount')
-    _eventcount = AdvancedTaskMixin.attr('peakselection.finder.mincount')
+    _eventcount = AdvancedTaskMixin.attr('peakselection.finder.grouper.mincount')
     _align5     = AdvancedTaskMixin.none('peakselection.align')
     _precision  = AdvancedTaskMixin.attr('peakselection.precision')
     _useem      = _PeakDescriptor()

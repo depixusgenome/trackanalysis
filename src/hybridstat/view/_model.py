@@ -246,14 +246,14 @@ class SequenceKeyProp(_SequenceKeyProp):
                 return min(obj.distances, key = obj.distances.__getitem__)
         return super().__get__(obj, tpe)
 
+# pylint: disable=too-many-instance-attributes
 class PeaksPlotModelAccess(SequencePlotModelAccess):
     "Access to peaks"
     def __init__(self, ctrl, key: str = None) -> None:
         if key is None:
             key = '.plot.peaks'
         super().__init__(ctrl, key)
-        self.config.root.tasks.extremumalignment.default = ExtremumAlignmentTask()
-
+        self.alignment                      = TaskAccess(self, ExtremumAlignmentTask)
         self.eventdetection                 = TaskAccess(self, EventDetectionTask)
         self.peakselection                  = TaskAccess(self, PeakSelectorTask)
         self.distances : Dict[str, Distance]= dict()
