@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "access to the model"
+from typing                     import Optional, List, Set, cast
 import numpy as np
 
 from utils                      import NoArgs
@@ -52,10 +53,13 @@ class DataCleaningAccess(TaskAccess):
         "returns bad cycles"
         return DataCleaningTask.badcycles(self.cache if cache is NoArgs else cache)
 
+
 class BeadSubtractionAccess(TaskAccess):
     "access to bead subtraction"
     def __init__(self, mdl):
         super().__init__(mdl, BeadSubtractionTask)
+        self.config.root.fixedbead.minextent.default = 0.25
+        self.project.root.tasks.fittoreference.gui.reference.default = None
 
     @property
     def beads(self):
@@ -70,6 +74,22 @@ class BeadSubtractionAccess(TaskAccess):
         else:
             self.update(beads = sorted(vals))
 
+    def referencebeads(self) -> Optional[List[int]]:
+        "return beads from the reference if they exist"
+        track = self.track
+        root  = self.project.root.tasks.fittoreference.gui.reference.get()
+        if root is None or track is None:
+            return None
+
+        lst  = self._ctrl.tasks.tasklist(root)
+        task = next((t for t in lst if isinstance(t, self.tasktype)), None)
+        if task is None:
+            return []
+
+        mine  = set(track.beadsonly.keys())
+        beads = [i for i in cast(BeadSubtractionTask, task).beads if i in mine]
+        return beads
+
     def switch(self, bead):
         "adds or removes the bead"
         self.beads = set(self.beads).symmetric_difference({bead})
@@ -77,6 +97,31 @@ class BeadSubtractionAccess(TaskAccess):
     @staticmethod
     def _configattributes(kwa):
         return {}
+
+    def possiblefixedbeads(self) -> Set[int]:
+        "returns bead ids with extent == all cycles"
+        lst   = self._ctrl.tasks.tasklist(self.roottask)
+        if not lst:
+            return set()
+
+        clean = next((t for t in lst if isinstance(t, DataCleaningTask)), None)
+        if not clean:
+            return set()
+
+        cache = self._ctrl.tasks.cache(self.roottask, clean)()
+        if not cache:
+            return set()
+
+        minext = self.config.root.fixedbead.minextent.get()
+        def _compute(itm):
+            arr   = next((i.values for i in itm if i.name == 'extent'), None)
+            if arr is None:
+                return False
+
+            valid = np.isfinite(arr)
+            return np.sum(arr[valid] < minext) == np.sum(valid)
+
+        return set(i for i, (j, _) in cache.items() if _compute(j))
 
 class DataCleaningModelAccess(TaskPlotModelAccess):
     "Model for Cycles View"

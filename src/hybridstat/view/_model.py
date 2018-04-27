@@ -16,6 +16,7 @@ from utils                      import updatecopy
 from control.modelaccess        import PROPS, TaskAccess
 
 from model.task                 import RootTask
+from cleaning.view              import BeadSubtractionAccess
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.histogram      import interpolator
 from peakfinding.processor      import PeakSelectorTask
@@ -92,16 +93,26 @@ class FitToReferenceAccess(TaskAccess):
     def setobservers(self, _):
         "observes the global model"
         self.__store.reference.observe(lambda _: self.resetmodel())
+        def _ontask(parent = None, **_):
+            if parent == self.reference:
+                info = dict(self.__DEFAULTS)
+                info['reference'] = self.reference
+                self.__store.update(**info)
+                self.resetmodel()
+        self._ctrl.tasks.observe("updatetask", "addtask", "removetask", _ontask)
 
     def resetmodel(self):
         "adds a bead to the task"
         return (self.update() if self.reference not in (self.roottask, None) else
-                self.remove() if self.task                                     else
+                self.remove() if self.task                                   else
                 None)
 
     def refhistogram(self, xaxis):
         "returns the histogram interpolated to the provided values"
         intp = self.__store.interpolator.get().get(self.bead, None)
+        if self.reference == self.roottask:
+            intp = None
+
         vals = np.full(len(xaxis), np.NaN, dtype = 'f4') if intp is None else intp(xaxis)
         if len(vals):
             # dealing with a visual bug: extremes should always be set to 0.
@@ -253,6 +264,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         if key is None:
             key = '.plot.peaks'
         super().__init__(ctrl, key)
+        self.subtracted                     = BeadSubtractionAccess(self)
         self.alignment                      = TaskAccess(self, ExtremumAlignmentTask)
         self.eventdetection                 = TaskAccess(self, EventDetectionTask)
         self.peakselection                  = TaskAccess(self, PeakSelectorTask)

@@ -18,6 +18,7 @@ from peakfinding.groupby        import ByEM, ByHistogram
 from utils.gui                  import startfile
 from excelreports.creation      import writecolumns
 from eventdetection.view        import AlignmentModalDescriptor
+from cleaning.view              import BeadSubtractionModalDescriptor
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
 from view.plots                 import DpxNumberFormatter, WidgetCreator
@@ -451,14 +452,15 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
     def _title() -> str:
         return 'Hybridstat Configuration'
 
-    @staticmethod
-    def _body() -> T_BODY:
-        return (AlignmentModalDescriptor.line('_alignment'),
+    def _body(self) -> T_BODY:
+        cls = type(self)
+        return (getattr(cls, '_subtracted').line(),
+                getattr(cls, '_alignment').line(),
                 ('Minimum frame count per event',    ' %(_framecount)d'),
                 ('Minimum event count per peak',     ' %(_eventcount)d'),
                 ('Align cycles using peaks',         ' %(_align5)b'),
                 ('Peak kernel size (blank ⇒ auto)',  ' %(_precision)of'),
-                ('Use EM to find peaks',     '         %(_useem)b'),
+                #('Use EM to find peaks',     '         %(_useem)b'),
                 ('Exhaustive fit algorithm',         ' %(_fittype)b'),
                 ('Use a theoretical peak 0 in fits', ' %(_peak0)b'),
                 ('Max distance to theoretical peak', ' %(_dist2theo)d'),
@@ -478,6 +480,7 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
         "creates the widget"
         return AdvancedTaskMixin.create(self, action)
 
+    _subtracted = BeadSubtractionModalDescriptor()
     _alignment  = AlignmentModalDescriptor()
     _framecount = AdvancedTaskMixin.attr('eventdetection.events.select.minlength')
     _eventcount = AdvancedTaskMixin.attr('peakselection.finder.grouper.mincount')

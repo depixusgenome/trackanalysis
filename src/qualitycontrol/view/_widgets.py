@@ -108,13 +108,6 @@ class MessagesListWidget(WidgetCreator[QualityControlModelAccess]):
         itm  = self.__widget.source if resets is None else resets[self.__widget.source]
         itm.update(data = self.__data())
 
-        # bug in bokeh 0.12.9: table update is incorrect unless the number
-        # of rows is fixed
-        width = sum([i[-1] for i in self.__config.columns.get()])
-        if width == self.__widget.width:
-            width = width+1
-        resets[self.__widget].update(width = width)
-
     def __data(self) -> Dict[str, List]:
         mdl   = cast(QualityControlModelAccess, self._model)
         msgs  = deepcopy(mdl.messages())

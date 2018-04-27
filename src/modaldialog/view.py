@@ -61,10 +61,14 @@ class AdvancedWidgetMixin(ABC):
             if '|' in val:
                 disp = val[val.find('(')+1:val.rfind(')')].split('|')[1+dflt].split(':')[1]
             else:
-                disp = (' ' if dflt is None  else
-                        '✓' if dflt is True  else
-                        '▢' if dflt is False else
-                        ('%'+val[val.rfind(')')+1:]) % dflt)
+                try:
+                    disp = (' '  if dflt is None  else
+                            '✓'  if dflt is True  else
+                            '▢'  if dflt is False else
+                            dflt if isinstance(dflt, str) else
+                            ('%'+val[val.rfind(')')+1:]) % dflt)
+                except TypeError:
+                    disp = str(dflt)
 
             return title, f'({disp})', val
 

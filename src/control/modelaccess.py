@@ -121,17 +121,18 @@ class TaskPlotModelAccess(PlotModelAccess):
     @property
     def roottask(self) -> Optional[RootTask]:
         "returns the current root task"
-        return self.project.track.get()
+        return self.project.track.get(default = None)
 
     @property
     def currenttask(self) -> Optional[Task]:
         "returns the current task"
-        return self.project.task.get()
+        return self.project.task.get(default = None)
 
     @property
     def track(self) -> Optional[Track]:
         "returns the current track"
-        return self._ctrl.tasks.track(self.roottask)
+        root = self.roottask
+        return self._ctrl.tasks.track(root) if root else None
 
     def impacts(self, root:RootTask, task:Task) -> bool:
         "returns whether changing this tasks affects the model output"
@@ -175,14 +176,6 @@ class TaskPlotModelAccess(PlotModelAccess):
     def runcontext(self, *processors: Processor, copy = True) -> ReplaceProcessors:
         "returns a ReplaceProcessors context from which a trackview can be obtains"
         return ReplaceProcessors(self, *processors, copy = copy)
-
-    def observetasks(self, *args, **kwa):
-        "observes the provided task"
-        def _check(parent = None, task = None, **_):
-            if self.project.state.get() is PlotState.active:
-                return self.checktask(parent, task)
-            return False
-        self._ctrl.observe(*args, argstest = _check, **kwa)
 
     def wrapobserver(self, fcn):
         "wraps an observing function"

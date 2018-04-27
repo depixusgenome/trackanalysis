@@ -217,6 +217,8 @@ class CSVOption(Option):
             opt  = (' value="{}"'.format(', '.join(str(i) for i in val))
                     if val is not None else '')
             opt += ' placeholder="comma separated values"'
+            if match.group('width'):
+                opt += f' style="width: {match.group("width")}px;"'
 
             inpt = '<input class="bk-widget-form-input" type="text" name="{}" {}>'
             return inpt.format(key, opt)
@@ -231,7 +233,7 @@ class DpxModal(Model):
                           TextOption(int,   _OPT+r'[id]',    0),
                           TextOption(float, _PREC+_OPT+r'f', lambda i: i.group('prec')),
                           TextOption(str,   _OPT+r'(?P<width>\d*)s',       None),
-                          CSVOption(int,    _OPT+r'csv[id]'),
+                          CSVOption(int,    _OPT+r'(?P<width>\d*)csv[id]'),
                           CSVOption(float,  _OPT+r'csvf'),
                           CSVOption(str,    _OPT+r'csv'),
                           ChoiceOption())

@@ -1,4 +1,12 @@
-# tag cycles_v4.12
+# tag cycles_v5.1
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Peaks
+
+The user can now add/remove subtracted beads from the advanced menu. She can also
+change the cycle alignment strategy.
+
+# tag cycles_v5.0
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
 ### Cleaning

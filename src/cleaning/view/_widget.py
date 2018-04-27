@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cleaning beads"
-from    typing          import List
+from    typing          import List, Tuple
 from    abc             import ABC
 
 import  bokeh.core.properties as props
@@ -17,6 +17,41 @@ from    view.static         import ROUTE
 from    view.plots          import DpxNumberFormatter, WidgetCreator
 from    eventdetection.view import AlignmentWidget
 from    ._model             import DataCleaningModelAccess, DataCleaningTask
+
+class BeadSubtractionModalDescriptor:
+    "for use with modal dialogs"
+    def __init__(self):
+        self._name = '_subtracted'
+
+    def __set_name__(self, _, name):
+        self._name = name
+
+    @staticmethod
+    def getdefault(model) -> str:
+        "return the modal dialog line"
+        model = getattr(model, '_model', model)
+        ref   = model.subtracted.referencebeads()
+        if ref is not None:
+            return f'ref = {ref}'
+
+        pot = model.subtracted.possiblefixedbeads()
+        return f'{pot} ?' if pot else ''
+
+    def line(self) -> Tuple[str, str]:
+        "return the modal dialog line"
+        return ('Subtracted beads', f"%({self._name})220csvi")
+
+    def __get__(self,inst,owner):
+        if inst is None:
+            return self
+        return getattr(getattr(inst, '_model').subtracted.task, 'beads', [])
+
+    def __set__(self,inst,value):
+        subtracted = getattr(inst, '_model').subtracted
+        if len(value) == 0:
+            subtracted.remove()
+        else:
+            subtracted.update(beads = list(value))
 
 class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
     "Table containing stats per peaks"

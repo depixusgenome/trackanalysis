@@ -37,12 +37,16 @@ class AlignmentModalDescriptor:
     __ORDER = (None, AlignmentTactic.pull, AlignmentTactic.onlyinitial,
                AlignmentTactic.onlypull)
     __NAMES = 'ø','best', 'Φ1', 'Φ3'
+    def __init__(self):
+        self._name = '_alignment'
 
-    @classmethod
-    def line(cls, name) -> Tuple[str, str]:
+    def __set_name__(self, _, name):
+        self._name = name
+
+    def line(self) -> Tuple[str, str]:
         "return the modal dialog line"
-        vals = '|'.join(f'{i}:{j}' for i, j in enumerate(cls.__NAMES))
-        return ('Cycle alignment strategy', f' %({name}|{vals})c')
+        vals = '|'.join(f'{i}:{j}' for i, j in enumerate(self.__NAMES))
+        return ('Cycle alignment', f' %({self._name}|{vals})c')
 
     def getdefault(self,inst)->int:
         "returns default peak finder"
