@@ -191,7 +191,7 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
     def compute(self, key: BEADKEY) -> np.ndarray:
         "Action applied to the frame"
         tmp  = cast(np.ndarray, self.data[key])
-        if isinstance(tmp, (Iterator, Generator)):
+        if isinstance(tmp, (Iterator, Generator, tuple)):
             tmp = list(tmp)
         data = FitToRefArray(tmp, discarded = getattr(tmp, 'discarded', 0))
 
