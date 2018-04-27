@@ -4,7 +4,7 @@
 from   typing                           import (Optional, # pylint: disable=unused-import
                                                 Iterable, Sequence, Any, Dict,
                                                 Iterator, Tuple, Union, NamedTuple,
-                                                List, cast)
+                                                List, Generator, cast)
 import numpy                            as     np
 
 from   utils                            import initdefaults
@@ -191,6 +191,8 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
     def compute(self, key: BEADKEY) -> np.ndarray:
         "Action applied to the frame"
         tmp  = cast(np.ndarray, self.data[key])
+        if isinstance(tmp, (Iterator, Generator)):
+            tmp = list(tmp)
         data = FitToRefArray(tmp, discarded = getattr(tmp, 'discarded', 0))
 
         stretch, bias    = self.optimize(key, data)

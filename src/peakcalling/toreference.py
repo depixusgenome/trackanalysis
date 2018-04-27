@@ -92,8 +92,8 @@ class HistogramFit(GriddedOptimization, ReferenceFit):
         left  = self._get(aleft)
         right = self._get(aright)
         kwa   = self.optimconfig(disp = 0, cons = self._constraints())
-        ret   = min((self._optimize(left, right, kwa, i) for i in self.grid),
-                    default = (DEFAULT_BEST, 1., 0.))
+        allv  = [self._optimize(left, right, kwa, i) for i in self.grid]
+        ret   = min(allv, default = (DEFAULT_BEST, 1., 0.))
 
         bias = right.minv-left.minv/ret[1]
         return Distance(ret[0], ret[1], ret[2]+bias)
@@ -273,21 +273,20 @@ class CorrectedHistogramFit(HistogramFit):
             peaks   = self._getpeaks(left, vals)
 
         self._apply_maxthreshold(vals)
-
+        data = self._to_data(hist, vals)
         if self.pivot == Pivot.bottom:
             minv   = peaks[0]
-            vals   = vals[0] - minv,  vals[1]
+            vals   = data.xaxis + data.minv - minv,  data.yaxis
             peaks  = peaks   - minv
         elif self.pivot == Pivot.top:
             minv   = peaks[-1]
-            vals   = vals[0] - minv,  vals[1]
+            vals   = data.xaxis + data.minv - minv,  data.yaxis
             peaks  = peaks   - minv
         elif self.pivot == Pivot.absolute:
-            vals   = vals[0] + left.minvalue, vals[1]
+            vals   = data.xaxis + data.minv,  data.yaxis
             minv   = 0.
 
-        data = self._to_data(hist, vals)
-        return ChiSquareData(data.fcn, data.xaxis, data.yaxis, minv, peaks)
+        return ChiSquareData(data.fcn, vals[0], vals[1], minv, peaks)
 
     def optimize(self, aleft, aright) -> Distance:
         "find best stretch & bias to fit right against left"

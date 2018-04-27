@@ -25,7 +25,7 @@ from testingcore                import DummyPool, path as utpath
 
 def test_toref():
     "tests reference comparison"
-    for i in product([.96, 1., 1.04], [-.05, 0., 0.5]):
+    for i in product([.96, 1.], [-.05, 0., 0.05]):
         arr1 = np.array([1., 1., .5,  8.])
         arr2 = np.array([1., .5, .5,  8.])/i[0]+i[1]
         ret  = HistogramFit(maxthreshold = .5).optimize(arr1, arr2)
@@ -36,11 +36,15 @@ def test_toref():
         assert_allclose(ret2[1:], i, rtol = 5e-4, atol = 5e-4)
 
         ret2 = ChiSquareHistogramFit(maxthreshold = .5,
+                                     firstregpeak = 0,
                                      pivot        = Pivot.top
                                     ).optimize((arr1, np.unique(arr1)),
                                                (arr2, np.unique(arr2)))
+        assert_allclose(ret2[1:], i, rtol = 5e-4, atol = 5e-4)
 
         ret2 = ChiSquareHistogramFit(maxthreshold = .5,
+                                     firstregpeak = 0,
+                                     stretch      = Range(1., .08, .02),
                                      pivot        = Pivot.absolute
                                     ).optimize((arr1, np.unique(arr1)),
                                                (arr2, np.unique(arr2)))

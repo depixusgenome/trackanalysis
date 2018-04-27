@@ -91,7 +91,7 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
         "optimizes the cost function"
         peaks = np.asarray(peaks)
         best  = DEFAULT_BEST, self.stretch.center, (self.bias.center or 0.)
-        delta = 0.
+        delta = hpdelta = 0.
         if len(peaks) > 1:
             rng   = lambda x, y, z: (('min_'+x, y-z), (x, y), ('max_'+x, y+z))
             brng  = lambda w, x, y, z: rng(w, x[0]*(x[1]+y), z*x[0])
