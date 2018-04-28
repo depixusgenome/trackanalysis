@@ -9,8 +9,7 @@ from concurrent.futures              import ProcessPoolExecutor, ThreadPoolExecu
 
 from control.processor.utils         import ExceptionCatchingTask
 from control.taskcontrol             import create as _createdata
-from control.taskio                  import (ConfigTrackIO, ConfigGrFilesIO, TaskIO,
-                                             currentmodelonly)
+from control.taskio                  import ConfigTrackIO, ConfigGrFilesIO, TaskIO
 from cleaning.processor              import DataCleaningTask, DataCleaningException
 from peakfinding.processor           import PeakSelectorTask
 from peakfinding.reporting.processor import PeakFindingExcelTask
@@ -67,7 +66,7 @@ class _SafeProc(TaskViewProcessor[_SafeTask, _SafeDict, BEADKEY]):
     "Changes the Z axis to fit the reference"
 
 FileDialog.DEFAULTS['pkz'] = (u'pickled report', '.pkz')
-@currentmodelonly
+
 class ConfigXlsxIO(TaskIO):
     "Ana IO saving only the current project"
     EXT      = 'xlsx', 'csv', 'pkz'
@@ -90,6 +89,11 @@ class ConfigXlsxIO(TaskIO):
 
     def save(self, path:str, models):
         "creates a Hybridstat report"
+        curr   = self.__ctrl.display.get("tasks", "roottask")
+        models = [i for i in models if curr is i[0]]
+        if not len(models):
+            raise IOError("Nothing to save", "warning")
+
         def _end(exc):
             if exc is None and not Path(path).exists():
                 exc = IOError("Report file created but not not found!")

@@ -32,7 +32,7 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
         if TYPE_CHECKING:
             self._model = CyclesModelAccess('', '')
 
-    def _create(self, ctrl, doc):
+    def _addtodoc(self, ctrl, doc):
         "returns the figure"
         self._hover = DpxHoverModel()
         doc.add_root(self._hover)
@@ -55,9 +55,9 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
     def ismain(self, ctrl):
         WidgetMixin.ismain(self, ctrl)
 
-    def observe(self, ctrl):
+    def addtodoc(self, ctrl, _):
         "sets-up model observers"
-        super().observe(ctrl)
+        self._model.settosame(ctrl)
         self._histobservers()
         self._widgetobservers(ctrl)
         self._model.config.observe('eventdetection.isactive', 'binwidth', 'minframes',

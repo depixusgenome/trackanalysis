@@ -170,7 +170,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
                        count = interpolator(data['z'], data['count'], fit2ref.hmin)(pos))
         return {'': data, 'events': events, 'peaks': self.__peaks(dtl)}
 
-    def _create(self, ctrl, doc):
+    def _addtodoc(self, ctrl, doc):
         "returns the figure"
         self.__create_fig()
         rends = self.__add_curves()
@@ -180,6 +180,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
     def observe(self, ctrl):
         "observes the model"
         super().observe(ctrl)
+        self._model.settosame(ctrl)
         self._model.observe(ctrl)
         for widget in self._widgets.values():
             widget.observe(ctrl)
@@ -256,7 +257,8 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
     def __setup_widgets(self, doc):
         action  = self.action
-        wdg     = {i: j.create(action, self._src['peaks']) for i, j in self._widgets.items()}
+        wdg     = {i: j.addtodoc(action, self._src['peaks'])
+                   for i, j in self._widgets.items()}
         enableOnTrack(self, self._fig, wdg)
         self._widgets['cstrpath'].listentofile(doc, action)
 

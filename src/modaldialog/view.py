@@ -90,7 +90,7 @@ class AdvancedWidgetMixin(ABC):
         "nothing to do"
         return
 
-    def create(self, action) -> List[Widget]:
+    def addtodoc(self, action) -> List[Widget]:
         "creates the widget"
         width  = self.css.input.width.get()
         height = self.css.input.height.get()

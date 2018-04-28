@@ -35,7 +35,7 @@ class TrackFileDialog(FileDialog):
             assert bopen
 
             pot = self.storedpaths(ctrl, STORAGE[0], ext)
-            if ctrl.globals.project.track.get(default = None) is None:
+            if ctrl.theme.get("tasks", "roottask", None) is None:
                 pot = [i for i in pot if i.suffix != '.gr']
             return self.firstexistingpath(pot)
 
@@ -303,18 +303,19 @@ class RejectedBeadsInput:
                 with ctrl.action:
                     bdctrl.discarded = beads
 
-        def _onproject():
+        tbar.on_change('currentbead', _ondiscard_currentbead_cb)
+        tbar.on_change('discarded',   _ondiscarded_cb)
+        tbar.on_change('accepted',    _onaccepted_cb)
+
+        @ctrl.tasks.observe("updatetask", "addtask", "removetask")
+        @ctrl.display.observe
+        def _ontasks(**_):
             disc = set(bdctrl.discarded)
             acc  = set(bdctrl.allbeads) - disc
             tbar.update(accepted  = ', '.join(str(i) for i in sorted(acc)),
                         discarded = ', '.join(str(i) for i in sorted(disc)))
 
-        tbar.on_change('currentbead',            _ondiscard_currentbead_cb)
-        tbar.on_change('discarded',              _ondiscarded_cb)
-        tbar.on_change('accepted',               _onaccepted_cb)
         ctrl.display.updatedefaults('keystroke', delbead = _ondiscard_currentbead)
-        ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
-        ctrl.globals.project.track.observe(_onproject)
 
 class FileList:
     "Selection of opened files"
@@ -366,7 +367,7 @@ class FileListInput:
             if model[0] in mdls:
                 index = mdls.index(model[0])
             else:
-                cur   = ctrl.globals.project.track.get()
+                cur   = ctrl.theme.get("tasks", "roottask")
                 index = mdls.index(cur) if cur in mdls else 0
 
             tbar.update(currentfile = index, filelist = [i for i, _ in vals])
@@ -376,12 +377,11 @@ class FileListInput:
             if new == -1:
                 return
 
-            track = ctrl.globals.project.track
-            lst   = list(FileList.get(ctrl))
+            lst = list(FileList.get(ctrl))
             if new >= len(lst):
-                _setfilelist(model = [track.get()])
+                _setfilelist(model = [ctrl.theme.get("tasks", "roottask")])
             else:
-                track.set(lst[new][1])
+                ctrl.theme.update("tasks", roottask = lst[new][1])
 
         tbar.on_change('currentfile', _oncurrentfile_cb)
 
@@ -434,7 +434,27 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
 
         self.__diagopen.setup(ctrl, doc)
         self.__diagsave.setup(ctrl, doc)
-        self.__setup_title(ctrl, doc)
+
+        @ctrl.theme.observe
+        def _ontasks(old = None, **_):
+            if 'roottask' not in old:
+                return
+            root = ctrl.theme.get("tasks", "roottask")
+            if not root:
+                tbar.frozen = True
+                return
+            tbar.frozen = True
+
+            path = ctrl.theme.get("tasks", "roottask").path
+            if isinstance(path, (list, tuple)):
+                path = path[0]
+
+            title = doc.title.split(':')[0]
+            if path:
+                title += ':' + Path(path).stem
+            doc.title = title
+
+
         for cls in self._HELPERS:
             cls.setup(ctrl, tbar, doc)
 
@@ -443,10 +463,6 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
                                     save = lambda: _onbtn_cb('save', 0, 0),
                                     quit = lambda: _onbtn_cb('quit', 0, 0))
 
-        def _onproject(items):
-            if 'track' in items:
-                tbar.frozen = items['track'].value is items.empty
-        ctrl.globals.project.observe(_onproject)
         mods = self.defaultsizingmode(height = 30)
         return layouts.row([layouts.widgetbox(tbar, **mods)], **mods)
 
@@ -455,16 +471,3 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         super().close()
         del self.__diagopen
         del self.__diagsave
-
-    @staticmethod
-    def __setup_title(ctrl, doc):
-        def _title(item):
-            path = getattr(item.value, 'path', None)
-            if isinstance(path, (list, tuple)):
-                path = path[0]
-            title = doc.title.split(':')[0]
-            if path:
-                title += ':' + Path(path).stem
-            doc.title = title
-
-        ctrl.globals.project.track.observe(_title)

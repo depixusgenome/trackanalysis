@@ -6,7 +6,8 @@ import numpy                as     np
 
 from   data                 import BEADKEY
 from   control.modelaccess  import TaskPlotModelAccess, TaskAccess
-from   cleaning.processor   import DataCleaningTask, DataCleaningProcessor
+from   cleaning.processor   import (DataCleaningTask, # pylint: disable=unused-import
+                                    DataCleaningProcessor)
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
@@ -18,11 +19,14 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
             cache.setdefault('messages', []).extend([(info[0],)+ i for i in err.args[0].data()])
         return None
 
+class DataCleaningTaskAccess(TaskAccess, tasktype = DataCleaningTask):
+    "access to the DataCleaningTask"
+
 class QualityControlModelAccess(TaskPlotModelAccess):
     "access to data cleaning"
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
-        self.cleaning   = TaskAccess(self, DataCleaningTask)
+        self.cleaning   = DataCleaningTaskAccess(self)
         self.config.root.fixedbead.minextent.default = 0.25
         self.__messages = self.project.messages
         self.__messages.setdefault(None)

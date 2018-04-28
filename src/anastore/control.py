@@ -4,6 +4,7 @@
 
 from typing             import Union, Tuple
 from control.taskio     import TaskIO
+from utils              import initdefaults
 from utils.logconfig    import getLogger
 from .api               import load, dump
 
@@ -35,26 +36,35 @@ class AnaIO(TaskIO):
             raise IOError("Nothing to save", "warning")
         return True
 
+class ConfigAnaIOTheme:
+    "define how to save the json data"
+    name         = "configanaio"
+    indent       = 4
+    ensure_ascii = False
+    sort_keys    = True
+    @initdefaults(frozenset(locals()) - {'name'})
+    def __init__(self, **_):
+        pass
+
 class ConfigAnaIO(AnaIO):
     "Ana IO"
     EXT = ('ana',)
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
-        self._ctrl         = ctrl
-        self._css          = ctrl.globals.css.anastore
-        self._css.defaults = {'indent': 4, 'ensure_ascii': False, 'sort_keys': True}
-        self._curr         = ctrl.globals.project.track.get
+        self._ctrl  = ctrl
+        self._model = ConfigAnaIOTheme()
+        ctrl.theme.add(self._model)
 
     def save(self, path:str, models):
         u"closes an ana file"
-        curr   = self._curr()
+        curr   = self._ctrl.theme.get("tasks", "roottask")
         models = [i for i in models if curr is i[0]]
 
         if len(models):
             ctrl = getattr(self._ctrl, 'globals', self._ctrl)
             cnf  = ctrl.writeconfig(None, dict).get('config', {})
             cnf  = {i: j for i, j in cnf.items() if i.startswith("tasks")}
-            dump(dict(tasks = models, config = cnf), path, **self._css.getitems(...))
+            dump(dict(tasks = models, config = cnf), path, **self._model.__dict__)
         else:
             raise IOError("Nothing to save", "warning")
         return True

@@ -86,7 +86,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         if TYPE_CHECKING:
             self._model = DataCleaningModelAccess(ctrl, '')
 
-    def _create(self, ctrl, *_):
+    def _addtodoc(self, ctrl, *_):
         self.__source = ColumnDataSource(data = self.__data(None, None))
 
         self.__fig = fig = figure(**self._figargs(y_range = Range1d,
@@ -162,7 +162,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
 
     def observe(self, ctrl):
         "sets-up model observers"
-        super().observe(ctrl)
+        self._model.settosame(ctrl)
         self._widgetobservers(ctrl)
 
 class CleaningView(PlotView[CleaningPlotCreator]):

@@ -38,7 +38,11 @@ class SummaryWidget(WidgetCreator[QualityControlModelAccess]):
         self.__widget: Div = None
         self.css.text.default = _TEXT
 
-    def create(self, _):
+    @staticmethod
+    def observe(_):
+        "do nothing"
+
+    def addtodoc(self, _):
         "creates the widget"
         self.__widget = Div(text = self.__text())
         return [self.__widget]
@@ -82,7 +86,11 @@ class MessagesListWidget(WidgetCreator[QualityControlModelAccess]):
     def __config(self):
         return self.css.table
 
-    def create(self, _) -> List[Widget]:
+    @staticmethod
+    def observe(_):
+        "do nothing"
+
+    def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
         cnf   = self.__config.columns
         get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
@@ -134,8 +142,8 @@ class QualityControlWidgets:
         for widget in self.__dict__.values():
             widget.reset(bkmodels)
 
-    def create(self, action, mode):
+    def addtodoc(self, action, mode):
         "returns all created widgets"
-        get = lambda i: getattr(self, i).create(action)
+        get = lambda i: getattr(self, i).addtodoc(action)
         return layouts.widgetbox(sum((get(i) for i in ('summary', 'messages')), []),
                                  **mode)

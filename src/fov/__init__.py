@@ -104,7 +104,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
                 return
 
             with Action(self._ctrl):
-                self.project.root.bead.set(bead)
+                self._ctrl.display.update("tasks", bead = bead)
 
         self._beadssource.on_change('selected', _onselect_cb)
 

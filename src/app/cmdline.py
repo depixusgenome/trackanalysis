@@ -173,7 +173,7 @@ def _files(directory, files, bead):
 
     if len(files) or len(directory) and  bead is not None:
         def _setbead(ctrl):
-            ctrl.globals.project.bead.set(bead)
+            ctrl.display.update("tasks", bead)
         INITIAL_ORDERS.append(_setbead)
 
 def _launch(view, app, desktop, kwa):

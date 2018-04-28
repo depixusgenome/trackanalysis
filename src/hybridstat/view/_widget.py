@@ -37,7 +37,11 @@ class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess]):
         self.css.title.reference.default      = 'Reference Track'
         self.css.title.reference.none.default = 'None'
 
-    def create(self, action, *_) -> List[Widget]:
+    @staticmethod
+    def observe(_):
+        "sets up observers"
+
+    def addtodoc(self, action, *_) -> List[Widget]:
         "creates the widget"
         self.__widget = Dropdown(name  = 'HS:reference',
                                  width = self.css.input.width.get(),
@@ -71,9 +75,13 @@ class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess]):
 
 class PeaksOligoListWidget(OligoListWidget):
     "deals with oligos"
-    def create(self, action, *_) -> List[Widget]: # pylint: disable=arguments-differ
+    def addtodoc(self, action, *_) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
-        return super().create(action)
+        return super().addtodoc(action)
+
+    @staticmethod
+    def observe(_):
+        "sets up observers"
 
 class PeaksSequencePathWidget(SequencePathWidget):
     "Widget for setting the sequence to use"
@@ -84,9 +92,13 @@ class PeaksSequencePathWidget(SequencePathWidget):
             return sorted(lst, key = lambda i: dist[i].value)
         return super()._sort(lst)
 
-    def create(self, action, *_) -> List[Widget]: # pylint: disable=arguments-differ
+    @staticmethod
+    def observe(_):
+        "sets up observers"
+
+    def addtodoc(self, action, *_) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
-        return super().create(action)
+        return super().addtodoc(action)
 
     def callbacks(self,             # type: ignore # pylint: disable=arguments-differ
                   hover: SequenceHoverMixin,
@@ -135,7 +147,11 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
                                   ['Silhouette',       '.1f'],
                                   ['reduced χ²',       '.1f']]}
 
-    def create(self, *_) -> List[Widget]: # pylint: disable=arguments-differ
+    @staticmethod
+    def observe(_):
+        "sets up observers"
+
+    def addtodoc(self, *_) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
         self.__widget = PeaksStatsDiv(style = self.css.stats.style.get())
         self.reset(None)
@@ -286,7 +302,11 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
             cols[ind].formatter.format = fmt
         return cols
 
-    def create(self, _, src) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
+    @staticmethod
+    def observe(_):
+        "sets up observers"
+
+    def addtodoc(self, _, src) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
         "creates the widget"
         width = self.css.peaks.columns.width.get()
         cols  = self.__cols()
@@ -349,7 +369,12 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
 
         doc.add_periodic_callback(_callback, self.css.constraints.filechecks.get())
 
-    def create(self, action, _) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
+    @staticmethod
+    def observe(_):
+        "sets up observers"
+
+    def addtodoc(self, action, # type: ignore # pylint: disable=arguments-differ
+                 _) -> List[Widget]:
         "creates the widget"
         title         = self.css.constraints.title.get()
         width         = self.css.input.width.get() - 10
@@ -475,10 +500,14 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
         "resets the widget when a new file is opened, ..."
         AdvancedTaskMixin.reset(resets)
 
-    def create(self, action, _   # type: ignore # pylint: disable=arguments-differ
-              ) -> List[Widget]:
+    def addtodoc(self, action, _   # type: ignore # pylint: disable=arguments-differ
+                ) -> List[Widget]:
         "creates the widget"
-        return AdvancedTaskMixin.create(self, action)
+        return AdvancedTaskMixin.addtodoc(self, action)
+
+    @staticmethod
+    def observe(_):
+        "sets up observers"
 
     _subtracted = BeadSubtractionModalDescriptor()
     _alignment  = AlignmentModalDescriptor()

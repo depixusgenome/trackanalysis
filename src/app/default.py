@@ -3,7 +3,7 @@
 "Updates app manager so as to deal with controllers"
 from .launcher  import setup
 
-VIEWS       = ('undo.UndoView', 'view.globalsview.GlobalsView',)
+VIEWS       = ('undo.UndoView', 'view.tasksview.TasksView',)
 CONTROLS    = ('control.taskcontrol.TaskController',
                'control.globalscontrol.GlobalsController',
                'anastore.control',

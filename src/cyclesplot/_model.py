@@ -4,17 +4,17 @@
 
 from    typing                      import Tuple, Optional, cast
 from    utils                       import NoArgs
-from    cordrift.processor          import DriftTask
-from    eventdetection.processor    import (ExtremumAlignmentTask,
-                                            EventDetectionTask)
+from    cordrift.processor          import DriftTask            # pylint: disable=unused-import
+from    eventdetection.processor    import (EventDetectionTask, # pylint: disable=unused-import
+                                            ExtremumAlignmentTask)
 from    control.modelaccess         import TaskAccess, PROPS
 from    sequences.modelaccess       import (SequencePlotModelAccess,
                                             SequenceKeyProp, FitParamProp)
 
-class EventDetectionTaskAccess(TaskAccess):
+class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
     "Access to the event detection task"
     def __init__(self, mdl):
-        super().__init__(mdl, EventDetectionTask)
+        super().__init__(mdl)
         self.config.eventdetection.isactive.default = False
 
     @property
@@ -22,7 +22,7 @@ class EventDetectionTaskAccess(TaskAccess):
         "returns the task if it exists"
         if not self.config.eventdetection.isactive.get():
             return None
-        return super().task
+        return cast(EventDetectionTask, super().task)
 
     def check(self, task, parent = NoArgs) -> bool:
         "wether this controller deals with this task"
@@ -38,6 +38,21 @@ class EventDetectionTaskAccess(TaskAccess):
         self.config.eventdetection.isactive.set(not kwa.pop('disabled', False))
         super().update(**kwa)
 
+class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
+    "access to ExtremumAlignmentTask"
+
+class BeadsDriftTaskAccess(TaskAccess,
+                           tasktype   = DriftTask,
+                           onbeads    = True,
+                           configname = 'driftperbead'):
+    "access to beads drift task"
+
+class CyclesDriftTaskAccess(TaskAccess,
+                            tasktype   = DriftTask,
+                            onbeads    = False,
+                            configname = 'driftpercycle'):
+    "access to beads drift task"
+
 class CyclesModelAccess(SequencePlotModelAccess):
     "Model for Cycles View"
     def __init__(self, ctrl, key: str = None) -> None:
@@ -50,14 +65,9 @@ class CyclesModelAccess(SequencePlotModelAccess):
         cls.peaks       .setdefault(self, None)     # type: ignore
         cls.sequencekey .setdefault(self, None)     # type: ignore
 
-        self.alignment      = TaskAccess(self, ExtremumAlignmentTask)
-        self.driftperbead   = TaskAccess(self, DriftTask,
-                                         attrs      = {'onbeads': True},
-                                         configname = 'driftperbead')
-        self.driftpercycle  = TaskAccess(self, DriftTask,
-                                         attrs      = {'onbeads': False},
-                                         configname = 'driftpercycle',
-                                         side       = 'RIGHT')
+        self.alignment      = ExtremumAlignmentTaskAccess(self)
+        self.driftperbead   = BeadsDriftTaskAccess(self)
+        self.driftpercycle  = CyclesDriftTaskAccess(self)
         self.eventdetection = EventDetectionTaskAccess(self)
         self.estimatedbias  = 0.
 

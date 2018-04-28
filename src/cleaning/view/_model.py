@@ -5,17 +5,14 @@ from typing                     import Optional, List, Set, cast
 import numpy as np
 
 from utils                      import NoArgs
-from eventdetection.processor   import ExtremumAlignmentTask
+# pylint: disable=unused-import
 from control.modelaccess        import TaskPlotModelAccess, TaskAccess
-
+from eventdetection.processor   import ExtremumAlignmentTask
 from ..beadsubtraction          import BeadSubtractionTask
 from ..processor                import DataCleaningTask
 
-class DataCleaningAccess(TaskAccess):
+class DataCleaningAccess(TaskAccess, tasktype = DataCleaningTask):
     "access to data cleaning"
-    def __init__(self, mdl):
-        super().__init__(mdl, DataCleaningTask)
-
     @property
     def cache(self):
         "returns the object cache"
@@ -53,11 +50,10 @@ class DataCleaningAccess(TaskAccess):
         "returns bad cycles"
         return DataCleaningTask.badcycles(self.cache if cache is NoArgs else cache)
 
-
-class BeadSubtractionAccess(TaskAccess):
+class BeadSubtractionAccess(TaskAccess, tasktype = BeadSubtractionTask):
     "access to bead subtraction"
     def __init__(self, mdl):
-        super().__init__(mdl, BeadSubtractionTask)
+        super().__init__(mdl)
         self.config.root.fixedbead.minextent.default = 0.25
         self.project.root.tasks.fittoreference.gui.reference.default = None
 
@@ -123,10 +119,13 @@ class BeadSubtractionAccess(TaskAccess):
 
         return set(i for i, (j, _) in cache.items() if _compute(j))
 
+class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
+    "access to bead subtraction"
+
 class DataCleaningModelAccess(TaskPlotModelAccess):
     "Model for Cycles View"
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
-        self.alignment  = TaskAccess(self, ExtremumAlignmentTask)
+        self.alignment  = ExtremumAlignmentTaskAccess(self)
         self.cleaning   = DataCleaningAccess(self)
         self.subtracted = BeadSubtractionAccess(self)

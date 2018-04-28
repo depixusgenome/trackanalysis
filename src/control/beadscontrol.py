@@ -1,13 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Deals with bead selection"
-from typing             import Optional, Iterator, Iterable, cast
-from model.task         import RootTask, DataSelectionTask
+from typing                     import Optional, Iterator, Iterable, cast
+from model.task                 import RootTask, DataSelectionTask
+from model.task.application     import TasksDisplay
+from data.track                 import Track
 
 class BeadController:
     "Deals with bead selection"
-    def __init__(self, ctrl):
-        self._ctrl    = ctrl
+    def __init__(self, ctrl, mdl: TasksDisplay = None) -> None:
+        self._ctrl   = ctrl
+        self.__tasks = cast(TasksDisplay, mdl if mdl else self._ctrl.display.model("tasks"))
+
+    @property
+    def roottask(self) -> Optional[RootTask]:
+        "returns the current root task"
+        return self.__tasks.roottask
+
+    @property
+    def track(self) -> Optional[Track]:
+        "returns the current root task"
+        return self.__tasks.track(self._ctrl)
 
     @property
     def project(self):
@@ -17,17 +30,17 @@ class BeadController:
     @property
     def allbeads(self) -> Iterator[int]:
         "returns all beads"
-        root = self.roottask
-        return iter(()) if root is None else self._ctrl.tasks.track(root).beadsonly.keys()
+        track = self.track
+        return iter(()) if track is None else cast(Iterator[int], track.beadsonly.keys())
 
     @property
     def availablebeads(self) -> Iterable[int]:
         "returns available beads"
-        if self._ctrl.tasks.track(self.roottask) is None:
+        if self.track is None:
             return iter(tuple())
 
         selected = None
-        procs    = self._ctrl.tasks.processors(self.roottask)
+        procs    = self.__tasks.processors(self._ctrl)
         if procs is None:
             return iter(tuple())
 
@@ -36,14 +49,15 @@ class BeadController:
         return selected
 
     @property
-    def roottask(self) -> Optional[RootTask]:
-        "returns the current root task"
-        return self.project.track.get()
+    def discarded(self):
+        "returns discarded beads"
+        sel = frozenset(self.availablebeads)
+        return (i for i in self.allbeads if i not in sel)
 
     @property
     def bead(self) -> Optional[int]:
         "returns the current bead number"
-        bead = self.project.bead.get()
+        bead = self.__tasks.bead
         return next(iter(self.availablebeads), None) if bead is None else bead
 
     @bead.setter
@@ -56,7 +70,7 @@ class BeadController:
            * *value > current*: the new current bead is either *value* or the first
            available bead beyond *value*.
         """
-        bead = self.project.bead.get()
+        bead = self.__tasks.bead
         if value == bead:
             return
 
@@ -78,13 +92,7 @@ class BeadController:
             value = bead if last is None else last
 
         if value != bead:
-            self.project.bead.set(value)
-
-    @property
-    def discarded(self):
-        "returns discarded beads"
-        sel = frozenset(self.availablebeads)
-        return (i for i in self.allbeads if i not in sel)
+            self._ctrl.display.update("tasks", bead = value)
 
 class DataSelectionBeadController(BeadController):
     "controller for discarding beads using a DataSelectionTask"

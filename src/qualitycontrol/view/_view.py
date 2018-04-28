@@ -18,15 +18,16 @@ class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
 
     def observe(self, ctrl):
         "observes the model"
+        self._model.settosame(ctrl)
         super().observe(ctrl)
         self._widgets.observe(ctrl)
         self._plots  .observe(ctrl)
 
-    def _create(self, _, doc):
+    def _addtodoc(self, _, doc):
         "returns the figure"
         mode    = self.defaultsizingmode()
-        widgets = self._widgets.create(self.action, mode)
-        grid    = self._plots.create(doc, mode)
+        widgets = self._widgets.addtodoc(self.action, mode)
+        grid    = self._plots.addtodoc(doc, mode)
         return layouts.row(grid, widgets)
 
     def _reset(self):

@@ -1,33 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "DAQ Model"
-from   collections          import ChainMap
-from   typing               import (Optional, Tuple, Union, Dict, Any, List,
+from   typing               import (Optional, Tuple, Union, Dict, List,
                                     Iterable, ClassVar, cast)
 import numpy                as     np
 from   utils                import initdefaults
-from   utils.inspection     import diffobj
+from   utils.configobject   import ConfigObject
 
-class ConfigObject:
-    """
-    Object with a few helper function for comparison
-    """
-    def __eq__(self, other):
-        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-    def diff(self, other) -> Dict[str, Any]:
-        "return the diff with `other`"
-        return diffobj(self, other)
-
-    def config(self, tpe = dict):
-        "return a chainmap with default and updated values"
-        if tpe in (dict, 'dict'):
-            return dict(self.__dict__)
-
-        get  = lambda i: getattr(i, '__dict__', i)
-        cur  = {i: get(j)                          for i, j in self.__dict__.items()}
-        dflt = {i: get(getattr(self.__class__, i)) for i in self.__dict__}
-        return ChainMap({i: j for i, j in cur.items() if j != dflt[i]}, dflt)
 
 FOVTYPE  = [('msg',  'B'),      ('err',     'uint16'), ('ttype',    'B'),
             ('time', 'uint64'), ('zstatus', 'B'),      ('xystatus', 'B'),

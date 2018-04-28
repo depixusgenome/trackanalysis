@@ -15,7 +15,7 @@ from typing          import (Union, Iterator, Type, cast, Tuple,
 from pathlib         import Path
 from functools       import partial
 
-from model.task      import Task, RootTask, TaskIsUniqueError, taskorder, TASK_ORDER
+from model.task      import Task, RootTask, TaskIsUniqueError
 from .event          import Controller, NoEmission
 from .processor      import Cache, Processor, run as _runprocessors
 from .processor.base import register, CACHE_T
@@ -327,7 +327,7 @@ class TaskController(BaseTaskController):
     "Task controller class which knows about globals"
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.__order:      Any = None
+        self.__model:      Any = None
         self.__readconfig: Any = None
 
     def setup(self, ctrl):
@@ -351,28 +351,14 @@ class TaskController(BaseTaskController):
         if getter('savers') is None:
             setter('savers', [_import(itm)(ctrl) for itm in cnf.io.save.get()])
 
-        self.__order         = ctrl.globals.config.tasks.order
-        self.__order.default = list(TASK_ORDER)
+        self.__model = ctrl.theme.model('tasks')
 
-        def _clear(itm):
-            if ctrl.globals.config.tasks.clear.get(default = True):
-                ctrl.tasks.cleardata(itm.old)
-        ctrl.globals.project.track.observe(_clear)
+        @ctrl.display.observe
+        def _ontasks(old = None, **_):
+            if "roottask" in old and ctrl.globals.config.tasks.clear.get(default = True):
+                ctrl.tasks.cleardata(old['roottask'])
 
         self.__readconfig = ctrl.globals.readconfig
-
-    def defaulttaskindex(self, parent:RootTask, task:Type[Task], side = 0) -> int:
-        "returns the default task index"
-        if not isinstance(task, type):
-            task = type(task)
-        order    = tuple(taskorder(self.__order.get()))
-        previous = order[:order.index(task)+side]
-
-        curr     = tuple(cast(Iterator[Task], self.tasklist(parent)))
-        for i, tsk in enumerate(curr[1:]):
-            if not isinstance(tsk, previous):
-                return i+1
-        return len(curr)
 
     def opentrack(self,
                   task : Union[str, RootTask, Dict[str,str]] = None,
@@ -389,7 +375,7 @@ class TaskController(BaseTaskController):
                 index = _m_none, side = 0):
         "opens a new file"
         if index == 'auto':
-            index = self.defaulttaskindex(parent, cast(Type[Task], task), side)
+            index = self.__model.defaulttaskindex(self.tasklist(parent), task, side)
         return super().addtask(parent, task, index)
 
     def __undos__(self, wrapper):

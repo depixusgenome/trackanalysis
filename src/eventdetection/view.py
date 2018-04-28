@@ -20,6 +20,10 @@ class AlignmentWidget(GroupWidget[ModelType]):
         self.css.title.alignment.labels.default = [u'ø', u'best', u'Φ1', u'Φ3']
         self.css.title.alignment.default        = u'Alignment'
 
+    @staticmethod
+    def observe(_):
+        "do nothing"
+
     def onclick_cb(self, value):
         "action to be performed when buttons are clicked"
         if value == 0:
@@ -81,6 +85,10 @@ class EventDetectionWidget(GroupWidget[ModelType]):
             self._model.eventdetection.update()
         elif 0 not in value and task is not None:
             self._model.eventdetection.remove()
+
+    @staticmethod
+    def observe(_):
+        "do nothing"
 
     def _data(self) -> dict:
         task = getattr(self._model, 'eventdetection').task

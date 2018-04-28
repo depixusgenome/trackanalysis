@@ -169,7 +169,7 @@ class WidgetCreator(GlobalsAccess, Generic[ModelType]):
         "sets-up config observers"
 
     @abstractmethod
-    def create(self, action) -> List[Widget]:
+    def addtodoc(self, action) -> List[Widget]:
         "Creates the widget"
 
     @abstractmethod
@@ -183,7 +183,7 @@ class GroupWidget(WidgetCreator[ModelType]):
         super().__init__(model)
         self._widget: RadioButtonGroup = None
 
-    def create(self, action) -> List[Widget]:
+    def addtodoc(self, action) -> List[Widget]:
         "creates the widget"
         name = self.__class__.__name__.replace('Widget', '').replace('Creator', '')
         css  = self.css.title[name.lower()]
@@ -207,6 +207,10 @@ class GroupWidget(WidgetCreator[ModelType]):
     @abstractmethod
     def _data(self) -> dict:
         "returns  a dict of updated widget attributes"
+
+    @abstractmethod
+    def observe(self, ctrl):
+        "Creates the widget"
 
 class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many-public-methods
     "Base plotter class"
@@ -378,12 +382,12 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
         vmax += delta
         return vmin, vmax
 
-    def create(self, ctrl, doc):
+    def addtodoc(self, ctrl, doc):
         "returns the figure"
         self._doc = doc
-        self._model.create(doc)
+        self._model.addtodoc(doc)
         with self.resetting():
-            return self._create(ctrl, doc)
+            return self._addtodoc(ctrl, doc)
 
     def activate(self, val):
         "activates the component: resets can occur"
@@ -418,9 +422,6 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
             with self.resetting():
                 self._model.reset()
 
-    def observe(self, _):
-        "sets-up model observers"
-        self.project.root.observe(self.reset)
 
     if SINGLE_THREAD: # pylint: disable=using-constant-test
         # use this for single-thread debugging
@@ -577,12 +578,16 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
                                        bottom = bottom,)
 
     @abstractmethod
-    def _create(self, ctrl, doc):
+    def _addtodoc(self, ctrl, doc):
         "creates the plot structure"
 
     @abstractmethod
     def _reset(self):
         "initializes the plot for a new file"
+
+    @abstractmethod
+    def observe(self, ctrl):
+        "sets-up model observers"
 
 PlotType = TypeVar('PlotType', bound = PlotCreator)
 class PlotView(Generic[PlotType], BokehView):
@@ -648,9 +653,14 @@ class PlotView(Generic[PlotType], BokehView):
         "activates the component: resets can occur"
         self._plotter.activate(val)
 
+    def observe(self, ctrl):
+        "sets up observers"
+        self._model.settaskmodel(ctrl, "tasks")
+        self._plotter.observe(ctrl)
+
     def addtodoc(self, ctrl, doc):
         "adds items to doc"
         super().addtodoc(ctrl, doc)
-        ret = self._plotter.create(ctrl, doc)
-        self._plotter.observe(ctrl)
+        ret = self._plotter.addtodoc(ctrl, doc)
+        self._plotter.addtodoc(ctrl)
         return ret

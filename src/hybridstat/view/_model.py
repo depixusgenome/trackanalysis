@@ -17,14 +17,16 @@ from control.modelaccess        import PROPS, TaskAccess
 
 from model.task                 import RootTask
 from cleaning.view              import BeadSubtractionAccess
-from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
+from eventdetection.processor   import (EventDetectionTask, # pylint: disable=unused-import
+                                        ExtremumAlignmentTask)
 from peakfinding.histogram      import interpolator
-from peakfinding.processor      import PeakSelectorTask
+from peakfinding.processor      import PeakSelectorTask # pylint: disable=unused-import
 from peakfinding.selector       import PeakSelectorDetails
 from peakcalling                import match
 from peakcalling.toreference    import ChiSquareHistogramFit
 from peakcalling.tohairpin      import Distance
-from peakcalling.processor      import FitToHairpinTask, FitToReferenceTask
+from peakcalling.processor      import (FitToHairpinTask, # pylint: disable=unused-import
+                                        FitToReferenceTask)
 from peakcalling.processor.fittoreference   import FitData
 
 from ..reporting.batch          import fittohairpintask
@@ -37,13 +39,13 @@ _DUMMY = type('_DummyDict', (),
                    __len__      = lambda _: 0,
                    __iter__     = lambda _: iter(())))()
 
-class FitToReferenceAccess(TaskAccess):
+class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     "access to the FitToReferenceTask"
     __DEFAULTS = dict(id           = None,   reference = None,
                       fitdata      = _DUMMY, peaks     = _DUMMY,
                       interpolator = _DUMMY)
     def __init__(self, ctrl):
-        super().__init__(ctrl, FitToReferenceTask)
+        super().__init__(ctrl)
         self.__store             = self.project.root.tasks.fittoreference.gui
         self.__store.defaults    = self.__DEFAULTS
 
@@ -175,10 +177,10 @@ class FitToReferenceAccess(TaskAccess):
             self.__store.update(**args)
         return True, 'id' in args
 
-class FitToHairpinAccess(TaskAccess):
+class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
     "access to the FitToHairpinTask"
     def __init__(self, ctrl):
-        super().__init__(ctrl, FitToHairpinTask)
+        super().__init__(ctrl)
         self.__defaults = self.config.root.tasks.fittohairpin
         self.__defaults.defaults = {'fit':         FitToHairpinTask.DEFAULT_FIT(),
                                     'match':       FitToHairpinTask.DEFAULT_MATCH(),
@@ -239,6 +241,15 @@ class FitToHairpinAccess(TaskAccess):
         elif task != cur:
             self.update(**task.config())
 
+class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
+    "access to the ExtremumAlignmentTask"
+
+class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
+    "access to the EventDetectionTask"
+
+class PeakSelectorTaskAccess(TaskAccess, tasktype = PeakSelectorTask):
+    "access to the PeakSelectorTask"
+
 class FitParamProp(_FitParamProp):
     "access to bias or stretch"
     def __get__(self, obj, tpe) -> Optional[float]: # type: ignore
@@ -264,13 +275,13 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         if key is None:
             key = '.plot.peaks'
         super().__init__(ctrl, key)
-        self.subtracted                     = BeadSubtractionAccess(self)
-        self.alignment                      = TaskAccess(self, ExtremumAlignmentTask)
-        self.eventdetection                 = TaskAccess(self, EventDetectionTask)
-        self.peakselection                  = TaskAccess(self, PeakSelectorTask)
         self.distances : Dict[str, Distance]= dict()
         self.peaks: Dict[str, np.ndarray]   = dict()
         self.estimatedbias                  = 0.
+        self.subtracted                     = BeadSubtractionAccess(self)
+        self.alignment                      = ExtremumAlignmentTaskAccess(self)
+        self.eventdetection                 = EventDetectionTaskAccess(self)
+        self.peakselection                  = PeakSelectorTaskAccess(self)
         self.fittoreference                 = FitToReferenceAccess(self)
         self.identification                 = FitToHairpinAccess(self)
 
@@ -313,7 +324,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
 
     def reset(self) -> bool: # type: ignore
         "adds tasks if needed"
-        if self.track is None or self.checkbead(False):
+        if self.track is None:
             return True
 
         if self.eventdetection.task is None:

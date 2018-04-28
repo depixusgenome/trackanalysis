@@ -75,7 +75,12 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
     def __config(self):
         return self.css.table
 
-    def create(self, _) -> List[Widget]:
+    @staticmethod
+    def observe(_):
+        "sets-up observers"
+        return
+
+    def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
         cnf   = self.__config.columns
         width = cnf.width.get()
@@ -138,7 +143,7 @@ class DownsamplingWidget(WidgetCreator[DataCleaningModelAccess]):
     def __config(self):
         return self.css.downsampling
 
-    def create(self, action) -> List[Widget]:
+    def addtodoc(self, action) -> List[Widget]:
         "creates the widget"
         cnf   = self.__config
         self.__widget = Slider(title    = cnf.title.get(),
@@ -153,8 +158,10 @@ class DownsamplingWidget(WidgetCreator[DataCleaningModelAccess]):
         self.__widget.on_change("value", _onchange_cb)
         return [self.__widget]
 
-    def observe(self, ctrl):
-        "observe the controller"
+    @staticmethod
+    def observe(_):
+        "sets-up observers"
+        return
 
     def reset(self, resets):
         "this widget has a source in common with the plots"
@@ -186,7 +193,12 @@ class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
         super().__init__(model)
         self.__widget: DpxCleaning = None
 
-    def create(self, action) -> List[Widget]:
+    @staticmethod
+    def observe(_):
+        "sets-up observers"
+        return
+
+    def addtodoc(self, action) -> List[Widget]:
         "creates the widget"
         self.__widget = DpxCleaning(name = "Cleaning:Filter")
 
@@ -245,7 +257,7 @@ class WidgetMixin(ABC):
         self.css.observe("downsampling", lambda: self.reset(False))
 
     def _createwidget(self, fig):
-        widgets = {i: j.create(self.action) for i, j in self.__widgets.items()}
+        widgets = {i: j.addtodoc(self.action) for i, j in self.__widgets.items()}
         self.__widgets['cleaning'].setfigure(fig)
         enableOnTrack(self, widgets)
         return widgets

@@ -228,7 +228,7 @@ class SequencePathWidget(WidgetCreator[ModelType]):
                         'sequence.missing.key' : u'Select sequence',
                         'sequence.missing.path': u'Find path'}
 
-    def create(self, action) -> List[Widget]:
+    def addtodoc(self, action) -> List[Widget]:
         "creates the widget"
         self.__dialog.title = self.css.title.fasta.get()
         self.__widget       = Dropdown(name  = 'Cycles:Sequence',
@@ -307,7 +307,7 @@ class OligoListWidget(WidgetCreator[ModelType]):
                                   'title.oligos'     : u'Oligos',
                                   'title.oligos.help': u'comma-separated list'}
 
-    def create(self, action) -> List[Widget]:
+    def addtodoc(self, action) -> List[Widget]:
         "creates the widget"
         self.__widget = AutocompleteInput(**self.__data(),
                                           placeholder = self.css.title.oligos.help.get(),

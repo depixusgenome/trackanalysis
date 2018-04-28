@@ -27,7 +27,7 @@ class PeaksTableWidget(_Widget[CyclesModelAccess]):
                                     'title'  : u'dna ↔ nm',
                                     'zformat': '0.0000'}
 
-    def create(self, _) -> List[Widget]:
+    def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
         width  = self.css.input.width.get()
         css    = self.css.table
@@ -97,7 +97,7 @@ class ConversionSlidersWidget(_Widget[CyclesModelAccess]):
         "adds info to the widget"
         self.__figdata = histsource
 
-    def create(self, _) -> List[Widget]:
+    def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
         widget = lambda x, s, e, n: Slider(value = getattr(self._model, x),
                                            title = self.css.title[x].get(),
@@ -159,6 +159,9 @@ class DriftWidget(GroupWidget[CyclesModelAccess]):
             value += [1]
         return dict(active = value)
 
+    def observe(self, _):
+        "sets-up config observers"
+
 class AdvancedWidget(_Widget[CyclesModelAccess], AdvancedWidgetMixin): # type: ignore
     "access to the modal dialog"
     def __init__(self, ctrl, model:CyclesModelAccess) -> None:
@@ -177,13 +180,16 @@ class AdvancedWidget(_Widget[CyclesModelAccess], AdvancedWidgetMixin): # type: i
     def _args(self, **kwa):
         return super()._args(model = self._model, **kwa)
 
+    def observe(self, _):
+        "sets-up config observers"
+
     def reset(self, resets):
         "resets the wiget when a new file is opened"
         AdvancedWidgetMixin.reset(resets)
 
-    def create(self, action) -> List[Widget]:
+    def addtodoc(self, action) -> List[Widget]:
         "creates the widget"
-        return AdvancedWidgetMixin.create(self, action)
+        return AdvancedWidgetMixin.addtodoc(self, action)
 
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
@@ -208,7 +214,7 @@ class WidgetMixin(ABC):
     def _createwidget(self):
         self.__widgets['sliders'].addinfo(self._histsource)
 
-        widgets = {i: j.create(self.action) for i, j in self.__widgets.items()}
+        widgets = {i: j.addtodoc(self.action) for i, j in self.__widgets.items()}
 
         enableOnTrack(self, self._hist, self._raw, widgets)
 

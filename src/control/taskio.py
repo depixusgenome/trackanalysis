@@ -80,9 +80,7 @@ class _GrFilesIOMixin:
     EXT: Tuple[str, ...] = TrackIO.EXT+('gr',)
     CGR                  = '.cgr'
     def __init__(self, ctrl):
-        self._track = None
-        fcn         = lambda itm: setattr(self, '_track', itm.value)
-        ctrl.globals.project.track.observe(fcn)
+        self._ctrl = ctrl
 
     def _open(self, path:OPEN_T, _):
         "opens a track file and adds a alignment"
@@ -103,9 +101,10 @@ class _GrFilesIOMixin:
             return None
 
         if len(trks) == 0:
-            if self._track is None:
+            track = self._ctrl.display.get("tasks", "roottask")
+            if track is None:
                 raise IOError(u"IOError: start by opening a track file!", "warning")
-            trks = topath(getattr(self._track, 'path'))
+            trks = topath(getattr(track, 'path'))
         return trks+grs
 
 class GrFilesIO(TrackIO, _GrFilesIOMixin):
@@ -121,24 +120,6 @@ class GrFilesIO(TrackIO, _GrFilesIOMixin):
 
         path = self._open(cast(Union[str, Tuple[str,...]], path), _)
         return None if path is None else TrackIO.open(self, path, _)
-
-def currentmodelonly(cls):
-    "Adapts a class such that only the current model is saved"
-    def __init__(self, ctrl, *_):
-        cls.__init__(self, ctrl, *_)
-        self.currentmodel = ctrl.globals.project.track.get
-
-    def save(self, path:str, models):
-        u"saves a file"
-        curr   = self.currentmodel()
-        models = [i for i in models if curr is i[0]]
-        if len(models):
-            return cls.save(self, path, models)
-        else:
-            raise IOError("Nothing to save", "warning")
-        return True
-
-    return type(cls.__name__, (cls,), {'__init__': __init__, 'save': save})
 
 class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
     "Adds an alignment to the tracks per default"
