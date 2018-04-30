@@ -4,13 +4,15 @@
 
 import pandas               as pd
 import numpy                as np
-from matplotlib.ticker import MultipleLocator
+
+from collections            import namedtuple
+#from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot    as plt
 import holoviews            as hv
 import seaborn              as sns
 from math import pi
 
-from bokeh.io import show
+#from bokeh.io import show
 from bokeh.models import (
     ColumnDataSource,
     HoverTool,
@@ -18,456 +20,429 @@ from bokeh.models import (
     BasicTicker,
     PrintfTickFormatter,
     ColorBar,
-)
-from bokeh.plotting import figure
+    FixedTicker,
+    FuncTickFormatter,
+    Plot,
+    BasicTickFormatter,
+    CategoricalTickFormatter
+    )
+from bokeh.plotting import figure, show
 
 import sankey
 
 
 
-def resumeTracksQuality(tracks):
+def resume_tracks_quality(tracks, dfmsg):
     """
-    (DictTracks/Track) -> pandas dataframe
-     Input: DictTracks or Tracks object. 
-     Output: a dataframe with the summary of good, bad, missing and total number of beads
-    The output dataframe has the track (or tracks) as index and 4 columns indicating good, bad, missing and total number of beads
+    (DictTracks/Track, pandas dataframe) -> pandas dataframe
+    Input: DictTracks or Tracks object, tracks.dfmsg.reset_index()
+    Output: 
+        * status:   dataframe with the status of bead per track. Either missing, 
+                    fixed or NaN of it is neither missing nor fixed
+        * table:    dataframe with a resume of fixed, missing and not fixed/missing            
     Example:
-    >>> resumeTracksQuality(tracks)
+    >>> resume_tracks_quality(tracks, dfmsg)
     """
+    #compute the chronological order of the tracks
+    order_tracks = pd.Series(list(tracks.dataframe()
+                                  .set_index('key')
+                                  .sort_values(by='modification')
+                                  .index.values))
     #identify if we have a single track or dict tracks
     try:
         tracks.keys()
         is_dict = True
     except AttributeError:
-        is_dict = False 
-    #loop to fill the list with the results for single or dict tracks
-    results = list()                            
-    if is_dict:
-        for key,val in tracks.items():
-            #print(key,set(tracks.availablebeads())-set(val.beads.keys()))
-            #print('good',list(val.cleaning.good()))
-            #print('bad',list(val.cleaning.bad()))
-            missing = len(set(tracks.availablebeads())-set(val.beads.keys()) ) 
-
-            #print(missing)
-            tot = len(list(tracks.availablebeads()) )#len(list(val.beadsonly.keys()))
-            good = len(list(val.cleaning.good()))
-            bad = len(list(val.cleaning.bad()))
-            results.append({'Track': key,
-                            'Total': tot,
-                            'Good': good,
-                            'Bad': bad,
-                            'Missing':missing})
-        results = pd.DataFrame(results,columns=['Track',
-                                                'Good',
-                                                'Bad',
-                                                'Missing',
-                                                'Total'])
-        results.set_index('Track',inplace=True)
-    else:
-        results.append({'Track': tracks.key,
-                        'Total' : len(list(tracks.beadsonly.keys())),
-                        'Good' : len(list(tracks.cleaning.good())),
-                        'Bad':  len(list(tracks.cleaning.bad())) })
-        results = pd.DataFrame(results,columns=['Track',
-                                                'Good',
-                                                'Bad',
-                                                'Total'])
-        results.set_index('Track',inplace=True)
-    return results
-
-
-def dfGoodBadBeads(tracks):
-    """
-    (DictTracks/Track,list) -> pandas dataframe
-    Input: Track or DictTracks object
-    Output: Dataframe with the quality of the bead. The cell [bd,trk] is 0 if the bead bd is bad in track trk. The value of the cell is 1 if the bead is good.
-     Example:
-     dfGoodBadBeads(tracks)
-     """
-    try:
-        tracks.keys()
-        is_dict=True
-    except AttributeError:
         is_dict = False
-    
+    #loop to fill the list with the results
+    #results = list()
     if is_dict:
-        all_beads = tracks.availablebeads()
-    else:
-        all_beads = list(tracks.beadsonly.keys())    
-    
-    df_good_bad = {}
-    df_good_bad['bead'] = all_beads
+        ncycles = [trk.ncycles for name, trk in tracks.items()]
+        stats = {k:None for k in tracks.keys()}
+        for name, val in stats.items():
+            stats[name] = {'ncycles': tracks[name].ncycles}
+        statsdf = pd.DataFrame(stats)
+        dfmsg['trackorder'] = [list(order_tracks).index(key) for key in dfmsg['key']]
+        dfmsg['pc_cycles'] = [cycles/statsdf[key]['ncycles']*100 for key, cycles
+                              in dfmsg[['key', 'cycles']].itertuples(index=False)]
+        dfstatus = pd.DataFrame(columns= order_tracks, index= tracks.availablebeads())
+        
+        #hfsigma too low
+        dfmsg100hfsigma = dfmsg[(dfmsg['types']=='hfsigma') & (
+                                        dfmsg['message'].str.find("<")!=-1)].query(
+                                                'pc_cycles==100').sort_values(
+                                                        by=['bead','trackorder'])
+        beads100hfsigma = set(map(tuple, dfmsg100hfsigma.
+                                  sort_values(by=['bead', 'trackorder']).
+                                  groupby(['bead', 'trackorder']).
+                                  count().
+                                  reset_index()[['bead', 'trackorder']].values
+                                 ))
+        for pair in beads100hfsigma:
+            dfstatus.iloc[pair[0], pair[1]] = 'hf--low'
+        #hfsigma too high
+        dfmsg100hfsigma_high = dfmsg[(dfmsg['types']=='hfsigma') & (
+                                             dfmsg['message'].str.find(">")!=-1 )].query(
+                                                     'pc_cycles==100').sort_values(
+                                                             by=['bead','trackorder'])
 
-    if is_dict:
-        for trk,val in tracks.items():
-            clean_beads = val.cleaning.good()
-            df_good_bad[trk] = list(map(lambda x: x in clean_beads and 1 or 0,all_beads))
-    else:
-        clean_beads = tracks.cleaning.good()
-        df_good_bad[tracks.key] = list(map(lambda x: x in clean_beads and 1 or 0,all_beads))
+        beads100hfsigma_high = set(map(tuple, dfmsg100hfsigma_high.
+                                       sort_values(by=['bead', 'trackorder']).
+                                       groupby(['bead', 'trackorder']).
+                                       count().
+                                       reset_index()[['bead', 'trackorder']].values
+                                      ))
+        for pair in beads100hfsigma_high:
+            dfstatus.iloc[pair[0], pair[1]] = 'hf--high'
+        #ping pong appears
+        dfmsg10pingpong = dfmsg[(dfmsg['types']=='pingpong')].query(
+                'pc_cycles>10').sort_values(by=['bead', 'trackorder'])
+        beads10pingpong = set(map(tuple, dfmsg10pingpong.
+                                  sort_values(by=['bead', 'trackorder']).
+                                  groupby(['bead', 'trackorder']).
+                                  count().
+                                  reset_index()[['bead', 'trackorder']].values
+                                 ))                          
+        for pair in beads10pingpong:
+            dfstatus.iloc[pair[0], pair[1]] = 'pingpong'
+        #if there is a good track after missing tracks,
+        #then the previous tracks are not missing
+        for bead_status in dfstatus.iterrows():
+            missing = False
+            for trknb, state in enumerate(pd.isnull(bead_status[1])):
+                if(not state):
+                    missing = True
+                if(state==True & missing==True):
+                    dfstatus.iloc[bead_status[0], 0:trknb] = np.nan
+                    missing = False
+        #if extent is too small, the bead is fixed, not missing
+        dfmsg90extent_low = dfmsg[(dfmsg['types']=='extent') & (
+                                          dfmsg['message'].str.find("<")!=-1 )].query(
+                                                  'pc_cycles>99').sort_values(
+                                                          by=['bead','trackorder'])
+        beads90extent_low = set(map(tuple, dfmsg90extent_low.
+                                    sort_values(by=['bead', 'trackorder']).
+                                    groupby(['bead', 'trackorder']).
+                                    count().
+                                    reset_index()[['bead', 'trackorder']].values
+                                   ))
+        for pair in beads90extent_low:
+            dfstatus.iloc[pair[0], pair[1]] = 'fixed'
+        #stats over the results
+        dfstatusstats = dfstatus.replace(['hf--low',
+                                          'hf--high',
+                                          'pingpong'], 'missing')
+        stats_resume = dfstatusstats.fillna('not_fixed/missing').apply(pd.value_counts)
 
-    df_good_bad = pd.DataFrame(df_good_bad)
+        results = namedtuple('Results', ['table', 'status'])
+        output = results(table=stats_resume.transpose(), status=dfstatusstats)
+        return output
+    ######################## FOR ONE TRACK, OBSOLETE ##########################
+    #else:
+    #    results.append({'Track': tracks.key,
+    #                    'Total' : len(list(tracks.beadsonly.keys())),
+    #                    'Good' : len(list(tracks.cleaning.good())),
+    #                    'Bad':  len(list(tracks.cleaning.bad()))})
+    #    results = pd.DataFrame(results, columns=['Track',
+    #                                             'Good',
+    #                                             'Bad',
+    #                                             'Total'])
+    #    results = results.set_index('Track')
+    #return results
+    ######################### END FOR ONE TRACK OBSOLETE #####################
 
-    #order by the best beads. A bead is better than another if it is 'good' in more tracks
-    tmp = df_good_bad.loc[:, df_good_bad.columns != 'bead']
-    idx = tmp.sum(axis=1).sort_values(ascending=True).index #order by sum of good beads by track
-    cols = df_good_bad.loc[idx].sum().sort_values(ascending=False).index #order by sum of good tracks per bead
-    df_good_bad = df_good_bad.loc[idx]
-    df_good_bad = df_good_bad[cols]
-    return df_good_bad
-
-def ismissing(bead,tracks,track_name):
+def evolution_missing_fixed(stats_resume,tracks):
     """
-    (int,Dict Track,str)-> bool
-    Input: bead is the label of the bead, tracks is a Dict Track object, track_name is a string contanining the name of the track
+    (pandas df,list) -> holoviews scatter/line plot
+    Input: output from resume_tracks_quality.table, list of tracks
+    Output: Scatter plot showing the evolution of the nb of missing, fixed and no-errors
+    beads. 
+    Example:
+    >>> evolution_missing_fixed(resume.table,tracks)
+    """
+        
+    stats_resume = stats_resume.transpose()
+    valuesfixed = list(stats_resume.loc['fixed'])
+    valuesmissing = list(stats_resume.loc['missing'])
+    valuesok = list(stats_resume.loc['not_fixed/missing'])
+    total = valuesfixed[0]+valuesmissing[0]+valuesok[0]
+
+    dates = pd.DatetimeIndex(tracks.dataframe().sort_values(
+        by='modification').modification.values)
+    trkdates = ['d{0}-{1}h{2}m'.format(d.day,d.hour,d.minute) for d in dates]
+        
+    datafixed = [tup for tup in zip(trkdates,np.array(valuesfixed)/total*100)]
+    datamissing = [tup for tup in zip(trkdates,np.array(valuesmissing)/total*100)]
+    dataok = [tup for tup in zip(trkdates,np.array(valuesok)/total*100)]
+    axes_opts={'xrotation': 45}
+
+    return hv.Points(
+        datafixed, label='fixed').redim.label(
+            x='date', y='% beads (total {0})'.format(total)).redim.range(
+                y=(0,100))*hv.Points(
+                    datamissing, label='missing')*hv.Points(
+                        dataok, label='ok')*hv.Curve(
+                            datafixed, group='fixed')*hv.Curve(
+                                datamissing, group='missing')*hv.Curve(
+                                    dataok, group='ok', vdims=['nb']).opts(
+                                            plot=axes_opts)
+
+def ismissing(bead, track_name, dfstatus):
+    """
+    (int,str,pandas df)-> bool
+    Input: bead is the label of the bead, tracks is a Dict Track object,
+    track_name is a string contanining the name of the track
     Output: True if bead is missing in track, False otherwise
     Example:
-    if 'GTC' belongs to tracks, we want to test if the bead 1 is missing or not from track GTC
-    >>>(1,tracks,'GTC')
+    if 'GTC' belongs to tracks, we want to test if the bead 1 is missing
+    or not from track GTC
+    >>>ismissing(1,'GTC',dfstatus)
     True
     """
-    return bead in set(tracks.availablebeads())-set(tracks[track_name].beads.keys())
+    return dfstatus[track_name][bead] == 'missing'
 
-#Auxiliary function resumeBeadsQuality: outputs a dataframe with the # of errors for each bead, for each type of error
-def resumeBeadsQuality(tracks,ordertracks=None):
+def isfixed(bead, track_name, dfstatus):
+    """
+    (int,str,pandas df)-> bool
+    Input: bead is the label of the bead, tracks is a Dict Track object,
+    track_name is a string contanining the name of the track
+    Output: True if bead is fixed in track, False otherwise
+    Example:
+    if 'GTC' belongs to tracks, we want to test if the bead 1 is missing
+    or not from track GTC
+    >>>isfixed(1,'GTC',dfstatus)
+    True
+    """
+    return dfstatus[track_name][bead] == 'fixed'
+
+def resume_bead_quality(tracks, dfmsg, dfstatus, ordertracks=None):
     """
     (DictTracks or single Track,list of str) -> pandas dataframe
-    Input: DictTracks or Track object and a list of the order of tracks (only necessary for DictTrack) 
-    Output: dataframe of frequence of errors per bead per track. The line bd/trk has 5 corresponding columns representing the 5 types of errors that can be detected for a bead. If the bead is missing all errors are set to NaN 
+    Input: DictTracks or Track object and a list of the order of tracks
+    (only necessary for DictTrack) 
+    Output: 
+        * res:  dataframe of frequence of errors per bead per track. 
+                The line bd/trk has as many columns as the nb of types of 
+                errors that can be detected for a bead. 
+                If the bead is missing/fixed all errors are set to NaN 
+        * detail : analogous to res, but missing and fixed are reported
     Example:
-    resumeBeadsQuality(track)
-    resumeBeadsQuality(tracks,order_tracks_chrono)
+    resumeBeadsQuality(tracks, dfmsg, resume.status, order_tracks)
     """
+    #check if the input is a single track or a dict of tracks
     try:
         tracks.keys()
         is_dict=True
     except AttributeError:
         is_dict = False
- 
-    dfmsg = tracks.cleaning.messages()
-    dfmsg = dfmsg.reset_index()
+    
+    #obtain all the messages from the cleaning process
+    #dfmsg = tracks.cleaning.messages()
+    #dfmsg = dfmsg.reset_index()
+
+    #list of all available beads
     if is_dict:
         all_beads = tracks.availablebeads()
     else:
         all_beads = list(tracks.beadsonly.keys())
-                                                             #Create a dataframe with rows = key and columns = possible errors. 
-#The cells contain the nb of cycles in track that present the corresponding error
-#The columns are :  [track extent population hfsigma< hfsigma> saturation]
-    dict_msg = {'bead':1,'track':'','extent<0.5':0,'hfsigma<0.0001':0, 'hfsigma>0.01':0,'pop<80%':0,'sat>90%':0}
+
+    #Create a dataframe with rows = key and columns = possible errors. 
+    #The cells contain the nb of cycles in track that present 
+    #the corresponding error
+    #The columns are :  
+    #[track extent population hfsigma< hfsigma> saturation]
+    
+    #extract the messages from dfmsg to create one dict per bead per track with all its error values
+    df_unique_msg = dfmsg[['types','message']].values
+    msg_unique = set(map(tuple,df_unique_msg))
+
+    keys = []
+    while len(msg_unique)!=0:
+        elem = msg_unique.pop()
+        keys.append(elem[0]+elem[1].replace(" ",""))
+
+    dict_msg = {**{'bead':None,
+                    'track':''},
+                **dict.fromkeys(keys,None) } 
+
+    #old dict_msg
+    #dict_msg = {'bead':1,'track':'','extent<0.5':0,'hfsigma<0.0001':0, 'hfsigma>0.01':0,'pop<80%':0,'sat>90%':0}
     msg = [dict_msg]
+    msg_missingfixed = [dict_msg]
     if is_dict:
-        for bd in all_beads:   
+        for bd in all_beads:
             tmp = dfmsg[dfmsg['bead']==bd]
             for tr in ordertracks:
                 #check if bd is missing in tr and set values to None
-                if ismissing(bd,tracks,tr):
-                    dict_aux = {'bead': bd,
-                                'track': tr,
-                                'extent<0.5': None,
-                                'hfsigma<0.0001': None,
-                                'hfsigma>0.01': None,
-                                'pop<80%': None,
-                                'sat>90%': None}
+                if (ismissing(bd, tr, dfstatus)) or (isfixed(bd, tr, dfstatus)): 
+                    dict_aux = {**{'bead':bd,
+                                   'track':tr},
+                                **dict.fromkeys(keys,None) }
+                    currentstatus = 'missing' if ismissing(bd,tr,dfstatus) else 'fixed'
+                    dict_aux_missingfixed = {**{'bead': bd,
+                                                  'track': tr},
+                                              **dict.fromkeys(keys, currentstatus)}
                 else:
                  #fill the dictionary of results for the non missing beads
-                    dict_aux = {'bead':bd,
-                                'track':tr,
-                                'extent<0.5':0 if tmp[(tmp['key']==tr) & (tmp['message']== '< 0.50' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '< 0.50' )]['cycles'].values[0] ,
-                                'hfsigma<0.0001':0 if tmp[(tmp['key']==tr) & (tmp['message']== '< 0.0001' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '< 0.0001' )]['cycles'].values[0] ,
-                                'hfsigma>0.01':0 if tmp[(tmp['key']==tr) & (tmp['message']== '> 0.0100' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '> 0.0100' )]['cycles'].values[0] ,
-                                'pop<80%':0 if tmp[(tmp['key']==tr) & (tmp['message']== '< 80%' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '< 80%' )]['cycles'].values[0] ,
-                                'sat>90%':0 if tmp[(tmp['key']==tr) & (tmp['message']== '> 90%' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '> 90%' )]['cycles'].values[0] }
+                    for key_dict_msg, val_dict_msg in dict_msg.items():
+                        if key_dict_msg == 'bead':
+                            dict_aux = {key_dict_msg: bd}
+                            dict_aux_missingfixed = {key_dict_msg: bd} 
+                        elif key_dict_msg == 'track':
+                            dict_aux[key_dict_msg] = tr
+                            dict_aux_missingfixed[key_dict_msg] = tr
+                        elif '<' in key_dict_msg:
+                            dict_aux[key_dict_msg] = 0 if tmp[
+                                (tmp['key'] == tr) &
+                                (tmp['types'] == key_dict_msg.split('<')[0]) &
+                                (tmp['message'] == '< '+key_dict_msg.split('<')[1])].empty else tmp[
+                                    (tmp['key']==tr) &
+                                    (tmp['types']==key_dict_msg.split('<')[0]) &
+                                    (tmp['message']=='< '+key_dict_msg.split('<')[1])]['cycles'].values[0]
+                            dict_aux_missingfixed[key_dict_msg] = dict_aux[
+                                    key_dict_msg]
+                        elif '>' in key_dict_msg:
+                            dict_aux[key_dict_msg] = 0 if tmp[
+                                (tmp['key']==tr) &
+                                (tmp['types']==key_dict_msg.split('>')[0]) &
+                                (tmp['message']=='> '+key_dict_msg.split('>')[1])].empty else tmp[
+                                    (tmp['key']==tr) &
+                                    (tmp['types']==key_dict_msg.split('>')[0]) &
+                                    (tmp['message']=='> '+key_dict_msg.split('>')[1])]['cycles'].values[0]
+                            dict_aux_missingfixed[key_dict_msg] = dict_aux[
+                                    key_dict_msg]
                 msg.append(dict_aux)
+                msg_missingfixed.append(dict_aux_missingfixed)
     else:
         for bd in all_beads:   
+        #### OBSOLETE revisit when updating the one track treatment ####
             tmp = dfmsg[dfmsg['bead']==bd]
-            dict_aux = {'bead':bd,
-                        'track':tracks.key,
-                        'extent<0.5':0 if tmp[ (tmp['message']== '< 0.50' )]['cycles'].empty else tmp[ (tmp['message']== '< 0.50' )]['cycles'].values[0] ,
-                                                                                     'hfsigma<0.0001':0 if tmp[ (tmp['message']== '< 0.0001' )]['cycles'].empty else tmp[ (tmp['message']== '< 0.0001' )]['cycles'].values[0] ,
-                        'hfsigma>0.01':0 if tmp[(tmp['message']== '> 0.0100' )]['cycles'].empty else tmp[ (tmp['message']== '> 0.0100' )]['cycles'].values[0] ,
-                        'pop<80%':0 if tmp[(tmp['message']== '< 80%' )]['cycles'].empty else tmp[ (tmp['message']== '< 80%' )]['cycles'].values[0] ,
-                                                                                     'sat>90%':0 if tmp[(tmp['message']== '> 90%' )]['cycles'].empty else tmp[ (tmp['message']== '> 90%' )]['cycles'].values[0] }
+            for key_dict_msg, val_dict_msg in dict_msg.items():
+                if key_dict_msg == 'bead':
+                    dict_aux = {key_dict_msg: bd}
+                elif key_dict_msg == 'track':
+                    dict_aux[key_dict_msg] = tracks.key
+                elif '<' in key_dict_msg:
+                    dict_aux[key_dict_msg] = 0 if tmp[(tmp['key']==tr) &
+                                                     (tmp['types']==key_dict_msg.split('<')[0]) &
+                                                     (tmp['message']=='< '+key_dict_msg.split('<')[1])].empty else tmp[(tmp['key']==tr) &
+                                                                                             (tmp['types']==key_dict_msg.split('<')[0]) &
+                                                                    (tmp['message']=='< '+key_dict_msg.split('<')[1])]['cycles'].values[0]
+                elif '>' in key_dict_msg:
+                    dict_aux[key_dict_msg] = 0 if tmp[(tmp['key']==tr) &
+                                                     (tmp['types']==key_dict_msg.split('>')[0]) &
+                                                     (tmp['message']=='> '+key_dict_msg.split('>')[1])].empty else tmp[(tmp['key']==tr) &
+                                                                                             (tmp['types']==key_dict_msg.split('>')[0]) &
+                                                                    (tmp['message']=='> '+key_dict_msg.split('>')[1])]['cycles'].values[0]
             msg.append(dict_aux)
     del msg[0]
-    return pd.DataFrame(msg)#[list(dict_msg.keys())]
+    del msg_missingfixed[0]
+    results = namedtuple('results', ['res', 'detail'])
+    output = results(res=pd.DataFrame(msg), detail=pd.DataFrame(msg_missingfixed))
+    return output
+
+def order_bead_best(df_resumeBeadsQuality):
+    """
+    (output from resume_bead_quality) -> list of int 
+    This function outputs the list of beads sorted by best to worst
+    in terms of the errors the bead presents
+    Example:
+    order_bead_best(df_resumeBeadsQuality)
+    """
+    noerror_per_bead = df_resumeBeadsQuality.res.groupby(
+                                                    'bead').count().iloc[:,1]
+    noerror_per_bead = pd.DataFrame(noerror_per_bead)
+    noerror_per_bead.columns = ['nb_noerrors']
+    return noerror_per_bead.sort_values(
+            by='nb_noerrors',ascending = False).reset_index().bead[::-1]
 
 
 #Auxiliary function TypeError: outputs a dataframe columns are the tracks rows the beads,
 #each cell contains the status of the bead: noError, extent>0.5,...
 def typeError(df_resumeBeadsQuality,orderbeads,ordertracks):
     """
-    (output from resumeBeadsQuality,list of int,list of str) -> pandas df
-    Input:  output from resumeBeadsQuality,list of beads order,list of tracks order
-    Output: dataframe of status of bead per track. The cell [bd,trk] is 0 contains the name of the most common error for bd in trk.
+    (output from resumeBeadsQuality,list of int,list of str)->pandas df
+    Input:  output from resumeBeadsQuality,list of beads order,list of tracks
+    order
+    Output: dataframe of status of bead per track. The status can be noError,
+    fixed, missing, errors>=1
     Example:
-    typeError(df_resumeBeadsQuality_single,order_beads_normal_single,order_tracks_chrono_single)
-    """ 
-    df_resumeBeadsQuality = df_resumeBeadsQuality.assign(mostCommonError =df_resumeBeadsQuality.set_index(['bead','track']).idxmax(axis=1).values)
-    df_resumeBeadsQuality = df_resumeBeadsQuality.assign(mostCommonError = np.where(df_resumeBeadsQuality.set_index(['bead','track']).max(axis=1)==0,
-'noError',
-df_resumeBeadsQuality['mostCommonError']))
-    df_resumeBeadsQuality = df_resumeBeadsQuality[['bead','track', 'mostCommonError']]
+    typeError(df_resumeBeadsQuality_single,
+              order_beads_normal_single,
+              order_tracks_chrono_single)
+    """
+    df = df_resumeBeadsQuality.detail.set_index(['bead','track'])
+    df['missing'] = df.apply(
+            lambda x: 1000000 if x[df.columns[0]] == 'missing' else 0, axis=1)
+    df['fixed'] = df.apply(
+            lambda x: 5000000 if x[df.columns[0]] == 'fixed' else 0, axis=1)
+
+    df = df.replace('fixed', 5).replace('missing',1)
+    df = df.astype('float', copy=False)
+
+    df = df.assign(mostCommonError = df.idxmax(axis=1).values)
+    df = df.assign(mostCommonError = np.where(
+        df.max(axis=1) == 0,
+        'noError',
+        df.mostCommonError))
+    df = df.assign(mostCommonError = np.where(
+        (df.max(axis=1)>0) & (df.max(axis=1)<1000000),
+        'errors>=1',
+        df.mostCommonError))
+    
+    df = df.reset_index()[['bead','track', 'mostCommonError']]
 
     aux = pd.DataFrame('', index=orderbeads, columns=ordertracks)
 
-    for bd in df_resumeBeadsQuality['bead'].unique():
-        for trk in df_resumeBeadsQuality['track'].unique():
-            aux.loc[bd][trk] = df_resumeBeadsQuality[(df_resumeBeadsQuality['bead']==bd) & (df_resumeBeadsQuality['track']==trk)].mostCommonError.values[0]
-
+    for bd in df['bead'].unique():
+        for trk in df['track'].unique():
+            aux.loc[bd][trk] = df[
+                    (df['bead']==bd) & (df['track']==trk)].mostCommonError.values[0]
     return aux
    
-
-#Function barBeadsByType that outputs a stacked bar chart (pandas) with percentage beads by their status
-def barBeadsByType(df_typeerror_single,ordertracks):
-    """
-    (output of typeError,list of str)-> pandas stacked bar chart
-    Input: output from typeError for a single track, list of tracks order
-    Output: stacked bar chart with the percentage of beads by their status
-    Example: barBeadsByType(df_typeError_single,order_tracks_chrono_single)
-    """
-
-    data_counts = df_typeerror_single[ordertracks[0]].value_counts()
-
-    dict_msg = {'noError':0, 'extent<0.5':0, 'hfsigma<0.0001':0, 'hfsigma>0.01':0, 'pop<80%':0, 'sat>90%':0}
-    msg = [dict_msg]
-    dict_aux = {'noError':0 if ('noError' in set(dict_msg.keys()).difference(data_counts.index) ) else data_counts.loc[['noError']].values[0] ,
-                'extent<0.5':0 if ('extent<0.5' in set(dict_msg.keys()).difference(data_counts.index) ) else data_counts.loc[['extent<0.5']].values[0],
-                'hfsigma<0.0001':0 if ('hfsigma<0.0001' in set(dict_msg.keys()).difference(data_counts.index) ) else data_counts.loc[['hfsigma<0.0001']].values[0] ,
-                'hfsigma>0.01':0 if ('hfsigma>0.01' in set(dict_msg.keys()).difference(data_counts.index) ) else data_counts.loc[['hfsigma>0.01']].values[0] ,
-                'pop<80%':0 if ('pop<80%' in set(dict_msg.keys()).difference(data_counts.index) )  else data_counts.loc[['pop<80%']].values[0] ,
-                'sat>90%':0 if ('hfsigma<0.0001' in set(dict_msg.keys()).difference(data_counts.index) ) else data_counts.loc[['sat>90%']].values[0]
-                }
-    msg.append(dict_aux)
-    del msg[0]
-    msg = list(msg)
-    msg = pd.DataFrame(msg)
-    msg = msg[['noError','extent<0.5','hfsigma<0.0001', 'hfsigma>0.01','pop<80%','sat>90%']]
-    msg.index = ordertracks
-    mycolors = [ "#006400","#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"]
-    ax = pd.DataFrame(msg.transpose()).transpose().plot(kind='barh',
-                                                        stacked=True,
-                                                        color = mycolors)
-    # create a list to collect the plt.patches data
-    totals = []
-
-    # find the values and append to list
-    for i in ax.patches:
-        totals.append(i.get_width())
-        totals = [t for t in totals if t!=0]
-        total = sum(totals)
-
-    # set individual bar lables using above list
-    acc = 0
-    counter = 0
-    yshift = [-0.03, 0.55, -0.03, 0.55, -0.03, 0.55]
-    for i in ax.patches:
-        if  i.get_width()!=0:
-            # get_width pulls left or right; get_y pushes up or down
-            x = acc + i.get_width()/2
-            ax.text(x-1.8, i.get_y()+yshift[counter], \
-                str(round((i.get_width()/total)*100, 1))+'%', fontsize=15,
-                color=mycolors[counter])
-            acc = acc + i.get_width()
-        counter = counter+1
-
-    ax.invert_yaxis()
-    plt.xlabel('Nb of beads',fontsize=15)
-    mylegend = plt.legend()
-    mylegend.get_texts()[0].set_text('No Error')
-    mylegend.get_texts()[1].set_text(r'$\Delta z$ too small')
-    mylegend.get_texts()[2].set_text(r'$\sigma[HF]$ too low')
-    mylegend.get_texts()[3].set_text(r'$\sigma[HF]$ too high')
-    mylegend.get_texts()[4].set_text(r'not enough points/cycles')
-    mylegend.get_texts()[5].set_text(r'non-closing')
-    ax.figure.set_size_inches(20,15)
-    ax.set_axisbelow(True)
-    ax.yaxis.grid(which="major", color='black', linestyle='-', linewidth=0)
-    ml = MultipleLocator(10)
-    ax.xaxis.set_minor_locator(ml)
-    ax.xaxis.grid(which='minor', color='black', linestyle='--', linewidth=0.8, alpha=0.3)
-    rc={'font.size': 20, 'axes.labelsize': 15, 'legend.fontsize': 16, 
-        'axes.titlesize': 20, 'xtick.labelsize': 15, 'ytick.labelsize': 20}
-    plt.rcParams.update(**rc) 
-    return ax
-
-#Create a dataframe fit to holoviews with nested categories. Columns are [bead track typeOfError nbErrors]
-#one row correspond to one beads, in one specific track, that has nbErrors of the specific typeOfError
-def dfCleaningMessages(tracks,orderbeads,ordertracks=None):
-    """
-    (tracks,list,list) -> pandas df
-    Input: track or DictTrack, list of beads order, list of tracks order
-    Output: pandas df with columns Index, NbErrors, bead, track, typeOfError.
-    Create a dataframe for holoviews with nested categories. One row correspond to one bead, in one specific track that has nbErrors of the specific typeOfError.
-    Example: 
-    dfCleaningMessages(track,order_beads_normal_single)
-    dfCleaningMessages(tracks,order_beads_normal,order_tracks_chrono)
-    """
-    try:
-        tracks.keys()
-        is_dict=True
-    except AttributeError:
-        is_dict = False
-
-    dfmsg = tracks.cleaning.messages()
-
-    #replace labels and names of columns
-    dfmsg_reset = dfmsg.reset_index()
-    dfmsg_reset = dfmsg_reset[['bead','key','message','cycles']] # ,'types','bead'
-    dfmsg_reset.rename(columns={"bead":"bead","key": "track", "message": "typeOfError", "cycles":"NbErrors"},inplace=True)
-    dfmsg_reset.replace('< 0.50','extent<0.5',inplace=True)
-    dfmsg_reset.replace('< 80%' ,'pop<80%',inplace=True)
-    dfmsg_reset.replace('< 0.0001','hfsigma<0.0001',inplace=True)
-    dfmsg_reset.replace('> 0.0100','hfsigma>0.01',inplace=True)
-    dfmsg_reset.replace('> 90%','sat>90%',inplace=True)
-
-#### COMPLETE THE DF WITH 0's WHERE THERE IS NO INFORMATION ################
-###HOW TO ADD ONE ROW TO DATAFRAME
-#df_test = pd.DataFrame([{'bead':0,'track':'GAG','typeOfError':'pop<80%','NbErrors':0}])
-#dfmsg_reset = dfmsg_reset.append(df_test)
-
-    alltypes = {'extent<0.5','pop<80%','hfsigma<0.0001','hfsigma>0.01','sat>90%'}
-    if is_dict:
-        for bead in orderbeads:
-            for trk in ordertracks:
-                presenttypes = set(dfmsg_reset[(dfmsg_reset['bead']==int(bead)) & (dfmsg_reset['track']==trk)]['typeOfError'])
-                missingtypes = alltypes - presenttypes
-                if len(missingtypes)>0:
-                    for adderror in missingtypes:
-                        df_test = pd.DataFrame([{'bead':int(bead),'track':str(trk),'typeOfError':adderror,'NbErrors':0}])
-                        dfmsg_reset = dfmsg_reset.append(df_test)
-    else:
-        for bead in orderbeads:
-            presenttypes = set(dfmsg_reset[(dfmsg_reset['bead']==int(bead))]['typeOfError'])
-            missingtypes = alltypes - presenttypes
-            if len(missingtypes)>0:
-                for adderror in missingtypes:
-                    df_test = pd.DataFrame([{'bead':int(bead),'track':tracks.key,'typeOfError':adderror,'NbErrors':0}])
-                    dfmsg_reset = dfmsg_reset.append(df_test)
-
-    dfmsg_reset = dfmsg_reset.reset_index()
-
-    if is_dict:
-        #to sort from best to worst track
-        dfmsg_reset.track = dfmsg_reset.track.astype("category")
-        dfmsg_reset.track = dfmsg_reset.track.cat.set_categories(ordertracks,ordered=True)
-        dfmsg_reset.sort_values(by='track',inplace=True) 
-
-    #dfmsg_reset.sort_values(by=['bead'])[dfmsg_reset.sort_values(by=['bead'])['bead']==40].sort_values(by='track')
-    return dfmsg_reset
-
-
-#Function barBeads that outputs a bar chart per bead, with columns tracks where the
-#y-axis represents the number of errors (per type of error) for that bead 
-#in the specific track
-def barBeads(tracks,df_dfGoodBadBeads,dfmsg,ordertracks,orderbeads):
-    """
-    (tracks,output dfGoodBadBeads,output dfCleaningMessages,list,list) -> holoviews bar chart
-    Input: track or DictTrack, output of dfGoodBadBeads, output of dfCleaningMessages, list of tracks order, list of beads order
-    Output: holoviews bar chart per bead. The y-axis represents the number of errors (per type of error) for that bead in the corresponding track
-    Example: 
-    barBeads(track,df_dfGoodBadBeads_single,dfmsg_single,order_tracks_chrono_single,order_beads_normal_single)
-    """
-    try:
-        tracks.keys()
-        is_dict=True
-    except AttributeError:
-        is_dict = False
-
-    #%%output size = 300
-    #%%opts Bars [category_index=2 stack_index=0 group_index=1 legend_position='top' legend_cols=7 color_by=['stack'] tools=['hover']] 
-    ###%%opts Bars.Stacked [stack_index='typeOfError'  ]  
-    ### %%opts Bars.Grouped [group_index='typeOfError'  ] 
-    ### %%opts Bars.Stacked (color=Cycle(values=["#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"]))
-    #    %%
-    #%%opts Bars (color=Cycle(values=["#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"]))
-
-    #%%opts Bars.Stacked (color=Cycle(values=["#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"]))
-
-    ordertracks = np.asarray(ordertracks)
-    orderbeads = np.asarray(orderbeads)
-    #orderbeads = list(orderbeads.astype(str))
-    #title_format="tt"+badbead]
-    ### HOLOVIEWS STACKED BAR ###
-    # http://holoviews.org/reference/elements/bokeh/Bars.html
-
-    #data_pc = df_dfGoodBadBeads[np.insert(ordertracks,0,'bead')]
-    data_pc = df_dfGoodBadBeads.set_index('bead')
-    goodpc = data_pc.astype('float').sum(axis=1)
-    goodpc = goodpc.astype('float')
-    N = len(ordertracks)
-
-    def holo_bars(bead):
-        copy = dfmsg
-        copy = copy[copy['bead']==bead]
-        copy = copy[['track','typeOfError','NbErrors']] 
-        if is_dict:
-            copy = copy.sort_values(['track','typeOfError'])
-            #trackcount = N-goodpc.loc['{:.0f}'.format(bead)])
-            #mytitle = ("Bad Bead in {trackcount:.0f} out of {alltracks:.0f} ({pc:.1f} %)"
-             #           .format(trackcount = N-goodpc.loc['{:.0f}'.format(bead)],
-             #                   alltracks = N,
-             #                   pc = (N-goodpc.loc['{:.0f}'.format(bead)])/N*100)
-             #           )
-
-            #mytitle= 'Bad Bead in '+ '{:.0f}'.format(N-goodpc.loc['{:.0f}'.format(bead)]) + ' out of '+ str(N) + '{:.0f}'.format(goodpc.loc['{:.0f}'.format(bead)]) #
-            #mytitle ='Bad Bead in '+'{:.0f}'.format((N-goodpc.loc[bead]))+' out of '+str(N)+' tracks ('+str(round((N-goodpc.loc[bead])/N*100,1))+'%) -' 
-            ##### to debug####  'nada '+ '{:.0f}'.format((N-goodpc.loc[bead])) # '{:.0f}'.format(N-goodpc.loc['{:.0f}'.format(bead)])#
-        else:
-            copy = copy.sort_values(['track','typeOfError'])
-            mytitle= 'Bad bead -' if N-goodpc.loc[bead]!=0 else 'Good Bead -'
-        if not is_dict:
-            copytable = hv.Table(copy)
-            barplot = copytable.to.bars(['typeOfError', 'track'], 'NbErrors', [],label=mytitle).redim.range(NbErrors=(0,200))
-            #barplot = hv.Bars(copy,  ['track','typeOfError'], ['NbErrors'],group='Grouped',label=mytitle).redim.range(NbErrors=(0, 600)) #,group='Stacked'
-            #barplot.relabel(group='Stacked')
-        else:
-            barplot = hv.Bars(copy,  ['track','typeOfError'], ['NbErrors'],group='Stacked').redim.range(NbErrors=(0, 600)) #,group='Stacked'
-
-        axes_opts = {'xrotation': 45}
-        return barplot.opts(plot=axes_opts)#.relabel(group='Grouped')#*hv.Text(0, 400, 'Quadratic Curve')
-        #return barplot
-
-    dmap = hv.DynamicMap(holo_bars, kdims=['bead'])
-    # dmap.redim.values(badbead = sorted(tracks.availablebeads())) #normal sort
-
-    #TO DEBUG
-    #hvbar_single = barBeads(track,df_dfGoodBadBeads[['bead','AGC']],dfmsg[dfmsg.track=='AGC'],order_tracks_chrono_single,order_beads_normal_single)
-    #hvbar_single
-    mybeads = [float(i) for i in orderbeads]
-    return dmap.redim.values(bead = mybeads).redim(NbErrors = "Count")
-
-
-#Function heatmapBeadsByStatus that outputs seaborn heatmap with the number of good beads per track, and bad goods by type of error
-def heatmapBeadsByStatus(df_resumeBeadsQuality,ordertracks,pc=True, order = 'chrono'):
+#
+#Function heatmapTracksStatus that outputs seaborn heatmap with the number
+#of good beads per track, and bad goods by type of error
+def heatmap_tracks_status(df_resumeBeadsQuality,ordertracks,pc=True, order = 'chrono'):
     """
     (output resumeBeadsQuality, list, bool, str) -> seaborn heatmap
-    Input: df_resumeBeadsQuality is the output of the function resumeBeadsQuality, list of tracks order, percentage True or False, order 'chrono' for chronological and 'best' for from best to worst
-    Output: 2 seaborn heatmaps side to side. Columns are types of Error and rows are tracks. Each cell presents the percentage of appearance of the specific error at the specific track
+    Input: df_resumeBeadsQuality is the output of the function resumeBeadsQuality,
+    list of tracks order, percentage True or False, order 'chrono' for
+    chronological and 'best' for from best to worst
+    Output: 2 seaborn heatmaps side to side. Columns are types of Error and
+    rows are tracks. Each cell presents the percentage of appearance of the
+    specific error at the specific track
     Example:
-    heatmapBeadsByStatus(df_resumeBeadsQuality,order_tracks_chrono)
+    heatmapTracksStatus(df_resumeBeadsQuality,order_tracks_chrono)
     """
-    
-    df_resumeBeadsQuality = df_resumeBeadsQuality[['bead','track',
-                                        'extent<0.5','hfsigma<0.0001',
-                                        'hfsigma>0.01','sat>90%','pop<80%']]
-    df_resumeBeadsQuality = df_resumeBeadsQuality.assign(mostCommonError = df_resumeBeadsQuality.set_index(['bead','track']).idxmax(axis=1).values)
-    df_resumeBeadsQuality = df_resumeBeadsQuality.assign(mostCommonError = np.where(df_resumeBeadsQuality.set_index(['bead','track']).max(axis=1)==0, 'noError', df_resumeBeadsQuality['mostCommonError']))
-    df_resumeBeadsQuality['mostCommonError'] = df_resumeBeadsQuality['mostCommonError'].fillna('missing')
+    #set first two columns bead and track
+    df_resumeBeadsQuality = df_resumeBeadsQuality.set_index(
+                                                         ['bead','track']).reset_index()
+    df_resumeBeadsQuality = df_resumeBeadsQuality.assign(
+                            mostCommonError = df_resumeBeadsQuality.set_index(
+                                ['bead','track']).idxmax(axis=1).values)
+    df_resumeBeadsQuality = df_resumeBeadsQuality.assign(
+                            mostCommonError = np.where(
+                                df_resumeBeadsQuality.set_index(
+                                    ['bead','track']).max(axis=1)==0,
+                                'noError', df_resumeBeadsQuality['mostCommonError']))
+    df_resumeBeadsQuality['mostCommonError'] = df_resumeBeadsQuality[
+            'mostCommonError'].fillna('missing/fixed')
     if pc:
         data_discarded = pd.crosstab(df_resumeBeadsQuality['track'], 
-                                     df_resumeBeadsQuality['mostCommonError'], normalize='index')*100
+                                     df_resumeBeadsQuality[
+                                         'mostCommonError'], normalize='index')*100
     else:
         data_discarded = pd.crosstab(df_resumeBeadsQuality['track'],
                                      df_resumeBeadsQuality['mostCommonError'])
-    errors = ['extent<0.5','hfsigma<0.0001','hfsigma>0.01','sat>90%','pop<80%','missing','noError']
+    errors = list(df_resumeBeadsQuality.set_index(
+        ['bead','track','mostCommonError']).columns) + ['missing/fixed','noError']
+    outputtable = data_discarded.copy()
     data_discarded = data_discarded.reindex(columns = errors,
                                                        fill_value=0)
     
     data_discarded = data_discarded.loc[ordertracks]
- #   data_discarded = data_discarded.sort_values(['noError'],ascending=False)
-
+    total_beads = len(df_resumeBeadsQuality['bead'].unique())
     fig, ax =plt.subplots(ncols=2)
     fig.set_size_inches(16, 18)
     myfmt = '.1f' if pc else '.0f'
@@ -475,163 +450,100 @@ def heatmapBeadsByStatus(df_resumeBeadsQuality,ordertracks,pc=True, order = 'chr
     noError_beads = sns.heatmap(data_discarded[['noError']],
                                 annot=True,
                                 fmt=myfmt,
-                                cmap='Greens',
+                                cmap='Blues',
                                 vmin = 0,
-                                vmax = 100,
+                                vmax = 100 if pc else total_beads,
                                 linewidths=0.5,
                                 ax=ax[0],
                                 square=True)
     noError_beads.set_yticklabels(noError_beads.get_yticklabels(),rotation=0)
     noError_beads.set_xticklabels(['No Error'])
     noError_beads.set_xticklabels(noError_beads.get_xticklabels(),rotation=30)
-    total_beads = len(df_resumeBeadsQuality['bead'].unique())
     ax[0].set_title(prefix_title+' of Beads Status = No Error (Total {:.0f} beads)'.format(total_beads))
     ax[0].set_xlabel('')
-    ax[0].set_ylabel('Tracks ('+['chronological' if order=='chrono' else 'best-to-worst'][0]+' order top-to-bottom)')
+    ax[0].set_ylabel('Tracks ('+[
+        'chronological' if order=='chrono' else 'best-to-worst'][0]+' order top-to-bottom)')
     data_discarded.pop('noError')
     error_beads = sns.heatmap(data_discarded,
                                 annot=True,
                                 fmt=myfmt,
                                 vmin = 0,
-                                vmax = 100,
+                                vmax = 100 if pc else total_beads,
                                 cmap='Reds',
                                 linewidths=0.5,
                                 ax=ax[1])
-    error_beads.set_xticklabels(error_beads.get_xticklabels(),rotation=30)
-    error_beads.set_xticklabels([r'$\Delta z$ too small',
-                                r'$\sigma[HF]$ too low',
-                                r'$\sigma[HF]$ too high',
-                                r'not enough points/cycles',
-                                r'non-closing',
-                                r'missing'])
-    error_beads.set_xticks([0,1,2,2.7,4.2,5.2])
+    error_beads.set_xticklabels(error_beads.get_xticklabels(),rotation=40)
     error_beads.set_yticklabels(error_beads.get_yticklabels(),rotation=0)
 
     ax[1].set_title(prefix_title+' of Beads by Status (Total {:.0f} beads)'.format(total_beads))
     ax[1].set_xlabel('')
-    ax[1].set_ylabel('Tracks ('+['chronological' if order=='chrono' else 'best-to-worst'][0]+' order top-to-bottom)')
+    ax[1].set_ylabel('Tracks ('+[
+        'chronological' if order=='chrono' else 'best-to-worst'][0]+' order top-to-bottom)')
     plt.tight_layout()
-    return ax
-
-
-#Function heatmapGoodBad that outputs bokeh heatmap with the status the beads per track (Good or Bad beads)
-def heatmapGoodBad(df_dfGoodBadBeads,ordertracks):
-    """
-    (output dfGoodBadBeads, list) -> bokeh heatmap
-    Input: df_resumeBeadsQuality is the output of the function resumeBeadsQuality, list of tracks order, percentage True or False, order 'chrono' for chronological and 'best' for from best to worst
-    Output: bokeh heatmap with the quality of the beads per track 
-    Example:
-    heatmapBeadsByType(df_resumeBeadsQuality,order_tracks_chrono)
-    """
-    df_dfGoodBadBeads['bead'] = df_dfGoodBadBeads['bead'].astype(str)
-    df_dfGoodBadBeads = df_dfGoodBadBeads.set_index('bead')
-    df_dfGoodBadBeads.columns.name = 'track'
-    df_dfGoodBadBeads=df_dfGoodBadBeads.transpose()
-
-    plotbeads = list(df_dfGoodBadBeads.columns)
-    plottracks = ordertracks #list(df_dfGoodBadBeads.index) #this is order_tracks_chrono if we used that as the order before, otherwise it is best to worst
-
-    # reshape to 1D array 
-    df = pd.DataFrame(df_dfGoodBadBeads.stack(), columns=['quality']).reset_index()
-
-    # colormap
-    colors = [ "#8B0000","#006400"] #[ "#550b1d","#75968f"] #
-    mapper = LinearColorMapper(palette=colors,  low=df.quality.min(), high=df.quality.max())
-    source = ColumnDataSource(df)
-
-    TOOLS = "hover,save,pan,box_zoom,reset,wheel_zoom"
-
-    p = figure(title="Bead quality",
-                x_range=plottracks,
-                y_range=plotbeads,
-                x_axis_location="above",
-                plot_width=1000,
-                plot_height=1500,
-                tools=TOOLS,
-                toolbar_location='below')
-    p.grid.grid_line_color = None
-    p.axis.axis_line_color = None
-    p.axis.major_tick_line_color = None
-    p.axis.major_label_text_font_size = "10pt"
-    p.axis.major_label_standoff = 5
-    p.axis.axis_label_standoff = 10
-    p.xaxis.major_label_orientation = pi / 3
-
-    p.rect(x="track", y="bead", width=1, height=1,
-    source=source,
-    fill_color={'field': 'quality', 'transform': mapper},
-    line_color=None)
-
-    color_bar = ColorBar(color_mapper=mapper,
-                         major_label_text_font_size="9pt",
-                         ticker=BasicTicker(desired_num_ticks=len(colors)),
-                         formatter=PrintfTickFormatter(format="%s"),
-                         label_standoff=10,
-                         border_line_color=None,
-                         location=(1, 0),
-                         major_label_overrides={0:'Bad Beads',0.5:'',1:'Good Beads'},
-                         major_tick_out=20)
-
-    p.add_layout(color_bar, 'right')
-
-    p.select_one(HoverTool).tooltips = [
-    ('Bead/Track', '@bead @track'),
-    ('Quality', '@quality'),
-    ]
-    return p
-
-
-def heatmapGoodBadDetailed(df_state_beads,ordertracks,orderbeads):
+    from collections import namedtuple
+    Results = namedtuple('Results', ['table','display'])
+    output = Results(table=outputtable,display=ax)
+    return output
+#
+def heatmap_status(df_state_beads,ordertracks,orderbeads):
     """
     (output resumeBeadsQuality, list,list) -> bokeh heatmap
-    Input: df_resumeBeadsQuality is the output of the function resumeBeadsQuality, list of tracks order
+    Input: df_resumeBeadsQuality is the output of the function
+    resumeBeadsQuality, list of tracks order
     Output: bokeh heatmap with the status of the beads per track
     Example:
-    heatmapGoodBadDetailed(df_resumeBeadsQuality,order_tracks_chrono,order_beads_best)
+    heatmapGoodBadDetailed(df_resumeBeadsQuality,
+                           order_tracks_chrono,
+                           order_beads_best)
     """
 
     orderbeads = np.asarray(orderbeads)
-    df_state_beads = df_state_beads.assign(mostCommonError =df_state_beads.set_index(['bead','track']).idxmax(axis=1).values)
-    df_state_beads = df_state_beads.assign(mostCommonError = np.where(df_state_beads.set_index(['bead','track']).max(axis=1)==0,
-                        'noError',
-                        df_state_beads['mostCommonError']))
-    df_state_beads = df_state_beads[['bead','track', 'mostCommonError']]
-
+    df_state_beads = df_state_beads.assign(
+        mostCommonError =df_state_beads.set_index(
+            ['bead', 'track']).idxmax(axis=1).values)
+    df_state_beads = df_state_beads.assign(
+        mostCommonError = np.where(df_state_beads.set_index(
+            ['bead', 'track']).max(axis=1)==0,'noError',
+                                   df_state_beads['mostCommonError']))
+    df_state_beads = df_state_beads[['bead', 'track', 'mostCommonError']]
     plotbeads = orderbeads # df_state_beads['bead'].unique()
-    plottracks = ordertracks # if order=='chrono' else order_tracks_best
+    plottracks = ordertracks
     aux = pd.DataFrame('', index=plottracks, columns=plotbeads)
 
     for bd in plotbeads:
         for trk in plottracks:
-            aux.loc[trk][bd] = df_state_beads[(df_state_beads['bead']==bd) & (df_state_beads['track']==trk)].mostCommonError.values[0]
+            aux.loc[trk][bd] = df_state_beads[
+                    (df_state_beads['bead']==bd) & 
+                    (df_state_beads['track']==trk)].mostCommonError.values[0]
 
-    # reshape to 1D array 
+    # reshape to 1D array
     df = pd.DataFrame(aux.stack(), columns=['typeError']).reset_index()
+    iterativeTypeError = list(df['typeError'].unique())
+    iterativeTypeError.remove('noError')
+    iterativeTypeError.insert(0, 'noError')
+    for i, err in enumerate(iterativeTypeError):
+        df['typeError'] = np.where(df['typeError'] == err, int(i), df['typeError'])
 
-    df['typeError'] = np.where(df['typeError']=='noError',int(0),df['typeError'])
-    df['typeError'] = np.where(df['typeError']=='extent<0.5',int(1),df['typeError'])
-    df['typeError'] = np.where(df['typeError']=='hfsigma<0.0001',int(2),df['typeError'])
-    df['typeError'] = np.where(df['typeError']=='hfsigma>0.01',int(3),df['typeError'])
-    df['typeError'] = np.where(df['typeError']=='pop<80%',int(4),df['typeError'])
-    df['typeError'] = np.where(df['typeError']=='sat>90%',int(5),df['typeError'])
-
-    df.columns = ['track','bead','typeError']
-    df['typeError'] = df['typeError'].apply(pd.to_numeric,errors='coerce') 
-
+    df.columns = ['track', 'bead', 'typeError']
+    df['typeError'] = df['typeError'].apply(pd.to_numeric, errors='coerce')
+    nberrors = df['typeError'].unique()
 # colormap
-    colors = [ "#006400","#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"] #
+    myreds = ["#B22222", "#8B008B", "#C71585", "#FF4500",
+              "#CD6600", "#F08080", "#FF9912", "#B8860B",
+              "#8A360F"]
+    colors = ["#4169E1"] +  myreds[0:(len(nberrors)-2)] 
 
-    mapper = LinearColorMapper(palette=colors, low=0,high=5) #low=df.typeError.min(), high=df.typeError.max())
-
-    #source = ColumnDataSource(df)
-    source=df
+    
+    mapper = LinearColorMapper(palette=colors, low=0, high=len(colors))
+    #low=df.typeError.min(), high=df.typeError.max())
+    labelsDict = dict(enumerate(iterativeTypeError))
+    source = ColumnDataSource(df)
     df['bead'] = df['bead'].astype(str)
-
     TOOLS = "hover,save,pan,box_zoom,reset,wheel_zoom"
 
     plotbeads = plotbeads.astype(str) #change to string for the figure
 
-    p = figure( plot_width=1000,
+    p = figure(plot_width=1000,
                 plot_height=1500,
                 title="Bead Status",
                 x_range=plottracks,
@@ -649,20 +561,42 @@ def heatmapGoodBadDetailed(df_state_beads,ordertracks,orderbeads):
     p.xaxis.major_label_orientation = pi / 3
 
     p.rect(x="track", y="bead", width=1, height=1, source=df,
-    fill_color={'field': 'typeError', 'transform': mapper},
-    line_color=None)
+        fill_color={'field': 'typeError', 'transform': mapper},
+        line_color='grey')
+    ############ to customize the color bar not used #########
+    #def frange(start, stop, step):
+    #    i = start
+    #    while i < stop:
+    #        yield i
+    #        i+=step
+    #myticks = []
+    #for i in frange(0.5,len(colors),1):
+    #    myticks.append(i)
+    #ticker = FixedTicker(ticks = myticks)
+    
+    #formatter_keys = myticks
+    #formatter_values = iterativeTypeError
+    #formatter_dict = dict(zip(formatter_keys,formatter_values))
 
-    color_bar = ColorBar(color_mapper=mapper, major_label_text_font_size="13pt",
-    ticker=BasicTicker(desired_num_ticks=len(colors)),
-    formatter=PrintfTickFormatter(format="%s"),
-    label_standoff=20, border_line_color=None, location=(1, 0),
-    major_label_overrides={0:'noError',
-                           1:'extent<0.5',
-                           2:'hfsigma<0.0001',
-                           3:'hfsigma>0.01',
-                           4:'pop<80%',
-                           5:'sat>90%'}, major_tick_out=20)
+    #formatter_funct = FuncTickFormatter(code="""
+    #    data = {0.5: a, 1.5:'b', 2.5:'c', 3.5:'d', 4.5:'e', 5.5:'f', 6.5:'g'}
+    #    return data[tick]
+    #""")
+    ################## end customize not used #################
 
+    color_bar = ColorBar(color_mapper=mapper,
+                         major_label_text_font_size="10pt",
+                         major_label_text_align = 'center',
+                         #ticker=ticker, 
+                         ticker = BasicTicker(desired_num_ticks=len(colors)),
+                         #formatter=CategoricalTickFormatter(tags=iterativeTypeError),
+                         formatter=PrintfTickFormatter(format="%s"),
+                         #formatter = formatter_funct,
+                         label_standoff=15,
+                         border_line_color=None, location=(0, 0),
+                         major_label_overrides= labelsDict,
+                         major_tick_out=20
+                          )
     p.add_layout(color_bar, 'right')
 
     p.select_one(HoverTool).tooltips = [
@@ -688,14 +622,11 @@ def flowBeads(df_sankey,first_track = None,last_track=None):
     df_sankey = df_sankey[[first_track, last_track]]
 
 #colors3 = [ "#006400","#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"] #
-
-    colorDict =  {'noError':'#006400',
-                  'extent<0.5':'#B22222',
-                  'hfsigma<0.0001':'#8B008B',
-                  'hfsigma>0.01':'#C71585',
-                  'sat>90%':'#FF4500', 
-                  'pop<80%':'#FF7F50', 
-                  'missing':'#00BFFF'}
+    
+    colorDict =  {'noError':'#4169E1',
+                  'fixed':'#FF6103',
+                  'errors>=1':'#87CEEB',
+                  'missing':'#CD0000'}
 
     df_sankey.reset_index()
     df_sankey = df_sankey.reset_index()[[first_track,last_track]]
@@ -704,18 +635,12 @@ def flowBeads(df_sankey,first_track = None,last_track=None):
                   aspect=20,
                   colorDict=colorDict,
                   fontsize=12,
-                  leftLabels=['pop<80%',
-                              'sat>90%',
-                              'hfsigma>0.01',
-                              'hfsigma<0.0001',
-                              'extent<0.5',
+                  leftLabels=['errors>=1',
+                              'fixed',
                               'missing',
                               'noError'],
-                  rightLabels=['pop<80%',
-                               'sat>90%',
-                               'hfsigma>0.01',
-                               'hfsigma<0.0001',
-                               'extent<0.5',
+                  rightLabels=['errors>=1',
+                               'fixed',
                                'missing',
                                'noError'])
     plt.gcf().set_size_inches(12,12)
