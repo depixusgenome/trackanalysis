@@ -231,4 +231,4 @@ def createview(main, controls, views):
     "Creates a main view"
     controls = (SuperController,)+tuple(controls)
     views    = (main,)+tuple(views)
-    return ConfigurationIO.createview((SuperController,)+controls, (main,)+views)
+    return ConfigurationIO.createview((SuperController,)+controls, views)

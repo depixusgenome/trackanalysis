@@ -180,8 +180,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
     def observe(self, ctrl):
         "observes the model"
         super().observe(ctrl)
-        self._model.settosame(ctrl)
-        self._model.observe(ctrl)
+        self._model.setobservers(ctrl)
         for widget in self._widgets.values():
             widget.observe(ctrl)
 

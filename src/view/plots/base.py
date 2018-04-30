@@ -655,12 +655,9 @@ class PlotView(Generic[PlotType], BokehView):
 
     def observe(self, ctrl):
         "sets up observers"
-        self._model.settaskmodel(ctrl, "tasks")
         self._plotter.observe(ctrl)
 
     def addtodoc(self, ctrl, doc):
         "adds items to doc"
         super().addtodoc(ctrl, doc)
-        ret = self._plotter.addtodoc(ctrl, doc)
-        self._plotter.addtodoc(ctrl)
-        return ret
+        return self._plotter.addtodoc(ctrl, doc)

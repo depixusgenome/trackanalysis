@@ -162,7 +162,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
 
     def observe(self, ctrl):
         "sets-up model observers"
-        self._model.settosame(ctrl)
+        super().observe(ctrl)
         self._widgetobservers(ctrl)
 
 class CleaningView(PlotView[CleaningPlotCreator]):

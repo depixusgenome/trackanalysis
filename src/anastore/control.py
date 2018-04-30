@@ -57,7 +57,7 @@ class ConfigAnaIO(AnaIO):
 
     def save(self, path:str, models):
         u"closes an ana file"
-        curr   = self._ctrl.theme.get("tasks", "roottask")
+        curr   = self._ctrl.display.get("tasks", "roottask")
         models = [i for i in models if curr is i[0]]
 
         if len(models):

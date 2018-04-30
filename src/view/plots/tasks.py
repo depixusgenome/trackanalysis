@@ -15,15 +15,19 @@ class TaskPlotCreator(PlotCreator[TModelType]):
         if css.stretch.get(default = None) is None:
             css.defaults = {'stretch': u'Stretch (base/µm)', 'bias': u'Bias (µm)'}
 
+    def _onchangetask(self, parent = None, task = None, **_):
+        if self._model.impacts(parent, task):
+            self.reset(False)
+
+    def _onchangedisplay(self, old = None, **_):
+        self.reset('roottask' in old)
+
     def observe(self, ctrl):
         "sets-up model observers"
-        super().observe(ctrl)
-
+        self._model.settaskmodel(ctrl, "tasks")
+        ctrl.display.observe("tasks", self._onchangedisplay)
         if any(isinstance(i, TaskAccess) for i in self._model.__dict__.values()):
-            def _ontask(parent = None, task = None, **_):
-                if self._model.impacts(parent, task):
-                    self.reset(False)
-            ctrl.observe("updatetask", "addtask", "removetask", _ontask)
+            ctrl.tasks.observe("updatetask", "addtask", "removetask", self. _onchangetask)
 
     @abstractmethod
     def _addtodoc(self, ctrl, doc):

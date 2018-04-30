@@ -35,7 +35,7 @@ class TrackFileDialog(FileDialog):
             assert bopen
 
             pot = self.storedpaths(ctrl, STORAGE[0], ext)
-            if ctrl.theme.get("tasks", "roottask", None) is None:
+            if ctrl.display.get("tasks", "roottask", None) is None:
                 pot = [i for i in pot if i.suffix != '.gr']
             return self.firstexistingpath(pot)
 
@@ -307,13 +307,13 @@ class RejectedBeadsInput:
         tbar.on_change('discarded',   _ondiscarded_cb)
         tbar.on_change('accepted',    _onaccepted_cb)
 
-        @ctrl.tasks.observe("updatetask", "addtask", "removetask")
-        @ctrl.display.observe
         def _ontasks(**_):
             disc = set(bdctrl.discarded)
             acc  = set(bdctrl.allbeads) - disc
             tbar.update(accepted  = ', '.join(str(i) for i in sorted(acc)),
                         discarded = ', '.join(str(i) for i in sorted(disc)))
+        ctrl.tasks.observe("updatetask", "addtask", "removetask", _ontasks)
+        ctrl.display.observe("tasks", _ontasks)
 
         ctrl.display.updatedefaults('keystroke', delbead = _ondiscard_currentbead)
 
@@ -367,7 +367,7 @@ class FileListInput:
             if model[0] in mdls:
                 index = mdls.index(model[0])
             else:
-                cur   = ctrl.theme.get("tasks", "roottask")
+                cur   = ctrl.display.get("tasks", "roottask")
                 index = mdls.index(cur) if cur in mdls else 0
 
             tbar.update(currentfile = index, filelist = [i for i, _ in vals])
@@ -379,9 +379,9 @@ class FileListInput:
 
             lst = list(FileList.get(ctrl))
             if new >= len(lst):
-                _setfilelist(model = [ctrl.theme.get("tasks", "roottask")])
+                _setfilelist(model = [ctrl.display.get("tasks", "roottask")])
             else:
-                ctrl.theme.update("tasks", roottask = lst[new][1])
+                ctrl.display.update("tasks", roottask = lst[new][1])
 
         tbar.on_change('currentfile', _oncurrentfile_cb)
 
@@ -439,13 +439,13 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         def _ontasks(old = None, **_):
             if 'roottask' not in old:
                 return
-            root = ctrl.theme.get("tasks", "roottask")
+            root = ctrl.display.get("tasks", "roottask")
             if not root:
                 tbar.frozen = True
                 return
             tbar.frozen = True
 
-            path = ctrl.theme.get("tasks", "roottask").path
+            path = ctrl.display.get("tasks", "roottask").path
             if isinstance(path, (list, tuple)):
                 path = path[0]
 

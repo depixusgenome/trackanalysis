@@ -85,7 +85,7 @@ class TaskPlotModelAccess(PlotModelAccess):
         "set _tasksmodel to same as main"
         if name in ctrl.theme:
             self._tasksmodel = TasksModel(theme   = ctrl.theme.model(name),
-                                          display = ctrl.display.model())
+                                          display = ctrl.display.model(name))
         else:
             self._tasksmodel.theme  .name = name
             self._tasksmodel.display.name = name

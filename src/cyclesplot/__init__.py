@@ -40,8 +40,11 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
         shape = self._createraw()
         self._createhist(self._rawsource.data, shape, self._raw.y_range)
         if 'fixed' in self.defaultsizingmode().values():
-            return [self._keyedlayout(ctrl, self._raw, self._hist), self._createwidget()]
-        return [self._createwidget(), self._keyedlayout(ctrl, self._raw, self._hist)]
+            layout = [self._keyedlayout(ctrl, self._raw, self._hist), self._createwidget()]
+        layout = [self._createwidget(), self._keyedlayout(ctrl, self._raw, self._hist)]
+        self._histobservers()
+        self._widgetobservers(ctrl)
+        return layout
 
     def _reset(self):
         shape = self._DEFAULT_DATA[1]
@@ -55,11 +58,9 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
     def ismain(self, ctrl):
         WidgetMixin.ismain(self, ctrl)
 
-    def addtodoc(self, ctrl, _):
+    def observe(self, ctrl):
         "sets-up model observers"
-        self._model.settosame(ctrl)
-        self._histobservers()
-        self._widgetobservers(ctrl)
+        super().observe(ctrl)
         self._model.config.observe('eventdetection.isactive', 'binwidth', 'minframes',
                                    lambda: self.reset(False))
 

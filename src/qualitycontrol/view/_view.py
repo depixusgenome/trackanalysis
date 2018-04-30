@@ -18,7 +18,6 @@ class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
 
     def observe(self, ctrl):
         "observes the model"
-        self._model.settosame(ctrl)
         super().observe(ctrl)
         self._widgets.observe(ctrl)
         self._plots  .observe(ctrl)
