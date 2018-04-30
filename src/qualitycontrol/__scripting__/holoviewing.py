@@ -47,6 +47,25 @@ class TrackQualityControlDisplay(ItemsDisplay, qc = Track):
         self._beads = None if isellipsis(vals) else [vals] if np.isscalar(vals) else list(vals)
         return self
 
+    def dataframe(self):
+        """
+        return the temperatures in a  dataframe
+        """
+        length = np.nanmean(np.diff(self._items.phases[:,0]))
+        get    = lambda i, j: getattr(self._items.secondaries, i)[j]
+        data   = lambda i: get(i, 'value')
+        index  = lambda i: np.int32(np.round(get(i, 'index')/length))
+
+        dframe: pd.DataFrame = None
+        for i in ("tservo", "tsink", "tsample"):
+            tmp    = pd.DataFrame({i: data(i)}, index = index(i))
+            dframe = tmp if dframe is None else dframe.join(tmp) # type: ignore
+
+        vca    = self._items.secondaries.vcap
+        dframe = dframe.join(pd.DataFrame({'zmag' : vca['zmag'], 'vcap' : vca['vcap']},
+                                          index = index("vcap")))
+        return dframe.assign(track = [self._items.key]*len(dframe))
+
     def temperatures(self):
         "displays the temperatures"
         length = np.nanmean(np.diff(self._items.phases[:,0]))
@@ -103,6 +122,12 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
     def tracks(self) -> TracksDict:
         "returns selected tracks"
         return self._items[self._keys] if self._keys else self._items
+
+    def dataframe(self):
+        """
+        return the temperatures in a  dataframe
+        """
+        return pd.concat([i.qc.dataframe() for i in self._items.values()])
 
     def secondaries(self, name:str) -> Dict[str, np.ndarray]:
         "returns selected tracks' secondaries"
