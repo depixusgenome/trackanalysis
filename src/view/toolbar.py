@@ -447,7 +447,7 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
             if 'track' in items:
                 tbar.frozen = items['track'].value is items.empty
         ctrl.globals.project.observe(_onproject)
-        mods = self.defaultsizingmode(height = 50)
+        mods = self.defaultsizingmode(height = 30)
         return layouts.row([layouts.widgetbox(tbar, **mods)], **mods)
 
     def close(self):
