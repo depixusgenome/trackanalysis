@@ -3,27 +3,22 @@
 """
 Adds quality control displays
 """
+from   typing                         import Union
 import numpy  as np
 import pandas as pd
 
 from  utils.decoration                import addproperty
+from  data.trackops                   import trackname
 from  data.__scripting__.track        import Track
 from  data.__scripting__.tracksdict   import TracksDict
 
-@addproperty(Track, "qc")
-class TrackQualityControl:
+def qcdataframe(items: Union[Track, TracksDict])-> pd.DataFrame:
     """
-    Adds items that should be qc'ed.
+    return the temperatures in a  dataframe
     """
-    def __items__(self, track):
-        self._items = track
-
-    def dataframe(self):
-        """
-        return the temperatures in a  dataframe
-        """
-        length = np.nanmean(np.diff(self._items.phases[:,0]))
-        get    = lambda i, j: getattr(self._items.secondaries, i)[j]
+    def _compute(track):
+        length = np.nanmean(np.diff(track.phases[:,0]))
+        get    = lambda i, j: getattr(track.secondaries, i)[j]
         data   = lambda i: get(i, 'value')
         index  = lambda i: np.int32(np.round(get(i, 'index')/length))
 
@@ -32,20 +27,29 @@ class TrackQualityControl:
             tmp    = pd.DataFrame({i: data(i)}, index = index(i))
             dframe = tmp if dframe is None else dframe.join(tmp) # type: ignore
 
-        vca    = self._items.secondaries.vcap
-        dframe = dframe.join(pd.DataFrame({'zmag' : vca['zmag'], 'vcap' : vca['vcap']},
-                                          index = index("vcap")))
-        return dframe.assign(track = [self._items.key]*len(dframe))
+        vca    = track.secondaries.vcap
+        if vca is None:
+            dframe = dframe.assign(zmag = np.full(len(dframe), np.NaN, dtype = 'f4'),
+                                   vcap = np.full(len(dframe), np.NaN, dtype = 'f4'))
+        else:
+            dframe = dframe.join(pd.DataFrame({'zmag' : vca['zmag'], 'vcap' : vca['vcap']},
+                                              index = index("vcap")))
+        return dframe.assign(track = np.full(len(dframe), trackname(track)))
+
+    return pd.concat([_compute(i) for i in getattr(items, 'values', lambda : (items,))()])
 
 @addproperty(TracksDict, "qc")
-class TracksDictQualityControl:
+@addproperty(Track, "qc")
+class TrackQualityControl:
     """
     Adds items that should be qc'ed.
     """
+    def __init__(self, track):
+        self._items = track
+
     def dataframe(self):
         """
         return the temperatures in a  dataframe
         """
-        return pd.concat([i.qc.dataframe() for i in self._items.values()])
-
+        return qcdataframe(self._items)
 __all__: list = []

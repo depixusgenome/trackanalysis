@@ -15,6 +15,7 @@ from   data.views                    import isellipsis
 from   data.track                    import Secondaries, Track  # pylint: disable=unused-import
 from   data.__scripting__.tracksdict import TracksDict          # pylint: disable=unused-import
 from   ..computations                import extensions
+from   .                             import TrackQualityControl as _TQC
 
 class SecondariesDisplay(ItemsDisplay, display = Secondaries):
     "Displays temperatures or vcap"
@@ -51,20 +52,7 @@ class TrackQualityControlDisplay(ItemsDisplay, qc = Track):
         """
         return the temperatures in a  dataframe
         """
-        length = np.nanmean(np.diff(self._items.phases[:,0]))
-        get    = lambda i, j: getattr(self._items.secondaries, i)[j]
-        data   = lambda i: get(i, 'value')
-        index  = lambda i: np.int32(np.round(get(i, 'index')/length))
-
-        dframe: pd.DataFrame = None
-        for i in ("tservo", "tsink", "tsample"):
-            tmp    = pd.DataFrame({i: data(i)}, index = index(i))
-            dframe = tmp if dframe is None else dframe.join(tmp) # type: ignore
-
-        vca    = self._items.secondaries.vcap
-        dframe = dframe.join(pd.DataFrame({'zmag' : vca['zmag'], 'vcap' : vca['vcap']},
-                                          index = index("vcap")))
-        return dframe.assign(track = [self._items.key]*len(dframe))
+        return _TQC(self._items).dataframe()
 
     def temperatures(self):
         "displays the temperatures"
@@ -127,7 +115,7 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
         """
         return the temperatures in a  dataframe
         """
-        return pd.concat([i.qc.dataframe() for i in self._items.values()])
+        return _TQC(self._items).dataframe()
 
     def secondaries(self, name:str) -> Dict[str, np.ndarray]:
         "returns selected tracks' secondaries"

@@ -6,6 +6,7 @@ Operations on tracks
 """
 from    copy        import copy as shallowcopy, deepcopy
 from    typing      import Union, Tuple, List, Optional, TypeVar, cast
+from    pathlib     import Path
 
 import  numpy       as     np
 
@@ -127,3 +128,11 @@ def clone(trk:TRACKS)-> TRACKS:
         return type(track)(**state)
 
     return type(trk)({i: clone(j) for i, j in cast(TracksDict, trk).items()})
+
+def trackname(track:Track) -> str:
+    "returns the track name"
+    if track.key:
+        return track.key
+
+    path = track.path
+    return Path(path if isinstance(path, (str, Path)) else path[0]).stem

@@ -4,7 +4,6 @@
 from    functools               import partial
 from    typing                  import (Generic, TypeVar, Callable, Dict, Any,
                                         Union, Type, Iterator, Tuple, Optional, cast)
-from    pathlib                 import Path
 
 import  pandas                  as     pd
 import  numpy                   as     np
@@ -12,6 +11,7 @@ import  numpy                   as     np
 from    utils.inspection        import parametercount
 from    model.task.dataframe    import DataFrameTask
 from    data.track              import Track
+from    data.trackops           import trackname
 from    data.views              import TrackView
 from    .base                   import Processor, ProcessorException
 
@@ -56,11 +56,7 @@ class DataFrameFactory(Generic[Frame]):
     @staticmethod
     def trackname(track:Track) -> str:
         "returns the track name"
-        if track.key:
-            return track.key
-
-        path = track.path
-        return Path(path if isinstance(path, (str, Path)) else path[0]).stem
+        return trackname(track)
 
     @classmethod
     def indexcolumns(cls, cnt, key = None, frame = None) -> Dict[str, np.ndarray]:
