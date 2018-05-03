@@ -4,7 +4,7 @@
 Creates a tasks property and adds it to the Track
 """
 from   copy               import copy as shallowcopy
-from   typing             import Dict, Any, Union, Optional, cast
+from   typing             import Dict, Any, Tuple, Union, Optional, List, cast
 from   pathlib            import Path
 
 import anastore
@@ -49,6 +49,42 @@ class TaskDescriptor:
         self.name    = tsk.name
         self.__doc__ = tsk.tasktype().__doc__
 
+class LocalTasksContext:
+    "local tasks context"
+    def __init__(self, ctx, ctrl):
+        self.ctx     = ctx
+        self.ctrl    = ctrl.theme
+        self.changes: List[Tuple[Any, Dict[str, Any]]] = []
+
+    def change(self, name, **args):
+        "add changes"
+        self.changes.append(self.ctrl.theme.update(name, **args))
+
+    def __enter__(self):
+        changes: List[Tuple[Any, Dict[str, Any]]] = []
+
+        if self.ctx.tasks:
+            cpy = dict(self.ctrl.get("tasks", "tasks"))
+            cpy.update(self.ctx.tasks)
+            changes.append(('tasks', {"tasks": cpy}))
+
+        cleaning = []
+        if self.ctx.driftpercycle:
+            cleaning.append(Tasks.driftpercycle)
+        if self.ctx.driftperbead:
+            cleaning.append(Tasks.driftperbead)
+        if len(cleaning):
+            old      = tuple(Tasks.__base_cleaning__())
+            cleaning = old[:1] + tuple(cleaning) + old[1:] #type: ignore
+            changes.append(("scripting", dict(cleaning = cleaning)))
+
+        self.changes = [self.ctrl.update(i, **j) for i, j in changes]
+        return self
+
+    def __exit__(self, *_):
+        for i in self.changes:
+            self.ctrl.update(i['model'], **i['old'])
+
 class LocalTasks:
     """
     Allows setting specific configurations per type of tasks. For
@@ -77,20 +113,9 @@ class LocalTasks:
             return False
         return all(j == obj.tasks[i] for i, j in self.tasks.items())
 
-    def config(self) -> Dict[str, Any]:
-        "returns a dictionnary of changes to the current globals"
-        cnf      = {'tasks.'+i: j for i, j in self.tasks.items()}
-        cleaning = []
-        if self.driftpercycle:
-            cleaning.append(Tasks.driftpercycle)
-        if self.driftperbead:
-            cleaning.append(Tasks.driftperbead)
-
-        old      = list(Tasks.__base_cleaning__())
-        if len(cleaning):
-            cleaning = old[:1] + cleaning + old[1:]
-            cnf['tasks.scripting.cleaning.tasks'] = tuple(cleaning)
-        return cnf
+    def context(self, ctrl) -> LocalTasksContext:
+        "return a context"
+        return LocalTasksContext(self, ctrl)
 
     def load(self, path: Union[str, Path, list]):
         """

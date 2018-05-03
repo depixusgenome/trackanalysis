@@ -20,10 +20,19 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
-        self.css.defaults = {'beads':   PlotAttrs('color', 'circle', alpha = .5),
-                             'text':    PlotAttrs('color',  'text', text_font_style= 'bold'),
+        self.css.defaults = {'beads':   PlotAttrs('color', 'circle',
+                                                  alpha                = .7,
+                                                  nonselection_alpha   = .7,
+                                                  selection_alpha      = .7,
+                                                  nonselection_color   = 'color',
+                                                  selection_fill_color = 'color'),
+                             'text':    PlotAttrs('color',  'text',
+                                                  text_font_style      = 'bold',
+                                                  nonselection_alpha      = 1.,
+                                                  nonselection_text_color = "color",
+                                                  selection_alpha      = 1.,
+                                                  selection_text_color = 'blue'),
                              'image':   PlotAttrs('Greys256', 'image', x = 0, y = 0),
-                             'current': PlotAttrs('blue', 'circle', 10),
                              'radius'       : 1.,
                              'figure.width' : 800,
                              'figure.height': 800,
@@ -54,10 +63,8 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         self.css.tools.calib.default = 'pan,box_zoom,save'
         self._fig:         Figure           = None
         self._beadssource: ColumnDataSource = None
-        self._cursource:   ColumnDataSource = None
         self._imgsource:   ColumnDataSource = None
         self._calibsource: ColumnDataSource = None
-        self._bdctrl                        = DataSelectionBeadController(self._ctrl)
         self.__idfov:      int              = None
 
     @property
@@ -65,7 +72,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         trk = self._model.track
         return None if trk is None or trk.fov.image is None else trk.fov
 
-    def _create(self, *_):
+    def _addtodoc(self, *_):
         self._fig = figure(**self._figargs(name    = 'FoV:Fig',
                                            x_range = Range1d(0, 1),
                                            y_range = Range1d(0, 1),
@@ -81,9 +88,6 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
                                                          dw    = [1], dh = [1]))
         self.css.calib.image.addto(self._fig, **{i:i for i in ('image', 'x', 'y', 'dw', 'dh')},
                                    source = self._calibsource)
-
-        self._cursource = ColumnDataSource(**self.__curdata())
-        self.css.current.addto(self._fig, x = 'x', y = 'y', source = self._cursource)
 
         self._beadssource  = ColumnDataSource(**self.__beadsdata())
         args = dict(x = 'x', y = 'y', radius = self.css.radius.get(), source = self._beadssource)
@@ -119,12 +123,10 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
             self.__imagedata()
 
         self._bkmodels[self._beadssource].update(self.__beadsdata())
-        sel = self._beadssource.selected
-        if getattr(sel, 'indices', None):
-            self._bkmodels[sel].update(indices = [])
-        sel = self._cursource.selected
-        if getattr(sel, 'indices', None):
-            self._bkmodels[sel].update(indices = [])
+        sel  = self._beadssource.selected
+        good = [self._model.bead] if self._model.bead is not None else []
+        if getattr(sel, 'indices', None) != good:
+            self._bkmodels[sel].update(indices = good)
 
         self.__calibdata()
 
@@ -169,15 +171,6 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         self.setbounds(self._fig.x_range, 'x', [0, max(dist[:2])])
         self.setbounds(self._fig.y_range, 'y', [0, max(dist[:2])])
 
-    def __curdata(self):
-        bead = self._model.bead
-        fov  = self.__fov
-        if fov is None or bead not in fov.beads:
-            return dict(data = dict.fromkeys(('x', 'y'), []))
-
-        pos = fov.beads[bead].position
-        return dict(data = dict(x = [pos[0]], y = [pos[1]]))
-
     def __tooltips(self):
         msgs  = self._model.messages()
         trans = self.css.tooltip.type.getitems(...)
@@ -194,7 +187,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
 
         row  = self.css.tooltip.good.get()
         trk  = self._model.track
-        for bead in self._bdctrl.allbeads:
+        for bead in DataSelectionBeadController(self._ctrl).allbeads:
             if bead not in ttips:
                 ttips[bead] = [row.format(rawprecision(trk, bead))]
 
@@ -207,7 +200,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
 
         hexes = getcolors(self)
         clrs  = hexes['good'], hexes['fixed'], hexes['bad'], hexes['discarded']
-        disc  = set(self._bdctrl.discarded)
+        disc  = set(DataSelectionBeadController(self._ctrl).discarded)
         fixed = self._model.fixedbeads() - disc
         bad   = self._model.badbeads() - disc - fixed
         ttips = self.__tooltips()

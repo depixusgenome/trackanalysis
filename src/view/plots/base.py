@@ -20,6 +20,7 @@ from    bokeh.models            import (Range1d, RadioButtonGroup, Model,
 from    utils.logconfig         import getLogger
 from    utils.inspection        import templateattribute
 from    control.modelaccess     import GlobalsAccess, PlotModelAccess, PlotState
+from    model.task.application  import TaskIOTheme
 from    ..base                  import (BokehView, threadmethod, spawn,
                                         defaultsizingmode as _defaultsizingmode,
                                         SINGLE_THREAD)
@@ -625,23 +626,13 @@ class PlotView(Generic[PlotType], BokehView):
     def _ismain(self, ctrl, tasks = None, ioopen = None, iosave = None):
         "Set-up things if this view is the main one"
         self._plotter.ismain(ctrl)
-
-        cnf = ctrl.globals.config.tasks
-        if tasks is not None:
-            cnf.default = tasks
-
-        for name, vals in (('open', ioopen), ('save', iosave)):
-            if vals is None:
-                continue
-
-            old = cnf.io[name].get()
-            new = []
-            for i in vals:
-                if isinstance(i, (str, int)):
-                    new.append(old[i] if isinstance(i, int) else i)
-                elif isinstance(i, slice) or i is Ellipsis:
-                    new.extend(old if i is Ellipsis else old[i])
-            cnf.io[name].default = new
+        cnf = ctrl.theme.model("taskio", True)
+        if cnf is None:
+            ctrl.theme.add(TaskIOTheme().setup(tasks, ioopen, iosave))
+        else:
+            diff = cnf.diff(cnf.setup(tasks, ioopen, iosave))
+            if diff:
+                ctrl.theme.updatedefaults(cnf, **diff)
 
     def close(self):
         "remove controller"

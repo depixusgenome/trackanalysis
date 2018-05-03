@@ -3,6 +3,7 @@
 "Deals with global information"
 from typing             import (Dict, Optional, List, Iterator, Type, Iterable,
                                 Callable, Any, TYPE_CHECKING)
+from copy               import deepcopy
 from utils              import initdefaults
 from utils.configobject import ConfigObject
 from .base              import Task, RootTask
@@ -72,6 +73,65 @@ class TasksDisplay(ConfigObject):
         "returns the processor's cache if it exists"
         return ctrl.tasks.cache(self.roottask, task) if task else lambda: None
 
+class TaskIOTheme(ConfigObject):
+    """
+    Info used when opening track files
+    """
+    name = "taskio"
+    tasks:      List[str] = []
+    inputs:     List[str] = ['anastore.control.AnaIO',
+                             'control.taskio.ConfigGrFilesIO',
+                             'control.taskio.ConfigTrackIO']
+    outputs:    List[str] = ['anastore.control.ConfigAnaIO']
+    processors: List[str] = []
+    clear                 = True
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    @property
+    def inputtypes(self):
+        "return loading objects"
+        return [self.__import(itm) for itm in self.inputs]
+
+    @property
+    def outputtypes(self):
+        "return output objects"
+        return [self.__import(itm) for itm in self.outputs]
+
+    @property
+    def processortypes(self):
+        "return processor objects"
+        return [self.__import(itm) for itm in self.processors]
+
+    def setup(self, tasks = None, ioopen = None, iosave = None):
+        "creates a new object using the current one and proposed changes"
+        cpy = deepcopy(self)
+        if tasks is not None:
+            cpy.tasks = list(tasks)
+
+        for name, vals in (('inputs', ioopen), ('outputs', iosave)):
+            if vals is None:
+                continue
+
+            old = getattr(cpy, name)
+            new = []
+            for i in vals:
+                if isinstance(i, (str, int)):
+                    new.append(old[i] if isinstance(i, int) else i)
+                elif isinstance(i, slice) or i is Ellipsis:
+                    new.extend(old if i is Ellipsis else old[i])
+            setattr(cpy, name, new)
+        return cpy
+
+    @staticmethod
+    def __import(name):
+        if not isinstance(name, str):
+            return name
+        modname, clsname = name[:name.rfind('.')], name[name.rfind('.')+1:]
+        return getattr(__import__(modname, fromlist = [clsname]), clsname)
+
+
 class TasksModel:
     "tasks related stuff"
     theme   = TasksTheme()
@@ -80,3 +140,10 @@ class TasksModel:
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
+
+    def addtocontroller(self, ctrl, noerase = True):
+        """
+        adds the current obj to the controller
+        """
+        self.theme   = ctrl.theme.model  (self.theme.name,   noerase)
+        self.display = ctrl.display.model(self.display.name, noerase)

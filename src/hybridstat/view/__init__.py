@@ -56,7 +56,7 @@ class HybridStatView(BokehView):
         "Allows setting-up stuff only when the view is the main one"
         self.__select(CleaningView) .ismain(ctrl)
         self.__select(PeaksPlotView).ismain(ctrl)
-        ctrl.globals.config.tasks.default = self.TASKS
+        ctrl.theme.updatedefaults("taskio", self.TASKS)
         def _advanced():
             for panel in self._panels:
                 if self.__state(panel).get() is PlotState.active:

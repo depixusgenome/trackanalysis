@@ -63,15 +63,22 @@ class DecentralizedController(Controller):
         name = getattr(obj, 'name', None)
         return name if name else type(obj).__name__
 
-    def add(self, obj):
+    def add(self, obj, noerase = True):
         "add a model to be updated & observed through this controller"
         name = self._objname(obj)
-        assert name and name not in self._objects, (name, obj)
+        if name in self._objects:
+            if noerase:
+                raise KeyError(f"key already registered: {name}")
+            else:
+                return self.model(name)
+        else:
+            assert name, (name, obj)
 
         self._objects[name]  = obj
         self._defaults[name] = deepcopy(obj)
         self.handle("added"+name, self.emitpolicy.outasdict,
                     dict(control = self, model = obj))
+        return obj
 
     def keys(self):
         "return the available keys in this controller"

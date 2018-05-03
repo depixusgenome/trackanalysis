@@ -3,6 +3,7 @@
 "Toolbar"
 import time
 from typing               import Callable, TYPE_CHECKING, Iterator, Tuple, Any
+from functools            import partial
 from pathlib              import Path
 
 import bokeh.core.properties   as props
@@ -250,7 +251,7 @@ class BeadInput:
                     bdctrl.bead = new
                 tbar.bead = bdctrl.bead
 
-        def _onproject(_ = None):
+        def _onproject(**_):
             bead  = bdctrl.bead
             avail = set(bdctrl.availablebeads)
             if bead not in avail:
@@ -264,8 +265,8 @@ class BeadInput:
                 tbar.bead = bead
 
         tbar.on_change('bead', _chg_cb)
-        ctrl.globals.project.observe('track', 'bead', _onproject)
-        ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
+        ctrl.display.observe("tasks", _onproject)
+        ctrl.observe("updatetask", "addtask", "removetask", _onproject)
         ctrl.display.updatedefaults('keystroke',
                                     beadup   = lambda: _chg_cb2(1),
                                     beaddown = lambda: _chg_cb2(-1))
@@ -360,6 +361,7 @@ class FileListInput:
     @staticmethod
     def setup(ctrl, tbar: DpxToolbar, _):
         "sets-up the gui"
+        stop = [False]
         @ctrl.observe("opentrack", "closetrack")
         def _setfilelist(model = None, **_):
             vals  = list(FileList.get(ctrl))
@@ -370,7 +372,11 @@ class FileListInput:
                 cur   = ctrl.display.get("tasks", "roottask")
                 index = mdls.index(cur) if cur in mdls else 0
 
-            tbar.update(currentfile = index, filelist = [i for i, _ in vals])
+            try:
+                stop[0] = True
+                tbar.update(currentfile = index, filelist = [i for i, _ in vals])
+            finally:
+                stop[0] = False
 
         def _oncurrentfile_cb(attr, old, new):
             new = int(new)
@@ -380,7 +386,7 @@ class FileListInput:
             lst = list(FileList.get(ctrl))
             if new >= len(lst):
                 _setfilelist(model = [ctrl.display.get("tasks", "roottask")])
-            else:
+            elif not stop[0]:
                 ctrl.display.update("tasks", roottask = lst[new][1])
 
         tbar.on_change('currentfile', _oncurrentfile_cb)
@@ -407,12 +413,30 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
 
         self.__diagopen = TrackFileDialog(self._ctrl)
         self.__diagsave = SaveFileDialog(self._ctrl)
+        self.__tbar     = None
 
     def addtodoc(self, ctrl, doc):
         "adds items to doc"
         super().addtodoc(ctrl, doc)
         assert doc is not None
         tbar   = DpxToolbar(hasquit = getattr(self._ctrl, 'FLEXXAPP', None) is not None)
+
+        def _ontasks(old = None, **_):
+            if 'roottask' not in old:
+                return
+            root = ctrl.display.get("tasks", "roottask")
+            if not root:
+                tbar.frozen = True
+                return
+            tbar.frozen = False
+            path = ctrl.display.get("tasks", "roottask").path
+            if isinstance(path, (list, tuple)):
+                path = path[0]
+
+            title = doc.title.split(':')[0]
+            if path:
+                title += ':' + Path(path).stem
+            doc.title = title
 
         def _onbtn_cb(attr, old, new):
             if attr == 'open':
@@ -431,29 +455,14 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         tbar.on_change('open', _onbtn_cb)
         tbar.on_change('save', _onbtn_cb)
         tbar.on_change('quit', _onbtn_cb)
+        ctrl.display.updatedefaults('keystroke',
+                                    open = partial(_onbtn_cb, 'open', 0, 0),
+                                    save = partial(_onbtn_cb, 'save', 0, 0),
+                                    quit = partial(_onbtn_cb, 'quit', 0, 0))
+        ctrl.display.observe("tasks", _ontasks)
 
         self.__diagopen.setup(ctrl, doc)
         self.__diagsave.setup(ctrl, doc)
-
-        @ctrl.theme.observe
-        def _ontasks(old = None, **_):
-            if 'roottask' not in old:
-                return
-            root = ctrl.display.get("tasks", "roottask")
-            if not root:
-                tbar.frozen = True
-                return
-            tbar.frozen = True
-
-            path = ctrl.display.get("tasks", "roottask").path
-            if isinstance(path, (list, tuple)):
-                path = path[0]
-
-            title = doc.title.split(':')[0]
-            if path:
-                title += ':' + Path(path).stem
-            doc.title = title
-
 
         for cls in self._HELPERS:
             cls.setup(ctrl, tbar, doc)

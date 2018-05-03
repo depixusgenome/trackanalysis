@@ -221,13 +221,6 @@ class GlobalsController(BaseGlobalsController):
         cnf = self.config
         cnf.catcherror.default = False
         cnf.phase.defaults     = PHASE.__dict__
-        cnf.tasks.defaults     = {'processors':  'control.processor.Processor',
-                                  'io.open':    ('anastore.control.AnaIO',
-                                                 'control.taskio.ConfigGrFilesIO',
-                                                 'control.taskio.ConfigTrackIO'),
-                                  'io.save':    ('anastore.control.ConfigAnaIO',),
-                                  'clear':      True
-                                 }
 
     def access(self, key: Optional[str] = None) -> GlobalsAccess:
         "returns a GlobalsAccess to a given map"

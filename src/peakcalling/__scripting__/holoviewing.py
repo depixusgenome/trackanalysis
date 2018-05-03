@@ -187,7 +187,7 @@ class _ManualHP(OligoMappingDisplay):
         values = list(_PeaksDisplay.getredim(self))
         params = tuple((i, getattr(self, '_'+i)) for i in ('stretch', 'bias')
                        if getattr(self, '_'+i) != getattr(self.__class__, '_'+i))
-        rngs   = Tasks.getconfig().fittohairpin.range.getitems(...) # type: ignore
+        rngs   = Tasks.getconfig().fittohairpinrange # type: ignore
 
         pins   = sequences.peaks(self._sequence, self._oligos)
         if isinstance(pins, np.ndarray):
@@ -361,7 +361,7 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
             redim = [i for i in redim if i[0] != 'key']
 
         if self._format is None and self._fit:
-            rngs   = Tasks.getconfig().fittoreference.range.getitems(...) # type: ignore
+            rngs   = Tasks.getconfig().fittoreferencerange # type: ignore
             redim += [(i, slice(*rngs[i])) for i in ('stretch', 'bias')]
         return redim
 

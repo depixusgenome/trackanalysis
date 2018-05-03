@@ -340,22 +340,21 @@ class TaskController(BaseTaskController):
 
         getter = lambda x:    getattr(self, '_'+x)
         setter = lambda x, y: setattr(self, '_'+x, y)
-        cnf    = ctrl.globals.config.tasks
+        mdl    = lambda x, y: ctrl.theme.get("taskio", x, y)
         if getter('procs') is None:
-            proc = _import(cnf.processors.get())
-            setter('procs', register(proc))
+            setter('procs', register(mdl("processortypes", [])))
 
         if getter('openers') is None:
-            setter('openers', [_import(itm)(ctrl) for itm in cnf.io.open.get()])
+            setter('openers', [i(ctrl) for i in mdl("inputtypes", [])])
 
         if getter('savers') is None:
-            setter('savers', [_import(itm)(ctrl) for itm in cnf.io.save.get()])
+            setter('savers', [i(ctrl) for i in mdl("outputtypes", [])])
 
         self.__model = ctrl.theme.model('tasks')
 
         @ctrl.display.observe
         def _ontasks(old = None, **_):
-            if "roottask" in old and ctrl.globals.config.tasks.clear.get(default = True):
+            if "roottask" in old and mdl("clear", True):
                 ctrl.tasks.cleardata(old['roottask'])
 
         self.__readconfig = ctrl.globals.readconfig

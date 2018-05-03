@@ -3,16 +3,34 @@
 """
 Saves stuff from session to session
 """
-from   typing              import Tuple, Union, cast
+from   typing              import Tuple, Union, List, cast
 from   pathlib             import Path
 from   copy                import deepcopy
 
+from   utils               import initdefaults
 from   utils.decoration    import addto
 from   view.dialog         import FileDialog
 from   data.__scripting__  import Track
 from   model.__scripting__ import Tasks, Task
 from   model.globals       import LocalContext
 from   .                   import default
+
+class ScriptingTheme:
+    """
+    model for scripting
+    """
+    name                  = "scripting"
+    gui                   = False
+    save                  = False
+    alignalways           = True
+    order:    List[Tasks] = None
+    cleaning: List[Tasks] = None
+    fittohairpinrange     = dict(stretch = (900., 1400.), bias = (-.25, .25))
+    fittoreferencerange   = dict(stretch = (.8, 1.2),     bias = (-.15, .15))
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
 
 class ScriptingView:
     "Dummy view for scripting"
@@ -28,19 +46,17 @@ class ScriptingView:
                                  config    = self._ctrl,
                                  multiple  = True,
                                  title     = "open a gr files")
-
-        self._ctrl.globals.config.scripting.defaults = dict(gui = False, save = False)
-        getattr(Tasks, 'setconfig')(self._ctrl)
+        self._ctrl.theme.add(ScriptingTheme())
 
     def opentrack(self, tpe = 'track'):
         "opens a gui to obtain a track"
-        if self._ctrl.globals.config.scripting.gui.get():
+        if self._ctrl.theme.get("scripting", "gui"):
             return (self.trkdlg if tpe == 'track' else self.grdlg).open()
         return AttributeError("Operation not allowed guiven current settings")
 
     def writeuserconfig(self):
         "writes the config to disk"
-        if self._ctrl.globals.config.scripting.save.get():
+        if self._ctrl.theme.get("scripting", "save"):
             self._ctrl.writeuserconfig()
 
     def observe(self, _):
@@ -59,31 +75,20 @@ class ScriptingView:
         "returns the controller"
         return self._ctrl
 
+@addto(Tasks, staticmethod)
+def getconfig():
+    "returns the config accessor"
+    return scriptapp.control.theme.model("scripting")
+
 @addto(Tasks, classmethod)
 def save(cls, task: Task):
     "saves the task to the default config"
     cpy = deepcopy(task)
     if getattr(cpy, '__scripting_save__', lambda: True)():
-        cls.getconfig()[cls(task).name].set(cpy)
+        out                 = dict(cls.control.theme.model("tasks").tasks)
+        out[cls(task).name] = cpy
+        cls.control.theme.update("tasks", tasks = out)
         scriptapp.writeuserconfig()
-
-@addto(Tasks, staticmethod)
-def getconfig():
-    "returns the config accessor"
-    return scriptapp.control.globals.config.tasks
-
-@addto(Tasks, classmethod)
-def setconfig(cls, cnf):
-    "add default values to the config"
-    cnf          = cnf.globals.config.tasks
-    cnf.defaults = cls.defaults()
-    cnf.fittohairpin.range.defaults = dict(stretch = (900., 1400.),
-                                           bias    = (-.25, .25))
-    cnf.fittoreference.range.defaults = dict(stretch = (.8, 1.2),
-                                             bias    = (-.15, .15))
-    cnf.scripting.defaults = {'alignment.always': True,
-                              'order':            None,
-                              'cleaning.tasks':   None}
 
 @addto(Tasks)
 def let(self, *resets, **kwa) -> Task:
@@ -99,7 +104,7 @@ def __call__(self, *resets, __old__ = Tasks.__call__, **kwa) -> Task:
     if Ellipsis in resets:
         cnf = self.default()
     else:
-        cnf = self.getconfig()[self.name].get(default = None)
+        cnf = self.control.theme.get("tasks", "tasks").get(self.name, None)
     if cnf is None:
         return __old__(self, *resets, **kwa)
     res = __old__(self, *resets, current = cnf, **kwa)
@@ -108,23 +113,22 @@ def __call__(self, *resets, __old__ = Tasks.__call__, **kwa) -> Task:
 @addto(Tasks, classmethod)
 def defaulttaskorder(cls, __old__ = Tasks.defaulttaskorder) -> Tuple[type, ...]:
     "returns the default task order"
-    order = cls.getconfig().scripting.order.get(default = None)
+    order = cls.control.theme.get("scripting", "order", None)
     return __old__(order)
 
 @addto(Tasks, classmethod)
 def __taskorder__(cls, __old__ = Tasks.__taskorder__):
-    cnf = cls.getconfig().scripting
-    old = __old__()
-    return ((cls.alignment,) + old) if cnf.alignment.always.get() else old
+    always = cls.control.theme.get("scripting", "alignalways")
+    old    = __old__()
+    return ((cls.alignment,) + old) if always else old
 
 @addto(Tasks, classmethod)
 def __cleaning__(cls):
-    cnf = cls.getconfig().scripting
-    ret = cnf.cleaning.tasks.get()
+    ret = cls.control.theme.get("scripting", "cleaning", None)
     if ret is None:
         ret = Tasks.__base_cleaning__()
 
-    if cnf.alignment.always.get():
+    if cls.control.theme.get("scripting", "alignalways"):
         # Remove alignment as it is not an optional task.
         # It will be added back in __tasklist__
         ret = tuple(i for i in ret if i is not Tasks.alignment)
@@ -154,11 +158,11 @@ localcontext.__doc__ = LocalContext.__doc__
 @addto(Tasks)
 def defaulttasklist(obj, upto, cleaned:bool = None, __old__ = Tasks.defaulttasklist):
     "Returns a default task list depending on the type of raw data"
-    cnf = getattr(getattr(obj, 'tasks', None), 'config', lambda: None)()
-    if cnf:
-        with localcontext().update(config = cnf):
-            return __old__(obj, upto, cleaned)
-    return __old__(obj, upto, cleaned)
+    cnf = getattr(obj, 'tasks', None)
+    if not cnf:
+        return __old__(obj, upto, cleaned)
+    with cnf.context(scriptapp.control):
+        return __old__(obj, upto, cleaned)
 
 @addto(Track)
 def __init__(self, *path: Union[str, Path], __old__ = Track.__init__, **kwa):

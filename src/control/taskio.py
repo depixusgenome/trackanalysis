@@ -61,16 +61,17 @@ class ConfigTrackIO(TrackIO):
     "Adds an alignment to the tracks per default"
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
-        self._ctrl = ctrl.globals.config.tasks
+        self._ctrl = ctrl
 
     def open(self, path:OPEN_T, model:tuple):
         "opens a track file and adds a alignment"
         tmp = TrackIO.open(self, path, model)
         if not tmp or not tmp[0]:
             return None
+
         items = [tmp[0][0]]
-        for name in self._ctrl.get(default = tuple()):
-            task = self._ctrl[name].get(default = None)
+        for name in self._ctrl.theme.get("taskio", "tasks"):
+            task = self._ctrl.theme.get("tasks", "tasks").get(name, None)
             if not getattr(task, 'disabled', True):
                 items.append(deepcopy(task))
         return [tuple(items)]
@@ -137,7 +138,7 @@ class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
         if mdls is None:
             return None
 
-        task = type(self._ctrl.extremumalignment.get(default = None))
+        task = type(self._ctrl.theme.get("tasks", "tasks").get("extremumalignment", None))
         ret  = []
         for mdl in mdls:
             ret.append(tuple(i for i in mdl if not isinstance(i, task)))
