@@ -12,7 +12,7 @@ from sequences.modelaccess      import (SequencePlotModelAccess,
                                         FitParamProp    as _FitParamProp,
                                         SequenceKeyProp as _SequenceKeyProp)
 
-from utils                      import updatecopy
+from utils                      import updatecopy, initdefaults
 from control.modelaccess        import PROPS, TaskAccess
 
 from model.task                 import RootTask
@@ -39,6 +39,17 @@ _DUMMY = type('_DummyDict', (),
                    __len__      = lambda _: 0,
                    __iter__     = lambda _: iter(())))()
 
+class FitToReferenceTheme:
+    """
+    stuff needed to display the FitToReferenceTask
+    """
+    name          = 'fittoreference'
+    histmin       = 1e-4
+    peakprecision = 1e-2
+    @initdefaults
+    def __init__(self, **_):
+        pass
+
 class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     "access to the FitToReferenceTask"
     __DEFAULTS = dict(id           = None,   reference = None,
@@ -46,10 +57,9 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
                       interpolator = _DUMMY)
     def __init__(self, ctrl):
         super().__init__(ctrl)
-        self.__store             = self.project.root.tasks.fittoreference.gui
-        self.__store.defaults    = self.__DEFAULTS
-
-        self.configtask.defaults = dict(histmin = 1e-4, peakprecision = 1e-2)
+        self.__store          = self.project.root.tasks.fittoreference.gui
+        self.__store.defaults = self.__DEFAULTS
+        self.__theme          = FitToReferenceTheme()
 
     @property
     def params(self) -> Optional[Tuple[float, float]]:
@@ -64,11 +74,15 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     fitalg  = property(lambda self: ChiSquareHistogramFit())
     stretch = property(lambda self: self.params[0])
     bias    = property(lambda self: self.params[1])
-    hmin    = property(lambda self: self.configtask.histmin.get())
+    hmin    = property(lambda self: self.__theme.histmin)
 
-    def update(self, **_):
+    def update(self, **kwa):
         "removes the task"
-        assert len(_) == 0
+        if kwa.get("disabled", False):
+            super().update(**kwa)
+            return
+
+        assert len(kwa) == 0
         newdata, newid = self.__computefitdata()
         if not newdata:
             return
@@ -92,8 +106,15 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
             info['reference'] = val
             self.__store.update(**info)
 
+    @property
+    def referencepeaks(self) -> Optional[np.ndarray]:
+        "returns reference peaks"
+        pks = self.__store.peaks.get().get(self.bead, None)
+        return None if pks is None or len(pks) == 0 else pks
+
     def setobservers(self, _):
         "observes the global model"
+        self._ctrl.theme.add(self.__theme)
         self.__store.reference.observe(lambda _: self.resetmodel())
         def _ontask(parent = None, **_):
             if parent == self.reference:
@@ -105,8 +126,8 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
 
     def resetmodel(self):
         "adds a bead to the task"
-        return (self.update() if self.reference not in (self.roottask, None) else
-                self.remove() if self.task                                   else
+        return (self.update()                if self.reference not in (self.roottask, None) else
+                self.update(disabled = True) if self.task                                   else
                 None)
 
     def refhistogram(self, xaxis):
@@ -126,7 +147,7 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
         ref = self.referencepeaks
         arr = np.full(len(peaks), np.NaN, dtype = 'f4')
         if len(peaks) and ref is not None and len(ref):
-            ids = match.compute(ref, peaks, self.configtask.peakprecision.get())
+            ids = match.compute(ref, peaks, self.__theme.peakprecision)
             arr[ids[:,1]] = ref[ids[:,0]]
         return arr
 
@@ -134,11 +155,6 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     def _configattributes(_):
         return {}
 
-    @property
-    def referencepeaks(self) -> Optional[np.ndarray]:
-        "returns reference peaks"
-        pks = self.__store.peaks.get().get(self.bead, None)
-        return None if pks is None or len(pks) == 0 else pks
 
     def __computefitdata(self) -> Tuple[bool, bool]:
         args  = {} # type: Dict[str, Any]
@@ -190,10 +206,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         "observes the global model"
         def _observe(_):
             task = self.default(mdl)
-            if task is None:
-                self.remove()
-            else:
-                self.update(**task.config())
+            self.update(disabled = task is None, **(task.config() if task else {}))
 
         mdl.observeprop('oligos', 'sequencepath', 'constraintspath', 'useparams',
                         'config.root.tasks.fittohairpin.fit',
@@ -237,7 +250,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         task = self.default(mdl)
         cur  = self.task
         if task is None and cur is not None:
-            self.remove()
+            self.update(disabled = True)
         elif task != cur:
             self.update(**task.config())
 

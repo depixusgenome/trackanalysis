@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "basic view module"
-from typing               import Callable, Set, TYPE_CHECKING # pylint: disable=unused-import
-from abc                  import ABC
-from concurrent.futures   import ThreadPoolExecutor
-from asyncio              import wrap_future
+from typing                     import Set
+from abc                        import ABC
+from asyncio                    import wrap_future
+from functools                  import partial
+from concurrent.futures         import ThreadPoolExecutor
 
-from bokeh.document       import Document
+from bokeh.document             import Document
 
-from tornado.ioloop           import IOLoop
-from control.action           import ActionDescriptor
-
-if TYPE_CHECKING:
-    from .keypress import DpxKeyEvent # pylint: disable=unused-import
+from tornado.ioloop             import IOLoop
+from control.action             import ActionDescriptor
 
 SINGLE_THREAD = False
 
@@ -35,33 +33,28 @@ class View(ABC):
 
 def enableOnTrack(ctrl, *aitms):
     "Enables/disables view elements depending on the track status"
-    litms = []
-    def _get(obj):
+    def _get(obj, litms):
         if isinstance(obj, (tuple, list)):
             for i in obj:
-                _get(i)
+                _get(i, litms)
         elif isinstance(obj, dict):
             for i in obj.values():
-                _get(i)
+                _get(i, litms)
         else:
-            litms.append(obj)
-    _get(aitms)
-    itms = tuple(litms)
-    for ite in itms:
-        if hasattr(ite, 'frozen'): # pylint: disable=simplifiable-if-statement
-            ite.frozen   = True
-        else:
-            ite.disabled = True
+            litms.append((obj, 'frozen' if hasattr(obj, 'frozen') else 'disabled'))
+        return litms
 
-    def _onproject(items, __lst__ = itms):
-        if 'track' in items:
-            val = items['track'].value is items.empty
-            for ite in __lst__:
-                if hasattr(ite, 'frozen'):
-                    ite.frozen   = val
-                else:
-                    ite.disabled = val
-    getattr(ctrl, '_ctrl', ctrl).globals.project.observe(_onproject)
+    itms = tuple(_get(aitms, []))
+    for ite, attr in itms:
+        setattr(ite, attr, True)
+
+    def _ontasks(lst, old = None, model = None, **_):
+        if 'roottask' in old:
+            val = model.roottask is None
+            for ite, attr in lst:
+                setattr(ite, attr, val)
+
+    getattr(ctrl, '_ctrl', ctrl).display.observe(partial(_ontasks, itms))
 
 POOL = ThreadPoolExecutor(1)
 async def threadmethod(fcn, *args, pool = None, **kwa):
@@ -91,7 +84,7 @@ def defaultsizingmode(self, kwa:dict = None, ctrl = None, **kwargs) -> dict:
 
 class BokehView(View):
     "A view with a gui"
-    __CTRL = set() # type: Set[int]
+    __CTRL: Set[int] = set()
     def __init__(self, ctrl = None, **kwargs):
         "initializes the gui"
         super().__init__(ctrl = ctrl, **kwargs)

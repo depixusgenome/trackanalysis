@@ -146,10 +146,8 @@ class DriftWidget(GroupWidget[CyclesModelAccess]):
         for ind, name in enumerate(('driftperbead', 'driftpercycle')):
             attr = getattr(self._model, name)
             task = attr.task
-            if ind in value and task is None:
-                getattr(self._model, name).update()
-            elif ind not in value and task is not None:
-                getattr(self._model, name).remove()
+            if ind in value:
+                getattr(self._model, name).update(disabled = task is not None)
 
     def _data(self) -> dict:
         value = [] # type: List[int]

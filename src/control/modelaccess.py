@@ -13,7 +13,8 @@ from model.globals          import PROPS
 from data.track             import Track
 from data.views             import TrackView
 from data.views             import BEADKEY
-from utils                  import NoArgs, updatecopy, updatedeepcopy
+from utils                  import NoArgs, updatedeepcopy
+from utils.inspection       import diffobj
 from .processor             import Processor
 from .processor.cache       import CacheReplacement
 from .taskcontrol           import ProcessorController
@@ -177,6 +178,9 @@ class TaskPlotModelAccess(PlotModelAccess):
         u"updates the model when a new track is loaded"
         PROPS.BeadProperty.clear(self)
 
+    def addtodoc(self, _):
+        "adds items to the doc"
+
     def __wrapobserver(self, fcn):
         "wraps an observing function"
         state = self.project.state
@@ -215,6 +219,19 @@ class TaskAccess(TaskPlotModelAccess):
         "returns the config task"
         return self._tasksmodel.theme.tasks[self.configname]
 
+    @configtask.setter
+    def configtask(self, values: Union[Task, Dict[str,Task]]):
+        "returns the config task"
+        task = self._tasksmodel.theme.tasks[self.configname]
+        kwa  = diffobj(task, values) if isinstance(values, Task) else values
+        kwa  = self._configattributes(kwa)
+        if not kwa:
+            return
+
+        tasks = dict(self._ctrl.theme.get("tasks", "tasks", {}))
+        tasks[self.configname] = updatedeepcopy(task, **kwa)
+        self._ctrl.theme.update("tasks", tasks = tasks)
+
     @property
     def task(self) -> Optional[Task]:
         "returns the task if it exists"
@@ -239,35 +256,26 @@ class TaskAccess(TaskPlotModelAccess):
             return None
         return next((t for t in cast(Iterator[Processor], self.tasklist) if self.check(t)),
                     None)
-    def remove(self):
-        "removes the task"
-        task = self.task
-        if task is not None:
-            self._ctrl.tasks.removetask(self.roottask, task)
-
-            kwa = self._configattributes({'disabled': True})
-            if len(kwa):
-                cnf = self.configtask
-                cnf.set(updatecopy(cnf.get(), **kwa))
-        return None
 
     def update(self, **kwa):
         "adds/updates the task"
-        root = self.roottask
         task = self._task
-        cnf  = self.configtask
 
-        kwa.setdefault('disabled', False)
-        if task is None:
-            item = updatedeepcopy(cnf.get(), **kwa)
-            self._ctrl.tasks.addtask(root, item, index = self.index)
+        if kwa.get('disabled', False):
+            if task is None:
+                return
+            self._ctrl.tasks.removetask(self.roottask, task)
+            kwa = {'disabled': True}
+
+        elif task is None:
+            kwa['disabled'] = False
+            item = updatedeepcopy(self.configtask, **kwa)
+            self._ctrl.tasks.addtask(self.roottask, item, index = self.index)
         else:
-            self._ctrl.tasks.updatetask(root, task, **kwa)
+            kwa['disabled'] = False
+            self._ctrl.tasks.updatetask(self.roottask, task, **kwa)
 
-        kwa = self._configattributes(kwa)
-        if len(kwa):
-            cnf = self.configtask
-            cnf.set(updatecopy(cnf.get(), **kwa))
+        self.configtask = kwa
 
     def check(self, task, parent = NoArgs) -> bool:
         "wether this controller deals with this task"

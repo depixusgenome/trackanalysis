@@ -26,10 +26,8 @@ class AlignmentWidget(GroupWidget[ModelType]):
 
     def onclick_cb(self, value):
         "action to be performed when buttons are clicked"
-        if value == 0:
-            self._model.alignment.remove()
-        else:
-            self._model.alignment.update(phase = self.__ORDER[value])
+        self._model.alignment.update(disabled = value == 0,
+                                     **({'phase': self.__ORDER[value]} if value else {}))
 
     def _data(self):
         val    = getattr(self._model.alignment.task, 'phase', None)
