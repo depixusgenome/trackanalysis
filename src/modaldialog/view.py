@@ -135,8 +135,8 @@ class TaskDescriptor:
         """
         mdl = self.__model(obj)
         mdl = (getattr(mdl, 'task', mdl) if wherefrom == "model"  else
-               mdl.configtask.get()      if wherefrom == "config" else
-               mdl.configtask.getdefault())
+               mdl.configtask            if wherefrom == "config" else
+               mdl.defaultconfigtask)
 
         for key in self._keys[1:]:
             mdl = getattr(mdl, key)

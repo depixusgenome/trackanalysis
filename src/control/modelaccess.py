@@ -215,6 +215,11 @@ class TaskAccess(TaskPlotModelAccess):
         DEFAULT_TASKS[name] = inst
 
     @property
+    def defaultconfigtask(self) -> Task:
+        "returns the config task"
+        return self._ctrl.theme.get("tasks", "tasks", {}, True).get(self.configname, None)
+
+    @property
     def configtask(self) -> Task:
         "returns the config task"
         return self._tasksmodel.theme.tasks[self.configname]

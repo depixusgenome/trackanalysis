@@ -458,7 +458,7 @@ class _PeakDescriptor:
         "returns default peak finder"
         if inst is None:
             return self
-        return not isinstance(getattr(inst, '_model').peakselection.configtask.default().finder,
+        return not isinstance(getattr(inst, '_model').peakselection.defaultconfigtask.finder,
                               ByHistogram)
 
     def __get__(self,inst,owner)->bool:

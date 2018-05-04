@@ -83,7 +83,3 @@ class QualityControlModelAccess(TaskPlotModelAccess):
     def clear(self):
         "clears the model's cache"
         self.__messages.pop()
-
-    @staticmethod
-    def addtodoc(*_):
-        "nothing to do"

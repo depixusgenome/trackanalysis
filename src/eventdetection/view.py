@@ -52,7 +52,7 @@ class AlignmentModalDescriptor:
 
     def getdefault(self,inst)->int:
         "returns default peak finder"
-        val = getattr(getattr(inst, '_model').alignment.configtask.default, 'phase', None)
+        val = getattr(getattr(inst, '_model').alignment.defaultconfigtask, 'phase', None)
         return self.__ORDER.index(val)
 
     def __get__(self,inst,owner):

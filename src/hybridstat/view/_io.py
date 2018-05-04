@@ -148,7 +148,7 @@ class ConfigXlsxIO(TaskIO):
 
         while len(missing):
             if not isinstance(model[-1], tuple(i.tasktype for i in missing)):
-                return model + [deepcopy(i.configtask.get()) for i in missing]
+                return model + [deepcopy(i.configtask) for i in missing]
             missing = missing[1:]
 
         ref = self.__model.fittoreference.reference
