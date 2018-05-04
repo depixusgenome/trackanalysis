@@ -151,7 +151,7 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
         self.config.ybars.percentiles.default = [25, 75]
 
     def _addtodoc(self, *_):
-        fig  = super()._create(_)
+        fig  = super()._addtodoc(_)
         args = dict(x = 'cycles', width  = self.css.ybars.width.get(), source = self._src[-1])
         self.css.ybars.addto(fig, top = 'top',    bottom = 'bottom', **args)
         self.css.ymed .addto(fig, top = 'median', bottom = 'median', **args)
@@ -215,7 +215,7 @@ class QualityControlPlots:
 
     def addtodoc(self, doc, mode):
         "returns the plot grid"
-        plots   = [[getattr(getattr(self, i), '_create')(doc)]
+        plots   = [[getattr(getattr(self, i), '_addtodoc')(doc)]
                    for i in ('ext', 'tsample', 'tsink', 'tservo')]
         for i in plots[1:]:
             i[0].x_range = plots[0][0].x_range
