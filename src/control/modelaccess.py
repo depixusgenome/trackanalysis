@@ -264,21 +264,24 @@ class TaskAccess(TaskPlotModelAccess):
 
     def update(self, **kwa):
         "adds/updates the task"
+        root = self.roottask
+        if root is None:
+            return
         task = self._task
 
         if kwa.get('disabled', False):
             if task is None:
                 return
-            self._ctrl.tasks.removetask(self.roottask, task)
+            self._ctrl.tasks.removetask(root, task)
             kwa = {'disabled': True}
 
         elif task is None:
             kwa['disabled'] = False
             item = updatedeepcopy(self.configtask, **kwa)
-            self._ctrl.tasks.addtask(self.roottask, item, index = self.index)
+            self._ctrl.tasks.addtask(root, item, index = self.index)
         else:
             kwa['disabled'] = False
-            self._ctrl.tasks.updatetask(self.roottask, task, **kwa)
+            self._ctrl.tasks.updatetask(root, task, **kwa)
 
         self.configtask = kwa
 

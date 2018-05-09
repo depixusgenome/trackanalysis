@@ -206,7 +206,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         "observes the global model"
         def _observe(_):
             task = self.default(mdl)
-            self.update(disabled = task is None, **(task.config() if task else {}))
+            self.update(**(task.config() if task else {'disabled': True}))
 
         mdl.observeprop('oligos', 'sequencepath', 'constraintspath', 'useparams',
                         'config.root.tasks.fittohairpin.fit',
