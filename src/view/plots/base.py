@@ -243,8 +243,8 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
             ctrl.globals.addGlobalMap(name+key)
 
         super().__init__(ctrl, key)
-        self._model: ModelType = self.modeltype()(ctrl, key)
-        self._ctrl  = ctrl
+        self._model: ModelType                    = self.modeltype()(ctrl, key)
+        self._ctrl                                = ctrl
         self._bkmodels: Dict[Model,Dict[str,Any]] = self._OrderedDict()
         self._doc:      Document                  = None
         self.project.state.default = PlotState.active
@@ -296,16 +296,19 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
         try:
             yield self
             for i, j in self._bkmodels.items():
-                upd = getattr(i, 'update', None)
-                if upd is None:
-                    j(i)
-                else:
-                    upd(**j)
-        except ValueError as exc:
-            if i is not None:
-                raise ValueError(f'Error updating {i} = {j}') from exc
-            else:
-                raise ValueError(f'Error updating') from exc
+                try:
+                    upd = getattr(i, 'update', None)
+                    if upd is None:
+                        if callable(j):
+                            j(i)
+                        else:
+                            LOGS.warning("incorrect bk update (%s, %s)", i, j)
+                    else:
+                        upd(**j)
+                except ValueError as exc:
+                    raise ValueError(f'Error updating {i} = {j}') from exc
+                except Exception as exc:
+                    raise RuntimeError(f'Error updating {i} = {j}') from exc
         finally:
             self._bkmodels.clear()
             self.state = old

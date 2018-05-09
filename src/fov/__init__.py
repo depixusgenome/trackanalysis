@@ -3,7 +3,8 @@
 u"all FoV view aspects here"
 from typing                 import Dict, List, Any # pylint: disable=unused-import
 import numpy as np
-from bokeh.models           import ColumnDataSource, Range1d, TapTool, HoverTool
+from bokeh.models           import (ColumnDataSource, Range1d, TapTool, HoverTool,
+                                    Selection)
 from bokeh.plotting         import figure, Figure
 from data                   import BEADKEY
 from control                import Controller
@@ -126,7 +127,10 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         sel  = self._beadssource.selected
         good = [self._model.bead] if self._model.bead is not None else []
         if getattr(sel, 'indices', None) != good:
-            self._bkmodels[sel].update(indices = good)
+            if sel is None:
+                self._bkmodels[self._beadssource].update(selected = Selection(indices = good))
+            else:
+                self._bkmodels[sel].update(indices = good)
 
         self.__calibdata()
 

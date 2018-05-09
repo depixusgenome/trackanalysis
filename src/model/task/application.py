@@ -49,7 +49,7 @@ class TasksDisplay(ConfigObject):
     """
     runtime globals on tasks
     """
-    name = "tasks"
+    name                = "tasks"
     bead:     int       = None
     roottask: RootTask  = None
 
