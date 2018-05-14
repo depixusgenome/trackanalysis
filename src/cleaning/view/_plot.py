@@ -3,19 +3,19 @@
 "Cycles plot view for cleaning data"
 from    typing         import Dict, TYPE_CHECKING
 
-from    bokeh.plotting import figure, Figure
+from    bokeh.plotting import Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 from    bokeh          import layouts
 
 import  numpy                   as     np
 
 from    utils.array             import repeat
-from    view.plots              import PlotAttrs, PlotView, DpxHoverTool
+from    view.plots              import PlotView, DpxHoverTool
 from    view.plots.tasks        import TaskPlotCreator
-from    view.colors             import getcolors, setcolors
+from    view.colors             import tohex
 from    control                 import Controller
 
-from    ._model                 import DataCleaningModelAccess
+from    ._model                 import DataCleaningModelAccess, CleaningPlotModel
 from    ._widget                import WidgetMixin
 from    ..processor             import DataCleaningProcessor, DataCleaning
 
@@ -52,35 +52,13 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
 
         return items, nans
 
-class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin):
+class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotModel],
+                          WidgetMixin):
     "Building the graph of cycles"
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
-        super().__init__(ctrl)
+        super().__init__(ctrl, figsize = (500, 800, 'fixed'))
         WidgetMixin.__init__(self)
-        cnf = self.css
-        cnf.figure.defaults = {'width': 500, 'height': 800}
-        cnf.points.default  = PlotAttrs('color',  'circle', 1, alpha   = .5)
-
-        setcolors(self,
-                  good       = 'blue',
-                  hfsigma    = 'gold',
-                  extent     = 'orange',
-                  population = 'hotpink',
-                  pingpong   = 'hotpink',
-                  saturation = 'chocolate',
-                  aberrant   = 'red')
-
-        cnf.colors.order.default  = ('aberrant', 'hfsigma', 'extent', 'population',
-                                     'pingpong', 'saturation', 'good')
-        self.css.downsampling.default  = 5
-        self.css.tools.default         = 'ypan,ybox_zoom,reset,save,dpxhover'
-        self.css.widgets.width.default = 470
-        self.css.figure.defaults  = dict(width    = 600,
-                                         height   = 800,
-                                         tooltips = [(u'(cycle, t, z)',
-                                                      '(@cycle, $~x{1}, $data_y{1.1111})')])
-
         self.__source: ColumnDataSource = None
         self.__fig:    Figure           = None
         if TYPE_CHECKING:
@@ -89,23 +67,23 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
     def _addtodoc(self, ctrl, *_):
         self.__source = ColumnDataSource(data = self.__data(None, None))
 
-        self.__fig = fig = figure(**self._figargs(y_range = Range1d,
-                                                  x_range = Range1d,
-                                                  name    = 'Clean:Cycles'))
-        glyph = self.css.points.addto(fig, x = 't', y = 'z', source = self.__source)
+        self.__fig = fig = self._theme.figure(y_range = Range1d,
+                                              x_range = Range1d,
+                                              name    = 'Clean:Cycles')
+        glyph = self._theme.points.addto(fig, x = 't', y = 'z', source = self.__source)
         hover = fig.select(DpxHoverTool)
         if hover:
-            hover[0].tooltips  = self.css.figure.tooltips.get()
+            hover[0].tooltips  = self._theme.tooltips
             hover[0].renderers = [glyph]
 
         fig.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
-        axis = LinearAxis(x_range_name = "time", axis_label = self.css.xtoplabel.get())
+        axis = LinearAxis(x_range_name = "time", axis_label = self._theme.xtoplabel)
         fig.add_layout(axis, 'above')
 
         self.fixreset(fig.y_range)
-        self._addcallbacks(fig)
+        self._theme.addcallbacks(self._ctrl, fig)
 
-        mode    = self.defaultsizingmode(width = self.css.widgets.width.get())
+        mode    = self.defaultsizingmode(width = self._theme.widgetwidth)
         widgets = self._createwidget(fig)
         left    = layouts.widgetbox(widgets['cleaning']+widgets['table']
                                     +widgets['align']+widgets['sampling'],
@@ -127,7 +105,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         if items is None or len(items) == 0 or not any(len(i) for _, i in items):
             items = [((0,0), [])]
 
-        order = self._model.cleaning.sorted(self.css.colors.order.get())
+        order = self._model.cleaning.sorted(self._theme.colororder)
         size  = max(len(i) for _, i in items)
         val   = np.full((len(items), size), np.NaN, dtype = 'f4')
         for (_, i), j in items:
@@ -138,15 +116,17 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
                    cycle = repeat([i[-1] for i, _ in items], val.shape[1], 1),
                    color = self.__color(order, nans, val))
         assert all(len(i) == val.size for  i in res.values())
-        if self.css.downsampling.get():
-            res = {i: j[::self.css.downsampling.get()] for i, j in res.items()}
+
+        dsampl = self._ctrl.theme.get('downsampling', 'value', 0)
+        if dsampl:
+            res = {i: j[::dsampl] for i, j in res.items()}
         return res
 
     def __color(self, order, nancache, items) -> np.ndarray:
-        hexes  = getcolors(self)
+        hexes  = tohex(self._theme.colors)
         tmp    = np.full(items.shape, hexes['good'], dtype = '<U7')
         cache  = self._model.cleaning.cache
-        for name in self.css.colors.order.get():
+        for name in self._theme.colororder:
             if name == 'aberrant' and nancache is not None:
                 color   = hexes[name]
                 cycnans = GuiDataCleaningProcessor.nans(self._model, nancache)

@@ -8,7 +8,8 @@ from    bokeh.model    import Model
 from    bokeh.models   import ColumnDataSource, GlyphRenderer, CustomJS, TapTool
 
 from    sequences.view import SequenceHoverMixin
-from    view.plots     import PlotAttrs, DpxHoverTool
+from    view.plots     import DpxHoverTool
+from    ._model        import CyclesPlotTheme
 
 class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-instance-attributes
     "controls keypress actions"
@@ -25,7 +26,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                                'cycle: [p.Int, -1],'),
                               __file__)
 
-    def __init__(self, **kwa):
+    def __init__(self, **kwa) -> None:
         super().__init__(**kwa) # type: ignore
         SequenceHoverMixin.__init__(self)
         self._rawsource: ColumnDataSource = None
@@ -33,27 +34,15 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         self._model:     Any              = None
 
     @staticmethod
-    def defaultconfig(mdl):
-        "default config"
-        css = mdl.css.raw
-        css.defaults = {'selection.dark'  : PlotAttrs('lightblue', 'line',   3),
-                        'selection.basic' : PlotAttrs('blue', 'line',   3),
-                        'tooltips'        : [(u'(cycle, t, z)',
-                                              '(@cycle, $~x{1}, $data_y{1.1111})')],
-                        'tooltips.radius' : 1.}
-        SequenceHoverMixin.defaultconfig(mdl)
-
-    @staticmethod
     def _createrawdata(data, shape):
         return dict(t = data['t'][:shape[1]], z = data['z'][:shape[1]])
 
-    def createraw(self, fig, source, shape, model):
+    def createraw(self, fig, source, shape, model, theme):
         "creates the hover tool"
         self._model = model
         self.shape  = tuple(shape)
 
-        css      = self._model.css.raw
-        tooltips = css.tooltips.get()
+        tooltips = theme.tooltips
         hover    = fig.select(DpxHoverTool)
 
         if tooltips is None or len(tooltips) == 0:
@@ -65,12 +54,12 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
             fig.renderers[-1].selection_glyph        = None
             fig.renderers[-1].nonselection_glyph     = None
             fig.renderers[-1].glyph.radius_dimension = 'x'
-            fig.renderers[-1].glyph.radius           = css.tooltips.radius.get()
+            fig.renderers[-1].glyph.radius           = theme.radius
 
         tap  = fig.select(TapTool)
         if tap is not None and len(tap):
             self._rawsource = ColumnDataSource(self._createrawdata(source.data, shape))
-            sel             = css.selection[self._model.themename].get()
+            sel             = theme.selection[self._model.themename]
             self._rawglyph  = sel.addto(fig,  x = 't', y = 'z', source = self._rawsource)
             args = dict(hvr    = self,
                         hvrsrc = self._rawsource,

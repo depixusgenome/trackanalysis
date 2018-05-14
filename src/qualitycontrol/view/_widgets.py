@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing all messages concerning discarded beads"
-from    typing              import List, Dict, cast
+from    typing              import List, Dict
 from    copy                import deepcopy
 
 from    bokeh.models        import (ColumnDataSource, DataTable, TableColumn,
                                     Widget, StringFormatter, Div)
 from    bokeh               import layouts
 
-from    view.plots          import DpxNumberFormatter, WidgetCreator
+from    utils               import initdefaults
+from    view.plots          import DpxNumberFormatter
 from    ._model             import QualityControlModelAccess
 
 _TEXT = """
@@ -31,16 +32,16 @@ _TEXT = """
 <p></p>
 """.strip().replace("    ", "").replace("\n", "")
 
-class SummaryWidget(WidgetCreator[QualityControlModelAccess]):
+class SummaryWidget:
     "summary info on the track"
     def __init__(self, model:QualityControlModelAccess) -> None:
-        super().__init__(model)
         self.__widget: Div = None
-        self.css.text.default = _TEXT
+        self.__tasks       = model
+        self.__model       = {'text': _TEXT}
 
-    @staticmethod
-    def observe(_):
+    def observe(self, ctrl):
         "do nothing"
+        ctrl.theme.add("qcsummarywidget", {'text': self.__model})
 
     def addtodoc(self, _):
         "creates the widget"
@@ -54,60 +55,60 @@ class SummaryWidget(WidgetCreator[QualityControlModelAccess]):
         itm.update(text = txt)
 
     def __text(self):
-        track  = self._model.track
+        track  = self.__tasks.track
         nbeads = 0  if track is None else sum(1 for i in track.beadsonly.keys())
-        bad    = sorted(self._model.badbeads())
-        fixed  = sorted(self._model.fixedbeads())
-        return self.css.text.format(ncycles   = 0 if track is None else track.ncycles,
-                                    nbeads    = nbeads,
-                                    ngood     = nbeads - len(bad),
-                                    nbad      = len(bad),
-                                    listbad   = ', '.join(str(i) for i in bad),
-                                    listfixed = ', '.join(str(i) for i in fixed))
+        bad    = sorted(self.__tasks.badbeads())
+        fixed  = sorted(self.__tasks.fixedbeads())
+        return self.__model['text'].format(ncycles   = 0 if track is None else track.ncycles,
+                                           nbeads    = nbeads,
+                                           ngood     = nbeads - len(bad),
+                                           nbad      = len(bad),
+                                           listbad   = ', '.join(str(i) for i in bad),
+                                           listfixed = ', '.join(str(i) for i in fixed))
 
-class MessagesListWidget(WidgetCreator[QualityControlModelAccess]):
+class MessagesListWidgetTheme:
+    "MessagesListWidgetTheme"
+    height   = 500
+    labels   = {'extent'     : 'Δz',
+                'pingpong'   : 'Σ|dz|',
+                'hfsigma'    : 'σ[HF]',
+                'population' : '% good',
+                'saturation' : 'non-closing'}
+    columns  = [['bead',    u'Bead',    '0', 65],
+                ['type',    u'Type',    '',  65],
+                ['cycles',  u'Cycles',  '0', 65],
+                ['message', u'Message', '',  65]]
+    @initdefaults(frozenset(locals()))
+    def __init__(self,**_):
+        pass
+
+class MessagesListWidget:
     "Table containing stats per peaks"
     def __init__(self, model:QualityControlModelAccess) -> None:
-        super().__init__(model)
-        self.__widget: DataTable   = None
-        css                        = self.__config
-        css.height.default   = 500
-        css.type.defaults    = {'extent'     : 'Δz',
-                                'pingpong'   : 'Σ|dz|',
-                                'hfsigma'    : 'σ[HF]',
-                                'population' : '% good',
-                                'saturation' : 'non-closing'}
-        css.columns.default  = [['bead',    u'Bead',    '0', 65],
-                                ['type',    u'Type',    '',  65],
-                                ['cycles',  u'Cycles',  '0', 65],
-                                ['message', u'Message', '',  65]]
+        self.__widget: DataTable = None
+        self.__tasks             = model
+        self.__theme             = MessagesListWidgetTheme()
 
-    @property
-    def __config(self):
-        return self.css.table
-
-    @staticmethod
-    def observe(_):
+    def observe(self, ctrl):
         "do nothing"
+        ctrl.theme.add(self.__theme)
 
     def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
-        cnf   = self.__config.columns
-        get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
         fmt   = lambda i: (StringFormatter() if i == '' else
                            DpxNumberFormatter(format = i, text_align = 'right'))
         cols  = list(TableColumn(field      = i[0],
-                                 title      = get(i[1]),
+                                 title      = i[1],
                                  formatter  = fmt(i[2]),
                                  width      = i[3])
-                     for i in cnf.get())
+                     for i in self.__theme.columns)
 
         self.__widget = DataTable(source         = ColumnDataSource(self.__data()),
                                   columns        = cols,
                                   editable       = False,
                                   index_position = None,
-                                  width          = sum([i[-1] for i in cnf.get()]),
-                                  height         = self.__config.height.get(),
+                                  width          = sum([i[-1] for i in self.__theme.columns]),
+                                  height         = self.__theme.height,
                                   name           = "Messages:List")
         return [self.__widget]
 
@@ -117,11 +118,10 @@ class MessagesListWidget(WidgetCreator[QualityControlModelAccess]):
         itm.update(data = self.__data())
 
     def __data(self) -> Dict[str, List]:
-        mdl   = cast(QualityControlModelAccess, self._model)
-        msgs  = deepcopy(mdl.messages())
+        msgs = deepcopy(self.__tasks.messages())
         if len(msgs['bead']):
-            trans = self.__config.type.getitems(...)
-            ncyc  = mdl.track.ncycles
+            trans = self.__theme.labels
+            ncyc  = self.__tasks.track.ncycles
             msgs['cycles'] = [ncyc if i is None else i  for i in msgs['cycles']]
             msgs['type']   = [trans.get(i, i)           for i in msgs['type']]
         return {i: list(j) for i, j in msgs.items()}

@@ -11,57 +11,67 @@ from control                import Controller
 from control.action         import Action
 from control.beadscontrol   import DataSelectionBeadController
 from signalfilter           import rawprecision
+from utils                  import initdefaults
 from view.plots.tasks       import TaskPlotCreator, TaskPlotModelAccess
-from view.plots             import PlotAttrs, PlotView
+from view.plots.base        import PlotAttrs, PlotView, PlotTheme, PlotModel
 from view.colors            import getcolors, setcolors
 from qualitycontrol.view    import QualityControlModelAccess
 
-class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
+class FoVPlotTheme(PlotTheme):
+    "FoV plot theme"
+    name        = "fovplot"
+    beads       = PlotAttrs('color', 'circle',
+                            alpha                   = .7,
+                            nonselection_alpha      = .7,
+                            selection_alpha         = .7,
+                            nonselection_color      = 'color',
+                            selection_fill_color    = 'color')
+    text        = PlotAttrs('color',  'text',
+                            text_font_style         = 'bold',
+                            nonselection_alpha      = 1.,
+                            nonselection_text_color = "color",
+                            selection_alpha         = 1.,
+                            selection_text_color    = 'blue')
+    image       = PlotAttrs('Greys256', 'image', x = 0, y = 0)
+    radius      = 1.
+    figsize     = 800, 800, 'fixed'
+    ylabel      = 'Y (μm)'
+    xlabel      = 'X (μm)'
+    colors      = dict(good = 'palegreen', fixed     = 'chocolate',
+                       bad  = 'orange',    discarded = 'red')
+    thumbnail   = 128
+    calibimg    = PlotAttrs('Greys256', 'image')
+    calibstart  = 1./16.
+    calibsize   = 6./16
+    calibtools  = 'pan,box_zoom,save'
+    tooltips    = '<table>@ttips{safe}</table>'
+    tooltiptype = {'extent'     : 'Δz',
+                   'pingpong'   : 'Σ|dz|',
+                   'hfsigma'    : 'σ[HF]',
+                   'population' : '% good',
+                   'saturation' : 'non-closing'}
+    tooltiprow  = ('<tr>'
+                   +'<td>{cycle}</td><td>cycle{plural} with:</td>'
+                   +'<td>{type}</td><td>{message}</td>'
+                   +'</tr>')
+    tooltipgood = ('<tr><td><td>'
+                   +'<td>σ[HF] =</td><td>{:.4f}</td>'
+                   +'</tr>')
+    toolbar     = dict(PlotTheme.toolbar)
+    toolbar['items'] = 'pan,box_zoom,tap,save,hover'
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class FoVPlotModel(PlotModel):
+    "FoV plot model"
+    theme = FoVPlotTheme()
+
+class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
     "Plots a default bead and its FoV"
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
-        self.css.defaults = {'beads':   PlotAttrs('color', 'circle',
-                                                  alpha                = .7,
-                                                  nonselection_alpha   = .7,
-                                                  selection_alpha      = .7,
-                                                  nonselection_color   = 'color',
-                                                  selection_fill_color = 'color'),
-                             'text':    PlotAttrs('color',  'text',
-                                                  text_font_style      = 'bold',
-                                                  nonselection_alpha      = 1.,
-                                                  nonselection_text_color = "color",
-                                                  selection_alpha      = 1.,
-                                                  selection_text_color = 'blue'),
-                             'image':   PlotAttrs('Greys256', 'image', x = 0, y = 0),
-                             'radius'       : 1.,
-                             'figure.width' : 800,
-                             'figure.height': 800,
-                             'ylabel'       : u'Y (μm)',
-                             'xlabel'       : u'X (μm)',
-                            }
-        setcolors(self,
-                  good = 'palegreen', fixed     = 'chocolate',
-                  bad  = 'orange',    discarded = 'red')
-        self.css.thumbnail.default     = 128
-        self.css.calib.defaults        = {'image'  : PlotAttrs('Greys256', 'image'),
-                                          'start'  : 1./16.,
-                                          'size'   : 6./16}
-        self.css.tooltip.default       = '<table>@ttips{safe}</table>'
-        self.css.tooltip.type.defaults = {'extent'     : 'Δz',
-                                          'pingpong'   : 'Σ|dz|',
-                                          'hfsigma'    : 'σ[HF]',
-                                          'population' : '% good',
-                                          'saturation' : 'non-closing'}
-        self.css.tooltip.row.default   = ('<tr>'
-                                          +'<td>{cycle}</td><td>cycle{plural} with:</td>'
-                                          +'<td>{type}</td><td>{message}</td>'
-                                          +'</tr>')
-        self.css.tooltip.good.default  = ('<tr><td><td>'
-                                          +'<td>σ[HF] =</td><td>{:.4f}</td>'
-                                          +'</tr>')
-        self.css.tools.default       = 'pan,box_zoom,tap,save,hover'
-        self.css.tools.calib.default = 'pan,box_zoom,save'
         self._fig:         Figure           = None
         self._beadssource: ColumnDataSource = None
         self._imgsource:   ColumnDataSource = None
@@ -74,29 +84,28 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         return None if trk is None or trk.fov.image is None else trk.fov
 
     def _addtodoc(self, *_):
-        self._fig = figure(**self._figargs(name    = 'FoV:Fig',
-                                           x_range = Range1d(0, 1),
-                                           y_range = Range1d(0, 1),
-                                           tools   = self.css.tools.get()))
+        self._fig = self._theme.figure(name    = 'FoV:Fig',
+                                       x_range = Range1d(0, 1),
+                                       y_range = Range1d(0, 1))
 
         self._imgsource   = ColumnDataSource(data = dict(image = [np.zeros((10, 10))],
                                                          dw    = [1], dh = [1]))
-        self.css.image.addto(self._fig, **{i:i for i in ('image', 'dw', 'dh')},
-                             source = self._imgsource)
+        self._theme.image.addto(self._fig, **{i:i for i in ('image', 'dw', 'dh')},
+                                source = self._imgsource)
 
         self._calibsource = ColumnDataSource(data = dict(image = [np.zeros((10, 10))],
                                                          x     = [0], y  = [0],
                                                          dw    = [1], dh = [1]))
-        self.css.calib.image.addto(self._fig, **{i:i for i in ('image', 'x', 'y', 'dw', 'dh')},
+        self._theme.calibimg.addto(self._fig, **{i:i for i in ('image', 'x', 'y', 'dw', 'dh')},
                                    source = self._calibsource)
 
         self._beadssource  = ColumnDataSource(**self.__beadsdata())
-        args = dict(x = 'x', y = 'y', radius = self.css.radius.get(), source = self._beadssource)
-        gl1  = self.css.beads.addto(self._fig, **args)
-        gl2  = self.css.text .addto(self._fig, **args, text = 'text')
+        args = dict(x = 'x', y = 'y', radius = self._theme.radius, source = self._beadssource)
+        gl1  = self._theme.beads.addto(self._fig, **args)
+        gl2  = self._theme.text .addto(self._fig, **args, text = 'text')
         self._fig.select(TapTool)[0].renderers = [gl1, gl2]
         self._fig.select(HoverTool)[0].update(renderers = [gl1, gl2],
-                                              tooltips  = self.css.tooltip.get())
+                                              tooltips  = self._theme.tooltips)
 
         def _onselect_cb(attr, old, new):
             inds = new.indices
@@ -142,12 +151,12 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         if fov is not None and bead in fov.beads:
             bead  = fov.beads[bead]
             img   = (bead.image if bead.image.size else
-                     bead.thumbnail(self.css.thumbnail.get(), fov))
+                     bead.thumbnail(self._theme.thumbnail, fov))
 
             pos   = bead.position
             rng   = (max(fov.size()),)*2
-            start = self.css.calib.start.get()
-            size  = self.css.calib.size.get()
+            start = self._theme.calibstart
+            size  = self._theme.calibsize
             dist  = [rng[0] * (start+ (0.5 if pos[0] < rng[0]*.5 else 0.)), # type: ignore
                      rng[1] * (start+ (0.5 if pos[1] < rng[1]*.5 else 0.)),
                      rng[0] * size,
@@ -176,20 +185,19 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         self.setbounds(self._fig.y_range, 'y', [0, max(dist[:2])])
 
     def __tooltips(self):
-        msgs  = self._model.messages()
-        trans = self.css.tooltip.type.getitems(...)
-        ttips = {} # type: Dict[BEADKEY, List[str]]
-        row   = self.css.tooltip.row.get()
+        msgs                            = self._model.messages()
+        ttips: Dict[BEADKEY, List[str]] = {} 
+        row                             = self._theme.tooltiprow
         for bead, cyc, tpe, msg  in sorted(zip(msgs['bead'], msgs['cycles'],
                                                msgs['type'], msgs['message']),
                                            key = lambda i: (i[0], -i[1])):
             val = row.format(cycle   = cyc,
-                             type    = trans[tpe],
+                             type    = self._theme.tooltiptype[tpe],
                              message = msg.replace('<', '&lt').replace('>', '&gt'),
                              plural  = 's' if cyc > 1 else '')
             ttips.setdefault(bead, []).append(val)
 
-        row  = self.css.tooltip.good.get()
+        row  = self._theme.tooltipgood
         trk  = self._model.track
         for bead in DataSelectionBeadController(self._ctrl).allbeads:
             if bead not in ttips:

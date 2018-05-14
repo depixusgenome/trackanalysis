@@ -11,30 +11,31 @@ from    view.plots          import PlotView
 from    view.plots.tasks    import TaskPlotCreator
 
 from   ._bokehext           import DpxHoverModel
-from   ._model              import CyclesModelAccess
+from   ._model              import CyclesModelAccess, CyclesPlotModel
 from   ._raw                import RawMixin
 from   ._hist               import HistMixin
 from   ._widget             import WidgetMixin
 
-class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin, WidgetMixin):
+class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel],
+                        HistMixin, RawMixin, WidgetMixin):
     "Displays cycles and their projection"
+    _model: CyclesModelAccess
+    _hover: DpxHoverModel
     def __init__(self, ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
-        RawMixin       .__init__(self)
-        HistMixin      .__init__(self)
-        WidgetMixin    .__init__(self, ctrl)
-
-        DpxHoverModel.defaultconfig(self)
-        self.css.tools.default  = 'ypan,ybox_zoom,reset,save,dpxhover'
-        self._hover: DpxHoverModel = None
-
-        if TYPE_CHECKING:
-            self._model = CyclesModelAccess('', '')
+        RawMixin   .__init__(self)
+        HistMixin  .__init__(self)
+        WidgetMixin.__init__(self, ctrl)
 
     def _addtodoc(self, ctrl, doc):
         "returns the figure"
         self._hover = DpxHoverModel()
+
+        fcn = lambda attr, old, new: self._model.newparams(**{attr: new})
+        self._hover.on_change("stretch", fcn)
+        self._hover.on_change("bias",    fcn)
+
         doc.add_root(self._hover)
 
         shape = self._createraw()
@@ -42,8 +43,6 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
         if 'fixed' in self.defaultsizingmode().values():
             layout = [self._keyedlayout(ctrl, self._raw, self._hist), self._createwidget()]
         layout = [self._createwidget(), self._keyedlayout(ctrl, self._raw, self._hist)]
-        self._histobservers()
-        self._widgetobservers(ctrl)
         return layout
 
     def _reset(self):
@@ -61,8 +60,9 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
     def observe(self, ctrl):
         "sets-up model observers"
         super().observe(ctrl)
-        self._model.config.observe('eventdetection.isactive', 'binwidth', 'minframes',
-                                   lambda: self.reset(False))
+        self._histobservers(ctrl)
+        self._widgetobservers(ctrl)
+        ctrl.theme.observe(self._model.cycles.theme, lambda **_: self.reset(False))
 
 class CyclesPlotView(PlotView[CyclesPlotCreator]):
     "Cycles plot view"

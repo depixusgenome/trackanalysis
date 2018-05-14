@@ -5,7 +5,6 @@ from .launcher  import setup
 
 VIEWS       = ('undo.UndoView', 'view.tasksview.TasksView',)
 CONTROLS    = ('control.taskcontrol.TaskController',
-               'control.globalscontrol.GlobalsController',
                'anastore.control',
                'undo.UndoController')
 

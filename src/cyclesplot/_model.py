@@ -2,40 +2,123 @@
 # -*- coding: utf-8 -*-
 "access to the model"
 
-from    typing                      import Tuple, Optional, cast
-from    utils                       import NoArgs
+from    typing                      import Optional, Dict, cast
+from    utils                       import NoArgs, initdefaults
 from    cordrift.processor          import DriftTask            # pylint: disable=unused-import
 from    eventdetection.processor    import (EventDetectionTask, # pylint: disable=unused-import
                                             ExtremumAlignmentTask)
-from    control.modelaccess         import TaskAccess, PROPS
-from    sequences.modelaccess       import (SequencePlotModelAccess,
-                                            SequenceKeyProp, FitParamProp)
+from    model.task                  import RootTask
+from    model.task.application      import TasksDisplay
+from    control.modelaccess         import TaskAccess
+from    sequences.modelaccess       import SequencePlotModelAccess
+from    view.plots.base             import PlotTheme, PlotModel, PlotAttrs, PlotDisplay
+
+class CyclesModelConfig:
+    "CyclesModelConfig"
+    """
+    added info for cycles
+    """
+    name             = "cycles"
+    showevents       = False
+    binwidth         = 0.01
+    minframes        = 10
+    estimatedstretch = 1./8.8e-4
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        pass
+
+class CyclesPlotTheme(PlotTheme):
+    "theme for cycles"
+    name       = "cyclestheme"
+    raw        = {'dark':  PlotAttrs('color', 'circle', .1, alpha = .5,
+                                     palette = 'YlOrBr'),
+                  'basic': PlotAttrs('color', 'circle', .1, alpha = .5,
+                                     palette = 'inferno')}
+    selection  = {'dark'  : PlotAttrs('lightblue', 'line',   3),
+                  'basic' : PlotAttrs('blue', 'line',   3)}
+    tooltips   = [('(cycle, t, z)', '(@cycle, $~x{1}, $data_y{1.1111})')]
+    radius     = 1.
+    histframes     = PlotAttrs('white', 'quad', 1, line_color = 'gray', fill_color = 'gray')
+    histcycles     = PlotAttrs('white', 'quad', 1, line_color = 'blue', fill_color = None,
+                               line_alpha = .5)
+    histxtoplabel  = 'Cycles'
+    histxlabel     = 'Frames'
+    figsize        = 450, 450, 'fixed'
+    toolbar        = dict(PlotTheme.toolbar)
+    toolbar.update(raw   = 'tap,ypan,ybox_zoom,reset,save,dpxhover',
+                   items = 'ypan,ybox_zoom,reset,save,dpxhover')
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+class BeadInfo:
+    """
+    bead related info
+    """
+    stretch: float               = CyclesModelConfig.estimatedstretch
+    bias   : float               = None
+    @initdefaults
+    def __init__(self, **kwa):
+        pass
+
+INFO = Dict[RootTask, Dict[int, BeadInfo]]
+class CyclesPlotDisplay(PlotDisplay):
+    "CyclesPlotDisplay"
+    name             = "cycles"
+    info: INFO       = {}
+    estimatedstretch = CyclesModelConfig.estimatedstretch
+    estimatedbias    = 0.
+    @initdefaults
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+    def __getitem__(self, tasks: TasksDisplay) -> Optional[BeadInfo]:
+        return self.info.get(tasks.roottask, {}).get(tasks.bead, None)
+
+    def newinfo(self, tasks: TasksDisplay, **info) -> Optional[INFO]:
+        "return a dict containing the new info"
+        old = self.info.get(tasks.roottask, {}).get(tasks.bead, None)
+        if old and all(getattr(old, i) == j for i, j in info.items()):
+            return None
+
+        if old is None:
+            info.setdefault('stretch', self.estimatedstretch)
+            info.setdefault('bias',    self.estimatedbias)
+            old = BeadInfo(**info)
+        else:
+            old.__dict__.update(**info)
+
+        res: INFO = dict(self.info)
+        res.setdefault(tasks.roottask, {})[tasks.bead] = old
+        return res
+
+class CyclesPlotModel(PlotModel):
+    "model for cycles"
+    theme   = CyclesPlotTheme()
+    display = CyclesPlotDisplay()
+    config  = CyclesModelConfig()
 
 class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
     "Access to the event detection task"
     def __init__(self, mdl):
         super().__init__(mdl)
-        self.config.eventdetection.isactive.default = False
+        self.__model = self._ctrl.theme.add(CyclesModelConfig(), True)
 
     @property
     def task(self) -> Optional[EventDetectionTask]:
         "returns the task if it exists"
-        if not self.config.eventdetection.isactive.get():
+        if not self.__model.showevents:
             return None
         return cast(EventDetectionTask, super().task)
 
     def check(self, task, parent = NoArgs) -> bool:
         "wether this controller deals with this task"
-        return (self.config.eventdetection.isactive.get()
-                and super().check(task, parent))
-
-    def remove(self):
-        "removes the task"
-        self.config.eventdetection.isactive.set(False)
+        return self.__model.showevents and super().check(task, parent)
 
     def update(self, **kwa):
         "adds/updates the task"
-        self.config.eventdetection.isactive.set(not kwa.pop('disabled', False))
+        self._ctrl.theme.update(self.__model, showevents = not kwa.pop('disabled', False))
         super().update(**kwa)
 
 class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
@@ -57,26 +140,27 @@ class CyclesModelAccess(SequencePlotModelAccess):
     "Model for Cycles View"
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
-        cls = type(self)
-        cls.binwidth    .setdefault(self, 0.01)     # type: ignore
-        cls.minframes   .setdefault(self, 10)       # type: ignore
-        cls.stretch     .setdefault(self)           # type: ignore
-        cls.bias        .setdefault(self)           # type: ignore
-        cls.peaks       .setdefault(self, None)     # type: ignore
-        cls.sequencekey .setdefault(self, None)     # type: ignore
-
+        self.cycles         = CyclesPlotModel.create(ctrl, key)
         self.alignment      = ExtremumAlignmentTaskAccess(self)
         self.driftperbead   = BeadsDriftTaskAccess(self)
         self.driftpercycle  = CyclesDriftTaskAccess(self)
         self.eventdetection = EventDetectionTaskAccess(self)
-        self.estimatedbias  = 0.
 
-    sequencekey  = cast(Optional[str],                SequenceKeyProp())
-    binwidth     = cast(float,                        PROPS.config('binwidth'))
-    minframes    = cast(int,                          PROPS.config('minframes'))
-    peaks        = cast(Optional[Tuple[float,float]], PROPS.bead  ('sequence.peaks'))
-    stretch      = cast(Optional[float],              FitParamProp('stretch'))
-    bias         = cast(Optional[float],              FitParamProp('bias'))
+    @property
+    def stretch(self) -> None:
+        "return the stretch for the current bead"
+        out = self.cycles.display[self.sequencemodel.tasks]
+        return out.stretch if out else self.cycles.display.estimatedstretch
+
+    @property
+    def bias(self) -> None:
+        "return the bias for the current bead"
+        out = self.cycles.display[self.sequencemodel.tasks]
+        return out.bias if out else self.cycles.display.estimatedbias
+
+    def newparams(self, **info):
+        "set stretch and bias"
+        self.cycles.display.newinfo(self.sequencemodel.tasks, **info)
 
     def runbead(self):
         "returns a tuple (dataitem, bead) to be displayed"

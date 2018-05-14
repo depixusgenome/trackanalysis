@@ -18,7 +18,7 @@ from peakcalling.processor.fittoreference import (FitToReferenceTask, FitToRefer
                                                   TaskViewProcessor, BEADKEY)
 
 from view.base                       import spawn, threadmethod
-from view.dialog                     import FileDialog
+from view.dialog                     import FileDialogModel
 
 from utils.logconfig                 import getLogger
 from utils.gui                       import startfile
@@ -65,7 +65,12 @@ class _SafeDict(FitToReferenceDict):
 class _SafeProc(TaskViewProcessor[_SafeTask, _SafeDict, BEADKEY]):
     "Changes the Z axis to fit the reference"
 
-FileDialog.DEFAULTS['pkz'] = (u'pickled report', '.pkz')
+FileDialogModel.types['pkz'] = (u'pickled report', '.pkz')
+class ConfigXlsxIOTheme:
+    "ConfigXlsxIOTheme"
+    name   = 'configxlsxiotheme'
+    start  = ('Report in progress ...', 'normal')
+    errors = {'running': ("Can only create one report at a time", "warning")}
 
 class ConfigXlsxIO(TaskIO):
     "Ana IO saving only the current project"
@@ -76,16 +81,7 @@ class ConfigXlsxIO(TaskIO):
         super().__init__(ctrl)
         self.__ctrl  = ctrl
         self.__model = PeaksPlotModelAccess(ctrl)
-        self.__msg   = ctrl.globals.project.message
-        self.__css   = ctrl.globals.css.title.hybridstatreport
-
-    @staticmethod
-    def setup(ctrl):
-        "sets-up default global values"
-        css = ctrl.css.root.title.hybridstatreport
-        css.defaults = {'start': (u'Report in progress ...', 'normal')}
-        css = css.errors
-        css.defaults = {'running': ("Can only create one report at a time", "warning")}
+        self.__theme = ctrl.theme.add(ConfigXlsxIOTheme(), True)
 
     def save(self, path:str, models):
         "creates a Hybridstat report"
@@ -100,16 +96,16 @@ class ConfigXlsxIO(TaskIO):
 
             if isinstance(exc, IOError) and len(exc.args) == 1:
                 if len(exc.args) == 1:
-                    msg = self.__css.errors.get(exc.args[0], default = None)
+                    msg = self.__theme.errors.get(exc.args[0], None)
                     if msg is not None:
-                        self.__msg.set(msg)
+                        self.__msg(msg)
                         LOGS.debug('Failed report creation with %s', msg[0])
                         return
             if exc is not None:
                 LOGS.exception(exc)
             else:
                 startfile(path)
-            self.__msg.set(exc)
+            self.__msg(exc)
 
         model = self.__complete_model(list(models[0]))
         try:
@@ -121,13 +117,13 @@ class ConfigXlsxIO(TaskIO):
                             _end)
         except IOError as exc:
             if len(exc.args) == 1:
-                msg = self.__css.errors.get(exc.args[0], default = None)
+                msg = self.__theme.errors.get(exc.args[0], None)
                 if msg is not None:
                     raise IOError(*msg) from exc
             raise
 
         if ret:
-            self.__msg.set(self.__css.start.get())
+            self.__msg(self.__theme.start)
         return ret
 
     def __complete_model(self, model):
@@ -159,6 +155,9 @@ class ConfigXlsxIO(TaskIO):
             model[ind]             = _SafeTask(**model[ind].config())
             model[ind].defaultdata =  procs.data
         return model
+
+    def __msg(self, msg):
+        self.__ctrl.display.update("message", message = msg)
 
     @classmethod
     def _run(cls, xlscnf, model, end = None):
@@ -198,9 +197,8 @@ class ConfigXlsxIO(TaskIO):
         spawn(_thread)
         return True
 
-def setupio(ctrl):
+def setupio(_):
     "sets the io up"
-    ConfigXlsxIO.setup(ctrl)
     name = lambda i: __name__ + '.'+i
     return dict(ioopen = (slice(None, -2),
                           name('PeaksConfigGRFilesIO'),

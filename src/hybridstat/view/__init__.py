@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"all view aspects here"
+"all view aspects here"
+from typing                 import Dict
+from functools              import partial
 from bokeh.models           import Tabs, Panel, Spacer
 from bokeh                  import layouts
 from view.base              import BokehView
@@ -12,6 +14,12 @@ from cyclesplot             import CyclesPlotView
 from .peaksplot             import PeaksPlotView
 from ._io                   import setupio
 
+class HybridStatTheme:
+    "HybridStatTheme"
+    width                  = 500
+    height                 = 60
+    titles: Dict[str, str] = []
+
 class HybridStatView(BokehView):
     "A view with all plots"
     TASKS = ((lambda lst: tuple(j for i, j in enumerate(lst) if j not in lst[:i]))
@@ -21,22 +29,24 @@ class HybridStatView(BokehView):
         super().__init__(ctrl = ctrl, **kwa)
         self._tabs   = None
         self._roots  = [] # type: ignore
+        self.__theme = HybridStatTheme()
         self._panels = [FoVPlotView         (ctrl = ctrl, **kwa),
                         QualityControlView  (ctrl = ctrl, **kwa),
                         CleaningView        (ctrl = ctrl, **kwa),
                         CyclesPlotView      (ctrl = ctrl, **kwa),
                         PeaksPlotView       (ctrl = ctrl, **kwa)]
 
-        ctrl.globals.css.plot.figure.defaults = dict(sizing_mode = 'fixed')
-        ctrl.globals.css.hybridstat.defaults  = dict(width = 500, height = 60)
-        titles = ctrl.globals.css.hybridstat.title
+        titles = self.__theme.titles
         for panel in self._panels:
-            key                         = self.__key(panel)
-            titles[key].default         = getattr(panel, 'PANEL_NAME', key.capitalize())
-            self.__state(panel).default = PlotState.disabled
-        titles['fov'].default           = 'FoV'
+            key         = self.__key(panel)
+            titles[key] = getattr(panel, 'PANEL_NAME', key.capitalize())
+        titles['fov']   = 'FoV'
 
-        self.__state(self.__select(CleaningView)).default = PlotState.active
+        cur = self.__select(CleaningView)
+        for panel in self._panels:
+            desc = tyep(panel.plotter).state
+            desc.setdefault(panel.plotter, (PlotState.active if panel is cur else
+                                            PlotState.disabled))
 
     @staticmethod
     def __key(panel):
@@ -44,10 +54,9 @@ class HybridStatView(BokehView):
 
     @staticmethod
     def __state(panel, val = None):
-        ret = panel.plotter.project.state
         if val is not None:
-            ret.set(PlotState(val))
-        return ret
+            panel.plotter.state = PlotState(val)
+        return panel.plotter.state
 
     def __select(self, tpe):
         return next(i for i in self._panels if isinstance(i, tpe))
@@ -59,7 +68,7 @@ class HybridStatView(BokehView):
         ctrl.theme.updatedefaults("taskio", tasks = self.TASKS)
         def _advanced():
             for panel in self._panels:
-                if self.__state(panel).get() is PlotState.active:
+                if self.__state(panel) is PlotState.active:
                     getattr(panel, 'advanced', lambda:None)()
                     break
         ctrl.display.updatedefaults('keystroke', advanced = _advanced)
@@ -68,7 +77,7 @@ class HybridStatView(BokehView):
         "returns object root"
         super().addtodoc(ctrl, doc)
 
-        titles = ctrl.globals.css.hybridstat.title
+        titles = self.__theme.titles
         mode   = self.defaultsizingmode()
         def _panel(view):
             ret = view.addtodoc(ctrl, doc)
@@ -77,10 +86,10 @@ class HybridStatView(BokehView):
             if isinstance(ret, (tuple, list)):
                 ret = layouts.column(ret, **mode)
             self._roots.append(ret)
-            return Panel(title = titles[self.__key(view)].get(), child = Spacer(), **mode)
+            return Panel(title = titles[self.__key(view)], child = Spacer(), **mode)
 
         ind = next((i for i, j in enumerate(self._panels)
-                    if self.__state(j).get() is PlotState.active),
+                    if self.__state(j) is PlotState.active),
                    None)
         if ind is None:
             ind = next(i for i, j in enumerate(self._panels)
@@ -92,7 +101,7 @@ class HybridStatView(BokehView):
         for panel in self._panels[ind+1:]:
             self.__state(panel, PlotState.disabled)
 
-        mode.update(ctrl.globals.css.hybridstat.getitems('width', 'height'))
+        mode.update(width = self.__theme.width, height = self.__theme.height)
         tabs = Tabs(tabs   = [_panel(panel) for panel in self._panels],
                     active = ind,
                     name   = 'Hybridstat:Tabs',
@@ -118,12 +127,12 @@ class HybridStatView(BokehView):
     def observe(self, ctrl):
         "observing the controller"
         super().observe(ctrl)
-        def _make(ind):
-            def _fcn(val):
-                if val.value == PlotState.active and self._tabs is not None:
-                    self._tabs.active = ind
-            return _fcn
+        def _fcn(ind, panel, old = None, **_):
+            if 'state' not in old:
+                return
+            if panel.state == PlotState.active and self._tabs is not None:
+                self._tabs.active = ind
 
         for ind, panel in enumerate(self._panels):
             panel.observe(ctrl)
-            self.__state(panel).observe(_make(ind))
+            ctrl.display.observe(getattr(panel, '_display'), partial(fcn, ind, panel))

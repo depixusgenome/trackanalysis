@@ -10,7 +10,6 @@ from   bokeh.layouts           import layout
 
 from   control.event           import EmitPolicy
 from   control.taskcontrol     import TaskController
-from   control.globalscontrol  import GlobalsController
 from   control.decentralized   import DecentralizedController
 from   control.action          import ActionDescriptor
 from   undo.control            import UndoController
@@ -194,30 +193,8 @@ class SuperController(BaseSuperController):
     """
     def __init__(self, view):
         hdl: dict    = dict()
-        self.globals = GlobalsController(handlers = hdl)
         self.tasks   = TaskController(handlers = hdl)
         super().__init__(view, handlers = hdl)
-
-    def observe(self, *args, **kwa):
-        "observe an event"
-        return self.tasks.observe(*args, **kwa)
-
-    def handle(self, *args, **kwa):
-        "handle an event"
-        return self.tasks.handle(*args, **kwa)
-
-    def _getmaps(self):
-        maps = super()._getmaps()
-        maps.update({i: self.globals.getGlobal(i, model = True)
-                     for i in self.globals.keys()
-                     if any(i.startswith(j) for j in ('config', 'css'))})
-        return maps
-
-    def _setmaps(self, maps):
-        for i, j in maps.items():
-            if any(i.startswith(k) for k in ('config', 'css')):
-                self.globals.getGlobal(i).update(j)
-        super()._setmaps(maps)
 
     def _observe(self, keys):
         "starts the controler"
@@ -225,7 +202,11 @@ class SuperController(BaseSuperController):
         self.tasks.setup(self)
 
     def _observeargs(self):
-        return (self.globals, r"^globals\.(?!.*?project).*$")
+        return (self.tasks, "opentrack",
+                self.tasks, "addtask",
+                self.tasks, "updatetask",
+                self.tasks, "removetask",
+                self.tasks, "closetrack")
 
 def createview(main, controls, views):
     "Creates a main view"

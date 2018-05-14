@@ -79,7 +79,7 @@ class IdentificationPeakInfo(PeakInfo):
         if not len(mdl.distances):
             return {'bases': (zvals-mdl.bias)*mdl.stretch}
 
-        strori  = mdl.css.stats.title.orientation.get()
+        strori  = '-+ '
         alldist = mdl.distances
         dico    = {}
         task    = cast(FitToHairpinTask, mdl.identification.task)

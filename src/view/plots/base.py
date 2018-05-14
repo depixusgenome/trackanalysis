@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "The basic architecture"
-from    typing              import (Tuple, Optional, Type, # pylint: disable=unused-import
-                                    Iterator, Sequence, List, Union, Any,
-                                    Generic, Dict, TypeVar, cast)
+from    typing              import (Tuple, Optional, Type, Iterator, Sequence,
+                                    List, Union, Any, Generic, Dict, TypeVar, cast)
 from    collections         import OrderedDict
 from    abc                 import abstractmethod
 from    contextlib          import contextmanager
@@ -14,9 +13,10 @@ import  numpy        as     np
 
 import  bokeh.palettes
 from    bokeh.document          import Document
-from    bokeh.models            import (Range1d, RadioButtonGroup, Model,
-                                        Paragraph, Widget, GlyphRenderer, CustomJS)
+from    bokeh.models            import Range1d, Model, Widget, GlyphRenderer, CustomJS
+from    bokeh.plotting          import Figure, figure
 
+from    utils                   import initdefaults
 from    utils.logconfig         import getLogger
 from    utils.inspection        import templateattribute
 from    control.modelaccess     import GlobalsAccess, PlotModelAccess, PlotState
@@ -26,8 +26,9 @@ from    ..base                  import (BokehView, threadmethod, spawn,
                                         SINGLE_THREAD)
 from    .bokehext               import DpxHoverTool, DpxKeyedRow
 
-LOGS    = getLogger(__name__)
-_m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
+LOGS        = getLogger(__name__)
+ModelType   = TypeVar('ModelType', bound = PlotModelAccess)
+RANGE_TYPE  = Tuple[Optional[float], Optional[float]]
 
 def checksizes(fcn):
     "Checks that the ColumnDataSource have same sizes"
@@ -82,7 +83,7 @@ class PlotAttrs:
         if palette is None:
             return [self.color]*count
         elif isinstance(palette, dict):
-            colors = max(palette.values(), key = len) # type: List[str]
+            colors: List[str] = max(palette.values(), key = len)
             npal   = len(colors)
             if indexes is None:
                 return [colors[int(i/count*npal)] for i in range(count)]
@@ -157,8 +158,6 @@ class PlotAttrs:
         getattr(self, '_'+self.glyph, self._default)(args)
         return getattr(fig, self.glyph)(**args)
 
-ModelType = TypeVar('ModelType', bound = PlotModelAccess)
-
 class WidgetCreator(GlobalsAccess, Generic[ModelType]):
     "Base class for creating a widget"
     def __init__(self, model:ModelType) -> None:
@@ -177,86 +176,194 @@ class WidgetCreator(GlobalsAccess, Generic[ModelType]):
     def reset(self, resets):
         "resets the wiget when a new file is opened"
 
-class GroupWidget(WidgetCreator[ModelType]):
-    "Allows creating group widgets"
-    INPUT = RadioButtonGroup
-    def __init__(self, model) -> None:
-        super().__init__(model)
-        self._widget: RadioButtonGroup = None
+class PlotTheme:
+    """
+    Default plot theme
+    """
+    name          = ''
+    ylabel        = 'Z (μm)'
+    yrightlabel   = 'Base number'
+    xtoplabel     = 'Time (s)'
+    xlabel        = 'Frames'
+    figsize       = 800, 600, 'fixed'
+    overshoot     =.001
+    toolbar       = dict(sticky   = False,
+                         location = 'above',
+                         items    = 'xpan,wheel_zoom,box_zoom,save')
+    tooltips: Any = None
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        pass
 
-    def addtodoc(self, action) -> List[Widget]:
-        "creates the widget"
-        name = self.__class__.__name__.replace('Widget', '').replace('Creator', '')
-        css  = self.css.title[name.lower()]
-        self._widget = self.INPUT(labels = css.labels.get(),
-                                  name   = 'Cycles:'+name,
-                                  **self._data())
-        self._widget.on_click(action(self.onclick_cb))
+    def figargs(self, **kwa) -> Dict[str, Any]:
+        "create a figure"
+        tips = kwa.pop('tooltips', self.tooltips)
+        args = {'toolbar_sticky':   self.toolbar['sticky'],
+                'toolbar_location': self.toolbar['location'],
+                'tools':            self.toolbar['items'],
+                'x_axis_label':     self.xlabel,
+                'y_axis_label':     self.ylabel,
+                'plot_width':       self.figsize[0],
+                'plot_height':      self.figsize[1],
+                'sizing_mode':      self.figsize[2]}
+        args.update(kwa)
 
-        if css.get(default = None) is not None:
-            return [Paragraph(text = css.get()), self._widget]
-        return [self._widget]
+        tools:list = []
+        if isinstance(args['tools'], str):
+            tools = cast(str, args['tools']).split(',')
+        elif not args['tools']:
+            tools = []
+        else:
+            tools = cast(List[Any], args['tools'])
 
-    def reset(self, resets):
-        "updates the widget"
-        resets[self._widget].update(**self._data())
+        if tips:
+            hvr = DpxHoverTool(tooltips = tips)
+            if 'dpxhover' not in tools:
+                tools.append(hvr)
+            else:
+                tools = [i if i != 'dpxhover' else hvr for i in tools]
 
-    @abstractmethod
-    def onclick_cb(self, value):
-        "action to be performed when buttons are clicked"
+        elif 'dpxhover' in tools:
+            tools = [i if i != 'dpxhover' else DpxHoverTool() for i in tools]
+        args['tools'] = tools
 
-    @abstractmethod
-    def _data(self) -> dict:
-        "returns  a dict of updated widget attributes"
+        for name in ('x_range', 'y_range'):
+            if args.get(name, None) is Range1d:
+                args[name] = Range1d(start = 0., end = 1.)
+        return args
 
-    @abstractmethod
-    def observe(self, ctrl):
-        "Creates the widget"
+    def figure(self, **kwa) -> Figure:
+        "creates a figure"
+        return figure(**self.figargs(**kwa))
 
-class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many-public-methods
+class PlotDisplay:
+    """
+    Default plot display
+    """
+    name                = ""
+    state               = PlotState.active
+    xbounds: RANGE_TYPE = (None, None)
+    ybounds: RANGE_TYPE = (None, None)
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        pass
+
+    def addcallbacks(self, ctrl, fig):
+        "adds Range callbacks"
+        updating = [False]
+        def _get(attr):
+            axis = getattr(fig, attr+'_range')
+
+            def _on_cb(attr, old, new):
+                if self.state is PlotState.active:
+                    vals = cast(Tuple[Optional[float],...], (axis.start, axis.end))
+                    if axis.bounds is not None:
+                        rng  = 1e-3*(axis.bounds[1]-axis.bounds[0])
+                        vals = tuple(None if abs(i-j) < rng else j
+                                     for i, j in zip(axis.bounds, vals))
+                    updating[0] = True
+                    ctrl.display.update(self, **{attr+'bounds': vals})
+                    updating[0] = False
+
+            axis.on_change('start', _on_cb)
+            axis.on_change('end',   _on_cb)
+
+        _get('x')
+        _get('y')
+
+        def _onobserve(old = None, **_):
+            if updating[0]:
+                return
+            for i in {'xbounds', 'ybounds'} & frozenset(old):
+                rng  = getattr(fig, i[0]+'_range')
+                vals = getattr(self, i)
+                bnds = rng.bounds
+                rng.update(start = bnds[0] if vals[0] is None else vals[0],
+                           end   = bnds[1] if vals[1] is None else vals[1])
+        ctrl.display.observe(self, _onobserve)
+        return fig
+
+class PlotModel:
+    """
+    base plot model
+    """
+    theme       = PlotTheme()
+    display     = PlotDisplay()
+    config: Any = None
+    def __init__(self, key, **kwa):
+        self.theme   = type(self.__class__.theme)(name = key, **kwa)
+        self.display = type(self.__class__.display)(name = key, **kwa)
+        if self.__class__.config:
+            self.config  = type(self.__class__.config)(name = key+"config", **kwa)
+
+    def observe(self, ctrl, noerase = True):
+        "sets-up model observers"
+        self.theme   = ctrl.theme  .add(self.theme, noerase)
+        self.display = ctrl.display.add(self.display, noerase)
+        if self.config:
+            self.config = ctrl.theme  .add(self.config, noerase)
+
+    @classmethod
+    def create(cls, ctrl, key, **kwa):
+        "creates the model and registers it"
+        self = cls(key, **kwa)
+        self.observe(ctrl, True)
+        return self
+
+PlotModelType    = TypeVar('PlotModelType',    bound = PlotModel)
+ControlModelType = TypeVar('ControlModelType', bound = PlotModelAccess)
+
+class _StateDescriptor:
+    def __get__(self, inst, owner):
+        return getattr(inst, '_plotmodel').display.state if inst else self
+
+    @staticmethod
+    def setdefault(inst, value):
+        "sets the default value"
+        getattr(inst, '_ctrl').display.updatedefaults(getattr(inst, '_plotmodel').display,
+                                                      state = PlotState(value))
+
+    def __set__(self, inst, value):
+        getattr(inst, '_ctrl').display.update(getattr(inst, '_plotmodel').display,
+                                              state = PlotState(value))
+
+class _ModelDescriptor:
+    def __init__(self):
+        self._name = ''
+
+    def __set_name__(self, _, name):
+        self._name  = name
+
+    def __get__(self, inst, owner):
+        return getattr(getattr(inst, '_plotmodel'), self._name) if inst else self
+
+    def __set__(self, inst, value):
+        getattr(inst, '_ctrl').display.update(self.__get__(inst, None), **value)
+
+class PlotCreator(Generic[ControlModelType, PlotModelType],
+                  GlobalsAccess): # pylint: disable=too-many-public-methods
     "Base plotter class"
-    _RESET  = frozenset(('bead',))
-    _CLEAR  = frozenset(('track',))
+    _RESET   = frozenset(('bead',))
+    _CLEAR   = frozenset(('track',))
+    state    = cast(PlotState,   _StateDescriptor())
+    _theme   = cast(PlotTheme,   _ModelDescriptor())
+    _display = cast(PlotDisplay, _ModelDescriptor())
+    _config  = cast(Any,         _ModelDescriptor())
     class _OrderedDict(OrderedDict):
         def __missing__(self, key):
-            value     = OrderedDict() # type: Dict
-            self[key] = value
+            value: Dict = OrderedDict()
+            self[key]   = value
             return value
 
     def __init__(self, ctrl, *_) -> None:
         "sets up this plotter's info"
-        css = ctrl.globals.css.plot
-        if css.ylabel.get(default = None) is None:
-            css.defaults = {'ylabel'             : u'Z (μm)',
-                            'yrightlabel'        : u'Base number',
-                            'xtoplabel'          : u'Time (s)',
-                            'xlabel'             : u'Frames',
-                            'toolbar_location'   : 'right',
-                            'toolbar_sticky'     : False,
-                            'input.width'        : 205,
-                            'figure.width'       : 800,
-                            'figure.height'      : 200}
-            css.figure.sizing_mode.default = 'fixed'
-
         key = type(self).key()
-        for name in 'config', 'project', 'css':
-            ctrl.globals.addGlobalMap(name+key)
-
         super().__init__(ctrl, key)
-        self._model: ModelType                    = self.modeltype()(ctrl, key)
+        self._model: ControlModelType             = templateattribute(self, 1)(ctrl, key)
+        self._plotmodel: PlotModelType            = templateattribute(self, 2)(name = key)
         self._ctrl                                = ctrl
         self._bkmodels: Dict[Model,Dict[str,Any]] = self._OrderedDict()
         self._doc:      Document                  = None
-        self.project.state.default = PlotState.active
-
-    @classmethod
-    def modeltype(cls) -> Type[ModelType]:
-        "the model class object"
-        return cast(Type[ModelType], templateattribute(cls, 0))
-
-    state = cast(PlotState,
-                 property(lambda self:    self.project.state.get(),
-                          lambda self, i: self.project.state.set(PlotState(i))))
 
     def defaultsizingmode(self, kwa = None, **kwargs):
         "the default sizing mode"
@@ -329,7 +436,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
 
     def newbounds(self, rng, axis, arr) -> dict:
         "Sets the range boundaries"
-        over  = self.css.boundary.overshoot.get()
+        over  = self._theme.overshoot
 
         if isinstance(arr, np.ndarray):
             if all(np.isnan(i) for i in arr) or len(arr) == 0:
@@ -349,12 +456,8 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
         vmin -= delta
         vmax += delta
 
-        if axis is None:
-            curr = None, None # type: Tuple[Optional[float], Optional[float]]
-        else:
-            curr = self.project[axis].get(default = (vmin, vmax))
-
-        attrs = OrderedDict(bounds = (vmin, vmax))                  # type: Dict[str, Any]
+        curr = getattr(self._display, f'{axis}bounds') if axis else (None, None)
+        attrs: Dict[str, Any] = OrderedDict(bounds = (vmin, vmax))
         attrs.update(start = vmin if curr[0]  is None else curr[0], # type: ignore
                      end   = vmax if curr[1]  is None else curr[1])
         if hasattr(rng, 'range_padding'):
@@ -381,7 +484,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
             vmin  = min(arr)
             vmax  = max(arr)
 
-        delta = (vmax-vmin)*self.config.boundary.overshoot.get()
+        delta = (vmax-vmin)*self._theme.overshoot
         vmin -= delta
         vmax += delta
         return vmin, vmax
@@ -453,7 +556,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
                         except Exception as exc: # pylint: disable=broad-except
                             args = getattr(exc, 'args', tuple())
                             if len(args) == 2 and args[1] == "warning":
-                                ctrl.globals.project.message.set(exc)
+                                ctrl.display.update("message", message = exc)
                             else:
                                 raise
                         finally:
@@ -477,109 +580,15 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
 
             spawn(_reset_and_render)
 
-    def _addcallbacks(self, fig):
-        "adds Range callbacks"
-        updating = [False]
-        def _get(attr):
-            axis = getattr(fig, attr+'_range')
-            cnf  = getattr(self.project, attr)
-
-            def _on_cb(attr, old, new):
-                if self.state is PlotState.active:
-                    vals = axis.start, axis.end # type: tuple
-                    if axis.bounds is not None:
-                        rng = 1e-3*(axis.bounds[1]-axis.bounds[0])
-                        vals = tuple(None if abs(i-j) < rng else j
-                                     for i, j in zip(axis.bounds, vals))
-                    updating[0] = True
-                    cnf.set(vals)
-                    updating[0] = False
-
-            cnf.default = None, None
-            axis.on_change('start', _on_cb)
-            axis.on_change('end',   _on_cb)
-
-        _get('x')
-        _get('y')
-
-        def _onobserve(items):
-            if updating[0]:
-                return
-            for i in {'x', 'y'} & frozenset(items):
-                rng  = getattr(fig, i+'_range')
-                vals = items[i].value
-                bnds = rng.bounds
-                rng.update(start = bnds[0] if vals[0] is None else vals[0],
-                           end   = bnds[1] if vals[1] is None else vals[1])
-
-        self.project.observe('x', 'y', _onobserve)
-        return fig
-
-    def _sizing(self, *attrs, translations = None, css = None, **kwa) -> dict:
-        "returns keys for sizing"
-        if css is None:
-            cssarr = (self.config,) + (self.css,)
-        elif isinstance(css, (tuple, list)):
-            cssarr = (self.config,) + tuple(css) + (self.css,)
-        else:
-            cssarr = (self.config,) + (css,) + (self.css,)
-
-        if translations is None:
-            translations = {}
-
-        args = {}
-        for name in attrs:
-            for dico in cssarr:
-                val = dico.get(name, default = _m_none)
-                if val is not _m_none:
-                    args[translations.get(name, name)] = val
-                    break
-
-        args.update((translations.get(i, i), j) for i, j in kwa.items())
-        return args
-
-    def _figargs(self, *cssarr, **kwa) -> dict:
-        trans = {'toolbar_sticky':      'toolbar_sticky',
-                 'toolbar_location':    'toolbar_location',
-                 'xlabel':              'x_axis_label',
-                 'ylabel':              'y_axis_label',
-                 'figure.sizing_mode':  'sizing_mode',
-                 'figure.width':        'plot_width',
-                 'figure.height':       'plot_height',
-                 'tools':               'tools'}
-        args = self._sizing(*trans.keys(), css = cssarr, translations = trans, **kwa)
-
-        if args.get('tools', _m_none) is _m_none:
-            args['tools'] = []
-        else:
-            args['tools'] = args['tools'].split(',')
-
-        ttips = _m_none
-        for css in cssarr if len(cssarr) else iter((self.config, self.css)):
-            ttips = css.get('tooltips', default = _m_none)
-            if ttips is not _m_none:
-                break
-
-        if ttips not in (_m_none, '', None):
-            if 'dpxhover' not in args['tools']:
-                args['tools'] += [DpxHoverTool(tooltips = ttips)]
-            else:
-                args['tools'] = [i if i != 'dpxhover' else DpxHoverTool(tooltips = ttips)
-                                 for i in args['tools']]
-        elif 'dpxhover' in args['tools']:
-            args['tools'] = [i if i != 'dpxhover' else DpxHoverTool()
-                             for i in args['tools']]
-
-        for name in ('x_range', 'y_range'):
-            if args.get(name, _m_none) is Range1d:
-                args[name] = Range1d(start = 0., end = 1.)
-        return args
-
     def _keyedlayout(self, ctrl, main, *figs, left = None, bottom = None, right = None):
         return DpxKeyedRow.keyedlayout(ctrl, self, main, *figs,
                                        left   = left,
                                        right  = right,
                                        bottom = bottom,)
+
+    def observe(self, ctrl):
+        "sets-up model observers"
+        self._plotmodel.observe(ctrl)
 
     @abstractmethod
     def _addtodoc(self, ctrl, doc):
@@ -588,10 +597,6 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
     @abstractmethod
     def _reset(self):
         "initializes the plot for a new file"
-
-    @abstractmethod
-    def observe(self, ctrl):
-        "sets-up model observers"
 
 PlotType = TypeVar('PlotType', bound = PlotCreator)
 class PlotView(Generic[PlotType], BokehView):
@@ -607,9 +612,6 @@ class PlotView(Generic[PlotType], BokehView):
                     name+'ylow'    : meta+'ArrowDown',
                     name+'yhigh'   : meta+'ArrowUp'}
 
-        plt = ctrl.globals.css.plot
-        plt.boundary.overshoot .default  =.001
-        plt.tools              .default  ='xpan,box_zoom,reset,save'
         ctrl.theme.updatedefaults('keystroke',
                                   reset = 'Shift -',
                                   **_gesture('pan', 'Alt-'),

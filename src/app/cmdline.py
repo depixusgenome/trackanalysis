@@ -167,7 +167,10 @@ def _files(directory, files, bead):
 
     if len(files):
         def _open(ctrl):
-            ctrl.globals.css.last.path.open.set(files[0])
+            if "filedialog" in ctrl.theme:
+                storage = dict(ctrl.theme.get("filedialog", "storage", {}))
+                storage['open'] = files[0]
+                ctrl.theme.update("filedialog", storage = storage)
             ctrl.tasks.opentrack(files)
         INITIAL_ORDERS.append(_open)
 

@@ -2,34 +2,65 @@
 # -*- coding: utf-8 -*-
 "Widgets for configuration"
 
-from    typing                  import TypeVar, Tuple
-from    bokeh.models            import CheckboxGroup, RadioButtonGroup
+from    typing                  import Tuple, List, TypeVar, Generic
+from    bokeh.models            import (RadioButtonGroup, CheckboxGroup, Widget,
+                                        Paragraph)
 
-from    view.plots              import GroupWidget
-from    control.modelaccess     import PlotModelAccess
+from    utils                   import initdefaults
+from    utils.inspection        import templateattribute
 from    .processor              import AlignmentTactic
 
-ModelType = TypeVar('ModelType', bound = PlotModelAccess)
-class AlignmentWidget(GroupWidget[ModelType]):
+class WidgetTheme:
+    "tWidgetTheme"
+    name   = "alignmentwidget"
+    labels = ['ø', 'best', 'Φ1', 'Φ3']
+    title  = 'Alignment'
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        pass
+
+T  = TypeVar("T", RadioButtonGroup, CheckboxGroup)
+class BaseWidget(Generic[T]):
     "Allows aligning the cycles on a given phase"
-    INPUT   = RadioButtonGroup
-    __ORDER = (None, AlignmentTactic.pull, AlignmentTactic.onlyinitial,
-               AlignmentTactic.onlypull)
-    def __init__(self, model:ModelType) -> None:
-        super().__init__(model)
-        self.css.title.alignment.labels.default = [u'ø', u'best', u'Φ1', u'Φ3']
-        self.css.title.alignment.default        = u'Alignment'
+    def __init__(self, model, **kwa):
+        name        = self.__class__.__name__.lower()
+        self._theme = WidgetTheme(name = name, **kwa)
+        self._task  = getattr(model, name.replace('widget', ''), model)
+        self.__widget: T = None
 
-    @staticmethod
-    def observe(_):
+    def addtodoc(self, action) -> List[Widget]:
+        "creates the widget"
+        name          = self.__class__.__name__.replace("Widget", "")
+        itm           = templateattribute(self, 0)
+        self.__widget = itm(labels = self._theme.labels, name = f'Cycles:{name}',
+                            **self._data())
+        self.__widget.on_click(action(self._onclick_cb))
+
+        if self._theme.title:
+            return [Paragraph(text = self._theme.title), self.__widget]
+        return [self.__widget]
+
+    def observe(self, ctrl):
         "do nothing"
+        self._theme = ctrl.theme.add(self._theme, True)
 
-    def onclick_cb(self, value):
+    def _onclick_cb(self, value):
         "action to be performed when buttons are clicked"
-        self._model.alignment.update(phase = self.__ORDER[value], disabled = value == 0)
+        raise NotImplementedError()
 
     def _data(self):
-        val    = getattr(self._model.alignment.task, 'phase', None)
+        raise NotImplementedError()
+
+class AlignmentWidget(BaseWidget[RadioButtonGroup]):
+    "Allows aligning the cycles on a given phase"
+    __ORDER = (None, AlignmentTactic.pull, AlignmentTactic.onlyinitial,
+               AlignmentTactic.onlypull)
+    def _onclick_cb(self, value):
+        "action to be performed when buttons are clicked"
+        self._task.update(phase = self.__ORDER[value], disabled = value == 0)
+
+    def _data(self):
+        val    = getattr(self._task.task, 'phase', None)
         active = 0 if val is None else self.__ORDER.index(AlignmentTactic(val))
         return dict(active = active)
 
@@ -68,25 +99,21 @@ class AlignmentModalDescriptor:
         else:
             alignment.update(phase = self.__ORDER[value])
 
-class EventDetectionWidget(GroupWidget[ModelType]):
+class EventDetectionWidgetTheme:
+    "EventDetectionWidgetTheme"
+    name   = "eventdetectionwidget"
+
+class EventDetectionWidget(BaseWidget[CheckboxGroup]):
     "Allows displaying only events"
-    INPUT = CheckboxGroup
-    def __init__(self, model:ModelType) -> None:
-        super().__init__(model)
-        self.css.title.eventdetection.labels.default = [u'Find events']
+    def __init__(self, model):
+        super().__init__(model, labels = ['Find events'], title = None)
 
-    def onclick_cb(self, value):
+    def _onclick_cb(self, value):
         "action to be performed when buttons are clicked"
-        task = self._model.eventdetection.task
-        if 0 in value and task is None:
-            self._model.eventdetection.update()
-        elif 0 not in value and task is not None:
-            self._model.eventdetection.remove()
-
-    @staticmethod
-    def observe(_):
-        "do nothing"
+        if 0 in value and self._task.task is None:
+            self._task.update(disabled = False)
+        elif 0 not in value and self._task.task is not None:
+            self._task.update(disabled = True)
 
     def _data(self) -> dict:
-        task = getattr(self._model, 'eventdetection').task
-        return dict(active = [] if task is None else [0])
+        return dict(active = [] if self._task.task is None else [0])

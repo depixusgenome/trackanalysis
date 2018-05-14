@@ -13,13 +13,13 @@ import numpy                    as     np
 
 from view.base                  import enableOnTrack
 from view.colors                import tohex
-from view.plots                 import PlotView, PlotAttrs
+from view.plots                 import PlotView
 from view.plots.tasks           import TaskPlotCreator
 from sequences.view             import (SequenceTicker,
                                         SequenceHoverMixin)
 from peakfinding.histogram      import interpolator
 
-from ._model                    import PeaksPlotModelAccess
+from ._model                    import PeaksPlotModelAccess, PeaksPlotModel
 from ._widget                   import createwidgets
 from ._io                       import setupio
 
@@ -78,34 +78,10 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
         fig.y_range.callback = CustomJS(code = "hvr.on_change_bounds(fig, src)",
                                         args = dict(fig = fig, src = src, hvr = self))
 
-class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
+class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     "Creates plots for peaks"
     def __init__(self, ctrl = None, *args): # pylint: disable=keyword-arg-before-vararg
         super().__init__(ctrl, *args)
-        self.css.defaults = {'count'           : PlotAttrs('lightblue', 'line', 1),
-                             'figure.width'    : 500,
-                             'figure.height'   : 750,
-                             'xtoplabel'       : u'Duration (s)',
-                             'xlabel'          : u'Rate (%)',
-                             'widgets.border'  : 10}
-
-        css = self.css.events
-        css.defaults = {'count'   : PlotAttrs('lightblue', 'circle', 3)}
-
-        css = self.css.reference
-        css.defaults = {'count'   : PlotAttrs('bisque', 'patch', alpha = 0.5)}
-
-        css = self.css.peaks
-        plt = lambda i, j: PlotAttrs(i, j, 15, fill_alpha = 0.5, angle = np.pi/2.)
-        css.defaults = {'duration': plt('lightgreen', 'diamond'),
-                        'count'   : plt('lightblue',  'triangle')}
-
-        css.colors.reference.default  = 'bisque'
-        css.colors.missing  .default  = 'red'
-        css.colors.found    .defaults = {'dark': 'black', 'default': 'gray'}
-
-        self.css.tools.default        = 'ypan,ybox_zoom,reset,save,dpxhover,tap'
-
         PeaksSequenceHover.defaultconfig(self)
         SequenceTicker.defaultconfig(self)
 
@@ -120,14 +96,11 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         "returns the model"
         return self._model
 
-    @property
-    def __foundcolor(self):
-        return self.css.peaks.colors.found[self.model.themename]
+    def __colors(self, name):
+        return tohex(self._theme.colors[self.model.themename][name])
 
     def __peaks(self, vals = None):
-        colors = [tohex(self.__foundcolor.get()),
-                  tohex(self.css.peaks.colors.missing.get()),
-                  tohex(self.css.peaks.colors.reference.get())]
+        colors = [self.__colors(i) for i in ('found', 'missing', 'reference')]
 
         peaks  = dict(self._model.peaks)
         if vals is not None and self._model.identification.task is not None:
@@ -211,22 +184,21 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
                 self.setbounds(self._fig.y_range, 'y', (0., 1.))
 
     def __create_fig(self):
-        self._fig = figure(**self._figargs(y_range = Range1d(start = 0., end = 1.),
-                                           name    = 'Peaks:fig',
-                                           x_range = Range1d(start = 0., end = 1e3)))
+        self._fig = self._theme.figure(y_range = Range1d(start = 0., end = 1.),
+                                       x_range = Range1d(start = 0., end = 1e3),
+                                       name    = 'Peaks:fig')
         self._fig.extra_x_ranges = {"duration": Range1d(start = 0., end = 1.)}
         axis  = LinearAxis(x_range_name          = "duration",
-                           axis_label            = self.css.xtoplabel.get(),
-                           axis_label_text_color = self.css.peaks.duration.get().color
+                           axis_label            = self._theme.xtoplabel,
+                           axis_label_text_color = self._theme.peaksduration.color
                           )
-        self._fig.xaxis[0].axis_label_text_color = self.css.peaks.count.get().color
+        self._fig.xaxis[0].axis_label_text_color = self._theme.peakscount.color
         self._fig.add_layout(axis, 'above')
-        self._addcallbacks(self._fig)
+        self._plotmodel.theme.addcallbacks(self._ctrl, self._fig)
 
     def __add_curves(self):
         self._src = {i: ColumnDataSource(j) for i, j in self.__data().items()}
 
-        css   = self.css
         rends = []
         for key in ('reference.count', 'count', 'events.count',
                     'peaks.count', 'peaks.duration'):
@@ -239,7 +211,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
             if 'peaks' in key:
                 args['line_color'] = 'color'
-            val = css[key].addto(self._fig, **args)
+            val = getattr(self._theme, key.replace('.', '')).addto(self._fig, **args)
             if 'peaks' in key:
                 rends.append(val)
         return rends

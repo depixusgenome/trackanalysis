@@ -69,8 +69,9 @@ class DecentralizedController(Controller):
         if name in self._objects:
             if noerase:
                 raise KeyError(f"key already registered: {name}")
-            else:
-                return self.model(name)
+            elif not isinstance(self.model(name), type(obj)):
+                raise TypeError(f"key already registered to a different type: {name}")
+            return self.model(name)
         else:
             assert name, (name, obj)
 

@@ -3,20 +3,19 @@
 "Model for peaksplot"
 from typing                     import (Optional, Dict, # pylint: disable=unused-import
                                         List, Tuple, Any, cast)
-from   copy                     import deepcopy
+from   copy                     import deepcopy, copy
 import pickle
 
 import numpy                    as     np
 
-from sequences.modelaccess      import (SequencePlotModelAccess,
-                                        FitParamProp    as _FitParamProp,
-                                        SequenceKeyProp as _SequenceKeyProp)
+from sequences.modelaccess      import SequencePlotModelAccess
 
 from utils                      import updatecopy, initdefaults
-from control.modelaccess        import PROPS, TaskAccess
+from control.modelaccess        import TaskAccess
 
 from model.task                 import RootTask
 from cleaning.view              import BeadSubtractionAccess
+from view.plots.base            import PlotModel, PlotTheme, PlotAttrs, PlotDisplay
 from eventdetection.processor   import (EventDetectionTask, # pylint: disable=unused-import
                                         ExtremumAlignmentTask)
 from peakfinding.histogram      import interpolator
@@ -33,11 +32,51 @@ from ..reporting.batch          import fittohairpintask
 from ._processors               import runbead, runrefbead
 from ._peakinfo                 import createpeaks
 
-_DUMMY = type('_DummyDict', (),
-              dict(get          = lambda *_: None,
-                   __contains__ = lambda _: False,
-                   __len__      = lambda _: 0,
-                   __iter__     = lambda _: iter(())))()
+class PeaksPlotTheme(PlotTheme):
+    """
+    cleaning plot theme
+    """
+    name            = "hybridstatpeaks"
+    figsize         = 500, 750, "fixed"
+    xtoplabel       = 'Duration (s)'
+    xlabel          = 'Rate (%)'
+    widgetsborder   = 10
+    count           = PlotAttrs('lightblue', 'line', 1)
+    eventscount     = PlotAttrs('lightblue', 'circle', 3)
+    referencecount  = PlotAttrs('bisque', 'patch', alpha = 0.5)
+    peaksduration   = PlotAttrs('lightgreen', 'diamond', 15, fill_alpha = 0.5,
+                                angle = np.pi/2.)
+    peakscount      = PlotAttrs('lightblue', 'triangle', 15, fill_alpha = 0.5,
+                                angle = np.pi/2.)
+    colors          = dict(dark    = dict(reference = 'bisque', missing = 'red',
+                                          found     = 'black'),
+                           default = dict(reference = 'bisque', missing = 'red',
+                                          found     = 'gray'))
+    toolbar          = dict(PlotTheme.toolbar)
+    toolbar['items'] = 'ypan,ybox_zoom,reset,save,dpxhover,tap'
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
+
+class PeaksPlotDisplay(PlotDisplay):
+    "CyclesPlotDisplay"
+    name                              = "hybridstatpeaks"
+    distances : Dict[str, Distance]   = dict()
+    peaks:      Dict[str, np.ndarray] = dict()
+    estimatedstretch                  = 1./8.8e-4
+    estimatedbias                     = 0.
+    constraintspath: Any              = None
+    useparams: bool                   = False
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+class PeaksPlotModel(PlotModel):
+    """
+    cleaning plot model
+    """
+    theme   = PeaksPlotTheme()
+    display = PeaksPlotDisplay()
 
 class FitToReferenceTheme:
     """
@@ -46,20 +85,38 @@ class FitToReferenceTheme:
     name          = 'fittoreference'
     histmin       = 1e-4
     peakprecision = 1e-2
-    @initdefaults
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+_DUMMY = type('_DummyDict', (),
+              dict(get          = lambda *_: None,
+                   __contains__ = lambda _: False,
+                   __len__      = lambda _: 0,
+                   __iter__     = lambda _: iter(())))()
+class FitToReferenceStore:
+    """
+    stuff needed to display the FitToReferenceTask
+    """
+    DEFAULTS = dict(ident        = None,   reference = None,
+                    fitdata      = _DUMMY, peaks     = _DUMMY,
+                    interpolator = _DUMMY)
+    name               = 'fittoreference'
+    ident        : Any = None
+    reference    : Any = None
+    fitdata      : Any = _DUMMY
+    peaks        : Any = _DUMMY
+    interpolator : Any = _DUMMY
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
 class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     "access to the FitToReferenceTask"
-    __DEFAULTS = dict(id           = None,   reference = None,
-                      fitdata      = _DUMMY, peaks     = _DUMMY,
-                      interpolator = _DUMMY)
     def __init__(self, ctrl):
         super().__init__(ctrl)
-        self.__store          = self.project.root.tasks.fittoreference.gui
-        self.__store.defaults = self.__DEFAULTS
-        self.__theme          = FitToReferenceTheme()
+        self.__store = FitToReferenceStore()
+        self.__theme = FitToReferenceTheme()
 
     @property
     def params(self) -> Optional[Tuple[float, float]]:
@@ -89,40 +146,44 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
 
         # pylint: disable=not-callable
         cache = None if newid else self.cache()
-        super().update(fitdata = self.__store.fitdata.get())
+        super().update(fitdata = self.__store.fitdata)
         if cache:
             self._ctrl.tasks.processors(self.roottask).data.setCacheDefault(self.task, cache)
 
     @property
     def reference(self) -> Optional[RootTask]:
         "returns the root task for the reference data"
-        return self.__store.reference.get()
+        return self.__store.reference
 
     @reference.setter
     def reference(self, val):
         "sets the root task for the reference data"
         if val is not self.reference:
-            info = dict(self.__DEFAULTS)
-            info['reference'] = val
-            self.__store.update(**info)
+            info = FitToReferenceStore(reference = self.reference).__dict__
+            self._ctrl.display.update(self.__store, **info)
 
     @property
     def referencepeaks(self) -> Optional[np.ndarray]:
         "returns reference peaks"
-        pks = self.__store.peaks.get().get(self.bead, None)
+        pks = self.__store.peaks.get(self.bead, None)
         return None if pks is None or len(pks) == 0 else pks
 
-    def setobservers(self, _):
+    def setobservers(self, ctrl):
         "observes the global model"
-        self._ctrl.theme.add(self.__theme)
-        self.__store.reference.observe(lambda _: self.resetmodel())
+        ctrl.theme.add(self.__theme)
+        ctrl.display.add(self.__store)
+
+        def _onref(old = None, **_):
+            if 'reference' in old:
+                self.resetmodel()
+        ctrl.observe(self.__store, _onref)
+
         def _ontask(parent = None, **_):
             if parent == self.reference:
-                info = dict(self.__DEFAULTS)
-                info['reference'] = self.reference
-                self.__store.update(**info)
+                info = FitToReferenceStore(reference = self.reference).__dict__
+                ctrl.display.update(self.__store, **info)
                 self.resetmodel()
-        self._ctrl.tasks.observe("updatetask", "addtask", "removetask", _ontask)
+        ctrl.tasks.observe("updatetask", "addtask", "removetask", _ontask)
 
     def resetmodel(self):
         "adds a bead to the task"
@@ -132,7 +193,7 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
 
     def refhistogram(self, xaxis):
         "returns the histogram interpolated to the provided values"
-        intp = self.__store.interpolator.get().get(self.bead, None)
+        intp = self.__store.interpolator.get(self.bead, None)
         if self.reference == self.roottask:
             intp = None
 
@@ -159,21 +220,21 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     def __computefitdata(self) -> Tuple[bool, bool]:
         args  = {} # type: Dict[str, Any]
         ident = pickle.dumps(tuple(self._ctrl.tasks.tasklist(self.reference)))
-        if self.__store.id.get() == ident:
+        if self.__store.ident == ident:
             if self.referencepeaks is not None:
                 return False, False
         else:
-            args['id'] = ident
+            args['ident'] = ident
 
-        fits  = self.__store.fitdata.get()
+        fits  = self.__store.fitdata
         if not fits:
             args['fitdata'] = fits = {}
 
-        peaks  = self.__store.peaks.get()
+        peaks  = self.__store.peaks
         if not peaks:
             args['peaks'] = peaks = {}
 
-        intps  = self.__store.interpolator.get()
+        intps  = self.__store.interpolator
         if not intps:
             args['interpolator'] = intps = {}
 
@@ -181,7 +242,7 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
         try:
             pks, dtls = runrefbead(self._ctrl, self.reference, ibead)
         except Exception as exc: # pylint: disable=broad-except
-            self.config.message.set(exc)
+            self._ctrl.display.update("message", message = exc)
             pks       = ()
 
         peaks[ibead] = np.array([i for i, _ in pks], dtype = 'f4')
@@ -190,28 +251,39 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
             intps[ibead] = interpolator(dtls, miny = self.hmin, fill_value = 0.)
 
         if args:
-            self.__store.update(**args)
-        return True, 'id' in args
+            self._ctrl.display.update(self.__store, **args)
+        return True, 'ident' in args
+
+class FitToHairpinTheme:
+    """
+    stuff needed to display the FitToHairpinTask
+    """
+    name        = 'fittohairpin'
+    fit         = FitToHairpinTask.DEFAULT_FIT()
+    match       = FitToHairpinTask.DEFAULT_MATCH()
+    constraints = deepcopy(FitToHairpinTask.DEFAULT_CONSTRAINTS)
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
 
 class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
     "access to the FitToHairpinTask"
     def __init__(self, ctrl):
         super().__init__(ctrl)
-        self.__defaults = self.config.root.tasks.fittohairpin
-        self.__defaults.defaults = {'fit':         FitToHairpinTask.DEFAULT_FIT(),
-                                    'match':       FitToHairpinTask.DEFAULT_MATCH(),
-                                    'constraints': deepcopy(FitToHairpinTask.DEFAULT_CONSTRAINTS)}
+        self.__defaults = ctrl.theme.add(FitToHairpinTheme(), True)
 
-    def setobservers(self, mdl):
+    def setobservers(self, mdl, ctrl):
         "observes the global model"
-        def _observe(_):
-            task = self.default(mdl)
-            self.update(**(task.config() if task else {'disabled': True}))
+        keys = {'probes', 'path', 'constraintspath', 'useparams', 'fit', 'match'}
+        def _observe(old = None, **_):
+            if keys.intersection(old):
+                task = self.default(mdl)
+                self.update(**(task.config() if task else {'disabled': True}))
 
-        mdl.observeprop('oligos', 'sequencepath', 'constraintspath', 'useparams',
-                        'config.root.tasks.fittohairpin.fit',
-                        'config.root.tasks.fittohairpin.match',
-                        _observe)
+        ctrl.theme  .observe(mdl.sequencemodel.config, _observe)
+        ctrl.theme  .observe(self.__defaults,          _observe)
+        ctrl.display.observe(mdl.peaksmodel.display,   _observe)
 
     @staticmethod
     def _configattributes(kwa):
@@ -222,25 +294,23 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         if inst is None and len(kwa) == 0:
             return
 
-        cnf  = self.__defaults[attr]
         inst = (inst() if isinstance(inst, type) else
                 inst   if inst is not None       else
-                cnf.get())
-        cnf.set(updatecopy(inst, **kwa))
+                getattr(self.__defaults, attr))
+        self._ctrl.theme.update(self.__defaults, **{attr: updatecopy(inst, **kwa)})
 
     def default(self, mdl, usr = True):
         "returns the default identification task"
         if isinstance(mdl, str):
-            tmp = self.__defaults[mdl]
-            return tmp.get() if usr else tmp.getdefault()
+            return self._ctrl.get(self.__defaults, mdl, defaultmodel = not usr)
 
         ols = mdl.oligos
         if ols is None or len(ols) == 0 or len(mdl.sequences(...)) == 0:
             return None
 
-        dist = self.__defaults.fit.get()
-        pid  = self.__defaults.match.get()
-        cstr = self.__defaults.constraints.get()
+        dist = self.__defaults.fit
+        pid  = self.__defaults.match
+        cstr = self.__defaults.constraints
         return fittohairpintask(mdl.sequencepath,    ols,
                                 mdl.constraintspath, mdl.useparams,
                                 constraints = cstr, fit = dist, match = pid)
@@ -263,24 +333,6 @@ class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
 class PeakSelectorTaskAccess(TaskAccess, tasktype = PeakSelectorTask):
     "access to the PeakSelectorTask"
 
-class FitParamProp(_FitParamProp):
-    "access to bias or stretch"
-    def __get__(self, obj, tpe) -> Optional[float]: # type: ignore
-        if obj is not None:
-            dist = obj.distances.get(obj.sequencekey, None)
-            if dist is not None:
-                return getattr(dist, self._key)
-        return super().__get__(obj, tpe)
-
-class SequenceKeyProp(_SequenceKeyProp):
-    "access to the sequence key"
-    def __get__(self, obj, tpe) -> Optional[str]:
-        "returns the current sequence key"
-        if obj is not None and len(obj.distances) and self.fromglobals(obj) is None:
-            if len(obj.distances):
-                return min(obj.distances, key = obj.distances.__getitem__)
-        return super().__get__(obj, tpe)
-
 # pylint: disable=too-many-instance-attributes
 class PeaksPlotModelAccess(SequencePlotModelAccess):
     "Access to peaks"
@@ -288,28 +340,57 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         if key is None:
             key = '.plot.peaks'
         super().__init__(ctrl, key)
-        self.distances : Dict[str, Distance]= dict()
-        self.peaks: Dict[str, np.ndarray]   = dict()
-        self.estimatedbias                  = 0.
-        self.subtracted                     = BeadSubtractionAccess(self)
-        self.alignment                      = ExtremumAlignmentTaskAccess(self)
-        self.eventdetection                 = EventDetectionTaskAccess(self)
-        self.peakselection                  = PeakSelectorTaskAccess(self)
-        self.fittoreference                 = FitToReferenceAccess(self)
-        self.identification                 = FitToHairpinAccess(self)
+        self.peaksmodel      = PeaksPlotModel.create(key, ctrl)
+        self.subtracted      = BeadSubtractionAccess(self)
+        self.alignment       = ExtremumAlignmentTaskAccess(self)
+        self.eventdetection  = EventDetectionTaskAccess(self)
+        self.peakselection   = PeakSelectorTaskAccess(self)
+        self.fittoreference  = FitToReferenceAccess(self)
+        self.identification  = FitToHairpinAccess(self)
 
-        cls = type(self)
-        cls.constraintspath .setdefault(self, None) # type: ignore
-        cls.useparams       .setdefault(self, True) # type: ignore
-        cls.sequencekey     .setdefault(self, None) # type: ignore
-        cls.stretch         .setdefault(self)       # type: ignore
-        cls.bias            .setdefault(self)       # type: ignore
+    @property
+    def stretch(self) -> float:
+        "return the stretch for the current bead"
+        dist = self.peaksmodel.display.distances
+        est  = self.peaksmodel.theme.estimatedstretch
+        key  = self.sequencemodel.currentkey
+        return getattr(dist.get(key, None), 'stretch', est)
 
-    sequencekey     = cast(Optional[str],   SequenceKeyProp())
-    stretch         = cast(Optional[float], FitParamProp('stretch'))
-    bias            = cast(Optional[float], FitParamProp('bias'))
-    constraintspath = cast(Optional[str],   PROPS.projectroot('constraints.path'))
-    useparams       = cast(bool,            PROPS.projectroot('constraints.useparams'))
+    @property
+    def bias(self) -> float:
+        "return the bias for the current bead"
+        dist = self.peaksmodel.display.distances
+        est  = self.peaksmodel.theme.estimatedbias
+        key  = self.sequencemodel.currentkey
+        return getattr(dist.get(key, None), 'bias', est)
+
+    @property
+    def sequencekey(self) -> Optional[str]:
+        "returns the sequence key"
+        dist = self.peaksmodel.display.distances
+        dflt =  min(dist, key = dist.__getitem__) if dist else None
+        return self.sequencemodel.display.hpins.get(self.sequencemodel.tasks.bead,
+                                                    dflt)
+
+    @property
+    def constraintspath(self):
+        "return the path to constraints"
+        return self.peaksmodel.display.constraintspath
+
+    @property
+    def useparams(self):
+        "return the path to constraints"
+        return self.peaksmodel.display.useparams
+
+    @property
+    def distances(self) -> Dict[str, Distance]:
+        "return the computed distances"
+        return self.peaksmodel.display.distances
+
+    @property
+    def peaks(self) -> Dict[str, np.ndarray]:
+        "return the computed peaks"
+        return self.peaksmodel.display.peaks
 
     @property
     def defaultidenfication(self):
@@ -322,17 +403,23 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         try:
             tmp, dtl = runbead(self)
         finally:
+            cpy = copy(self)
+            cpy.peaksmodel = copy(self.peaksmodel)
+            cpy.peaksmodel.display = copy(self.peaksmodel.display)
+            disp = cpy.peaksmodel.display
             if dtl is None:
-                self.distances     = {}
-                self.peaks         = createpeaks(self, [])
-                self.estimatedbias = 0.
+                disp.distances     = {}
+                disp.peaks         = createpeaks(self, [])
+                disp.estimatedbias = 0.
             else:
                 tsk   = cast(PeakSelectorTask, self.peakselection.task)
                 peaks = tuple(tsk.details2output(cast(PeakSelectorDetails, dtl)))
 
-                self.distances     = tmp.distances if self.identification.task else {}
-                self.peaks         = createpeaks(self, peaks)
-                self.estimatedbias = self.peaks['z'][0]
+                disp.distances     = tmp.distances if self.identification.task else {}
+                disp.peaks         = createpeaks(self, peaks)
+                disp.estimatedbias = disp.peaks['z'][0]
+            info = {i: getattr(disp, i) for i in ('distances', 'peaks', 'estimatedbias')}
+            self._ctrl.display.update(self.peaksmodel.display, **info)
         return dtl
 
     def reset(self) -> bool: # type: ignore
@@ -350,7 +437,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         self.identification.resetmodel(self)
         return False
 
-    def setobservers(self, _):
+    def setobservers(self, ctrl):
         "observes the global model"
-        self.identification.setobservers(self)
-        self.fittoreference.setobservers(self)
+        self.identification.setobservers(self, ctrl)
+        self.fittoreference.setobservers(ctrl)

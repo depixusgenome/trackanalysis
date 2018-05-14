@@ -5,31 +5,22 @@
 import  warnings
 from    abc            import ABC
 
-from    bokeh.plotting import figure, Figure
+from    bokeh.plotting import Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 
 import  numpy        as np
 
-from    view.plots     import PlotAttrs, checksizes
+from    view.plots     import checksizes
 from    sequences.view import SequenceTicker, estimatebias
+from    model.level    import PHASE
+from    ._model        import CyclesModelAccess, CyclesPlotTheme
 
 class HistMixin(ABC):
     "Building a projection of phase 5 onto the Z axis"
+    _theme: CyclesPlotTheme
+    _model: CyclesModelAccess
     def __init__(self):
         "sets up this plotter's info"
-        self.css.defaults = {'frames'    : PlotAttrs('white', 'quad',   1,
-                                                     line_color = 'gray',
-                                                     fill_color = 'gray'),
-                             'cycles'    : PlotAttrs('white', 'quad',   1,
-                                                     fill_color = None,
-                                                     line_alpha = .5,
-                                                     line_color = 'blue'),
-                             'figure.width' : 450,
-                             'figure.height': 450}
-        self.css.hist.defaults = {'xtoplabel'    : u'Cycles',
-                                  'xlabel'       : u'Frames'}
-        SequenceTicker.defaultconfig(self)
-
         self._histsource: ColumnDataSource = None
         self._hist:       Figure           = None
         self._ticker                       = SequenceTicker()
@@ -38,9 +29,9 @@ class HistMixin(ABC):
     def __data(self, data, shape): # pylint: disable=too-many-locals
         bins  = np.array([-1, 1])
         zeros = np.zeros((1,), dtype = 'f4')
-        items = (zeros,)
+        items = (zeros,) # type: ignore
         if shape != (1, 0):
-            phase = self.config.root.phase.measure.get()
+            phase = PHASE.measure
             zvals = data['z'].reshape(shape)
             if self._model.eventdetection.task is None:
                 track = self._model.track
@@ -55,7 +46,7 @@ class HistMixin(ABC):
                 rng = (np.nanmin([np.nanmin(i) for i in items]),
                        np.nanmax([np.nanmax(i) for i in items]))
             if all(np.isfinite(i) for i in rng):
-                width = self._model.binwidth
+                width = self._model.cycles.theme.binwidth
                 bins  = np.arange(rng[0]-width*.5, rng[1]+width*1.01, width, dtype = 'f4')
                 if bins[-2] > rng[1]:
                     bins = bins[:-1]
@@ -67,7 +58,7 @@ class HistMixin(ABC):
             else:
                 items = (zeros,)
 
-        threshold = self._model.minframes
+        threshold = self._model.cycles.theme.minframes
         return dict(frames  = np.sum(items, axis = 0),
                     cycles  = np.sum([np.int32(i > threshold) for i in items], axis = 0),
                     left    = zeros,
@@ -75,50 +66,52 @@ class HistMixin(ABC):
                     top     = bins[1:])
 
     def _createhist(self, data, shape, yrng):
-        self._hist       = figure(**self._figargs(self.css.hist,
-                                                  y_axis_location = None,
-                                                  x_range         = Range1d(0, 5e4),
-                                                  y_range         = yrng,
-                                                  name            = 'Cycles:Hist'))
+        self._hist       = self._theme.figure(x_axis_label    = self._theme.histxlabel,
+                                              y_axis_location = None,
+                                              x_range         = Range1d(0, 5e4),
+                                              y_range         = yrng,
+                                              tooltips        = None,
+                                              name            = 'Cycles:Hist')
 
         hist             = self.__data(data, shape)
         self._histsource = ColumnDataSource(hist)
         self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 100.)}
 
-        attrs = self.css.cycles.get()
         axis  = LinearAxis(x_range_name          = "cycles",
-                           axis_label            = self.css.hist.xtoplabel.get(),
-                           axis_label_text_color = attrs.line_color
-                          )
+                           axis_label            = self._theme.histxtoplabel,
+                           axis_label_text_color = self._theme.histcycles.line_color)
         self._hist.add_layout(axis, 'above')
 
-        self.css.frames.addto(self._hist,
-                              source = self._histsource,
-                              bottom = "bottom", top   = "top",
-                              left   = "left",   right = "frames")
+        self._theme.histframes.addto(self._hist,
+                                     source = self._histsource,
+                                     bottom = "bottom", top   = "top",
+                                     left   = "left",   right = "frames")
 
-        attrs.addto(self._hist,
-                    source = self._histsource,
-                    bottom = "bottom", top   = "top",
-                    left   = "left",   right = "cycles",
-                    x_range_name = "cycles")
+        self._theme.histcycles.addto(self._hist,
+                                     source = self._histsource,
+                                     bottom = "bottom", top   = "top",
+                                     left   = "left",   right = "cycles",
+                                     x_range_name = "cycles")
 
         self._ticker.create(self._hist, self._model, self)
 
         self._hover.createhist(self._hist, self._model, self)
         self._hover.slaveaxes(self._hist, self._histsource)
 
-    def _histobservers(self):
+    def _histobservers(self, ctrl):
+        self._ticker.observe(ctrl)
+        self._hover.observe(ctrl)
         def _fcn():
             with self.resetting():
                 self._ticker.reset(self._bkmodels)
                 self._hover.resethist(self._bkmodels)
-        self._model.observeprop('oligos', 'sequencepath', _fcn)
+        ctrl.theme.observe('sequence', _fcn)
 
     def _resethist(self, data, shape):
         hist = self.__data(data, shape)
 
-        self._model.estimatedbias = estimatebias(hist['bottom'], hist['cycles'])
+        self._ctrl.display.update(self._model.cycles.display,
+                                  estimatedbias = estimatebias(hist['bottom'], hist['cycles']))
         self._hover.resethist(self._bkmodels)
         self._ticker.reset(self._bkmodels)
 

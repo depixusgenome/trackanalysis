@@ -3,29 +3,35 @@
 """
 Allows creating modals from anywhere
 """
-from typing             import Dict, List, Tuple, Any, TYPE_CHECKING
+from typing             import Dict, List, Tuple, Any
 from abc                import ABC, abstractmethod
 from copy               import deepcopy
 from bokeh.document     import Document                     # pylint: disable=unused-import
 from bokeh.models       import Widget, Button
+from utils              import initdefaults
 from utils.logconfig    import getLogger
 from .                  import dialog
 LOGS   = getLogger(__name__)
 T_BODY = Tuple[Tuple[str, str],...]
 
+class AdvancedWidgetTheme:
+    "AdvancedWidgetTheme"
+    name   = "advancedwidget"
+    width  = 60
+    height = 20
+    label = "advanced"
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
 class AdvancedWidgetMixin(ABC):
     "A button to access the modal dialog"
+    __widget: Button
+    __doc:    Document
+    __action: type
     def __init__(self, ctrl):
-        self.__widget: Button   = None
-        self.__doc:    Document = None
-        self.__action: type     = None
         ctrl.theme.updatedefaults('keystroke', advanced = 'Alt-a')
-        self.css.dialog.defaults = dict(title  = self._title(),
-                                        button = 'Advanced',
-                                        body   = tuple(i for i, _ in self._body()))
-        if TYPE_CHECKING:
-            self.css:   Any = None
-            self._ctrl: Any = None
+        self._theme = ctrl.add(AdvancedWidgetTheme(), True)
 
     @abstractmethod
     def _body(self) -> T_BODY:
@@ -72,12 +78,9 @@ class AdvancedWidgetMixin(ABC):
 
             return title, f'({disp})', val
 
-        css  = self.css.dialog
-        body = zip(css.body.get(), tuple(i for _, i in self._body()))
-        args = dict(title   = css.title.get(),
+        args = dict(title   = self._title(),
                     context = lambda title: self,
-                    body    = tuple(_add(i, j)  for i, j in body)
-                   )
+                    body    = tuple(_add(i, j)  for i, j in self._body()))
         args.update(kwa)
         return args
 
@@ -92,12 +95,11 @@ class AdvancedWidgetMixin(ABC):
 
     def addtodoc(self, action) -> List[Widget]:
         "creates the widget"
-        width  = self.css.input.width.get()
-        height = self.css.input.height.get()
-        self.__widget = Button(width = width, height = height,
-                               label = self.css.dialog.button.get())
+        self.__widget = Button(width  = self._theme.width,
+                               height = self._theme.height,
+                               label  = self._theme.button)
         self.__widget.on_click(self.on_click)
-        self.__action = action().withcalls(self.css.dialog.title.get())
+        self.__action = action().withcalls(self._title())
         return [self.__widget]
 
     def __enter__(self):

@@ -325,10 +325,10 @@ class BaseTaskController(Controller):
 
 class TaskController(BaseTaskController):
     "Task controller class which knows about globals"
+    __model:      Any
+    __readconfig: Any
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.__model:      Any = None
-        self.__readconfig: Any = None
 
     def setup(self, ctrl):
         "sets up the missing info"
@@ -357,7 +357,7 @@ class TaskController(BaseTaskController):
             if "roottask" in old and mdl("clear", True):
                 ctrl.tasks.cleardata(old['roottask'])
 
-        self.__readconfig = ctrl.globals.readconfig
+        self.__ctrl = ctrl
 
     def opentrack(self,
                   task : Union[str, RootTask, Dict[str,str]] = None,
@@ -366,7 +366,13 @@ class TaskController(BaseTaskController):
             assert task is None
             if len(model.get('tasks', (()))[0]):
                 super().opentrack(model = model.pop("tasks")[0])
-                self.__readconfig(model)
+
+                from anastore.configuration import readconfig
+                maps = readconfig(model, patchname = "config")
+                with self.__ctrl.action:
+                    for i, j in maps.items():
+                        if i.startswith('theme.') and i[6:] in self.__ctrl.theme and j:
+                            self.__ctrl.theme.update(i[6:], **j)
         else:
             super().opentrack(task, cast(Iterable[Task], model))
 

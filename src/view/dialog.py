@@ -7,7 +7,26 @@ from typing             import List, Optional, Callable, Dict, Tuple
 from tkinter            import Tk as _Tk
 from tkinter.filedialog import (askopenfilename   as _tkopen,
                                 asksaveasfilename as _tksave)
+from utils              import initdefaults
+
 _m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
+class FileDialogModel:
+    "file dialog info"
+    name  = "filedialog"
+    types = {'all':      ('all files',               '.*'),
+             'trk':      ('track files',             '.trk'),
+             'gr':       ('graphics files',          '.gr'),
+             'ana':      ('analysis files',          '.ana'),
+             'fasta':    ('fasta files',             '.fasta'),
+             'xlsx':     ('excel files',             '.xlsx'),
+             'csv':      ('comma-separated values',  '.csv')}
+    types['any'] = types['all']
+    types['*']   = types['all']
+    storage: Dict[str, str] = {}
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
 class BaseFileDialog:
     """
     Deals with filepaths to be opened or saved
@@ -18,16 +37,6 @@ class BaseFileDialog:
     Default descriptions and extensions exist for usual file types. One can
     have thus:  *filetypes* = 'trk|*' for track files + any other extension.
     """
-    DEFAULTS = {'all':      (u'all files',               '.*'),
-                'trk':      (u'track files',             '.trk'),
-                'gr':       (u'graphics files',          '.gr'),
-                'ana':      (u'analysis files',          '.ana'),
-                'fasta':    (u'fasta files',             '.fasta'),
-                'xlsx':     (u'excel files',             '.xlsx'),
-                'csv':      (u'comma-separated values',  '.csv')}
-    DEFAULTS['any'] = DEFAULTS['all']
-    DEFAULTS['*']   = DEFAULTS['all']
-
     _KFT  = 'filetypes'
     _KEXT = 'defaultextension'
     def __init__(self, **kwa):
@@ -37,7 +46,7 @@ class BaseFileDialog:
         self.initialfile     : Optional[str]  = kwa.get('initialfile',     None)
         self.multiple        : Optional[bool] = kwa.get('multiple',        None)
         self.title           : Optional[str]  = kwa.get('title',           None)
-        self.defaults = dict(self.DEFAULTS)
+        self._config  = FileDialogModel()
 
     @staticmethod
     def exists(path):
@@ -67,7 +76,7 @@ class BaseFileDialog:
 
         def _transf(item):
             ele = tuple(ite.strip() for ite in item.split(':'))
-            return self.defaults[ele[0].lower()] if len(ele) == 1 else ele
+            return self._config.types[ele[0].lower()] if len(ele) == 1 else ele
 
         info[self._KFT] = [_transf(ite) for ite in self.filetypes.split('|')]
 
@@ -77,7 +86,7 @@ class BaseFileDialog:
                 raise KeyError('Missing defaultextension or filetypes')
             info[self._KEXT] = info[self._KFT][0][1]
         elif not self.defaultextension.startswith('.'):
-            info[self._KEXT] = self.defaults[self.defaultextension.strip().lower()][1]
+            info[self._KEXT] = self._config.types[self.defaultextension.strip().lower()][1]
 
     def _parse_all(self, _):
         info = {key: getattr(self, key)
@@ -130,32 +139,16 @@ class FileDialog(BaseFileDialog):
     Default descriptions and extensions exist for usual file types. One can
     have thus:  *filetypes* = 'trk|*' for track files + any other extension.
     """
-    def __init__(self, **kwa):
+    access : Tuple[Callable, Callable]
+    def __init__(self, ctrl, storage = None, **kwa):
         super().__init__(**kwa)
-        self.config : Tuple[Callable, Callable] = None
-        ctrl = kwa.get('config')  # type: ignore
-        if hasattr(ctrl, 'globals'):
-            self.globals(ctrl).defaults = dict.fromkeys(self.defaults, None)
-
-        if isinstance(ctrl, (tuple, list)):
-            self.config = ctrl
-        elif ctrl:
-            storage = kwa.get('storage', None)
-            if storage is not None:
-                self.globals(ctrl)[storage].default = None
-            self.config = self._getconfig(ctrl, storage), self._setconfig(ctrl, storage)
-
-    @staticmethod
-    def globals(ctrl):
-        "returns access to globals"
-        return ctrl.globals.css.last.path
+        self._config = ctrl.theme.add(self._config)
+        self.access  = self._getconfig(ctrl, storage), self._setconfig(ctrl, storage)
 
     @staticmethod
     def storedpaths(ctrl, name, exts) -> List[Path]:
         "returns a stored path"
-        cnf = ctrl.globals.css.last.path
-        fcn = lambda i: cnf[i].get(default = None)
-
+        fcn = lambda i: ctrl.theme.get("filedialog", "storage", {}).get(i, None)
         pot = [fcn(i.replace('.', '')) for _, i in exts]
         if name is not None:
             pot.insert(0, fcn(name))
@@ -173,7 +166,7 @@ class FileDialog(BaseFileDialog):
 
     @classmethod
     def _setconfig(cls, ctrl, storage = None):
-        cnf    = cls.globals(ctrl)
+        get    = lambda i: ctrl.theme.get("filedialog", "storage", {}).get(i, None)
         exists = cls.exists
         def _defaultpath(rets, bcheck: bool = True):
             vals: Dict[str, str] = {}
@@ -186,21 +179,21 @@ class FileDialog(BaseFileDialog):
                         continue
                     ret = ret.resolve()
 
-                if cnf.get(ret.suffix[1:], default = _m_none) is not _m_none:
+                if get(ret.suffix[1]) is not None:
                     vals.setdefault(ret.suffix[1:], str(ret))
                 if first is None:
                     first = ret
             if storage is not None:
                 vals[storage] = str(first)
-            cnf.update(**vals)
+            ctrl.theme.update("filedialog", **vals)
 
         return _defaultpath
 
     def _parse_path(self, info:dict, bopen):
-        if self.config is None:
+        if self.access is None:
             return
 
-        path = self.config[0](info[self._KFT], bopen)
+        path = self.access[0](info[self._KFT], bopen)
         if path is not None:
             apath = Path(path)
             if apath.is_dir():
@@ -216,6 +209,6 @@ class FileDialog(BaseFileDialog):
 
     def _tk_run(self, info:dict, dialog:Callable):
         rets = super()._tk_run(info, dialog)
-        if self.config is not None and self.config[1] is not None:
-            self.config[1](rets, dialog is _tkopen)
+        if self.access is not None and self.access[1] is not None:
+            self.access[1](rets, dialog is _tkopen)
         return rets

@@ -4,7 +4,8 @@
 from typing                     import Optional, List, Set, cast
 import numpy as np
 
-from utils                      import NoArgs
+from utils                      import NoArgs, initdefaults
+from view.plots.base            import PlotAttrs, PlotTheme, PlotModel
 # pylint: disable=unused-import
 from control.modelaccess        import TaskPlotModelAccess, TaskAccess
 from eventdetection.processor   import ExtremumAlignmentTask
@@ -52,11 +53,6 @@ class DataCleaningAccess(TaskAccess, tasktype = DataCleaningTask):
 
 class BeadSubtractionAccess(TaskAccess, tasktype = BeadSubtractionTask):
     "access to bead subtraction"
-    def __init__(self, mdl):
-        super().__init__(mdl)
-        self.config.root.fixedbead.minextent.default = 0.25
-        self.project.root.tasks.fittoreference.gui.reference.default = None
-
     @property
     def beads(self):
         "returns beads to subtract"
@@ -70,7 +66,7 @@ class BeadSubtractionAccess(TaskAccess, tasktype = BeadSubtractionTask):
     def referencebeads(self) -> Optional[List[int]]:
         "return beads from the reference if they exist"
         track = self.track
-        root  = self.project.root.tasks.fittoreference.gui.reference.get()
+        root  = self._ctrl.theme.get("fittoreference", "reference", None)
         if root is None or track is None:
             return None
 
@@ -93,28 +89,8 @@ class BeadSubtractionAccess(TaskAccess, tasktype = BeadSubtractionTask):
 
     def possiblefixedbeads(self) -> Set[int]:
         "returns bead ids with extent == all cycles"
-        lst   = self._ctrl.tasks.tasklist(self.roottask)
-        if not lst:
-            return set()
-
-        clean = next((t for t in lst if isinstance(t, DataCleaningTask)), None)
-        if not clean:
-            return set()
-
-        cache = self._ctrl.tasks.cache(self.roottask, clean)()
-        if not cache:
-            return set()
-
-        minext = self.config.root.fixedbead.minextent.get()
-        def _compute(itm):
-            arr   = next((i.values for i in itm if i.name == 'extent'), None)
-            if arr is None:
-                return False
-
-            valid = np.isfinite(arr)
-            return np.sum(arr[valid] < minext) == np.sum(valid)
-
-        return set(i for i, (j, _) in cache.items() if _compute(j))
+        mdl = self._ctrl.theme.model("qc") if "qc" in self._ctrl.theme else None
+        return mdl.fixedbeads(self._ctrl.tasks, self.roottask) if mdl else set()
 
 class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
     "access to bead subtraction"
@@ -126,3 +102,32 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
         self.alignment  = ExtremumAlignmentTaskAccess(self)
         self.cleaning   = DataCleaningAccess(self)
         self.subtracted = BeadSubtractionAccess(self)
+
+class CleaningPlotTheme(PlotTheme):
+    """
+    cleaning plot theme
+    """
+    points           = PlotAttrs('color',  'circle', 1, alpha   = .5)
+    figsize          = 600, 800, 'fixed'
+    widgetwidth      = 470
+    order            = ('aberrant', 'hfsigma', 'extent', 'population',
+                        'pingpong', 'saturation', 'good')
+    colors           = dict(good       = '#6baed6', # blue
+                            hfsigma    = 'gold',
+                            extent     = 'orange',
+                            population = 'hotpink',
+                            pingpong   = 'hotpink',
+                            saturation = 'chocolate',
+                            aberrant   = 'red')
+    tooltips         = [(u'(cycle, t, z)', '(@cycle, $~x{1}, $data_y{1.1111})')]
+    toolbar          = dict(PlotTheme.toolbar)
+    toolbar['items'] = 'ypan,ybox_zoom,reset,save,dpxhover'
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class CleaningPlotModel(PlotModel):
+    """
+    cleaning plot model
+    """
+    theme   = CleaningPlotTheme()

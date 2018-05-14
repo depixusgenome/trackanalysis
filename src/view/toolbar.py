@@ -9,9 +9,11 @@ from pathlib              import Path
 import bokeh.core.properties   as props
 
 from bokeh                import layouts
+from bokeh.document       import Document
 from bokeh.models         import Widget
 from bokeh.io             import curdoc
 
+from utils                import initdefaults
 from utils.gui            import parseints
 from utils.logconfig      import getLogger
 from control.taskio       import TaskIO
@@ -24,14 +26,25 @@ LOGS  = getLogger(__name__)
 if TYPE_CHECKING:
     from model.task import RootTask # pylint: disable=unused-import
 
+class BeadToolbarTheme:
+    "BeadToolbarTheme"
+    name         = "beadtoolbar"
+    openlabel    = 'Open'
+    savelabel    = 'Save'
+    quitlabel    = 'Quit'
+    opentitle    = 'Open a track or analysis file'
+    savetitle    = 'Save an analysis file'
+    fnamesmany   = '{Path(files[0]).stem} + ...'
+    fnamessingle = '{Path(path).stem}'
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
 STORAGE = 'open', 'save'
 class TrackFileDialog(FileDialog):
     "A file dialog that doesn't open .gr files first"
     def __init__(self, ctrl):
-        super().__init__(multiple  = 1,
-                         storage   = STORAGE[0],
-                         config    = ctrl)
-
+        super().__init__(ctrl, multiple  = 1, storage = STORAGE[0])
         def _defaultpath(ext, bopen):
             assert bopen
 
@@ -40,13 +53,13 @@ class TrackFileDialog(FileDialog):
                 pot = [i for i in pot if i.suffix != '.gr']
             return self.firstexistingpath(pot)
 
-        self.__store: Callable = self.config[1]
-        self.config            = _defaultpath, None
+        self.__store: Callable = self.access[1]
+        self.access            = _defaultpath, None
 
     def setup(self, ctrl, _):
         "sets the document"
         self.filetypes = '*|'+TaskIO.extensions(ctrl, 'openers')
-        self.title     = ctrl.globals.css.title.open.dialog.get()
+        self.title     = ctrl.theme.get("beadtoolbar").opentitle
 
     async def run(self, ctrl, doc):
         "runs the dialog"
@@ -61,8 +74,7 @@ class TrackFileDialog(FileDialog):
 class SaveFileDialog(FileDialog):
     "A file dialog that adds a default save path"
     def __init__(self, ctrl):
-        super().__init__(storage = STORAGE[1],
-                         config  = ctrl)
+        super().__init__(ctrl, storage = STORAGE[1])
         def _defaultpath(ext, bopen):
             assert not bopen
             pot = [i for i in self.storedpaths(ctrl, STORAGE[0], ext) if i.exists()]
@@ -90,13 +102,13 @@ class SaveFileDialog(FileDialog):
             self.defaultextension = sav.suffix[1:] if sav.suffix != '' else None
             return str(sav)
 
-        self.__store = self.config[1]
-        self.config  = _defaultpath, None
+        self.__store = self.access[1]
+        self.access  = _defaultpath, None
 
     def setup(self, ctrl, _):
         "sets the document"
         self.filetypes = TaskIO.extensions(ctrl, 'savers')
-        self.title     = ctrl.globals.css.title.save.dialog.get()
+        self.title     = ctrl.theme.get("beadtoolbar").savetitle
 
     async def run(self, ctrl, doc):
         "runs the dialog"
@@ -129,103 +141,133 @@ class DpxToolbar(Widget):
     def __init__(self, **kwa):
         super().__init__(name = 'Main:toolbar', **kwa)
 
-class MessagesInput:
-    "Everything related to messages"
-    @staticmethod
-    def init(ctrl):
-        "initializes globals"
-        ctrl.globals.project.message.default = None
-        msg = ctrl.globals.css.message
-        siz = 'height: 28px; margin-top: 0px;'
-        msg.defaults = dict(normal  = '<p style="%s">{}</p>' % siz,
-                            warning = '<p style="%s color:blue;">{}</p>' % siz,
-                            error   = '<p style="%s color:red;"> {}</p>' % siz,
-                            busy    = u'Please wait ...',
-                            period  = 50,
-                            width   = 350)
-        msg.timeout.defaults = dict(normal  = 1000,
-                                    error   = 50000,
-                                    warning = 50000)
+class MessageTheme:
+    "Message theme"
+    _SIZ    = 'height: 28px; margin-top: 0px;'
+    name    = "message"
+    period  = 50
+    width   = 350
+    busy    = "Please wait ..."
+    types   = dict(normal  = '<p style="%s">{}</p>' % _SIZ,
+                   warning = '<p style="%s color:blue;">{}</p>' % _SIZ,
+                   error   = '<p style="%s color:red;"> {}</p>' % _SIZ,
+                   busy    = u'Please wait ...')
+    timeout = dict(normal  = 1.,
+                   error   = 50.,
+                   warning = 50.)
 
-    @staticmethod
-    def setup(ctrl, tbar: DpxToolbar, doc):
-        "sets-up the gui"
-        msg   = ctrl.globals.project.message
-        busy  = ctrl.globals.css.message.busy.get(), 'normal'
+    del _SIZ
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class MessageDisplay:
+    "Message display"
+    name    = "message"
+    message = ""
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class MessagesView:
+    "Everything related to messages"
+    def __init__(self, **_):
+        self._theme        = MessageTheme(**_)
+        self._display      = MessageDisplay(**_)
+        self._last:list    = [None, None, self._theme.timeout['normal']]
+        self._tbar         = None
+        self._doc:Document = None
+
+    def observe(self, ctrl):
+        "initializes globals"
+        if self._theme in ctrl.theme:
+            return
+
+        ctrl.theme.add(self._theme)
+        ctrl.display.add(self._display)
+        busy  = self._theme.busy, 'normal'
 
         @ctrl.display.observe
         def _onstartaction(recursive = None):      # pylint: disable=unused-variable
             if not recursive:
-                _settext(busy)
+                self._settext(busy)
 
         @ctrl.display.observe
         def _onstartcomputation(recursive = None): # pylint: disable=unused-variable
             if recursive:
                 return
-            val = msg.get()
+            val = self._display.message
             if val is None or (isinstance(val, tuple) and val[1] == 'normal'):
-                _settext(busy)
+                self._settext(busy)
 
-        def _observer(recursive = None, value = None, catcherror = None, **_):
+        @ctrl.display.observe("stopaction", "stopcomputation")
+        def _observer(recursive  = None,           # pylint: disable=unused-variable
+                      value      = None,
+                      catcherror = None, **_):
             if not recursive and value is not None:
                 LOGS.info('stop')
-                msg.set(value)
+                ctrl.display.update(self._display, message = value)
                 catcherror[0] = getattr(ctrl, 'CATCHERROR', True)
-        ctrl.display.observe("stopaction", "stopcomputation", _observer)
 
-        templ      = ctrl.globals.css.message.getdict(..., fullnames = False)
-        timeout    = ctrl.globals.css.message.timeout.getdict(..., fullnames = False)
-        timeout    = {i: j*1e-3 for i, j in timeout.items()}
+        @ctrl.display.observe
+        def _onmessage(old = None, **_): # pylint: disable=unused-variable
+            if 'message' in old:
+                self._settext(self._display.message)
 
-        last: list = [None, None, timeout['normal']]
+    def addtodoc(self, _, doc, tbar):
+        "add to doc"
+        self._tbar = tbar
+        self._doc  = doc
+        self._last = [None, None, self._theme.timeout['normal']]
         def _setmsg():
-            if last[0] is None:
+            if self._last[0] is None:
                 return
 
-            if last[0] != '':
-                tbar.message = last[0]
-                last[0] = ''
-                last[1] = time.time()+last[2]
+            if self._last[0] != '':
+                self._tbar.message = self._last[0]
+                self._last[0] = ''
+                self._last[1] = time.time()+self._last[2]
 
-            elif last[1] < time.time():
-                last[0]         = None
-                tbar.message = ''
-        doc.add_periodic_callback(_setmsg, ctrl.globals.css.message.period.get())
+            elif self._last[1] < time.time():
+                self._last[0]      = None
+                self._tbar.message = ''
+        doc.add_periodic_callback(_setmsg, self._theme.period)
 
-        def _settext(text):
-            text = getattr(text, 'value', text)
-            if text is None:
+    def _settext(self, text):
+        text = getattr(text, 'value', text)
+        if text is None:
+            return
+
+        templ = self._theme.types
+        if isinstance(text, Exception):
+            args = getattr(text, 'args', tuple())
+            if len(args) == 1:
+                args = args[0], 'error'
+            elif len(args) != 2:
+                args = text,    'error'
+            elif args[1] not in templ:
+                args = str(args), 'error'
+        else:
+            args = text
+
+        val = templ[str(args[1])].format(str(args[0])
+                                         .replace('<', '&lt')
+                                         .replace('>', '&gt'))
+        if args[1] == 'error':
+            LOGS.error(str(args[0]))
+        elif args[1] == 'warning':
+            LOGS.warning(str(args[0]))
+
+        timeout       = self._theme.timeout
+        self._last[0] = val
+        self._last[1] = time.time()+timeout.get(args[1], timeout['normal'])
+        self._last[2] = timeout.get(args[1], timeout['normal'])
+        if curdoc() is self._doc:
+            try:
+                self._tbar.message = val
                 return
-            elif isinstance(text, Exception):
-                args = getattr(text, 'args', tuple())
-                if len(args) == 1:
-                    args = args[0], 'error'
-                elif len(args) != 2:
-                    args = text,    'error'
-                elif args[1] not in templ:
-                    args = str(args), 'error'
-            else:
-                args = text
-
-            val = templ[str(args[1])].format(str(args[0])
-                                             .replace('<', '&lt')
-                                             .replace('>', '&gt'))
-            if args[1] == 'error':
-                LOGS.error(str(args[0]))
-            elif args[1] == 'warning':
-                LOGS.warning(str(args[0]))
-
-            last[0] = val
-            last[1] = time.time()+timeout.get(args[1], timeout['normal'])
-            last[2] = timeout.get(args[1], timeout['normal'])
-            if curdoc() is doc:
-                try:
-                    tbar.message = val
-                    return
-                except RuntimeError:
-                    pass
-
-        ctrl.globals.project.message.observe(_settext)
+            except RuntimeError:
+                pass
 
 class BeadInput:
     "Spinner for controlling the current bead"
@@ -322,9 +364,6 @@ class FileList:
     "Selection of opened files"
     def __init__(self, ctrl):
         self._ctrl: Any = ctrl
-        fnames = ctrl.globals.css.filenames
-        fnames.defaults = {'many': '{Path(files[0]).stem} + ...',
-                           'single': '{Path(path).stem}'}
 
     @staticmethod
     def __pathname(ctrl, task):
@@ -332,14 +371,14 @@ class FileList:
             return task.key
 
         lst = task.path
-        cnf = ctrl.globals.css.filenames
+        cnf = ctrl.theme.model("beadtoolbar")
         if isinstance(lst, (tuple, list)):
             if len(lst) > 1:
                 # pylint: disable=eval-used
-                return eval(f'f"{cnf.many.get()}"', dict(files = lst, Path = Path))
+                return eval(f'f"{cnf.fnamesmany}"', dict(files = lst, Path = Path))
             lst = lst[0]
         # pylint: disable=eval-used
-        return eval(f'f"{cnf.single.get()}"', dict(path = lst, Path = Path))
+        return eval(f'f"{cnf.fnamessingle}"', dict(path = lst, Path = Path))
 
     @classmethod
     def get(cls, ctrl) -> Iterator[Tuple[str, 'RootTask']]:
@@ -393,15 +432,13 @@ class FileListInput:
 
 class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
     "Toolbar"
-    _HELPERS = BeadInput, RejectedBeadsInput, MessagesInput, FileListInput
+    _HELPERS   = BeadInput, RejectedBeadsInput, FileListInput
+    __diagopen : TrackFileDialog
+    __diagsave : SaveFileDialog
 
     def __init__(self, ctrl = None, **kwa):
         "Sets up the controller"
         super().__init__(ctrl = ctrl, **kwa)
-        css          = ctrl.globals.css.title
-        css.defaults = {'open': u'Open', 'save': u'Save', 'quit': u'Quit',
-                        'open.dialog': u'Open a track or analysis file',
-                        'save.dialog': u'Save an analysis file'}
         ctrl.theme.updatedefaults('keystroke',
                                   open    = "Control-o",
                                   save    = "Control-s",
@@ -411,9 +448,16 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         for cls in self._HELPERS:
             cls.init(ctrl)
 
+        self.__messages = MessagesView()
+        self.__theme    = BeadToolbarTheme()
+        self.__tbar     = None
+
+    def observe(self, ctrl):
+        "sets up observers"
+        self.__messages.observe(ctrl)
+        ctrl.theme.add(self.__theme, True)
         self.__diagopen = TrackFileDialog(self._ctrl)
         self.__diagsave = SaveFileDialog(self._ctrl)
-        self.__tbar     = None
 
     def addtodoc(self, ctrl, doc):
         "adds items to doc"
@@ -452,6 +496,7 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
             else:
                 raise RuntimeError('Unknown toolbar button: '+attr)
 
+        self.__messages.addtodoc(ctrl, doc, tbar)
         tbar.on_change('open', _onbtn_cb)
         tbar.on_change('save', _onbtn_cb)
         tbar.on_change('quit', _onbtn_cb)

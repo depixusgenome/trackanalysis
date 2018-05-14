@@ -3,16 +3,13 @@
 """
 Saves stuff from session to session
 """
-from   typing              import Tuple, Union, List, cast
-from   pathlib             import Path
+from   typing              import Tuple, List
 from   copy                import deepcopy
 
 from   utils               import initdefaults
 from   utils.decoration    import addto
-from   view.dialog         import FileDialog
 from   data.__scripting__  import Track
 from   model.__scripting__ import Tasks, Task
-from   model.globals       import LocalContext
 from   .                   import default
 
 class ScriptingTheme:
@@ -20,7 +17,6 @@ class ScriptingTheme:
     model for scripting
     """
     name                  = "scripting"
-    gui                   = False
     save                  = False
     alignalways           = True
     order:    List[Tasks] = None
@@ -37,22 +33,7 @@ class ScriptingView:
     APPNAME = 'Scripting'
     def __init__(self, **kwa):
         self._ctrl  = kwa['ctrl']
-        self.trkdlg = FileDialog(filetypes = 'trk|*',
-                                 config    = self._ctrl,
-                                 multiple  = False,
-                                 title     = "open a track file")
-
-        self.grdlg  = FileDialog(filetypes = 'gr|*',
-                                 config    = self._ctrl,
-                                 multiple  = True,
-                                 title     = "open a gr files")
         self._ctrl.theme.add(ScriptingTheme())
-
-    def opentrack(self, tpe = 'track'):
-        "opens a gui to obtain a track"
-        if self._ctrl.theme.get("scripting", "gui"):
-            return (self.trkdlg if tpe == 'track' else self.grdlg).open()
-        return AttributeError("Operation not allowed guiven current settings")
 
     def writeuserconfig(self):
         "writes the config to disk"
@@ -134,27 +115,6 @@ def __cleaning__(cls):
         ret = tuple(i for i in ret if i is not Tasks.alignment)
     return ret
 
-def localcontext(**kwa) -> LocalContext:
-    """
-    Isolates the configuration for a period of time.
-
-    It is **NOT THREAD SAFE**.
-
-    For example:
-
-    ```python
-    >>> with localcontext():
-    ...     # change tasks as wanted
-    ...     Tasks.peakselector(align = None)
-    ...     assert Tasks.peakselector.get().align is None
-
-    >>> # changes within the localcontext have been discarded
-    >>> assert Tasks.peakselector.get().align is not None
-    ```
-    """
-    return LocalContext(scriptapp.control, **kwa)
-localcontext.__doc__ = LocalContext.__doc__
-
 @addto(Tasks)
 def defaulttasklist(obj, upto, cleaned:bool = None, __old__ = Tasks.defaulttasklist):
     "Returns a default task list depending on the type of raw data"
@@ -163,31 +123,6 @@ def defaulttasklist(obj, upto, cleaned:bool = None, __old__ = Tasks.defaulttaskl
         return __old__(obj, upto, cleaned)
     with cnf.context(scriptapp.control):
         return __old__(obj, upto, cleaned)
-
-@addto(Track)
-def __init__(self, *path: Union[str, Path], __old__ = Track.__init__, **kwa):
-    if 'path' in kwa and len(path):
-        raise RuntimeError("Path cannot be specified both in keywords and arguments")
-    if 'path' in kwa:
-        if isinstance(kwa['path'], (str, Path)):
-            path = (kwa.pop('path'),)
-        else:
-            path = cast(tuple, kwa.pop('path'))
-
-    cnf = scriptapp.control.globals.css.last.path.trk
-    if path is not None and any(i in (Ellipsis, 'prev', '') for i in path):
-        path = cnf.get()
-
-    gui = None
-    if path is not None and len(path) == 0:
-        gui = scriptapp.opentrack()
-        if isinstance(gui, AttributeError):
-            gui = None
-
-    if path or gui:
-        cnf.set(gui if gui else path[0])
-        scriptapp.writeuserconfig()
-    __old__(self, path = (gui if gui else path if path else ''), **kwa)
 
 @addto(Track)
 def grfiles(self):
@@ -203,4 +138,4 @@ def grfiles(self):
 # pylint: disable=no-member,invalid-name
 scriptapp = default.application(ScriptingView).open(None).topview.views[0] # type: ignore
 
-__all__ = ['scriptapp', 'Tasks', 'localcontext']
+__all__ = ['scriptapp', 'Tasks']

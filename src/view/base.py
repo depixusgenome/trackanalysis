@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "basic view module"
-from typing                     import Set
 from abc                        import ABC
 from asyncio                    import wrap_future
 from functools                  import partial
@@ -84,15 +83,9 @@ def defaultsizingmode(self, kwa:dict = None, ctrl = None, **kwargs) -> dict:
 
 class BokehView(View):
     "A view with a gui"
-    __CTRL: Set[int] = set()
     def __init__(self, ctrl = None, **kwargs):
         "initializes the gui"
         super().__init__(ctrl = ctrl, **kwargs)
-        css = ctrl.globals.css
-        if id(ctrl) not in BokehView.__CTRL:
-            BokehView.__CTRL.add(id(ctrl))
-            css.button.defaults = {'width': 90, 'height': 20}
-            css.input .defaults = {'width': 90, 'height': 20}
         self._doc:  Document        = None
 
     def close(self):

@@ -2,64 +2,51 @@
 # -*- coding: utf-8 -*-
 "Provides plots for temperatures and bead extensions"
 import warnings
-from   typing            import Dict, Optional, Tuple, cast
+from   typing               import Dict, Optional, Tuple, cast
 
-import numpy             as     np
-from   bokeh             import layouts
-from   bokeh.models      import ColumnDataSource, Range1d
-from   bokeh.plotting    import Figure, figure
+from   bokeh                import layouts
+from   bokeh.models         import ColumnDataSource, Range1d
+from   bokeh.plotting       import Figure
+import numpy                as     np
 
-from   data              import Beads, Track
-from   model.level       import PHASE
-from   view.plots        import PlotAttrs
-from   view.plots.tasks  import TaskPlotCreator
+from   data                 import Beads, Track
+from   view.plots.tasks     import TaskPlotCreator
 
-from   ..computations    import extensions
-from   ._model           import QualityControlModelAccess
+from   ..computations       import extensions
+from   ._model              import (QualityControlModelAccess,
+                                    DriftControlPlotModel,
+                                    DriftControlPlotTheme,
+                                    DriftControlPlotConfig,
+                                    ExtensionPlotTheme)
 
-
-class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
+class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
+                                              DriftControlPlotModel]):
     "Shows temperature temporal series"
-    def __init__(self, ctrl, mdl):
-        super().__init__(ctrl)
-        self._model       = mdl
-        self.css.defaults = {'measures'     : PlotAttrs('lightblue', 'line', 2, alpha = .75),
-                             'median'       : PlotAttrs('lightgreen', 'line', 2,
-                                                        line_dash = 'dashed'),
-                             'pop10'        : PlotAttrs('lightgreen', 'line', 2,
-                                                        line_dash = [4]),
-                             'pop90'        : PlotAttrs('lightgreen', 'line', 2,
-                                                        line_dash = [4]),
-                             'figure.width' : 700,
-                             'figure.height': 150,
-                             'outline.width': 7,
-                             'outline.color': 'red',
-                             'outline.alpha': .5,
-                             'ylabel'       : self._xlabel(),
-                             'xlabel'       : 'Cycles'}
-
-        self.css.tools.default                = 'pan,box_zoom,reset,save'
-        self.config.lines.percentiles.default = [10, 50, 90]
-        self.config.yspan.default             = [5, 95], 0.3
-        self.config.phases.default            = PHASE.initial, PHASE.pull
-        self.config.warningthreshold.default  = 0.3
-        self._src: ColumnDataSource           = {}
-        self._fig: Figure                     = None
+    _theme:  DriftControlPlotTheme
+    _config: DriftControlPlotConfig
+    _fig:    Figure
+    def __init__(self, ctrl, mdl: QualityControlModelAccess, **kwa) -> None:
+        name = self.__class__.__name__.replace('PlotCreator', '')
+        kwa.setdefault("ylabel", f'T {name[1:].lower()} (°C)')
+        super().__init__(ctrl, name = name, **kwa)
+        self._tasks                 = mdl
+        self._src: ColumnDataSource = {}
 
     def _addtodoc(self, *_):
         "returns the figure"
-        args = self._figargs(y_range            = Range1d(start = 0., end = 20.),
-                             x_range            = Range1d(start = 0., end = 1e2),
-                             outline_line_width = self.css.outline.width.get(),
-                             outline_line_color = self.css.outline.color.get(),
-                             outline_line_alpha = 0.,
-                             name               = self.__class__.__name__)
-        self._fig = figure(**args)
+        self._fig = self._theme.figure(y_range = Range1d(start = 0., end = 20.),
+                                       x_range = Range1d(start = 0., end = 1e2),
+                                       outline_line_width = self._theme.outlinewidth,
+                                       outline_line_color = self._theme.outlinecolor,
+                                       outline_line_alpha = 0.,
+                                       name               = self.__class__.__name__)
         self._src = [ColumnDataSource(i) for i in self._data()]
 
-        self.css.measures.addto(self._fig, y = 'measures', x = 'cycles', source = self._src[0])
+        self._theme.measures.addto(self._fig, y = 'measures', x = 'cycles',
+                                   source = self._src[0])
         for pop in ('pop10', 'median', 'pop90'):
-            self.css[pop].addto(self._fig, x = 'cycles', y = pop, source = self._src[1])
+            getattr(self._theme, pop).addto(self._fig, x = 'cycles', y = pop,
+                                            source = self._src[1])
 
         self.fixreset(self._fig.x_range)
         self.fixreset(self._fig.y_range)
@@ -70,19 +57,19 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         for i, j in zip(self._src, data):
             self._bkmodels[i]['data'] = j
 
-        self.setbounds(self._fig.x_range, 'x', (0., getattr(self._model.track, 'ncycles', 1)))
+        self.setbounds(self._fig.x_range, 'x', (0., getattr(self._tasks.track, 'ncycles', 1)))
 
         xvals = data[0]['measures'][np.isfinite(data[0]['measures'])]
         xrng  = (np.min(xvals), np.max(xvals)) if len(xvals) else (0., 30.)
         self.setbounds(self._fig.y_range, 'y', xrng)
         if len(xvals):
-            perc, factor = self.config.yspan.get()
+            perc, factor = self._config.yspan
             span         = np.percentile(xvals, perc)
             delta        = max(1e-5, span[1]-span[0])
             span         = span[0]-delta*factor, span[1]+delta*factor
             self._bkmodels[self._fig.y_range].update(start = span[0], end = span[1])
 
-        alpha = self.css.outline.alpha.get() if self._warn(data) else 0.
+        alpha = self._theme.outlinealpha if self._warn(data) else 0.
         self._bkmodels[self._fig]['outline_line_alpha'] = alpha
 
     @staticmethod
@@ -95,7 +82,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
                      pop90    = empty()))
 
     def _data(self) -> Tuple[Dict[str, np.ndarray], ...]:
-        track = self._model.track
+        track = self._tasks.track
         if track is None:
             return self._defaults()
 
@@ -103,7 +90,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         if meas is None or len(meas) == 0:
             return self._defaults()
 
-        pops  = np.nanpercentile(meas, self.config.lines.percentiles.get())
+        pops  = np.nanpercentile(meas, self._config.percentiles)
         return (dict(measures = meas, cycles = cycles),
                 dict(cycles   = [np.nanmin(cycles), np.nanmax(cycles)],
                      pop10    = np.full(2, pops[0], dtype = 'f4'),
@@ -120,13 +107,9 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         length = np.nanmean(np.diff(track.phases[:,0]))
         return vals['index']/length, vals['value']
 
-    @classmethod
-    def _xlabel(cls) -> str:
-        name = cls.__name__.replace('PlotCreator', '')
-        return f'T {name[1:].lower()} (°C)'
 
     def _warn(self, data):
-        thr = self.config.warningthreshold.get()
+        thr = self._config.warningthreshold
         return (False if thr is None or len(data[1]['pop10']) == 0 else
                 (data[1]['pop90'][0] - data[1]['pop10'][0]) > thr)
 
@@ -141,20 +124,18 @@ class TServoPlotCreator(DriftControlPlotCreator):
 
 class ExtensionPlotCreator(DriftControlPlotCreator):
     "Shows bead extension temporal series"
+    _theme: ExtensionPlotTheme
     def __init__(self, *args):
         super().__init__(*args)
-        self.css.measures.default    = PlotAttrs('lightblue', 'circle', 2, alpha = .75)
-        self.css.ybars.default       = PlotAttrs('lightblue', 'vbar', 1, alpha = .75)
-        self.css.ymed.default        = PlotAttrs('lightblue', 'vbar', 1, fill_alpha = 0.)
-        self.css.ybars.width.default = .8
-        self.config.warningthreshold.default  = 1.5e-2
-        self.config.ybars.percentiles.default = [25, 75]
+        self._plotmodel.theme = ExtensionPlotTheme(ylabel = 'δ(Φ3-Φ1) (µm)')
+        self._plotmodel.config.warningthreshold = 1.5e-2
+        self._plotmodel.config.percentiles      = [25, 75]
 
     def _addtodoc(self, *_):
         fig  = super()._addtodoc(_)
-        args = dict(x = 'cycles', width  = self.css.ybars.width.get(), source = self._src[-1])
-        self.css.ybars.addto(fig, top = 'top',    bottom = 'bottom', **args)
-        self.css.ymed .addto(fig, top = 'median', bottom = 'median', **args)
+        args = dict(x = 'cycles', width  = self._theme.ybarswidth, source = self._src[-1])
+        self._theme.ybars.addto(fig, top = 'top',    bottom = 'bottom', **args)
+        self._theme.ymed .addto(fig, top = 'median', bottom = 'median', **args)
 
         # set first of glyphs
         rends         = list(fig.renderers)
@@ -175,8 +156,8 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
         if len(data[0]['measures']) == 0:
             return data
 
-        meas = data[0]['measures'].reshape((-1, self._model.track.ncycles)).T
-        perc = list(self.config.ybars.percentiles.get()) + [50]
+        meas = data[0]['measures'].reshape((-1, self._tasks.track.ncycles)).T
+        perc = list(self._config.percentiles) + [50]
         bars = np.nanpercentile(meas, perc, axis = 1)
         new  = dict(cycles = np.arange(bars.shape[1], dtype = 'i4'),
                     top    = bars[1,:],
@@ -185,15 +166,11 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
         return data + (new,)
 
     def _measures(self, track: Track) -> Optional[np.ndarray]: # type: ignore
-        beads = self._model.runbead()
+        beads = self._tasks.runbead()
         if beads is not None:
-            cyc, cnt = extensions(cast(Beads, beads), *self.config.phases.get())
+            cyc, cnt = extensions(cast(Beads, beads), *self._config.phases)
             return (np.concatenate(cyc), np.concatenate(cnt)) if len(cnt) else None
         return None
-
-    @staticmethod
-    def _xlabel() -> str:
-        return 'δ(Φ3-Φ1) (µm)'
 
 class QualityControlPlots:
     "All plots together"
@@ -204,7 +181,9 @@ class QualityControlPlots:
         self.ext     = ExtensionPlotCreator(ctrl, mdl)
 
     def observe(self, _):
-        "observations are delegated to the main PlotCreator"
+        "sets up observers"
+        for i in self.__dict__.values():
+            i.observe(_)
 
     def reset(self, bkmodels):
         "resets the plots"
@@ -215,12 +194,11 @@ class QualityControlPlots:
 
     def addtodoc(self, doc, mode):
         "returns the plot grid"
-        plots   = [[getattr(getattr(self, i), '_addtodoc')(doc)]
-                   for i in ('ext', 'tsample', 'tsink', 'tservo')]
+        plots   = [[getattr(i, '_addtodoc')(doc)] for i in self.__dict__.values()]
         for i in plots[1:]:
             i[0].x_range = plots[0][0].x_range
         for i in plots[:-1]:
             i[0].xaxis.visible = False
 
-        tbar = self.tsample.css.toolbar_location.get()
+        tbar = self.tsample.figargs()['toolbar_location']
         return layouts.gridplot(plots, **mode, toolbar_location = tbar)

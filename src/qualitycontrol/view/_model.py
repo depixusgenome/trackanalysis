@@ -8,6 +8,9 @@ from   data                 import BEADKEY
 from   control.modelaccess  import TaskPlotModelAccess, TaskAccess
 from   cleaning.processor   import (DataCleaningTask, # pylint: disable=unused-import
                                     DataCleaningProcessor)
+from   model.level          import PHASE
+from   utils                import initdefaults
+from   view.plots.base      import PlotAttrs, PlotTheme, PlotModel
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
@@ -22,14 +25,55 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
 class DataCleaningTaskAccess(TaskAccess, tasktype = DataCleaningTask):
     "access to the DataCleaningTask"
 
+class QualityControlDisplay:
+    "QualityControlDisplay"
+    name                      = "qc"
+    messages: Dict[str, list] = {}
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class QualityControlTheme:
+    "QualityControlDisplay"
+    name            = "qc"
+    fixedbeadextent = .2
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+
+    def fixedbeads(self, ctrl, root) -> Set[BEADKEY]:
+        "returns bead ids with extent == all cycles"
+        lst   = ctrl.tasklist(root)
+        if not lst:
+            return set()
+
+        clean = next((t for t in lst if isinstance(t, DataCleaningTask)), None)
+        if not clean:
+            return set()
+
+        cache = ctrl.cache(root, clean)()
+        if cache is None:
+            return set()
+
+        minext = self.fixedbeadextent
+        def _compute(itm):
+            arr   = next((i.values for i in itm if i.name == 'extent'), None)
+            if arr is None:
+                return False
+
+            valid = np.isfinite(arr)
+            return np.sum(arr[valid] < minext) == np.sum(valid)
+
+        return set(i for i, (j, _) in cache.items() if _compute(j))
+
 class QualityControlModelAccess(TaskPlotModelAccess):
     "access to data cleaning"
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
         self.cleaning   = DataCleaningTaskAccess(self)
-        self.config.root.fixedbead.minextent.default = 0.25
-        self.__messages = self.project.messages
-        self.__messages.setdefault(None)
+        self.__theme    = ctrl.add(QualityControlTheme(), True)
+        self.__display  = ctrl.add(QualityControlDisplay(), True)
 
     def buildmessages(self):
         "creates beads and warnings where applicable"
@@ -48,7 +92,7 @@ class QualityControlModelAccess(TaskPlotModelAccess):
                                    cycles  = [i[1] for i in mem],
                                    type    = [i[2] for i in mem],
                                    message = [i[3] for i in mem])
-        self.__messages.set(default)
+        self._ctrl.update(self.__display, messages = default)
 
     def badbeads(self) -> Set[BEADKEY]:
         "returns bead ids with messages"
@@ -58,28 +102,62 @@ class QualityControlModelAccess(TaskPlotModelAccess):
 
     def fixedbeads(self) -> Set[BEADKEY]:
         "returns bead ids with extent == all cycles"
-        cache   = self.cleaning.cache() # pylint: disable=not-callable
-        if cache is None:
-            return set()
-
-        minext  = self.config.root.fixedbead.minextent.get()
-        def _compute(itm):
-            arr   = next((i.values for i in itm if i.name == 'extent'), None)
-            if arr is None:
-                return False
-
-            valid = np.isfinite(arr)
-            return np.sum(arr[valid] < minext) == np.sum(valid)
-
-        return set(i for i, (j, _) in cache.items() if _compute(j))
+        return self.__theme.fixedbeads(self._ctrl.tasks, self.roottask)
 
     def messages(self) -> Dict[str, List]:
         "returns beads and warnings where applicable"
-        msg = self.__messages.get()
+        msg = self.__display.messages
         if msg is None:
             self.buildmessages()
-        return self.__messages.get()
+        return self.__display.messages
 
     def clear(self):
         "clears the model's cache"
-        self.__messages.pop()
+        self._ctrl.update(self.__display, messages = {})
+
+class DriftControlPlotTheme(PlotTheme):
+    "drift control plot theme"
+    name             = "driftcontrol"
+    measures         = PlotAttrs('lightblue',  'line', 2, alpha     = .75)
+    median           = PlotAttrs('lightgreen', 'line', 2, line_dash = 'dashed')
+    pop10            = PlotAttrs('lightgreen', 'line', 2, line_dash = [4])
+    pop90            = PlotAttrs('lightgreen', 'line', 2, line_dash = [4])
+    figsize          = 700, 150, 'fixed'
+    outlinewidth     = 7
+    outlinecolor     = 'red'
+    outlinealpha     = .5
+    ylabel           = ''
+    xlabel           = 'Cycles'
+    toolbar          = dict(PlotTheme.toolbar)
+    toolbar['items'] = 'pan,box_zoom,reset,save'
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
+
+class DriftControlPlotConfig:
+    "allows configuring the drift control plots"
+    name              = "driftcontrolconfig"
+    percentiles       = [10, 50, 90]
+    yspan             = [5, 95], 0.3
+    phases            = PHASE.initial, PHASE.pull
+    warningthreshold  = 0.3
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class DriftControlPlotModel(PlotModel):
+    "qc plot model"
+    theme  = DriftControlPlotTheme()
+    config = DriftControlPlotConfig()
+
+class ExtensionPlotTheme(DriftControlPlotTheme):
+    "drift control plot theme"
+    measures   = PlotAttrs('lightblue', 'circle', 2, alpha = .75)
+    ybars      = PlotAttrs('lightblue', 'vbar', 1,   alpha = .75)
+    ymed       = PlotAttrs('lightblue', 'vbar', 1,   fill_alpha = 0.)
+    ybarswidth = .8
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)

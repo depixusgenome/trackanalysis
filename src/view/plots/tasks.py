@@ -4,16 +4,13 @@
 from typing                 import TypeVar
 from abc                    import abstractmethod
 from control.modelaccess    import TaskPlotModelAccess, TaskAccess
-from .base                  import PlotCreator
+from .base                  import PlotCreator, PlotModelType
 
 TModelType = TypeVar('TModelType', bound = TaskPlotModelAccess)
-class TaskPlotCreator(PlotCreator[TModelType]):
+class TaskPlotCreator(PlotCreator[TModelType, PlotModelType]):
     "Base plotter for tracks"
-    def __init__(self, ctrl, *_) -> None:
-        super().__init__(ctrl)
-        css = ctrl.globals.css.plot.title
-        if css.stretch.get(default = None) is None:
-            css.defaults = {'stretch': u'Stretch (base/µm)', 'bias': u'Bias (µm)'}
+    def __init__(self, ctrl, *_, **kwa) -> None:
+        super().__init__(ctrl, **kwa)
 
     def _onchangetask(self, parent = None, task = None, **_):
         if self._model.impacts(parent, task):
@@ -24,6 +21,7 @@ class TaskPlotCreator(PlotCreator[TModelType]):
 
     def observe(self, ctrl):
         "sets-up model observers"
+        super().observe(ctrl)
         self._model.settaskmodel(ctrl, "tasks")
         ctrl.display.observe("tasks", self._onchangedisplay)
         if any(isinstance(i, TaskAccess) for i in self._model.__dict__.values()):

@@ -11,10 +11,11 @@ from    bokeh.models    import (ColumnDataSource, DataTable, TableColumn,
 
 import  numpy       as     np
 
+from    utils               import initdefaults
 from    utils.gui           import parseints
 from    view.base           import enableOnTrack
 from    view.static         import ROUTE
-from    view.plots          import DpxNumberFormatter, WidgetCreator
+from    view.plots          import DpxNumberFormatter
 from    eventdetection.view import AlignmentWidget
 from    ._model             import DataCleaningModelAccess, DataCleaningTask
 
@@ -53,52 +54,48 @@ class BeadSubtractionModalDescriptor:
         else:
             subtracted.update(beads = list(value))
 
-class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
+class CyclesListTheme:
+    "Cycles List Model"
+    name    = "cycleslist"
+    order   = ('population', 'hfsigma', 'extent', 'aberrant',
+               'pingpong', 'saturation', 'good')
+    width   = 65
+    height  = 420
+    columns = [['cycle',      u'Cycle',       '0'],
+               ['population', u'% good',      '0.'],
+               ['hfsigma',    u'σ[HF]',       '0.0000'],
+               ['extent',     u'Δz',          '0.0'],
+               ['pingpong',   u'Σ|dz|',       '0.0'],
+               ['saturation', u'Non-closing', ''],
+               ['discarded',  u'Discarded',   '']]
+
+class CyclesListWidget:
     "Table containing stats per peaks"
-    def __init__(self, model:DataCleaningModelAccess) -> None:
-        super().__init__(model)
+    def __init__(self, task) -> None:
         self.__widget: DataTable  = None
-        css                       = self.__config
-        css.lines.order.default   = ('population', 'hfsigma', 'extent', 'aberrant',
-                                     'pingpong', 'saturation', 'good')
-        css.columns.width.default = 65
-        css.height.default        = 420
-        css.columns.default       = [['cycle',      u'Cycle',       '0'],
-                                     ['population', u'% good',      '0.'],
-                                     ['hfsigma',    u'σ[HF]',       '0.0000'],
-                                     ['extent',     u'Δz',          '0.0'],
-                                     ['pingpong',   u'Σ|dz|',       '0.0'],
-                                     ['saturation', u'Non-closing', ''],
-                                     ['discarded',  u'Discarded',   '']]
+        self.__task               = task
+        self.__model              = CyclesListTheme()
 
-    @property
-    def __config(self):
-        return self.css.table
-
-    @staticmethod
-    def observe(_):
+    def observe(self, ctrl):
         "sets-up observers"
-        return
+        ctrl.theme.add(self.__model)
 
     def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
-        cnf   = self.__config.columns
-        width = cnf.width.get()
-        get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
         fmt   = lambda i: (StringFormatter(text_align = 'center',
                                            font_style = 'bold') if i == '' else
                            DpxNumberFormatter(format = i, text_align = 'right'))
         cols  = list(TableColumn(field      = i[0],
-                                 title      = get(i[1]),
+                                 title      = i[1],
                                  formatter  = fmt(i[2]))
-                     for i in cnf.get())
+                     for i in self.__model.columns)
 
         self.__widget = DataTable(source         = ColumnDataSource(self.__data()),
                                   columns        = cols,
                                   editable       = False,
                                   index_position = None,
-                                  width          = width*len(cols),
-                                  height         = self.__config.height.get(),
+                                  width          = self.__model.width*len(cols),
+                                  height         = self.__model.height,
                                   name           = "Cleaning:List")
         return [self.__widget]
 
@@ -109,12 +106,12 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         itm.update(data = data)
 
     def __data(self) -> dict:
-        cache = self._model.cleaning.cache
+        cache = self.__task.cache
         if cache is None or len(cache) == 0:
-            return {i: [] for i, _1, _2 in self.__config.columns.get()}
-        names = set(i[0] for i in self.__config.columns.get()) & set(cache)
-        bad   = self._model.cleaning.nbadcycles(cache)
-        order = self._model.cleaning.sorted(self.__config.lines.order.get(), cache)
+            return {i: [] for i, _1, _2 in self.__model.columns}
+        names = set(i[0] for i in self.__model.columns) & set(cache)
+        bad   = self.__task.nbadcycles(cache)
+        order = self.__task.sorted(self.__model.order, cache)
         info  = {i: cache[i].values[order] for i in names}
 
         info['saturation'] = np.zeros(len(order), dtype = 'U1')
@@ -128,45 +125,46 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         info['cycle'] = order
         return info
 
-class DownsamplingWidget(WidgetCreator[DataCleaningModelAccess]):
+class DownSamplingTheme:
+    "stuff for downsampling"
+    name     = "downsampling"
+    title    = "Downsampling"
+    tooltips = "Display only 1 out of every few data points"
+    start    = 0
+    value    = 5
+    end      = 5
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class DownsamplingWidget:
     "allows downsampling the graph for greater speed"
-    def __init__(self, model:DataCleaningModelAccess) -> None:
-        super().__init__(model)
+    def __init__(self) -> None:
         self.__widget: Slider  = None
-        css                       = self.__config
-        css.defaults = {"title": "Downsampling",
-                        "tooltips": "Display only 1 out of every few data points",
-                        "start": 0,
-                        "end":   5}
+        self.__model           = DownSamplingTheme()
 
-    @property
-    def __config(self):
-        return self.css.downsampling
-
-    def addtodoc(self, action) -> List[Widget]:
+    def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
-        cnf   = self.__config
-        self.__widget = Slider(title    = cnf.title.get(),
-                               value    = cnf.get(),
-                               start    = cnf.start.get(),
-                               end      = cnf.end.get(),
+        cnf   = self.__model
+        self.__widget = Slider(**{getattr(cnf, i)
+                                  for i in ('title', 'value', 'start', 'end')},
                                callback_policy = "mouseup")
-        @action
-        def _onchange_cb(attr, old, new):
-            cnf.set(new)
-
-        self.__widget.on_change("value", _onchange_cb)
         return [self.__widget]
 
-    @staticmethod
-    def observe(_):
+    def observe(self, ctrl):
         "sets-up observers"
-        return
+        ctrl.theme.add(self.__model)
+
+        @ctrl.action
+        def _onchange_cb(attr, old, new):
+            ctrl.theme.update(self.__model, value = new)
+        self.__widget.on_change("value", _onchange_cb)
 
     def reset(self, resets):
         "this widget has a source in common with the plots"
         itm  = self.__widget if resets is None else resets[self.__widget]
-        itm.update(value = self.__config.get())
+        itm.update(value = self.__model.value)
 
 class DpxCleaning(Widget):
     "Interface to filters needed for cleaning"
@@ -187,10 +185,10 @@ class DpxCleaning(Widget):
     maxextent          = props.Float(DataCleaningTask.maxextent)
     maxsaturation      = props.Float(DataCleaningTask.maxsaturation)
 
-class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
+class CleaningFilterWidget:
     "All inputs for cleaning"
     def __init__(self, model:DataCleaningModelAccess) -> None:
-        super().__init__(model)
+        self.__model               = model
         self.__widget: DpxCleaning = None
 
     @staticmethod
@@ -204,7 +202,7 @@ class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
 
         @action
         def _on_cb(attr, old, new):
-            self._model.cleaning.update(**{attr: new})
+            self.__model.cleaning.update(**{attr: new})
 
         for name in ('maxabsvalue', 'maxderivate', 'minpopulation',
                      'minhfsigma',  'maxhfsigma',  'minextent',
@@ -213,26 +211,26 @@ class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
 
         @action
         def _on_subtract_cb(attr, old, new):
-            self._model.subtracted.beads = parseints(new)
+            self.__model.subtracted.beads = parseints(new)
         self.__widget.on_change('subtracted', _on_subtract_cb)
 
         @action
         def _on_subtract_cur_cb(attr, old, new):
-            self._model.subtracted.switch(self._model.bead)
+            self.__model.subtracted.switch(self.__model.bead)
         self.__widget.on_change('subtractcurrent', _on_subtract_cur_cb)
 
         return [self.__widget]
 
     def reset(self, resets):
         "resets the widget when opening a new file, ..."
-        task = self._model.cleaning.task
+        task = self.__model.cleaning.task
         if task is None:
-            task = self._model.cleaning.configtask
+            task = self.__model.cleaning.configtask
 
         info = {i:j for i, j in task.config().items() if hasattr(self.__widget, i)}
 
-        info['framerate'] = getattr(self._model.track, 'framerate', 1./30.)
-        info['subtracted']= ', '.join(str(i) for i in sorted(self._model.subtracted.beads))
+        info['framerate'] = getattr(self.__model.track, 'framerate', 1./30.)
+        info['subtracted']= ', '.join(str(i) for i in sorted(self.__model.subtracted.beads))
 
         (self.__widget if resets is None else resets[self.__widget]).update(**info)
 
@@ -245,16 +243,19 @@ class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
     def __init__(self):
-        align  = AlignmentWidget[DataCleaningModelAccess](self._model)
-        self.__widgets = dict(table    = CyclesListWidget(self._model),
-                              align    = align,
+        self.__widgets = dict(table    = CyclesListWidget(self._model.cleaning),
+                              align    = AlignmentWidget(self._model.alignment),
                               cleaning = CleaningFilterWidget(self._model),
-                              sampling = DownsamplingWidget(self._model))
+                              sampling = DownsamplingWidget())
 
     def _widgetobservers(self, ctrl):
         for widget in self.__widgets.values():
             widget.observe(ctrl)
-        self.css.observe("downsampling", lambda: self.reset(False))
+
+        def _ondownsampling(old = None, **_):
+            if 'value' in old:
+                self.reset(False)
+        ctrl.theme.observe("downsampling", _ondownsampling)
 
     def _createwidget(self, fig):
         widgets = {i: j.addtodoc(self.action) for i, j in self.__widgets.items()}

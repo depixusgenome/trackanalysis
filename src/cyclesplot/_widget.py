@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Widgets for configuration"
 
-from    typing              import List, Tuple, TYPE_CHECKING
+from    typing              import List, Tuple, Dict, Optional
 from    abc                 import ABC
 
 from    bokeh               import layouts
@@ -10,36 +10,60 @@ from    bokeh.models        import (ColumnDataSource, Slider, CustomJS, Paragrap
                                     DataTable, TableColumn, IntEditor, NumberEditor,
                                     CheckboxButtonGroup, Widget)
 
+from    utils               import initdefaults
+from    model.task          import RootTask
+from    model.task.application import TasksDisplay
 from    sequences.view      import OligoListWidget, SequencePathWidget
-from    view.plots          import GroupWidget, WidgetCreator as _Widget, DpxNumberFormatter
+from    view.plots          import DpxNumberFormatter
 from    view.base           import enableOnTrack
 from    modaldialog.view    import AdvancedWidgetMixin
 
 from    eventdetection.view import AlignmentWidget, EventDetectionWidget
-from    ._model             import CyclesModelAccess
+from    ._model             import CyclesModelAccess, CyclesPlotTheme
 
-class PeaksTableWidget(_Widget[CyclesModelAccess]):
+class PeaksTableTheme:
+    "peaks table theme"
+    name    = "peakstable"
+    height  = 100
+    width   = 60
+    title   = 'dna ↔ nm'
+    columns = [CyclesPlotTheme.yrightlabel, CyclesPlotTheme.ylabel]
+    zstep   = 1e-4
+    zformat = '0.0000'
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class PeaksTableDisplay:
+    "peaks table display"
+    name    = "peakstable"
+    peaks : Dict[RootTask, Dict[int, Tuple[float, float]]] = {}
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def __getitem__(self, tasks: TasksDisplay) -> Optional[Tuple[float, float]]:
+        return self.peaks.get(tasks.roottask, {}).get(tasks.bead, None)
+
+class PeaksTableWidget:
     "Table of peaks in z and dna units"
-    def __init__(self, model:CyclesModelAccess) -> None:
-        super().__init__(model)
+    def __init__(self, tasks:CyclesModelAccess) -> None:
         self.__widget: DataTable = None
-        self.css.table.defaults  = {'height' : 100,
-                                    'title'  : u'dna ↔ nm',
-                                    'zformat': '0.0000'}
+        self.__theme             = PeaksTableTheme()
+        self.__display           = PeaksTableDisplay()
+        self.__tasks             = tasks
 
     def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
-        width  = self.css.input.width.get()
-        css    = self.css.table
-        height = css.height.get()
-        fmt    = DpxNumberFormatter(format = css.zformat.get(), text_align = 'right')
+        width  = self.__theme.width
+        fmt    = DpxNumberFormatter(format = self.__theme.zformat, text_align = 'right')
         cols   = [TableColumn(field     = 'bases',
-                              title     = self.css.yrightlabel.get(),
+                              title     = self.__theme.columns[0],
                               editor    = IntEditor(),
                               width     = width//2),
                   TableColumn(field     = 'z',
-                              title     = self.css.ylabel.get(),
-                              editor    = NumberEditor(step = 1e-4),
+                              title     = self.__theme.columns[1],
+                              editor    = NumberEditor(step = self.__theme.zstep),
                               formatter = fmt,
                               width     = width//2)]
 
@@ -48,19 +72,23 @@ class PeaksTableWidget(_Widget[CyclesModelAccess]):
                                   editable       = True,
                                   index_position = None,
                                   width          = width,
-                                  height         = height,
+                                  height         = self.__theme.height,
                                   name           = "Cycles:Peaks")
 
-        return [Paragraph(text = css.title.get()), self.__widget]
+        return [Paragraph(text = self.__theme.title), self.__widget]
 
     def reset(self, resets):
         "updates the widget"
         resets[self.__widget.source]['data'] = self.__data()
 
-    def observe(self, _):
+    def observe(self, ctrl):
         "sets-up config observers"
-        fcn = lambda: setattr(self.__widget.source, 'data', self.__data())
-        self._model.observeprop('oligos', 'sequencepath', 'sequencekey', fcn)
+        ctrl.theme.add(self.__theme)
+        ctrl.display.add(self.__display)
+
+        fcn = lambda **_: setattr(self.__widget.source, 'data', self.__data())
+        ctrl.theme  .observe("sequence", fcn)
+        ctrl.display.observe("sequence", fcn)
 
     def callbacks(self, hover):
         "adding callbacks"
@@ -69,29 +97,36 @@ class PeaksTableWidget(_Widget[CyclesModelAccess]):
         self.__widget.source.js_on_change("data", jsc) # pylint: disable=no-member
 
     def __data(self):
-        info = self._model.peaks
-        hyb  = self._model.hybridisations(None)
+        info = self.__display[self.__tasks.sequencemodel.tasks].peaks
+        hyb  = self.__tasks.hybridisations(None)
         if hyb is not None  and len(hyb) > 2 and info is None:
             info =  hyb['position'][0], hyb['position'][-1]
 
         if info is None:
             info = 0, 1000
 
-        stretch, bias = self._model.stretch, self._model.bias
+        stretch, bias = self.__tasks.stretch, self.__tasks.bias
         info         += info[0]/stretch+bias, info[1]/stretch+bias
         return dict(bases = info[:2], z = info[2:])
 
-class ConversionSlidersWidget(_Widget[CyclesModelAccess]):
+class ConversionSliderTheme:
+    "Conversion slider table theme"
+    name    = "conversionslider"
+    stretch = dict(start = 900,  step  = 5, end = 1400, title = 'Stretch (base/µm)')
+    bias    = dict(step  = 1e-4, ratio = .25, offset = .05, title = 'Bieas (µm)')
+    width   = 60
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class ConversionSlidersWidget:
     "Sliders for managing stretch and bias factors"
-    def __init__(self, model:CyclesModelAccess) -> None:
-        super().__init__(model)
+    def __init__(self, display) -> None:
+        self.__display                   = display
+        self.__theme                     = ConversionSliderTheme()
         self.__stretch: Slider           = None
         self.__bias:    Slider           = None
         self.__figdata: ColumnDataSource = None
-
-        base = self.css.base
-        base.stretch.defaults = dict(start = 900,  step  = 5, end = 1400)
-        base.bias   .defaults = dict(step  = 1e-4, ratio = .25, offset = .05)
 
     def addinfo(self, histsource):
         "adds info to the widget"
@@ -99,30 +134,30 @@ class ConversionSlidersWidget(_Widget[CyclesModelAccess]):
 
     def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
-        widget = lambda x, s, e, n: Slider(value = getattr(self._model, x),
-                                           title = self.css.title[x].get(),
-                                           step  = self.css.base[x].step.get(),
-                                           width = self.css.input.width.get(),
+        widget = lambda x, s, e, n: Slider(value = getattr(self.__display, x),
+                                           title = getattr(self.__theme,  x)['title'],
+                                           step  = getattr(self.__theme,  x)['step'],
+                                           width = self.__theme.width,
                                            start = s, end = e, name = n)
 
-        vals = tuple(self.css.base.stretch.get('start', 'end'))
+        vals = tuple(self.__theme.stretch[i] for i in ('start', 'end'))
         self.__stretch = widget('stretch', vals[0], vals[1], 'Cycles:Stretch')
         self.__bias    = widget('bias', -1., 1., 'Cycles:Bias')
         return [self.__stretch, self.__bias]
 
     def reset(self, resets):
         "updates the widgets"
-        ratio  = self.css.base.bias.ratio.get()
+        ratio  = self.__theme.bias['ratio']
         if resets and self.__figdata in resets and 'data' in resets[self.__figdata]:
             data = resets[self.__figdata]['data']
         else:
             data = self.__figdata.data
         start  = data['bottom'][0]
         end    = start + (data['top'][-1] - start)*ratio
-        start -= self.css.base.bias.offset.get()
+        start -= self.__theme.bias['offset']
 
-        resets[self.__bias].update(value = self._model.bias, start = start, end = end)
-        resets[self.__stretch].update(value = self._model.stretch)
+        resets[self.__bias].update(value = self.__display.bias, start = start, end = end)
+        resets[self.__stretch].update(value = self.__display.stretch)
 
     def callbacks(self, hover):
         "adding callbacks"
@@ -133,38 +168,56 @@ class ConversionSlidersWidget(_Widget[CyclesModelAccess]):
         bias   .js_on_change('value', CustomJS(code = "hvr.on_change_bias(cb_obj)",
                                                args = dict(hvr = hover)))
 
-class DriftWidget(GroupWidget[CyclesModelAccess]):
-    "Allows removing the drifts"
-    INPUT = CheckboxButtonGroup
-    def __init__(self, model:CyclesModelAccess) -> None:
-        super().__init__(model)
-        self.css.title.drift.labels.default = [u'Per bead', u'Per cycle']
-        self.css.title.drift.default        = u'Drift Removal'
+class DriftWidgetTheme:
+    "drift widget theme"
+    labels = ['Per bead', 'Per cycle']
+    title  = 'Drift Removal'
 
-    def onclick_cb(self, value):
+class DriftWidget:
+    "Allows removing the drifts"
+    def __init__(self, tasks:CyclesModelAccess) -> None:
+        self.__theme = DriftWidgetTheme()
+        self.__tasks = tasks
+        self.__widget: CheckboxButtonGroup = None
+
+    def addtodoc(self, action) -> List[Widget]:
+        "creates the widget"
+        self.__widget = CheckboxButtonGroup(labels = self.__theme.labels,
+                                            name   = 'Cycles:DriftWidget',
+                                            **self.__data())
+        self.__widget.on_click(action(self._onclick_cb))
+
+        return [Paragraph(text = self.__theme.title), self.__widget]
+
+    def _onclick_cb(self, value):
         "action to be performed when buttons are clicked"
         for ind, name in enumerate(('driftperbead', 'driftpercycle')):
-            attr = getattr(self._model, name)
+            attr = getattr(self.__tasks, name)
             task = attr.task
             if (ind not in value) != (task is None):
-                getattr(self._model, name).update(disabled = ind not in value)
+                getattr(self.__tasks, name).update(disabled = ind not in value)
 
-    def _data(self) -> dict:
+    def reset(self, resets):
+        "updates the widget"
+        resets[self.__widget].update(**self.__data())
+
+    def observe(self, ctrl):
+        "sets-up config observers"
+        ctrl.theme.add(self.__theme)
+
+    def __data(self) -> dict:
         value = [] # type: List[int]
-        if self._model.driftperbead.task  is not None:
+        if self.__tasks.driftperbead.task  is not None:
             value  = [0]
-        if self._model.driftpercycle.task is not None:
+        if self.__tasks.driftpercycle.task is not None:
             value += [1]
         return dict(active = value)
 
-    def observe(self, _):
-        "sets-up config observers"
-
-class AdvancedWidget(_Widget[CyclesModelAccess], AdvancedWidgetMixin): # type: ignore
+class AdvancedWidget(AdvancedWidgetMixin):
     "access to the modal dialog"
     def __init__(self, ctrl, model:CyclesModelAccess) -> None:
-        super().__init__(model)
-        AdvancedWidgetMixin.__init__(self, ctrl)
+        self._model = model
+        super().__init__(ctrl)
 
     @staticmethod
     def _title() -> str:
@@ -172,8 +225,8 @@ class AdvancedWidget(_Widget[CyclesModelAccess], AdvancedWidgetMixin): # type: i
 
     @staticmethod
     def _body() -> Tuple[Tuple[str,str],...]:
-        return (('Histogram bin width',         '%(binwidth).3f'),
-                ('Minimum frames per position', '%(minframes)d'))
+        return (('Histogram bin width',         '%(cycles.theme.binwidth).3f'),
+                ('Minimum frames per position', '%(cycles.theme.minframes)d'))
 
     def _args(self, **kwa):
         return super()._args(model = self._model, **kwa)
@@ -194,16 +247,20 @@ class WidgetMixin(ABC):
     def __init__(self, ctrl):
         self.__widgets = dict(table    = PeaksTableWidget(self._model),
                               sliders  = ConversionSlidersWidget(self._model),
-                              seq      = SequencePathWidget(self._model),
-                              oligos   = OligoListWidget(self._model),
-                              align    = AlignmentWidget[CyclesModelAccess](self._model),
+                              seq      = SequencePathWidget(),
+                              oligos   = OligoListWidget(),
+                              align    = AlignmentWidget(self._model.alignment),
                               drift    = DriftWidget(self._model),
-                              events   = EventDetectionWidget[CyclesModelAccess](self._model),
+                              events   = EventDetectionWidget(self._model.eventdetection),
                               advanced = AdvancedWidget(ctrl, self._model))
 
     def ismain(self, ctrl):
         "setup for when this is the main show"
         self.__widgets['advanced'].ismain(ctrl)
+
+    def advanced(self):
+        "triggers the advanced dialog"
+        self.__widgets['advanced'].on_click()
 
     def _widgetobservers(self, ctrl):
         for widget in self.__widgets.values():
@@ -243,14 +300,3 @@ class WidgetMixin(ABC):
                                    hvr     = self._hover,
                                    ttip    = self._hover.source))
         self._hover.js_on_change("updating", jsc)
-
-    def advanced(self):
-        "triggers the advanced dialog"
-        self.__widgets['advanced'].on_click()
-
-    if TYPE_CHECKING:
-        # pylint: disable=no-self-use,unused-argument
-        config    = None    # type: ignore
-        css       = None    # type: ignore
-        key       = lambda *_: None
-        _figargs  = lambda *_: None

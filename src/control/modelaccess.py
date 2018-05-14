@@ -9,7 +9,6 @@ from functools              import wraps
 
 from model.task             import RootTask, Task
 from model.task.application import DEFAULT_TASKS, TasksDisplay, TasksTheme, TasksModel
-from model.globals          import PROPS
 from data.track             import Track
 from data.views             import TrackView
 from data.views             import BEADKEY
@@ -18,7 +17,6 @@ from utils.inspection       import diffobj
 from .processor             import Processor
 from .processor.cache       import CacheReplacement
 from .taskcontrol           import ProcessorController
-from .globalscontrol        import GlobalsAccess
 from .event                 import Controller
 
 class PlotState(Enum):
@@ -29,11 +27,12 @@ class PlotState(Enum):
     disabled     = 'disabled'
     outofdate    = 'outofdate'
 
-class PlotModelAccess(GlobalsAccess):
+class PlotModelAccess:
     "Default plot model"
     def __init__(self, model:Union[Controller, 'PlotModelAccess'], key = None) -> None:
-        super().__init__(model, key)
-        self._ctrl = getattr(model, '_ctrl', model)
+        self._key   = key
+        self._model = model
+        self._ctrl  = getattr(model, '_ctrl', model)
 
     def clear(self):
         "clears the model's cache"
@@ -46,9 +45,7 @@ class PlotModelAccess(GlobalsAccess):
     @property
     def themename(self) -> str:
         "return the theme name"
-        ctrl = getattr(self._ctrl, 'theme', None)
-        mdl  = getattr(ctrl, 'model', lambda _: None)('main')
-        return getattr(mdl, 'themename', 'dark')
+        return self._ctrl.theme.get("main", "themename", "dark")
 
 class ReplaceProcessors(CacheReplacement):
     """
@@ -150,47 +147,8 @@ class TaskPlotModelAccess(PlotModelAccess):
         "returns a ReplaceProcessors context from which a trackview can be obtains"
         return ReplaceProcessors(self, *processors, copy = copy)
 
-    def observeprop(self, *args):
-        "observe an attribute set through props"
-        fcn   = self.__wrapobserver(next(i for i in args if callable(i)))
-        attrs = tuple(i for i in args if isinstance(i, str))
-        assert len(attrs) + 1 == len(args)
-
-        keys: Dict[str, List[str]] = dict()
-        cls                        = type(self)
-        for attr in attrs:
-            if '.' in attr:
-                for key in ('config.root.', 'project.root.', 'project.', 'config.'):
-                    if attr.startswith(key):
-                        keys.setdefault(key[:-1], []).append(attr[len(key):])
-            else:
-                prop = getattr(cls, attr)
-                for obs in prop.OBSERVERS:
-                    keys.setdefault(obs, []).append(prop.key)
-
-        for key, items in keys.items():
-            val = self
-            for attr in key.split('.'):
-                val = getattr(val, attr)
-            val.observe(*items, fcn) # pylint: disable=no-member
-
-    def clear(self):
-        u"updates the model when a new track is loaded"
-        PROPS.BeadProperty.clear(self)
-
     def addtodoc(self, _):
         "adds items to the doc"
-
-    def __wrapobserver(self, fcn):
-        "wraps an observing function"
-        state = self.project.state
-        @wraps(fcn)
-        def _wrapped(*args, **kwargs):
-            if state.get() is PlotState.active:
-                fcn(*args, **kwargs)
-            elif state.get() is PlotState.disabled:
-                state.set(PlotState.outofdate)
-        return _wrapped
 
 class TaskAccess(TaskPlotModelAccess):
     "access to tasks"

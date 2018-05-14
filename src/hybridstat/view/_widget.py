@@ -15,6 +15,7 @@ from signalfilter               import rawprecision
 
 from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
 from peakfinding.groupby        import ByEM, ByHistogram
+from utils                      import initdefaults
 from utils.gui                  import startfile
 from excelreports.creation      import writecolumns
 from eventdetection.view        import AlignmentModalDescriptor
@@ -28,32 +29,41 @@ from sequences.view             import (SequenceTicker, SequenceHoverMixin,
 from modaldialog.view           import AdvancedTaskMixin, T_BODY
 from ._model                    import PeaksPlotModelAccess
 
-class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess]):
-    "Dropdown for choosing the reference"
-    def __init__(self, ctrl, model) -> None:
-        super().__init__(model)
-        self.__files = FileList(ctrl)
-        self.__widget: Dropdown  = None
-        self.css.title.reference.default      = 'Reference Track'
-        self.css.title.reference.none.default = 'None'
+class ReferenceWidgetTheme:
+    "ref widget theme"
+    title = 'Reference Track'
+    none  = 'None'
+    width = 120
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
 
-    @staticmethod
-    def observe(_):
+class ReferenceWidget:
+    "Dropdown for choosing the reference"
+    __files : FileList
+    __widget: Dropdown
+    def __init__(self, model) -> None:
+        self.__theme = ReferenceWidgetTheme()
+        self.__model = model
+
+    def observe(self, ctrl):
         "sets up observers"
+        self.__files = FileList(ctrl)
+        ctrl.theme.add(self.__theme)
 
     def addtodoc(self, action, *_) -> List[Widget]:
         "creates the widget"
         self.__widget = Dropdown(name  = 'HS:reference',
-                                 width = self.css.input.width.get(),
+                                 width = self.__theme.width,
                                  **self.__data())
         @action
         def _py_cb(new):
             inew = int(new)
             val  = None if inew < 0 else [i for _, i in self.__files()][inew]
-            self._model.fittoreference.reference = val
+            self.__model.fittoreference.reference = val
 
         self.__widget.on_click(_py_cb)
-        return [Paragraph(text = self.css.title.reference.get()), self.__widget]
+        return [Paragraph(text = self.__theme.title), self.__widget]
 
     def reset(self, resets):
         "updates the widget"
@@ -67,9 +77,9 @@ class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess]):
     def __data(self) -> dict:
         lst   = list(self.__files())
         menu  = [(j, str(i)) for i, j in enumerate(i for i, _ in lst)]
-        menu += [None, (self.css.title.reference.none.get(), '-1')]
+        menu += [None, (self.__theme.none, '-1')]
 
-        key   = self._model.fittoreference.reference
+        key   = self.__model.fittoreference.reference
         index = -1 if key is None else [i for _, i in lst].index(key)
         return dict(menu  = menu, label = menu[index][0], value = str(index))
 
@@ -79,22 +89,18 @@ class PeaksOligoListWidget(OligoListWidget):
         "creates the widget"
         return super().addtodoc(action)
 
-    @staticmethod
-    def observe(_):
-        "sets up observers"
-
 class PeaksSequencePathWidget(SequencePathWidget):
     "Widget for setting the sequence to use"
+    def __init__(self, mdl):
+        super().__init__()
+        self._model = mdl
+
     def _sort(self, lst) -> List[str]: # type: ignore
         dist = self._model.distances
         if len(dist):
             lst  = [i for i in lst if i in dist]
             return sorted(lst, key = lambda i: dist[i].value)
         return super()._sort(lst)
-
-    @staticmethod
-    def observe(_):
-        "sets up observers"
 
     def addtodoc(self, action, *_) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
@@ -124,36 +130,43 @@ _LINE = """
         </div>
     </div>
     """.strip().replace("    ", "").replace("\n", "")
-class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
-    "Table containing stats per peaks"
-    def __init__(self, model:PeaksPlotModelAccess) -> None:
-        super().__init__(model)
-        self.__widget: PeaksStatsDiv = None
-        css = self.css.stats
-        css.defaults = {'title.line': _LINE,
-                        'title.openhairpin': u' & open hairpin',
-                        'title.orientation': u'-+ ',
-                        'style': {'padding-top': '40px'},
-                        'lines': [['cycles',            '.0f'],
-                                  ['css:title.stretch', '.3f'],
-                                  ['css:title.bias',    '.4f'],
-                                  ['σ[HF] (µm)',       '.4f'],
-                                  ['σ[Peaks] (µm)',    '.4f'],
-                                  ['Average Skew ',    '.2f'],
-                                  ['Peak count',       '.0f'],
-                                  ['Events per Cycle', '.1f'],
-                                  ['Down Time Φ₅ (s)', '.1f'],
-                                  ['Sites found',      ''],
-                                  ['Silhouette',       '.1f'],
-                                  ['reduced χ²',       '.1f']]}
 
-    @staticmethod
-    def observe(_):
+class PeaksStatsWidgetTheme:
+    "PeaksStatsWidgetTheme"
+    line        = _LINE
+    openhairpin =  ' & open hairpin'
+    orientation = u'-+ '
+    style       = {'padding-top': '40px'}
+    lines       = [['cycles',            '.0f'],
+                   ['Stretch (base/µm)', '.3f'],
+                   ['Bias (µm)',         '.4f'],
+                   ['σ[HF] (µm)',        '.4f'],
+                   ['σ[Peaks] (µm)',     '.4f'],
+                   ['Average Skew ',     '.2f'],
+                   ['Peak count',        '.0f'],
+                   ['Events per Cycle',  '.1f'],
+                   ['Down Time Φ₅ (s)',  '.1f'],
+                   ['Sites found',       ''],
+                   ['Silhouette',        '.1f'],
+                   ['reduced χ²',        '.1f']]
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class PeaksStatsWidget:
+    "Table containing stats per peaks"
+    __widget: PeaksStatsDiv
+    def __init__(self, model:PeaksPlotModelAccess) -> None:
+        self.__model = model
+        self.__theme = PeaksStatsWidgetTheme()
+
+    def observe(self, ctrl):
         "sets up observers"
+        ctrl.theme.add(self.__theme)
 
     def addtodoc(self, *_) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
-        self.__widget = PeaksStatsDiv(style = self.css.stats.style.get())
+        self.__widget = PeaksStatsDiv(style = self.__theme.style)
         self.reset(None)
         return [self.__widget]
 
@@ -161,17 +174,15 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
         "resets the widget upon opening a new file, ..."
         itm  = self.__widget if resets is None else resets[self.__widget]
         data = self.__data()
-        itm.update(data = data, text = data.get(self._model.sequencekey, data['']))
+        itm.update(data = data, text = data.get(self.__model.sequencekey, data['']))
 
     class _TableConstructor:
         "creates the html table containing stats"
-        def __init__(self, css):
-            get         = lambda i: css[i[4:]].get() if i.startswith('css:') else i
-            self.titles = [(get(i[0]), i[1]) for i in css.stats.lines.get()]
-            self.values = ['']*len(self.titles) # type: List
-            self.line   = css.stats.title.line.get()
-            self.openhp = css.stats.title.openhairpin.get()
-
+        def __init__(self, theme: PeaksStatsWidgetTheme) -> None:
+            self.titles = [tuple(i) for i in theme.lines]
+            self.values = ['']*len(self.titles)
+            self.line   = theme.line
+            self.openhp = theme.openhairpin
 
         def trackdependant(self, mdl):
             "all track dependant stats"
@@ -247,75 +258,76 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
             return ('{:'+fmt+'} ± {:'+fmt+'}').format(*val)
 
     def __data(self) -> Dict[str,str]:
-        tab = self._TableConstructor(self.css)
-        tab.trackdependant(self._model)
+        tab = self._TableConstructor(self.__theme)
+        tab.trackdependant(self.__model)
         ret = {'': tab()}
 
-        if self._model.identification.task is not None:
-            dist = self._model.distances
+        if self.__model.identification.task is not None:
+            dist = self.__model.distances
             for key in dist:
-                tab.sequencedependant(self._model, dist, key)
+                tab.sequencedependant(self.__model, dist, key)
                 ret[key] = tab()
 
-        elif self._model.fittoreference.task is not None:
-            tab.referencedependant(self._model)
+        elif self.__model.fittoreference.task is not None:
+            tab.referencedependant(self.__model)
             ret[''] = tab()
         return ret
 
-class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
+class PeakListTheme:
+    "PeakListWidgetTheme"
+    height     = 400
+    colwidth   = 60
+    refid      = '0.0000'
+    columns    = [['z',        'Z (µm)',        '0.0000'],
+                  ['bases',    u'Z (base)',     '0.0'],
+                  ['id',       u'Id',           '0'],
+                  ['orient',   u'Strand',       ''],
+                  ['distance', u'Distance',     '0.0'],
+                  ['count',    'css:xlabel',    '0.0'],
+                  ['duration', 'css:xtoplabel', '0.000'],
+                  ['sigma',    u'σ (µm)',       '0.0000'],
+                  ['skew',     u'skew',         '0.00']]
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class PeakListWidget:
     "Table containing stats per peaks"
+    __widget: DataTable
     def __init__(self, model:PeaksPlotModelAccess) -> None:
-        super().__init__(model)
-        self.__widget: DataTable      = None
-        self.css.peaks.height.default = 400
-        self.css.peaks.table.error.default = ('File extension must be .xlsx',
-                                              'warning')
-        css               = self.css.peaks.columns
-        css.width.default = 60
-        css.refid.default = '0.0000'
-        css.default       = [['z',        'css:ylabel',    '0.0000'],
-                             ['bases',    u'Z (base)',     '0.0'],
-                             ['id',       u'Id',           '0'],
-                             ['orient',   u'Strand',       ''],
-                             ['distance', u'Distance',     '0.0'],
-                             ['count',    'css:xlabel',    '0.0'],
-                             ['duration', 'css:xtoplabel', '0.000'],
-                             ['sigma',    u'σ (µm)',       '0.0000'],
-                             ['skew',     u'skew',         '0.00']]
+        self.__model = model
+        self.__theme = PeakListTheme()
 
     def __cols(self):
-        get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
         fmt   = lambda i: (StringFormatter(text_align = 'center',
                                            font_style = 'bold') if i == '' else
                            DpxNumberFormatter(format = i, text_align = 'right'))
         cols  = list(TableColumn(field      = i[0],
-                                 title      = get(i[1]),
+                                 title      = i[1],
                                  formatter  = fmt(i[2]))
-                     for i in self.css.peaks.columns.get())
+                     for i in self.__theme.columns)
 
-        cnf   = self.css.peaks
-        isref = (self._model.fittoreference.task is not None and
-                 self._model.identification.task is None)
+        isref = (self.__model.fittoreference.task is not None and
+                 self.__model.identification.task is None)
         for name in ('id', 'distance'):
-            ind = next(i for i, j in enumerate(cnf.columns.get()) if j[0] == name)
-            fmt = cnf.columns.refid.get() if isref else cnf.columns.get()[ind][-1]
+            ind = next(i for i, j in enumerate(self.__theme.columns) if j[0] == name)
+            fmt = self.__theme.refid if isref else self.__theme.columns[ind][-1]
             cols[ind].formatter.format = fmt
         return cols
 
-    @staticmethod
-    def observe(_):
+    def observe(self, ctrl):
         "sets up observers"
+        ctrl.theme.add(self.__theme)
 
     def addtodoc(self, _, src) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
         "creates the widget"
-        width = self.css.peaks.columns.width.get()
         cols  = self.__cols()
         self.__widget = DataTable(source         = src,
                                   columns        = cols,
                                   editable       = False,
                                   index_position = None,
-                                  width          = width*len(cols),
-                                  height         = self.css.peaks.height.get(),
+                                  width          = self.__theme.colwidth*len(cols),
+                                  height         = self.__theme.height,
                                   name           = "Peaks:List")
         return [self.__widget]
 
@@ -323,18 +335,24 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
         "resets the wiget when a new file is opened"
         resets[self.__widget].update(columns = self.__cols())
 
-class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
-    "Selects an id file"
-    def __init__(self, model:PeaksPlotModelAccess) -> None:
-        super().__init__(model)
-        self.keeplistening       = True
-        self.__widget: PathInput = None
-        self.__dlg    = FileDialog(config    = self._ctrl,
-                                   storage   = 'constraints.path',
-                                   filetypes = '*|xlsx')
+class PeakIDPathTheme:
+    "PeakIDPathTheme"
+    title      = 'Id file path'
+    filechecks = 500
+    width      = 120
+    tableerror = ('File extension must be .xlsx', 'warning')
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
 
-        css          = self.css.constraints
-        css.defaults = {'title': u'Id file path', 'filechecks': 500}
+class PeakIDPathWidget:
+    "Selects an id file"
+    __widget: PathInput
+    __dlg   : FileDialog
+    def __init__(self, model:PeaksPlotModelAccess) -> None:
+        self.keeplistening  = True
+        self.__model        = model
+        self.__theme        = PeakIDPathTheme()
 
     def listentofile(self, doc, action):
         "sets-up a periodic callback which checks whether the id file has changed"
@@ -342,13 +360,13 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
 
         @action
         def _do_resetmodel():
-            self._model.identification.resetmodel(self._model)
+            self.__model.identification.resetmodel(self.__model)
 
         def _callback():
             if not self.keeplistening:
                 return
 
-            path = self._model.constraintspath
+            path = self.__model.constraintspath
             if path is None:
                 finfo[0] = None
                 return
@@ -367,18 +385,19 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
 
             _do_resetmodel()
 
-        doc.add_periodic_callback(_callback, self.css.constraints.filechecks.get())
+        doc.add_periodic_callback(_callback, self.__theme.filechecks)
 
-    @staticmethod
-    def observe(_):
+    def observe(self, ctrl):
         "sets up observers"
+        ctrl.theme.add(self.__theme)
+        self.__dlg = FileDialog(ctrl,
+                                storage   = 'constraints.path',
+                                filetypes = '*|xlsx')
 
     def addtodoc(self, action, # type: ignore # pylint: disable=arguments-differ
                  _) -> List[Widget]:
         "creates the widget"
-        title         = self.css.constraints.title.get()
-        width         = self.css.input.width.get() - 10
-        self.__widget = PathInput(width = width, title = title,
+        self.__widget = PathInput(width = self.__theme.width, title = self.__theme.title,
                                   placeholder = "", value = "",
                                   name = 'Peaks:IDPath')
 
@@ -392,35 +411,35 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
         def _onchangetext_cb(attr, old, new):
             path = self.__widget.value.strip()
             if path == '':
-                self._model.constraintspath = None
+                self.__model.constraintspath = None
                 return
 
             elif not Path(path).exists():
                 if not path.endswith(".xlsx"):
-                    raise IOError(*self.css.peaks.table.error.get())
+                    raise IOError(*self.__theme.tableerror)
                 try:
                     writecolumns(path, "Summary",
-                                 [('Bead', [self._model.bead]),
-                                  ('Reference', [self._model.sequencekey]),
-                                  ('Stretch (base/µm)', [self._model.stretch]),
-                                  ('Bias (µm)', [self._model.bias])])
+                                 [('Bead', [self.__model.bead]),
+                                  ('Reference', [self.__model.sequencekey]),
+                                  ('Stretch (base/µm)', [self.__model.stretch]),
+                                  ('Bias (µm)', [self.__model.bias])])
                 except:
                     raise
                 else:
                     startfile(path)
 
-            self._model.constraintspath = str(Path(path).resolve())
+            self.__model.constraintspath = str(Path(path).resolve())
 
         self.__widget.on_change('click', _onclick_cb)
         self.__widget.on_change('value', _onchangetext_cb)
 
-        self.__dlg.title = title
+        self.__dlg.title = self.__theme.title
         return [self.__widget]
 
     def reset(self, resets):
         "resets the wiget when a new file is opened, ..."
         txt  = ''
-        path = self._model.constraintspath
+        path = self.__model.constraintspath
         if path is not None and Path(path).exists():
             txt = str(Path(path).resolve())
         (self.__widget if resets is None else resets[self.__widget]).update(value = txt)
@@ -471,8 +490,13 @@ class _PeakDescriptor:
             return
         mdl.peakselection.update(finder=ByHistogram(mincount=getattr(inst,"_eventcount")))
 
-class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # type: ignore
+class AdvancedWidget(AdvancedTaskMixin):
     "access to the modal dialog"
+    def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
+        self._model = model
+        super().__init__(ctrl)
+        self._outp: Dict[str, Dict[str, Any]] = {}
+
     @staticmethod
     def _title() -> str:
         return 'Hybridstat Configuration'
@@ -490,11 +514,6 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
                 ('Use a theoretical peak 0 in fits', ' %(_peak0)b'),
                 ('Max distance to theoretical peak', ' %(_dist2theo)d'),
                )
-
-    def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
-        super().__init__(model)
-        AdvancedTaskMixin.__init__(self, ctrl)
-        self._outp: Dict[str, Dict[str, Any]] = {}
 
     def reset(self, resets):
         "resets the widget when a new file is opened, ..."
@@ -525,8 +544,8 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
 def createwidgets(ctrl, mdl: PeaksPlotModelAccess) -> Dict[str, WidgetCreator]:
     "returns a dictionnary of widgets"
     return dict(seq      = PeaksSequencePathWidget(mdl),
-                ref      = ReferenceWidget(ctrl, mdl),
-                oligos   = PeaksOligoListWidget(mdl),
+                ref      = ReferenceWidget(mdl),
+                oligos   = PeaksOligoListWidget(),
                 stats    = PeaksStatsWidget(mdl),
                 peaks    = PeakListWidget(mdl),
                 cstrpath = PeakIDPathWidget(mdl),

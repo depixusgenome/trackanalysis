@@ -23,11 +23,6 @@ class BeadController:
         return self.__tasks.track(self._ctrl)
 
     @property
-    def project(self):
-        "returns globals for the project"
-        return self._ctrl.globals.project
-
-    @property
     def allbeads(self) -> Iterator[int]:
         "returns all beads"
         track = self.track

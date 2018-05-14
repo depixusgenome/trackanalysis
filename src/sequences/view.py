@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Create a grid displaying a sequence"
-from    typing         import (List, # pylint: disable=unused-import
-                               Optional, Tuple, Sequence, TypeVar, cast)
+from    typing         import List, Optional, Tuple, Callable
 import  numpy   as np
 
 import  bokeh.core.properties as props
@@ -10,15 +9,31 @@ from    bokeh.models    import (LinearAxis, ColumnDataSource, Range1d, Widget,
                                 BasicTicker, Dropdown, Paragraph, CustomJS,
                                 AutocompleteInput)
 
-from    utils.gui       import implementation
+from   utils                import initdefaults
+from   utils.gui            import implementation
 
 from   view.dialog          import FileDialog
-from   view.plots.base      import checksizes, WidgetCreator
+from   view.plots.base      import checksizes
 from   view.plots.bokehext  import DpxHoverTool
 
-from   .                    import marksequence, splitoligos
-from   .modelaccess         import SequencePlotModelAccess
+from   .                    import marksequence
+from   .modelaccess         import SequenceModel
 
+class SequenceTickerTheme:
+    "sequence ticker theme"
+    standoff = -2
+    grid     = dict(dark = dict(color = ('lightgray', 'lightgreen'),
+                                width = (1,          1),
+                                alpha = (.8,         .8),
+                                dash  = ('solid',    'solid')),
+                    basic = dict(color = ('lightgray', 'lightgreen'),
+                                 width = (1,          1),
+                                 alpha = (.8,         .8),
+                                 dash  = ('solid',    'solid')))
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
 
 def estimatebias(position: np.ndarray, cnt: np.ndarray) -> float:
     "estimate the bias using the plot data"
@@ -42,10 +57,10 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.__standoff      = None
         self.__defaults:dict = dict()
         self.__withbase:list = []
         self.__model         = None
+        self.__theme         = SequenceTickerTheme()
         self.__fig           = None
         self.__axis: SequenceTicker = None
 
@@ -54,16 +69,19 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
         u"returns the fixed axis"
         return self.__axis
 
-    def create(self, fig, mdl, cnf, loc = 'right'):
+    def observe(self, ctrl):
+        "add observers"
+        self.__theme = ctrl.theme.add(self.__theme, True)
+
+    def create(self, fig, mdl, loc = 'right'):
         "Sets the ticks according to the configuration"
         self.__model = mdl
         self.__fig   = fig
         self.__axis  = type(self)()
-        self.__standoff = cnf.css.yrightlabel.standoff
 
         fig.extra_y_ranges        = {"bases": Range1d(start = 0., end = 1.)}
         fig.add_layout(LinearAxis(y_range_name = "bases",
-                                  axis_label   = cnf.css.yrightlabel.get(),
+                                  axis_label   = mdl.cycles.theme.yrightlabel,
                                   ticker       = self.__axis),
                        loc)
 
@@ -80,32 +98,21 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 
         self.__withbase = dict()
         for name in ('color', 'dash', 'width', 'alpha'):
-            gridprops = cnf.css.grid[self.__model.themename][name].get()
+            gridprops = self.__theme.grid[self.__model.themename][name]
             self.__withbase['grid_line_'+name]       = gridprops[0]
             self.__withbase['minor_grid_line_'+name] = gridprops[1]
-
-    @staticmethod
-    def defaultconfig(mdl):
-        "default config"
-        mdl.css.yrightlabel.standoff.default = -2
-        mdl.css.plot.grid.dark.defaults  = dict(color = ('lightgray', 'lightgreen'),
-                                                width = (1,          1),
-                                                alpha = (.8,         .8),
-                                                dash  = ('solid',    'solid'))
-        mdl.css.plot.grid.basic.defaults = dict(color = ('lightgray', 'lightgreen'),
-                                                width = (1,          1),
-                                                alpha = (.8,         .8),
-                                                dash  = ('solid',    'solid'))
 
     def reset(self, resets):
         "Updates the ticks according to the configuration"
         mdl    = self.__model
         fig    = self.__fig
-        key    = mdl.sequencekey if mdl.sequencekey is not None and len(mdl.oligos) else 'NONE'
+        key    = (mdl.sequencemodel.currentkey
+                  if mdl.sequencemodel.currentkey is not None and len(mdl.oligos)
+                  else 'NONE')
         majors = {}
         minors = {}
         axis   = next(i for i in fig.right if isinstance(i, LinearAxis))
-        resets[axis].update(axis_label_standoff = self.__standoff.get())
+        resets[axis].update(axis_label_standoff = self.__theme.standoff)
         if key == 'NONE':
             resets[fig.ygrid[0]].update(self.__defaults)
         else:
@@ -120,13 +127,24 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
         major = {i: majors[i]+minors[i] for i in majors}
         resets[self.__axis].update(major = major, minor = minor, key = key)
 
+class SequenceHoverTheme:
+    "sequence hover theme"
+    radius   = 1.
+    policy   = 'follow_mouse'
+    tooltips = '@z{1.1111} ↔ @values: @text'
+    oligosize = 4
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
 class SequenceHoverMixin:
     "controls keypress actions"
     def __init__(self):
         self.__source: ColumnDataSource = None
         self.__tool:   DpxHoverTool     = None
-        self.__size = None
-        self._model = None
+        self.__theme                    = SequenceHoverTheme()
+        self._model                     = None
 
     @staticmethod
     def impl(name, fields, extra = None):
@@ -135,20 +153,16 @@ class SequenceHoverMixin:
         code = implementation(__file__, args, NAME  = name, extra = extra)
         return code
 
-    @staticmethod
-    def defaultconfig(mdl):
-        "default config"
-        mdl.css.plot.sequence.defaults = {'tooltips.radius': 1.,
-                                          'tooltips.policy': 'follow_mouse',
-                                          'tooltips'       : u'@z{1.1111} ↔ @values: @text'}
-        mdl.config.plot.oligos.size.default = 4
+    def observe(self, ctrl):
+        "add observers"
+        self.__theme = ctrl.theme.add(self.__theme, True)
 
     @property
     def source(self):
         "returns the tooltip source"
         return self.__source
 
-    def create(self, fig, mdl, cnf, xrng = None):
+    def create(self, fig, mdl, xrng = None):
         "Creates the hover tool for histograms"
         self.update(framerate = 1./30.,
                     bias      = mdl.bias if mdl.bias is not None else 0.,
@@ -157,24 +171,22 @@ class SequenceHoverMixin:
         hover = fig.select(DpxHoverTool)
         if len(hover) == 0:
             return
-        hover.point_policy = mdl.css.sequence.tooltips.policy.get()
-        self._model    = mdl
-        self.__tool   = hover[0]
-        self.__size   = cnf.config.oligos.size
-        self.__source = ColumnDataSource(self.__data())
+        hover.point_policy = self.__theme.policy
+        self._model        = mdl
+        self.__tool        = hover[0]
+        self.__source      = ColumnDataSource(self.__data())
 
-        css  = cnf.css.sequence.tooltips
         args = dict(x                = 'inds',
                     y                = 'values',
                     source           = self.__source,
-                    radius           = css.radius.get(),
+                    radius           = self.__theme.radius,
                     radius_dimension = 'y',
                     line_alpha       = 0.,
                     fill_alpha       = 0.,
                     y_range_name     = 'bases')
         if xrng is not None:
             args['x_range_name'] = xrng
-        self.__tool.update(tooltips  = css.get(),
+        self.__tool.update(tooltips  = self.__theme.tooltips,
                            mode      = 'hline',
                            renderers = [fig.circle(**args)])
 
@@ -193,9 +205,9 @@ class SequenceHoverMixin:
     @checksizes
     def __data(self):
         mdl   = self._model
-        key   = mdl.sequencekey
-        oligs = mdl.oligos
-        osiz  = max((len(i) for i in oligs), default = self.__size.get())
+        key   = mdl.sequencemodel.currentkey
+        oligs = mdl.sequencemodel.currentprobes
+        osiz  = max((len(i) for i in oligs), default = self.__theme.oligosize)
         dseq  = mdl.sequences(...)
         if len(dseq) == 0:
             return dict(values = [0], inds = [0], text = [''], z = [0])
@@ -212,46 +224,49 @@ class SequenceHoverMixin:
         data['z']    = data['values']/mdl.stretch+(0. if mdl.bias is None else mdl.bias)
         return data
 
-ModelType = TypeVar("ModelType", bound = SequencePlotModelAccess)
-class SequencePathWidget(WidgetCreator[ModelType]):
+class SequencePathTheme:
+    "SequencePathWidgetTheme"
+    name        = "sequencetheme"
+    dlgtitle    = 'Open a fasta file'
+    label       = 'Selected DNA sequence'
+    missingkey  = 'Select sequence'
+    missingpath = 'Find path'
+    width       = 120
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class SequencePathWidget:
     "Dropdown for choosing a fasta file"
-    def __init__(self, model) -> None:
-        super().__init__(model)
-        self.__widget: Dropdown  = None
-        self.__list:   List[str] = []
-        self.__dialog = FileDialog(filetypes = 'fasta|*',
-                                   config    = self._ctrl,
-                                   storage   = 'sequence')
-        css = self.css.plot.title
-        css.defaults = {'fasta'                : u'Open a fasta file',
-                        'sequence'             : u'Selected DNA sequence',
-                        'sequence.missing.key' : u'Select sequence',
-                        'sequence.missing.path': u'Find path'}
+    __dialog: FileDialog
+    __widget: Dropdown
+    __click:  Callable[[str], None]
+    def __init__(self):
+        self.__list: List[str] = []
+        self.__theme           = SequencePathTheme()
+        self.__model           = SequenceModel()
 
     def addtodoc(self, action) -> List[Widget]:
         "creates the widget"
-        self.__dialog.title = self.css.title.fasta.get()
-        self.__widget       = Dropdown(name  = 'Cycles:Sequence',
-                                       width = self.css.input.width.get(),
-                                       **self.__data())
-        @action
-        def _py_cb(new):
-            if new in self.__list:
-                self._model.sequencekey = new
-            elif new == '←':
-                path = self.__dialog.open()
-                if self._model.setnewsequencepath(path):
-                    self.__widget.value = '→'
-                    if path is not None:
-                        raise IOError("Could not find any sequence in the file")
+        self.__widget = Dropdown(name  = 'Cycles:Sequence',
+                                 width = self.__theme.width,
+                                 **self.__data())
+        self.__widget.on_click(action(self.__click)) # type: ignore
+        return [Paragraph(text = self.__theme.label), self.__widget]
 
-        self.__widget.on_click(_py_cb)
-        return [Paragraph(text = self.css.title.sequence.get()), self.__widget]
-
-    def observe(self, _):
+    def observe(self, ctrl):
         "sets-up config observers"
-        fcn = lambda: self.__widget.update(**self.__data())
-        self._model.observeprop('sequencekey', 'sequencepath', fcn)
+        self.__dialog = FileDialog(ctrl,
+                                   storage   = "sequence",
+                                   title     = self.__theme.dlgtitle,
+                                   filetypes = 'fasta|*')
+        self.__theme  = ctrl.theme.  add(self.__theme,   True)
+        self.__model  = SequenceModel.create(ctrl)
+        self.__click  = lambda new: self.__onclick(ctrl, new)
+
+        fcn           = lambda **_: self.__widget.update(**self.__data())
+        ctrl.theme.  observe(self.__model.config,  fcn)
+        ctrl.display.observe(self.__model.display, fcn)
 
     def reset(self, resets):
         "updates the widget"
@@ -281,50 +296,68 @@ class SequencePathWidget(WidgetCreator[ModelType]):
     def __data(self) -> dict:
         lst = self.__list
         lst.clear()
-        lst.extend(self._sort(sorted(self._model.sequences(...).keys())))
+        lst.extend(self._sort(sorted(self.__model.config.sequences.keys())))
 
-        key   = self._model.sequencekey
+        key   = self.__model.currentkey
         val   = key if key in lst else None
-        menu  = [(i, i) for i in lst] if len(lst) else []  # type: List[Optional[Tuple[str,str]]]
-        css   = self.css.title.sequence
+        menu: List[Optional[Tuple[str,str]]] = [(i, i) for i in lst]
         if len(menu):
-            title = css.missing.key.get()
+            title = self.__theme.missingkey
             menu += [None, (title, '←')]
         else:
-            title = css.missing.path.get()
+            title = self.__theme.missingpath
             menu += [('', '→'), (title, '←')]
         return dict(menu  = menu,
                     label = title if val is None else key,
                     value = '→'   if val is None else val)
 
-class OligoListWidget(WidgetCreator[ModelType]):
+    def __onclick(self, ctrl, new):
+        if new in self.__list:
+            self.__model.setnewkey(ctrl, new)
+        elif new == '←':
+            path = self.__dialog.open()
+            if self.__model.setnewsequencepath(ctrl, path):
+                self.__widget.value = '→'
+                if path is not None:
+                    raise IOError("Could not find any sequence in the file")
+
+class OligoListTheme:
+    "OligoListTheme"
+    name      = 'probestheme'
+    title     = 'Oligos'
+    tooltip   = 'comma-separated list'
+    width     = 120
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class OligoListWidget:
     "Input for defining a list of oligos"
-    def __init__(self, model) -> None:
-        super().__init__(model)
-        self.__widget: AutocompleteInput = None
-        self.css.plot.defaults = {'oligos.history'          : [],
-                                  'oligos.history.maxlength': 10,
-                                  'title.oligos'     : u'Oligos',
-                                  'title.oligos.help': u'comma-separated list'}
+    __widget: AutocompleteInput
+    __click:  Callable[[str], None]
+    def __init__(self):
+        self.__theme = OligoListTheme()
+        self.__model = SequenceModel()
+
+    def observe(self, ctrl):
+        "sets-up config observers"
+        self.__theme = ctrl.theme.add(self.__theme)
+        self.__model = SequenceModel.create(ctrl)
+        self.__click = lambda new: self.__model.setnewprobes(ctrl, new)
+        fcn          = lambda **_: self.__widget.update(**self.__data())
+        ctrl.theme  .observe(self.__model.config,  fcn)
+        ctrl.display.observe(self.__model.display, fcn)
 
     def addtodoc(self, action) -> List[Widget]:
         "creates the widget"
         self.__widget = AutocompleteInput(**self.__data(),
-                                          placeholder = self.css.title.oligos.help.get(),
-                                          title       = self.css.title.oligos.get(),
-                                          width       = self.css.input.width.get(),
+                                          placeholder = self.__theme.tooltip,
+                                          title       = self.__theme.title,
+                                          width       = self.__theme.width,
                                           name        = 'Cycles:Oligos')
 
-        widget = self.__widget
-        @action
-        def _py_cb(attr, old, new):
-            ols  = splitoligos(new)
-            hist = self.css.plot.oligos.history
-            lst  = list(i for i in hist.get() if i != ols)[:hist.maxlength.get()]
-            hist.set(([ols] if len(ols) else []) + lst)
-            self._model.oligos = ols  # type: ignore
-
-        widget.on_change('value', _py_cb)
+        fcn  = action(lambda attr, old, new: self.__click(new)) # type: ignore
+        self.__widget.on_change('value', fcn)
         return [self.__widget]
 
     def reset(self, resets):
@@ -332,12 +365,7 @@ class OligoListWidget(WidgetCreator[ModelType]):
         resets[self.__widget].update(**self.__data())
 
     def __data(self):
-        hist = self.css.plot.oligos.history.get()
+        hist = self.__model.config.history
         lst  = [', '.join(sorted(j.lower() for j in i)) for i in hist]
-        ols  = ', '.join(sorted(j.lower() for j in self._model.oligos))
+        ols  = ', '.join(sorted(j.lower() for j in self.__model.currentprobes))
         return dict(value = ols, completions = lst)
-
-    def observe(self, _):
-        "sets-up config observers"
-        fcn = lambda: self.__widget.update(**self.__data())
-        self._model.observeprop('oligos', fcn)
