@@ -9,8 +9,8 @@ from   control.modelaccess  import TaskPlotModelAccess, TaskAccess
 from   cleaning.processor   import (DataCleaningTask, # pylint: disable=unused-import
                                     DataCleaningProcessor)
 from   model.level          import PHASE
+from   model.plots          import PlotAttrs, PlotTheme, PlotModel
 from   utils                import initdefaults
-from   view.plots.base      import PlotAttrs, PlotTheme, PlotModel
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"

@@ -327,9 +327,7 @@ class TaskController(BaseTaskController):
     "Task controller class which knows about globals"
     __model:      Any
     __readconfig: Any
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
-
+    __ctrl:       Any
     def setup(self, ctrl):
         "sets up the missing info"
         def _import(name):

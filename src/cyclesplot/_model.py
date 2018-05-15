@@ -9,12 +9,11 @@ from    eventdetection.processor    import (EventDetectionTask, # pylint: disabl
                                             ExtremumAlignmentTask)
 from    model.task                  import RootTask
 from    model.task.application      import TasksDisplay
+from    model.plots                 import PlotTheme, PlotModel, PlotAttrs, PlotDisplay
 from    control.modelaccess         import TaskAccess
 from    sequences.modelaccess       import SequencePlotModelAccess
-from    view.plots.base             import PlotTheme, PlotModel, PlotAttrs, PlotDisplay
 
 class CyclesModelConfig:
-    "CyclesModelConfig"
     """
     added info for cycles
     """

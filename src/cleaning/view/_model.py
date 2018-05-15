@@ -5,7 +5,7 @@ from typing                     import Optional, List, Set, cast
 import numpy as np
 
 from utils                      import NoArgs, initdefaults
-from view.plots.base            import PlotAttrs, PlotTheme, PlotModel
+from model.plots                import PlotAttrs, PlotTheme, PlotModel
 # pylint: disable=unused-import
 from control.modelaccess        import TaskPlotModelAccess, TaskAccess
 from eventdetection.processor   import ExtremumAlignmentTask
@@ -124,7 +124,7 @@ class CleaningPlotTheme(PlotTheme):
     toolbar['items'] = 'ypan,ybox_zoom,reset,save,dpxhover'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
-        pass
+        super().__init__(**_)
 
 class CleaningPlotModel(PlotModel):
     """

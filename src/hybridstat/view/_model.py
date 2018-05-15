@@ -13,11 +13,11 @@ from sequences.modelaccess      import SequencePlotModelAccess
 from utils                      import updatecopy, initdefaults
 from control.modelaccess        import TaskAccess
 
-from model.task                 import RootTask
 from cleaning.view              import BeadSubtractionAccess
-from view.plots.base            import PlotModel, PlotTheme, PlotAttrs, PlotDisplay
 from eventdetection.processor   import (EventDetectionTask, # pylint: disable=unused-import
                                         ExtremumAlignmentTask)
+from model.task                 import RootTask
+from model.plots                import PlotModel, PlotTheme, PlotAttrs, PlotDisplay
 from peakfinding.histogram      import interpolator
 from peakfinding.processor      import PeakSelectorTask # pylint: disable=unused-import
 from peakfinding.selector       import PeakSelectorDetails

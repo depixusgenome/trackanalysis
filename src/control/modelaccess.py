@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Controller for most plots and views"
-from typing                 import (Tuple, Optional, Iterator, List, Union, Any,
+from typing                 import (Tuple, Optional, Iterator, Union, Any,
                                     Callable, Dict, Type, ClassVar, cast)
 from copy                   import copy as shallowcopy
-from enum                   import Enum
-from functools              import wraps
 
 from model.task             import RootTask, Task
 from model.task.application import DEFAULT_TASKS, TasksDisplay, TasksTheme, TasksModel
@@ -18,14 +16,6 @@ from .processor             import Processor
 from .processor.cache       import CacheReplacement
 from .taskcontrol           import ProcessorController
 from .event                 import Controller
-
-class PlotState(Enum):
-    "plot state"
-    active       = 'active'
-    abouttoreset = 'abouttoreset'
-    resetting    = 'resetting'
-    disabled     = 'disabled'
-    outofdate    = 'outofdate'
 
 class PlotModelAccess:
     "Default plot model"

@@ -5,17 +5,19 @@ from typing                 import Dict, List, Any # pylint: disable=unused-impo
 import numpy as np
 from bokeh.models           import (ColumnDataSource, Range1d, TapTool, HoverTool,
                                     Selection)
-from bokeh.plotting         import figure, Figure
-from data                   import BEADKEY
+from bokeh.plotting         import Figure
+
 from control                import Controller
 from control.action         import Action
 from control.beadscontrol   import DataSelectionBeadController
+from data                   import BEADKEY
+from model.plots            import PlotAttrs, PlotTheme, PlotModel
+from qualitycontrol.view    import QualityControlModelAccess
 from signalfilter           import rawprecision
 from utils                  import initdefaults
+from view.colors            import tohex
 from view.plots.tasks       import TaskPlotCreator, TaskPlotModelAccess
-from view.plots.base        import PlotAttrs, PlotView, PlotTheme, PlotModel
-from view.colors            import getcolors, setcolors
-from qualitycontrol.view    import QualityControlModelAccess
+from view.plots.base        import PlotView
 
 class FoVPlotTheme(PlotTheme):
     "FoV plot theme"
@@ -61,7 +63,7 @@ class FoVPlotTheme(PlotTheme):
     toolbar['items'] = 'pan,box_zoom,tap,save,hover'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
-        pass
+        super().__init__(**_)
 
 class FoVPlotModel(PlotModel):
     "FoV plot model"
@@ -69,14 +71,14 @@ class FoVPlotModel(PlotModel):
 
 class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
     "Plots a default bead and its FoV"
+    _fig:         Figure
+    _beadssource: ColumnDataSource
+    _imgsource:   ColumnDataSource
+    _calibsource: ColumnDataSource
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
-        self._fig:         Figure           = None
-        self._beadssource: ColumnDataSource = None
-        self._imgsource:   ColumnDataSource = None
-        self._calibsource: ColumnDataSource = None
-        self.__idfov:      int              = None
+        self.__idfov: int = None
 
     @property
     def __fov(self):
@@ -186,7 +188,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
 
     def __tooltips(self):
         msgs                            = self._model.messages()
-        ttips: Dict[BEADKEY, List[str]] = {} 
+        ttips: Dict[BEADKEY, List[str]] = {}
         row                             = self._theme.tooltiprow
         for bead, cyc, tpe, msg  in sorted(zip(msgs['bead'], msgs['cycles'],
                                                msgs['type'], msgs['message']),
@@ -210,7 +212,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
         if fov is None:
             return dict(data = dict.fromkeys(('x', 'y', 'text', 'color', 'ttips'), []))
 
-        hexes = getcolors(self)
+        hexes = tohex(self._theme.colors)
         clrs  = hexes['good'], hexes['fixed'], hexes['bad'], hexes['discarded']
         disc  = set(DataSelectionBeadController(self._ctrl).discarded)
         fixed = self._model.fixedbeads() - disc

@@ -17,7 +17,7 @@ from   bokeh.models           import ColumnDataSource, LinearAxis, DataRange1d
 from   utils            import initdefaults
 from   utils.inspection import diffobj
 from   view.threaded    import ThreadedDisplay, DisplayModel
-from   view.plots.base  import PlotAttrs
+from   model.plots      import PlotAttrs
 from   modaldialog      import dialog
 from   .toolbarconfig   import ConfigTool
 

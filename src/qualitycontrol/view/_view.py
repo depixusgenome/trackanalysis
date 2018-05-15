@@ -2,19 +2,21 @@
 # -*- coding: utf-8 -*-
 "View module showing all messages concerning discarded beads"
 from    bokeh             import layouts
+from    model.plots       import PlotModel
 from    view.plots        import PlotView
 from    view.plots.tasks  import TaskPlotCreator
 from    ._widgets         import QualityControlWidgets
 from    ._plots           import QualityControlPlots
 from    ._model           import QualityControlModelAccess
 
-class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
+class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess, PlotModel]):
     "Creates plots for discard list"
     _RESET = frozenset()         # type: frozenset
     def __init__(self, ctrl = None, *args): # pylint: disable=keyword-arg-before-vararg
-        super().__init__(ctrl = ctrl, *args)
-        self._widgets = QualityControlWidgets(self._model)
-        self._plots   = QualityControlPlots  (ctrl, self._model)
+        super().__init__(ctrl, *args)
+        self._widgets   = QualityControlWidgets(self._model)
+        self._plots     = QualityControlPlots  (ctrl, self._model)
+        self._plotmodel = None
 
     def observe(self, ctrl):
         "observes the model"

@@ -6,7 +6,7 @@ from functools              import partial
 from bokeh.models           import Tabs, Panel, Spacer
 from bokeh                  import layouts
 from view.base              import BokehView
-from view.plots             import PlotState
+from model.plots            import PlotState
 from cleaning.view          import CleaningView
 from qualitycontrol.view    import QualityControlView
 from fov                    import FoVPlotView
@@ -18,7 +18,7 @@ class HybridStatTheme:
     "HybridStatTheme"
     width                  = 500
     height                 = 60
-    titles: Dict[str, str] = []
+    titles: Dict[str, str] = {}
 
 class HybridStatView(BokehView):
     "A view with all plots"
@@ -44,7 +44,7 @@ class HybridStatView(BokehView):
 
         cur = self.__select(CleaningView)
         for panel in self._panels:
-            desc = tyep(panel.plotter).state
+            desc = type(panel.plotter).state
             desc.setdefault(panel.plotter, (PlotState.active if panel is cur else
                                             PlotState.disabled))
 
@@ -135,4 +135,4 @@ class HybridStatView(BokehView):
 
         for ind, panel in enumerate(self._panels):
             panel.observe(ctrl)
-            ctrl.display.observe(getattr(panel, '_display'), partial(fcn, ind, panel))
+            ctrl.display.observe(getattr(panel, '_display'), partial(_fcn, ind, panel))

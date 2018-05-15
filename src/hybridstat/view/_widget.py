@@ -22,7 +22,7 @@ from eventdetection.view        import AlignmentModalDescriptor
 from cleaning.view              import BeadSubtractionModalDescriptor
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
-from view.plots                 import DpxNumberFormatter, WidgetCreator
+from view.plots                 import DpxNumberFormatter
 from view.toolbar               import FileList
 from sequences.view             import (SequenceTicker, SequenceHoverMixin,
                                         OligoListWidget, SequencePathWidget)
@@ -541,7 +541,7 @@ class AdvancedWidget(AdvancedTaskMixin):
                               lambda i: ((ChiSquareFit, PeakGridFit)[i](),))
     _dist2theo  = _IdAccessor('match', lambda i: i.window, lambda i: {'window': i})
 
-def createwidgets(ctrl, mdl: PeaksPlotModelAccess) -> Dict[str, WidgetCreator]:
+def createwidgets(ctrl, mdl: PeaksPlotModelAccess) -> Dict[str, Any]:
     "returns a dictionnary of widgets"
     return dict(seq      = PeaksSequencePathWidget(mdl),
                 ref      = ReferenceWidget(mdl),

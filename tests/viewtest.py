@@ -2,10 +2,7 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
-from pytest                     import approx       # pylint: disable=no-name-in-module
-
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
-from view.plots                 import DpxKeyedRow
 
 def test_toolbar(bokehaction):
     "test the toolbar"

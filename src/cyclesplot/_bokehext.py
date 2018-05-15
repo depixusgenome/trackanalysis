@@ -9,7 +9,6 @@ from    bokeh.models   import ColumnDataSource, GlyphRenderer, CustomJS, TapTool
 
 from    sequences.view import SequenceHoverMixin
 from    view.plots     import DpxHoverTool
-from    ._model        import CyclesPlotTheme
 
 class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-instance-attributes
     "controls keypress actions"
@@ -37,7 +36,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
     def _createrawdata(data, shape):
         return dict(t = data['t'][:shape[1]], z = data['z'][:shape[1]])
 
-    def createraw(self, fig, source, shape, model, theme):
+    def createraw(self, fig, source, shape, model, theme): # pylint: disable=too-many-arguments
         "creates the hover tool"
         self._model = model
         self.shape  = tuple(shape)
@@ -68,9 +67,9 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
             code = "hvr.launch_hover(rawsrc, hvrsrc, glyph)"
             source.callback = CustomJS(code = code, args = args)
 
-    def createhist(self, fig, mdl, cnf):
+    def createhist(self, fig, mdl):
         "Creates the hover tool for histograms"
-        self.create(fig, mdl, cnf, 'cycles')
+        self.create(fig, mdl, 'cycles')
 
     def slaveaxes(self, fig, src):
         "slaves a histogram's axes to its y-axis"

@@ -16,7 +16,7 @@ from   bokeh.plotting         import figure, Figure
 
 from   utils                  import initdefaults
 from   utils.logconfig        import getLogger
-from   view.plots.base        import PlotAttrs
+from   model.plots            import PlotAttrs
 from   view.threaded          import DisplayModel, ThreadedDisplay
 from   .model                 import DAQBead
 LOGS = getLogger(__name__)

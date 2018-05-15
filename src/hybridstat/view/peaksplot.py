@@ -5,7 +5,7 @@ from typing                     import Dict
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
-from bokeh.plotting             import figure, Figure
+from bokeh.plotting             import Figure
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
                                         Model, TapTool, CustomJS)
 
@@ -80,13 +80,10 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
 
 class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     "Creates plots for peaks"
-    def __init__(self, ctrl = None, *args): # pylint: disable=keyword-arg-before-vararg
-        super().__init__(ctrl, *args)
-        PeaksSequenceHover.defaultconfig(self)
-        SequenceTicker.defaultconfig(self)
-
+    _fig: Figure
+    def __init__(self, ctrl):
+        super().__init__(ctrl)
         self._src: Dict[str, ColumnDataSource] = {}
-        self._fig: Figure                      = None
         self._widgets                          = createwidgets(ctrl, self._model)
         self._ticker                           = SequenceTicker()
         self._hover                            = PeaksSequenceHover()
