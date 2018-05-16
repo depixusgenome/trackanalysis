@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot view for cleaning data"
-from    typing         import Dict, TYPE_CHECKING
+from    typing         import Dict
 
 from    bokeh.plotting import Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
@@ -15,7 +15,8 @@ from    view.plots.tasks        import TaskPlotCreator
 from    view.colors             import tohex
 from    control                 import Controller
 
-from    ._model                 import DataCleaningModelAccess, CleaningPlotModel
+from    ._model                 import (DataCleaningModelAccess, CleaningPlotModel,
+                                        CleaningPlotTheme)
 from    ._widget                import WidgetMixin
 from    ..processor             import DataCleaningProcessor, DataCleaning
 
@@ -55,14 +56,14 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
 class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotModel],
                           WidgetMixin):
     "Building the graph of cycles"
+    _model:   DataCleaningModelAccess
+    _theme:   CleaningPlotTheme
+    __source: ColumnDataSource
+    __fig:    Figure
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
-        super().__init__(ctrl, figsize = (500, 800, 'fixed'))
+        super().__init__(ctrl)
         WidgetMixin.__init__(self)
-        self.__source: ColumnDataSource = None
-        self.__fig:    Figure           = None
-        if TYPE_CHECKING:
-            self._model = DataCleaningModelAccess(ctrl, '')
 
     def _addtodoc(self, ctrl, *_):
         self.__source = ColumnDataSource(data = self.__data(None, None))
@@ -105,7 +106,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         if items is None or len(items) == 0 or not any(len(i) for _, i in items):
             items = [((0,0), [])]
 
-        order = self._model.cleaning.sorted(self._theme.colororder)
+        order = self._model.cleaning.sorted(self._theme.order)
         size  = max(len(i) for _, i in items)
         val   = np.full((len(items), size), np.NaN, dtype = 'f4')
         for (_, i), j in items:
@@ -126,7 +127,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         hexes  = tohex(self._theme.colors)
         tmp    = np.full(items.shape, hexes['good'], dtype = '<U7')
         cache  = self._model.cleaning.cache
-        for name in self._theme.colororder:
+        for name in self._theme.order:
             if name == 'aberrant' and nancache is not None:
                 color   = hexes[name]
                 cycnans = GuiDataCleaningProcessor.nans(self._model, nancache)

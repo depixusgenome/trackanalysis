@@ -108,7 +108,7 @@ class CleaningPlotTheme(PlotTheme):
     cleaning plot theme
     """
     points           = PlotAttrs('color',  'circle', 1, alpha   = .5)
-    figsize          = 600, 800, 'fixed'
+    figsize          = 500, 800, 'fixed'
     widgetwidth      = 470
     order            = ('aberrant', 'hfsigma', 'extent', 'population',
                         'pingpong', 'saturation', 'good')
