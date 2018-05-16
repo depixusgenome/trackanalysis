@@ -179,15 +179,10 @@ class PlotTheme:
             tools = cast(List[Any], args['tools'])
 
         from view.plots.bokehext import DpxHoverTool
-        if tips:
-            hvr = DpxHoverTool(tooltips = tips)
-            if 'dpxhover' not in tools:
-                tools.append(hvr)
-            else:
-                tools = [i if i != 'dpxhover' else hvr for i in tools]
+        if 'dpxhover' in tools:
+            hvr   = DpxHoverTool(tooltips = tips) if tips else DpxHoverTool()
+            tools = [i if i != 'dpxhover' else hvr for i in tools]
 
-        elif 'dpxhover' in tools:
-            tools = [i if i != 'dpxhover' else DpxHoverTool() for i in tools]
         args['tools'] = tools
 
         from bokeh.models import Range1d
@@ -255,11 +250,11 @@ class PlotModel:
     theme       = PlotTheme()
     display     = PlotDisplay()
     config: Any = None
-    def __init__(self, key, **kwa):
-        self.theme   = type(self.__class__.theme)(name = key, **kwa)
-        self.display = type(self.__class__.display)(name = key, **kwa)
+    def __init__(self, name, **kwa):
+        self.theme   = type(self.__class__.theme)(name = name, **kwa)
+        self.display = type(self.__class__.display)(name = name, **kwa)
         if self.__class__.config:
-            self.config  = type(self.__class__.config)(name = key+"config", **kwa)
+            self.config  = type(self.__class__.config)(name = name+"config", **kwa)
 
     def observe(self, ctrl, noerase = True):
         "sets-up model observers"

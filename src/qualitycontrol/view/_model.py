@@ -71,9 +71,9 @@ class QualityControlModelAccess(TaskPlotModelAccess):
     "access to data cleaning"
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
-        self.cleaning   = DataCleaningTaskAccess(self)
-        self.__theme    = ctrl.add(QualityControlTheme(), True)
-        self.__display  = ctrl.add(QualityControlDisplay(), True)
+        self.cleaning  = DataCleaningTaskAccess(self)
+        self.__theme   = ctrl.theme.add(QualityControlTheme(), True)
+        self.__display = ctrl.display.add(QualityControlDisplay(), True)
 
     def buildmessages(self):
         "creates beads and warnings where applicable"
@@ -92,7 +92,7 @@ class QualityControlModelAccess(TaskPlotModelAccess):
                                    cycles  = [i[1] for i in mem],
                                    type    = [i[2] for i in mem],
                                    message = [i[3] for i in mem])
-        self._ctrl.update(self.__display, messages = default)
+        self._ctrl.display.update(self.__display, messages = default)
 
     def badbeads(self) -> Set[BEADKEY]:
         "returns bead ids with messages"
@@ -107,13 +107,13 @@ class QualityControlModelAccess(TaskPlotModelAccess):
     def messages(self) -> Dict[str, List]:
         "returns beads and warnings where applicable"
         msg = self.__display.messages
-        if msg is None:
+        if not msg:
             self.buildmessages()
         return self.__display.messages
 
     def clear(self):
         "clears the model's cache"
-        self._ctrl.update(self.__display, messages = {})
+        self._ctrl.display.update(self.__display, messages = {})
 
 class DriftControlPlotTheme(PlotTheme):
     "drift control plot theme"

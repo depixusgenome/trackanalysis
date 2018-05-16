@@ -142,7 +142,7 @@ class FileDialog(BaseFileDialog):
     access : Tuple[Callable, Callable]
     def __init__(self, ctrl, storage = None, **kwa):
         super().__init__(**kwa)
-        self._config = ctrl.theme.add(self._config)
+        self._config = ctrl.theme.add(self._config, False)
         self.access  = self._getconfig(ctrl, storage), self._setconfig(ctrl, storage)
 
     @staticmethod

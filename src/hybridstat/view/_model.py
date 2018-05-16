@@ -176,7 +176,7 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
         def _onref(old = None, **_):
             if 'reference' in old:
                 self.resetmodel()
-        ctrl.observe(self.__store, _onref)
+        ctrl.display.observe(self.__store, _onref)
 
         def _ontask(parent = None, **_):
             if parent == self.reference:

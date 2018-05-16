@@ -59,7 +59,7 @@ class TrackFileDialog(FileDialog):
     def setup(self, ctrl, _):
         "sets the document"
         self.filetypes = '*|'+TaskIO.extensions(ctrl, 'openers')
-        self.title     = ctrl.theme.get("beadtoolbar").opentitle
+        self.title     = ctrl.theme.get("beadtoolbar", 'opentitle')
 
     async def run(self, ctrl, doc):
         "runs the dialog"
@@ -108,7 +108,7 @@ class SaveFileDialog(FileDialog):
     def setup(self, ctrl, _):
         "sets the document"
         self.filetypes = TaskIO.extensions(ctrl, 'savers')
-        self.title     = ctrl.theme.get("beadtoolbar").savetitle
+        self.title     = ctrl.theme.get("beadtoolbar", 'savetitle')
 
     async def run(self, ctrl, doc):
         "runs the dialog"
@@ -308,7 +308,7 @@ class BeadInput:
 
         tbar.on_change('bead', _chg_cb)
         ctrl.display.observe("tasks", _onproject)
-        ctrl.observe("updatetask", "addtask", "removetask", _onproject)
+        ctrl.tasks  .observe("updatetask", "addtask", "removetask", _onproject)
         ctrl.display.updatedefaults('keystroke',
                                     beadup   = lambda: _chg_cb2(1),
                                     beaddown = lambda: _chg_cb2(-1))
@@ -401,7 +401,7 @@ class FileListInput:
     def setup(ctrl, tbar: DpxToolbar, _):
         "sets-up the gui"
         stop = [False]
-        @ctrl.observe("opentrack", "closetrack")
+        @ctrl.tasks.observe("opentrack", "closetrack")
         def _setfilelist(model = None, **_):
             vals  = list(FileList.get(ctrl))
             mdls  = [i for _, i in vals]

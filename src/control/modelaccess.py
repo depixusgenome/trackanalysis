@@ -71,18 +71,22 @@ class TaskPlotModelAccess(PlotModelAccess):
 
     def settaskmodel(self, ctrl, name):
         "set _tasksmodel to same as main"
-        if name in ctrl.theme:
-            self._tasksmodel = TasksModel(theme   = ctrl.theme.model(name),
-                                          display = ctrl.display.model(name))
-        else:
-            self._tasksmodel.theme  .name = name
-            self._tasksmodel.display.name = name
-            ctrl.theme  .add(self._tasksmodel.theme)
-            ctrl.display.add(self._tasksmodel.display)
+        lst = ('display', 'theme')
+        if name not in ctrl.theme:
+            for i in lst:
+                getattr(self._tasksmodel , i).name = name
+                getattr(ctrl, i).add(getattr(self._tasksmodel, i))
 
-        for inst in self.__dict__.values():
-            if isinstance(inst, TaskPlotModelAccess):
-                inst.settaskmodel(ctrl, name)
+        objs = [(i, getattr(ctrl, i).model(getattr(self._tasksmodel, i))) for i in lst]
+        done = set()
+        itms = {self}
+        while len(itms):
+            cur = itms.pop()
+            for i, j in objs:
+                setattr(getattr(cur, '_tasksmodel'), i, j)
+            done.add(cur)
+            itms.update(i for i in cur.__dict__.values()
+                        if isinstance(i, TaskPlotModelAccess) and i not in done)
 
     @property
     def roottask(self) -> Optional[RootTask]:

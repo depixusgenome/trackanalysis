@@ -62,7 +62,7 @@ class _ModelDescriptor:
         self._name = ''
 
     def __set_name__(self, _, name):
-        self._name  = name
+        self._name  = name[1:]
 
     def __get__(self, inst, owner):
         return getattr(getattr(inst, '_plotmodel'), self._name) if inst else self
@@ -78,6 +78,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
     _theme   = cast(PlotTheme,   _ModelDescriptor())
     _display = cast(PlotDisplay, _ModelDescriptor())
     _config  = cast(Any,         _ModelDescriptor())
+    _doc     : Document
     class _OrderedDict(OrderedDict):
         def __missing__(self, key):
             value: Dict = OrderedDict()
@@ -88,11 +89,10 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         "sets up this plotter's info"
         super().__init__()
         key = type(self).key()
-        self._model: ControlModelType             = templateattribute(self, 1)(ctrl, key)
-        self._plotmodel: PlotModelType            = templateattribute(self, 2)(name = key)
+        self._model: ControlModelType             = templateattribute(self, 0)(ctrl)
+        self._plotmodel: PlotModelType            = templateattribute(self, 1)(name = key)
         self._ctrl                                = ctrl
         self._bkmodels: Dict[Model,Dict[str,Any]] = self._OrderedDict()
-        self._doc:      Document                  = None
 
     def defaultsizingmode(self, kwa = None, **kwargs):
         "the default sizing mode"
@@ -266,7 +266,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
             with self.resetting():
                 self._model.reset()
                 self._reset()
-            ctrl.handle('rendered', args = {'plot': self})
+            ctrl.display.handle('rendered', args = {'plot': self})
     else:
         def __doreset(self, ctrl):
             with self.resetting():
@@ -302,7 +302,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                         with BokehView.computation.type(ctrl, calls = self.__doreset):
                             with self.resetting():
                                 self._bkmodels.update(ret)
-                    ctrl.handle('rendered', args = {'plot': self})
+                    ctrl.display.handle('rendered', args = {'plot': self})
                     LOGS.debug("%s.reset done in %.3f+%.3f",
                                type(self).__qualname__, durations[-1], time() - start)
                 self._doc.add_next_tick_callback(_render)
