@@ -4,7 +4,10 @@
 /*
   collection of functions too costly for python
   implementing the EM step in c++ for speed up
-  needs to replace expression with diagproba
+  TO DO : 
+  * replace expression with diagproba
+  * use log probabilities
+  * use cholesky decomposition for covariance matrix
 */
 
 namespace peakfinding{
@@ -37,11 +40,25 @@ namespace peakfinding{
 	double exppdf(double loc,double scale,double pos){
 	    return loc>pos?0:exp((loc-pos)/scale)/scale;
 	}
+	double lognormpdf(double loc,double var,double pos){
+	    return -0.5*(pow(pos-loc,2)/var); //-log(sqrt(2*PI*var));
+	}
 	
+	double logexppdf(double loc,double scale,double pos){
+	    return loc>pos?-DBL_MAX:(loc-pos)/scale-log(scale);
+	}
+
+	double logpdfparam(blas::vector<double> param,blas::vector<double> datum){
+	    double pdf = 0.;
+	    for (unsigned int it=0;it<param.size()-2;it+=2){
+		pdf += lognormpdf(param(it),param(it+1),datum[it/2]);
+	    }
+	    return pdf+logexppdf(param[param.size()-2],param[param.size()-1],datum[datum.size()-1]);
+	}
 	double pdfparam(blas::vector<double> param,blas::vector<double> datum){
 	    double pdf = 1.;
 	    for (unsigned int it=0;it<param.size()-2;it+=2){
-		pdf *= normpdf(param(it),param(it+1),datum[it/2]); // datum[0] to change
+		pdf *= normpdf(param(it),param(it+1),datum[it/2]);
 	    }
 	    return pdf*exppdf(param[param.size()-2],param[param.size()-1],datum[datum.size()-1]);
 	}
@@ -63,9 +80,19 @@ namespace peakfinding{
 	    return score;
 	}
 	
+	matrix logscoreparams(const matrix &data,const matrix &params){
+	    matrix lscore(params.size1(),data.size1(),0);
+	    for (unsigned r=0,nrows=params.size1();r<nrows;++r){
+		for (unsigned col=0,ncols=data.size1();col<ncols;++col){
+		    lscore(r,col) = logpdfparam(blas::row(params,r),row(data,col));
+		}
+	    }
+	    return lscore; // no added uniform pdf
+	}
+	
 	// this function can be improved
 	// must change creation of diagproba to row * matrix
-	matrix maximizeparam(const matrix &data,matrix pz_x,double uppercov,double lowercov){
+	matrix maximizeparam(const matrix &data,matrix pz_x,double lowercov){
 	    // maximizes (all) parameters to reduce data manipulations 
 	    // proba is a row of npz_x
 	    const unsigned DCOLS = data.size2();
@@ -108,10 +135,7 @@ namespace peakfinding{
 		// need to add the spatial means and covariance a row at a time
 		for (unsigned dim=0,maxdim=DCOLS-1;dim<maxdim;++dim){
 		    newparams(it,2*dim) = wspdata(it,dim);	// mean
-		    if (ncov(dim,dim)>uppercov){
-			newparams(it,2*dim+1)=uppercov;
-		    }
-		    else if(ncov(dim,dim)<lowercov){
+		    if(ncov(dim,dim)<lowercov){
 			newparams(it,2*dim+1)=lowercov;
 		    }
 		    else{
@@ -127,7 +151,6 @@ namespace peakfinding{
 	
 	MaximizedOutput maximization(const matrix &data,
 				     matrix pz_x,
-				     double uppercov,
 				     double lowercov){
 	    // returns next iteration of rates, params
 	    // normalize according to data in npz_x
@@ -146,7 +169,7 @@ namespace peakfinding{
 	    nrates/=pz_x.size2();
 	    MaximizedOutput output;
 	    output.rates  = nrates;
-	    output.params = maximizeparam(data,npz_x,uppercov,lowercov);
+	    output.params = maximizeparam(data,npz_x,lowercov);
 	    return output;
 	}
 
@@ -172,28 +195,27 @@ namespace peakfinding{
 	void oneemstep(matrix &data,
 		       matrix &rates,
 		       matrix &params,
-		       double uppercov,
 		       double lowercov){
 	    // Expectation then Maximization steps of EM
 	    matrix score		= scoreparams(data,params);
 	    matrix pz_x			= getpz_x(score,rates);	    
-	    MaximizedOutput maximized	= maximization(data,pz_x,uppercov,lowercov);
+	    MaximizedOutput maximized	= maximization(data,pz_x,lowercov);
 	    rates			= maximized.rates;
 	    params			= maximized.params;
 	    return;
 	}
 
+	
 	void emsteps(matrix &data,
 		     matrix &rates,
 		     matrix &params,
 		     unsigned nsteps,
-		     double uppercov,
 		     double lowercov){
 	    matrix score = scoreparams(data,params);
 	    double prevll=llikelihood(score, rates);
 	    double newll;
 	    for (unsigned ite=0u;ite<nsteps;++ite){
-		oneemstep(data,rates,params,uppercov,lowercov);
+		oneemstep(data,rates,params,lowercov);
 		score = scoreparams(data,params);
 		newll = llikelihood(score, rates);
 		if (newll-prevll<PRECISION) return;

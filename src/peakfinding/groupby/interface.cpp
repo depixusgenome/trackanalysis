@@ -28,7 +28,6 @@ namespace peakfinding{
 			  ndarray pyrates,
 			  ndarray pyparams,
 			  unsigned nsteps,
-			  double uppercov,
 			  double lowercov){
 	    // convert to matrices, run n times, return
 	    auto    infopar	= pyparams.request();
@@ -37,10 +36,7 @@ namespace peakfinding{
 	    matrix    rates	= arraytomatrix(pyrates);
 	    matrix    data	= arraytomatrix(pydata);
 	    
-	    // for (unsigned it=0;it<nsteps;++it){
-	    // 	oneemstep(data,rates,params,uppercov,lowercov);
-	    // }
-	    emsteps(data,rates,params,nsteps,uppercov,lowercov);
+	    emsteps(data,rates,params,nsteps,lowercov);
 	    // updated score to match with rates & params
 	    auto    score = scoreparams(data,params);
 	    // back to numpy array
@@ -59,6 +55,19 @@ namespace peakfinding{
 	    output.rates  = outrates;
 	    output.params = outparams;
 	    return output;
+	}
+
+	ndarray pylogscore(ndarray pydata,ndarray pyparams){
+	    auto    infopar	= pyparams.request();
+	    auto    infodat	= pydata.request();
+	    matrix    params	= arraytomatrix(pyparams);
+	    matrix    data	= arraytomatrix(pydata);
+	    auto    score	= logscoreparams(data,params);
+	    ndarray outscore({score.size1(),score.size2()},
+	    		     {score.size2()*sizeof(double),sizeof(double)},
+	    		     &(score.data()[0]));
+
+	    return outscore;
 	}
 
 	ndarray pyscore(ndarray pydata,ndarray pyparams){
@@ -87,14 +96,16 @@ namespace peakfinding{
 
 	void pymodule(py::module &mod){
 	    auto doc = R"_(Runs Expectation Maximization N times)_";
-	    mod.def("emrunner",[](ndarray data,ndarray rates,ndarray params,unsigned nsteps,double upper,double lower)
-	     	    {return emrunner(data,rates,params,nsteps,upper,lower);},doc);
+	    mod.def("emrunner",[](ndarray data,ndarray rates,ndarray params,unsigned nsteps,double lower)
+	     	    {return emrunner(data,rates,params,nsteps,lower);},doc);
 	    mod.def("normpdf",[](double loc,double var, double pos){return normpdf(loc,var,pos);},
 		    R"_(compute pdf of normal distribution)_");
 	    mod.def("exppdf",[](double loc,double scale, double pos){return exppdf(loc,scale,pos);},
 		    R"_(compute pdf of exponential distribution)_");
 	    mod.def("emscore",[](ndarray data,ndarray params){return pyscore(data,params);},
 		    R"_(returns score matrix)_");
+	    mod.def("emlogscore",[](ndarray data,ndarray params){return pylogscore(data,params);},
+		    R"_(returns log score matrix)_");
 	    mod.def("empz_x",[](ndarray score,ndarray rates){return pypz_x(score,rates);},
 		    R"_(returns pz_x matrix)_");
 
