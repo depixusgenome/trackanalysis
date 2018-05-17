@@ -15,7 +15,6 @@ namespace peakfinding{
 	namespace blas=boost::numeric::ublas;
 	using  matrix = blas::matrix<double>;
 	double llikelihood(const matrix& ,const matrix&);
-	double llikelihood2(const matrix& ,const matrix&);
 	struct MaximizedOutput{matrix rates,params;};
 	double normpdf(double loc,double var,double pos);
 	double exppdf(double loc,double scale,double pos);

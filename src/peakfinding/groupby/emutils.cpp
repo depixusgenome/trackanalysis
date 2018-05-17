@@ -15,29 +15,13 @@ namespace peakfinding{
 	double PRECISION = 1e-9;
 	double PI=3.14159;
 	
-	double llikelihood2(const matrix& score, const matrix& rates){
+	double llikelihood(const matrix& score, const matrix& rates){
 	    // using matrix_row instead
-	    // test improvement
 	    matrix tmp = score;
 	    for (unsigned r=0u;r<rates.size1();++r){
 		blas::matrix_row<matrix> viewrow(tmp,r);
-		tmp*=rates(r,0);
+		viewrow*=rates(r,0);
 	    }
-	    
-	    blas::vector<double> rsum(tmp.size2(),0.);
-	    for (unsigned r=0u, nrows=tmp.size1(); r<nrows;++r)
-	    	rsum+=blas::row(tmp,r);
-	    
-	    double out =0.; // use vector sum from boost instead
-	    for (unsigned c=0u,ncols=rsum.size();c<ncols;c++)
-		out+=std::log(rsum[c]);
-	    return out;
-	}
-
-	double llikelihood(const matrix& score, const matrix& rates){
-	    auto	ones	 = matrix(1,score.size2(),1.);
-	    auto	bigrates = blas::prod(rates,ones);	// can be optimized
-	    matrix	tmp	 = blas::element_prod(score,bigrates);
 
 	    blas::vector<double> rsum(tmp.size2(),0.);
 	    for (unsigned r=0u, nrows=tmp.size1(); r<nrows;++r)
@@ -48,7 +32,7 @@ namespace peakfinding{
 		out+=std::log(rsum[c]);
 	    return out;
 	}
-	
+
 	double normpdf(double loc,double var,double pos){
 	    return exp(-0.5*(pow(pos-loc,2)/var))/(sqrt(2*PI*var));
 	}
@@ -191,7 +175,7 @@ namespace peakfinding{
 
 	matrix getpz_x(const matrix& score,const  matrix& rates){
 	    auto	ones	 = matrix(1,score.size2(),1.);
-	    auto	bigrates = blas::prod(rates,ones);	// can be optimized
+	    auto	bigrates = blas::prod(rates,ones); // can be optimized // replace with view
 	    matrix	pz_x	 = blas::element_prod(score,bigrates);
 	    blas::vector<double> norm(pz_x.size2(),0.);
 	    for (unsigned r=0u, nrows=pz_x.size1();r<nrows;++r)
@@ -234,7 +218,7 @@ namespace peakfinding{
 		oneemstep(data,rates,params,lowercov);
 		score = scoreparams(data,params);
 		newll = llikelihood(score, rates);
-		if (newll-prevll<PRECISION) return;
+		if (newll-prevll<1e-4) return;
 		prevll=newll;
 	    }
 	}

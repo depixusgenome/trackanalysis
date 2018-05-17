@@ -62,7 +62,7 @@ class EMFlagger:
             delta[-2:] = 0.0
         return delta
 
-    def splitparams(self,params,rates,idx):
+    def splitparams(self,rates,params,idx):
         """
         splits a peak in two
         """
@@ -72,7 +72,7 @@ class EMFlagger:
         nparams[idx+1] += delta
         nrates = np.vstack([rates[:idx+1],rates[idx:]])
         nrates[idx:idx+2] /=2
-        return nparams,nrates
+        return nrates,nparams
 
     @abstractmethod
     def find(self,**kwa):
@@ -129,8 +129,8 @@ class ByEM(EMFlagger): # needs cleaning
         _, bias,slope = kwa.get("hist",(np.array([]),0,1))
         return peaks * slope + bias , ids
 
-    def _fromzestimate(self,data:np.ndarray,zpeaks:np.ndarray):
-        'estimates other params values from first estimates in z postion'
+    def fromzestimate(self,data:np.ndarray,zpeaks:np.ndarray):
+        "calls fittingalgo based on estimation of zpeaks"
         # group peaks too close
         tomerge  = np.where(np.diff(zpeaks)>self.mergewindow)[0]
         bins     = [min(data[:,0])]+[np.mean(zpeaks[i:i+2]) for i in tomerge]+[max(data[:,0])]
@@ -141,7 +141,7 @@ class ByEM(EMFlagger): # needs cleaning
     def paramsfromzbins(self,data,bins,mincount=None):
         "given a list of bins along z axis, estimates the parameters"
         mincount  = self.mincount if mincount is None else mincount
-        digi      = np.digitize(data[:,-1].ravel(),bins)
+        digi      = np.digitize(data[:,0].ravel(),bins)
         clas      = {idx:np.array([data[_1] for _1,_2 in enumerate(digi) if _2==idx])
                      for idx in set(digi)}
         params = np.vstack([list(itertools.chain.from_iterable(zip(np.nanmean(clas[idx],axis=0),
@@ -161,7 +161,7 @@ class ByEM(EMFlagger): # needs cleaning
     def kernelinitializer(self,**kwa):
         'uses ZeroCrossing for initialization faster'
         peaks  = ByHistogram(**self.kwargs)(**kwa)[0]
-        return self._fromzestimate(self.data,peaks)
+        return self.fromzestimate(self.data,peaks)
 
     @staticmethod
     def score(data:np.ndarray,params:np.ndarray)->np.ndarray:
@@ -217,7 +217,7 @@ class ByEM(EMFlagger): # needs cleaning
         while any(params[:,1]>upperbound):
             idx = np.argmax(params[:,1])
             # split the one with highest covariance
-            nparams,nrates = self.splitparams(params,rates,idx)
+            nrates,nparams = self.splitparams(rates,params,idx)
             # could be improved by reducing the number of peaks (and associated data)
             # to optimized during emstep
             rates, params = self.fittingalgo(self.data,nrates,nparams,self.emiter)
@@ -233,8 +233,8 @@ class ByEmMutu(ByEM):
         computes the mutual information of the peaks
         if element i,j has >0 then  i,j are dependent (i.e. represents the same data)
         '''
-        pz_x = empz_x(score,rates)
-        pij  = np.array(np.matrix(pz_x)*np.matrix(pz_x).T)/pz_x.shape[1]
+        pz_x = np.matrix(empz_x(score,rates))
+        pij  = np.array(pz_x*pz_x.T)/pz_x.shape[1]
         return pij*np.log2( (pij/np.mean(pz_x,axis=1)).T/np.mean(pz_x,axis=1) )
 
     def isbetter(self,score:np.ndarray,rates:np.ndarray)->bool:
@@ -244,46 +244,36 @@ class ByEmMutu(ByEM):
         False otherwise
         '''
         info    = self.mutualinformation(score,rates)
-        # eps     = max(abs(np.diag(info)))
         offdiag = np.array([info[i] for i in zip(*np.triu_indices_from(info,k=1))])
-        # if any(offdiag>-eps):
-        #     return False
-        if any(offdiag>0):
+        if any(offdiag>-1e-4):
             return False
         return True
 
-    # def mutualsplit(self,data,rates,params):
-    #     '''
-    #     splits the peaks with great Z variance
-    #     if mutual information allows keep the split of peaks
-    #     '''
-    #     delta                        = np.array([0.001]*params.shape[1]) # in microns
-    #     delta[-2:]                   = 0.0
-    #     delta[range(1,2,len(delta))] = 0.0 # no delta in cov
-    #     score, rates, params         = self.cfit(data,rates,params,self.emiter)
-    #     notchecked = np.array([True]*params.shape[0])
+    def mutualsplit(self,rates,params):
+        '''
+        splits the peaks with great Z variance
+        if mutual information allows keep the split of peaks
+        '''
+        rates, params = self.fittingalgo(self.data,rates,params,self.emiter)
+        notchecked = np.array([True]*params.shape[0])
 
-    #     while any(notchecked):
-    #         print(f'notchecked={notchecked, np.sum(notchecked)}')
-    #         asort = np.argsort(params[:,1]) # cov along Z
-    #         params=params[asort]
-    #         for idx in (i for i,j in enumerate(notchecked) if j):
-    #             # split
-    #             nparams             = np.vstack([params[:idx+1],params[idx:]])
-    #             nparams[idx]       -= delta
-    #             nparams[idx+1]     += delta
-    #             nrates              = np.vstack([rates[:idx+1],rates[idx:]])
-    #             nrates[idx:idx+2]  /= 2
-    #             # thermalise
-    #             sco,rat,par = self.cfit(data,nrates, nparams, self.emiter)
-    #             # check mutual information
-    #             if self.isbetter(sco,rat):
-    #                 notchecked   = np.insert(notchecked,idx,True)
-    #                 rates,params = rat,par
-    #                 break
-    #             notchecked[idx]=False
+        while any(notchecked):
+            print(f"params.shape={params.shape}")
+            for idx in (i for i,j in enumerate(notchecked) if j):
+                nrates,nparams = self.splitparams(rates,params,idx)
 
-    #     return score,rates,params
+                # thermalise, thermalise only the splitted peaks to save time
+                nrates,nparams = self.fittingalgo(self.data,nrates, nparams, self.emiter)
+                sco = self.score(self.data,nparams[[idx,idx+1]])
+
+                # check mutual information
+                if self.isbetter(sco,nrates[[idx,idx+1]]):
+                    notchecked   = np.insert(notchecked,idx,True)
+                    rates,params = nrates,nparams
+                    break
+                notchecked[idx]=False
+
+        return rates,params
 
 
 class ByGauss(ByEM):
