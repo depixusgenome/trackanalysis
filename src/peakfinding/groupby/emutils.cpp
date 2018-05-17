@@ -14,9 +14,27 @@ namespace peakfinding{
     namespace emutils{
 	double PRECISION = 1e-9;
 	double PI=3.14159;
+	
+	double llikelihood2(const matrix& score, const matrix& rates){
+	    // using matrix_row instead
+	    // test improvement
+	    matrix tmp = score;
+	    for (unsigned r=0u;r<rates.size1();++r){
+		blas::matrix_row<matrix> viewrow(tmp,r);
+		tmp*=rates(r,0);
+	    }
+	    
+	    blas::vector<double> rsum(tmp.size2(),0.);
+	    for (unsigned r=0u, nrows=tmp.size1(); r<nrows;++r)
+	    	rsum+=blas::row(tmp,r);
+	    
+	    double out =0.; // use vector sum from boost instead
+	    for (unsigned c=0u,ncols=rsum.size();c<ncols;c++)
+		out+=std::log(rsum[c]);
+	    return out;
+	}
 
 	double llikelihood(const matrix& score, const matrix& rates){
-	    
 	    auto	ones	 = matrix(1,score.size2(),1.);
 	    auto	bigrates = blas::prod(rates,ones);	// can be optimized
 	    matrix	tmp	 = blas::element_prod(score,bigrates);
@@ -25,8 +43,6 @@ namespace peakfinding{
 	    for (unsigned r=0u, nrows=tmp.size1(); r<nrows;++r)
 	    	rsum+=blas::row(tmp,r);
 	    
-	    // std::transform(rsum.data().begin(),rsum.data().begin(),
-	    // 		   rsum.data().begin(),std::log);
 	    double out =0.; // use vector sum from boost instead
 	    for (unsigned c=0u,ncols=rsum.size();c<ncols;c++)
 		out+=std::log(rsum[c]);

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
 import itertools
-import pickle
+from abc import abstractmethod
 from functools import partial
 from typing import Dict, Tuple
 
@@ -21,14 +21,16 @@ from .histogramfitter import ByHistogram  # pylint: disable = unused-import
 
 class EMFlagger:
     'flag peak corresponding to events'
-    mincount=5
-    @initdefaults(frozenset(locals()))
-    def __init__(self,**_):
-        pass
+    withtime=True
+    def __init__(self,**kwa):
+        self.kwargs = kwa
+        self.mincount= kwa.get("mincount",5)
+        self.events= None
+        self.data=None
 
     def __strip(self, params, events):
         '''
-        then assigns events to most likely peaks
+        assigns events to most likely peaks
         '''
         pos = np.array([ np.array([[np.nanmean(evt),len(evt)] for evt in cyc])
                          if cyc.size>0 else np.array([]) for cyc in events])
@@ -51,39 +53,67 @@ class EMFlagger:
         asort  = np.argsort(params[:,0])
         return self.__strip(params[asort],events)
 
+
+    def getdelta(self,dims):
+        "delta value for a peak parameter"
+        delta = np.array([0.001]*dims) # in microns
+        delta[range(1,2,len(delta))] = 0.0 # no delta in cov
+        if self.withtime:
+            delta[-2:] = 0.0
+        return delta
+
+    def splitparams(self,params,rates,idx):
+        """
+        splits a peak in two
+        """
+        delta = self.getdelta(params.shape[1])
+        nparams         = np.vstack([params[:idx+1],params[idx:]])
+        nparams[idx]   -= delta
+        nparams[idx+1] += delta
+        nrates = np.vstack([rates[:idx+1],rates[idx:]])
+        nrates[idx:idx+2] /=2
+        return nparams,nrates
+
+    @abstractmethod
+    def find(self,**kwa):
+        "finds best set of parameters"
+        pass
+
+    def __call__(self,**kwa):
+        self.kwargs = kwa
+        self.events = kwa.get("events",None)
+        if self.withtime:
+            self.data  = np.array([[np.nanmean(evt),len(evt)]
+                                   for cycle in self.events
+                                   for evt in cycle])
+        else:
+            self.data = np.array([[np.nanmean(evt)]
+                                  for cycle in self.events
+                                  for evt in cycle])
+
+        return self.find(**kwa)
+
+
 class ByEM(EMFlagger): # needs cleaning
     '''
     finds peaks and groups events using Expectation Maximization
     the number of components is estimated using BIC criteria
     '''
     emiter     = 1000
-    tol        = 0.5  # loglikelihood tolerance
+    tol        = 0.5  # loglikelihood tolerance # need to provide to c code
     decimals   = 4    # rounding values
-    floaterr   = 1e-10
-    minpeaks   = 1
     upperbound = 0.005**2 # in microns**2
     mergewindow = 0.005
+    withtime = True
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
-        self.kwargs = kwa
         self.fittingalgo = self.cfit
         super().__init__(**kwa)
-
-    def __call__(self,**kwa):
-        return self.find(**kwa)
-
-    def _findpeaks(self,data):
-        rates,params = self.initialize(data,maxbins=1)
-        return self.splitter(data,rates,params,upperbound=self.upperbound)[-2:]
 
     def findfromzestimates(self,**kwa):
         "estimates starting parameters using kernel density"
         rates, params = self.kernelinitializer(**kwa)
-        events = kwa.get("events",None)
-        data   = np.array([[np.nanmean(evt),len(evt)]
-                           for cycle in events
-                           for evt in cycle])
-        return self.splitter(data,rates,params,upperbound=self.upperbound)[-2:]
+        return self.splitter(rates,params,upperbound=self.upperbound)[-2:]
 
     def find(self, **kwa):
         """
@@ -95,12 +125,7 @@ class ByEM(EMFlagger): # needs cleaning
         precision, hf sigma
         """
         rates, params = self.findfromzestimates(**kwa)
-        events        = kwa.get("events",None)
-        data          = np.array([[np.nanmean(evt),len(evt)]
-                                  for cycle in events
-                                  for evt in cycle])
-        #rates,params = self._findpeaks(data) # before
-        peaks, ids    = self.group(rates.ravel()*data.shape[0],params,events)
+        peaks, ids    = self.group(rates.ravel()*self.data.shape[0],params,self.events)
         _, bias,slope = kwa.get("hist",(np.array([]),0,1))
         return peaks * slope + bias , ids
 
@@ -108,47 +133,35 @@ class ByEM(EMFlagger): # needs cleaning
         'estimates other params values from first estimates in z postion'
         # group peaks too close
         tomerge  = np.where(np.diff(zpeaks)>self.mergewindow)[0]
-        bins     = [zpeaks[0]-0.1]+[np.mean(zpeaks[i:i+2]) for i in tomerge]+[zpeaks[-1]+0.1]
+        bins     = [min(data[:,0])]+[np.mean(zpeaks[i:i+2]) for i in tomerge]+[max(data[:,0])]
 
         # estimate rates, params using merged
-        params   = self.paramsfromzbins(data,bins,mincount=0)
-        assig    = self.assign(self.score(data,params))
-        rates    = np.array([len(assig[idx])/data.shape[0]
-                             for idx in range(params.shape[0])]).reshape(-1,1)
-        return rates , params
+        return self.paramsfromzbins(data,bins,mincount=0)
 
     def paramsfromzbins(self,data,bins,mincount=None):
         "given a list of bins along z axis, estimates the parameters"
         mincount  = self.mincount if mincount is None else mincount
-        digi      = np.digitize(data[:,:-1].ravel(),bins)
+        digi      = np.digitize(data[:,-1].ravel(),bins)
         clas      = {idx:np.array([data[_1] for _1,_2 in enumerate(digi) if _2==idx])
                      for idx in set(digi)}
         params = np.vstack([list(itertools.chain.from_iterable(zip(np.nanmean(clas[idx],axis=0),
                                                                    np.nanvar(clas[idx],axis=0))))
                             for idx in set(digi)
                             if len(clas[idx])>self.mincount])
-        params[:,-2] = 0.
-        params[:,-1] = [np.nanstd(clas[idx][-1])
-                        for idx in set(digi)
-                        if len(clas[idx])>self.mincount]
-        return params
+        if self.withtime:
+            params[:,-2] = 0.
+            params[:,-1] = [np.nanstd(clas[idx][-1])
+                            for idx in set(digi)
+                            if len(clas[idx])>self.mincount]
+        rates = np.array([[len(clas[idx])] for idx in set(digi)
+                          if len(clas[idx])>self.mincount])
 
-    def initialize(self,data:np.ndarray,maxbins:int=1):
-        'initialize using density'
-        bins       = np.histogram(data[:,0],bins=maxbins)[1]
-        bins[-1]  += 0.1
-        params     = self.paramsfromzbins(data,bins)
-        return 1/len(params)*np.ones((len(params),1)), params
+        return rates/np.sum(rates),params
 
     def kernelinitializer(self,**kwa):
-        'uses ZeroCrossing for initialization (much faster)'
+        'uses ZeroCrossing for initialization faster'
         peaks  = ByHistogram(**self.kwargs)(**kwa)[0]
-        events = kwa.get("events",None)
-        # can merge close zpeaks from later subdivision by EM
-        data   = np.array([[np.nanmean(evt),len(evt)]
-                           for cycle in events
-                           for evt in cycle])
-        return self._fromzestimate(data,peaks)
+        return self._fromzestimate(self.data,peaks)
 
     @staticmethod
     def score(data:np.ndarray,params:np.ndarray)->np.ndarray:
@@ -184,10 +197,10 @@ class ByEM(EMFlagger): # needs cleaning
     def cfit(data,rates,params,emiter,lowerbound=1e-4):
         'fitting using c calls'
         out = emrunner(data,rates,params,emiter,lowerbound)
-        return out.score, out.rates, out.params
+        return out.rates, out.params
 
     @classmethod
-    def __rmduplicates(cls,params,rates):
+    def rmduplicates(cls,params,rates):
         '''
         this removes only using z coordinates, but
         removing duplicates requires extension to t (and x, y if available)
@@ -198,27 +211,17 @@ class ByEM(EMFlagger): # needs cleaning
         return list(map(lambda x:next(x[1])[-1],itertools.groupby(sortedinfo,key=lambda x:x[0])))
 
     # could split all parameters with upper bound too high
-    def splitter(self,data,rates,params,upperbound=0.005**2):
+    def splitter(self,rates,params,upperbound=0.005**2):
         'splits the peaks with great Z variance'
-        delta = np.array([0.001]*params.shape[1]) # in microns
-        delta[-2:] = 0.0
-        delta[range(1,2,len(delta))] = 0.0 # no delta in cov
-        score, rates, params = self.fittingalgo(data,rates,params,self.emiter)
-        # if the number of events in rates is too low, skip this
-        # while np.logical_and(any(params[:,1]>upperbound),
-        # rates.ravel()*data.shape[0]>self.mincount):
+        rates, params = self.fittingalgo(self.data,rates,params,self.emiter)
         while any(params[:,1]>upperbound):
             idx = np.argmax(params[:,1])
             # split the one with highest covariance
-            nparams         = np.vstack([params[:idx+1],params[idx:]])
-            nparams[idx]   -= delta
-            nparams[idx+1] += delta
-            nrates = np.vstack([rates[:idx+1],rates[idx:]])
-            nrates[idx:idx+2] /=2
+            nparams,nrates = self.splitparams(params,rates,idx)
             # could be improved by reducing the number of peaks (and associated data)
             # to optimized during emstep
-            score, rates, params = self.fittingalgo(data,nrates,nparams,self.emiter)
-        return score,rates,params
+            rates, params = self.fittingalgo(self.data,nrates,nparams,self.emiter)
+        return rates,params
 
 class ByEmMutu(ByEM):
     ''' uses mutual information theory to decide whether peaks should be splitted or not'''
@@ -249,42 +252,39 @@ class ByEmMutu(ByEM):
             return False
         return True
 
-    def mutualsplit(self,data,rates,params):
-        '''
-        splits the peaks with great Z variance
-        if mutual information allows keep the split of peaks
-        '''
-        delta                        = np.array([0.001]*params.shape[1]) # in microns
-        delta[-2:]                   = 0.0
-        delta[range(1,2,len(delta))] = 0.0 # no delta in cov
-        score, rates, params         = self.cfit(data,rates,params,self.emiter)
-        notchecked = np.array([True]*params.shape[0])
+    # def mutualsplit(self,data,rates,params):
+    #     '''
+    #     splits the peaks with great Z variance
+    #     if mutual information allows keep the split of peaks
+    #     '''
+    #     delta                        = np.array([0.001]*params.shape[1]) # in microns
+    #     delta[-2:]                   = 0.0
+    #     delta[range(1,2,len(delta))] = 0.0 # no delta in cov
+    #     score, rates, params         = self.cfit(data,rates,params,self.emiter)
+    #     notchecked = np.array([True]*params.shape[0])
 
-        while any(notchecked):
-            print(f'notchecked={notchecked, np.sum(notchecked)}')
-            asort = np.argsort(params[:,1]) # cov along Z
-            params=params[asort]
-            for idx in (i for i,j in enumerate(notchecked) if j):
-                # split
-                nparams             = np.vstack([params[:idx+1],params[idx:]])
-                nparams[idx]       -= delta
-                nparams[idx+1]     += delta
-                nrates              = np.vstack([rates[:idx+1],rates[idx:]])
-                nrates[idx:idx+2]  /= 2
-                # thermalise
-                sco,rat,par = self.cfit(data,nrates, nparams, self.emiter)
-                # check mutual information
-                if self.isbetter(sco,rat):
-                    notchecked   = np.insert(notchecked,idx,True)
-                    rates,params = rat,par
-                    break
-                notchecked[idx]=False
+    #     while any(notchecked):
+    #         print(f'notchecked={notchecked, np.sum(notchecked)}')
+    #         asort = np.argsort(params[:,1]) # cov along Z
+    #         params=params[asort]
+    #         for idx in (i for i,j in enumerate(notchecked) if j):
+    #             # split
+    #             nparams             = np.vstack([params[:idx+1],params[idx:]])
+    #             nparams[idx]       -= delta
+    #             nparams[idx+1]     += delta
+    #             nrates              = np.vstack([rates[:idx+1],rates[idx:]])
+    #             nrates[idx:idx+2]  /= 2
+    #             # thermalise
+    #             sco,rat,par = self.cfit(data,nrates, nparams, self.emiter)
+    #             # check mutual information
+    #             if self.isbetter(sco,rat):
+    #                 notchecked   = np.insert(notchecked,idx,True)
+    #                 rates,params = rat,par
+    #                 break
+    #             notchecked[idx]=False
 
-        return score,rates,params
+    #     return score,rates,params
 
-    def _findpeaks(self,data):
-        rates,params = self.initialize(data,maxbins=1)
-        return self.mutualsplit(data,rates,params)[-2:]
 
 class ByGauss(ByEM):
     '''
@@ -292,102 +292,14 @@ class ByGauss(ByEM):
     uses sklearn EM implementation
     '''
     fitter:GaussianMixture
+    withtime = False
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
-        self.kwargs = kwa
         self.fittingalgo = self.skfit
         super().__init__(**kwa)
 
-    def findfromzestimates(self,**kwa):
-        "estimates starting parameters using kernel density"
-        rates, params = self.kernelinitializer(**kwa)
-        events = kwa.get("events",None)
-        data   = np.array([[np.nanmean(evt)]
-                           for cycle in events
-                           for evt in cycle])
-        return self.splitter(data,rates,params,upperbound=self.upperbound)
-
-    def find(self, **kwa):
-        """
-        find peaks along z axis
-        keyword arguments are :
-        hist,
-        events,
-        pos,
-        precision, hf sigma
-        """
-        rates, params = self.findfromzestimates(**kwa)
-        events        = kwa.get("events",None)
-        data          = np.array([[np.nanmean(evt)]
-                                  for cycle in events
-                                  for evt in cycle])
-        peaks, ids    = self.group(rates.ravel()*data.shape[0],params,events)
-        _, bias,slope = kwa.get("hist",(np.array([]),0,1))
-        return peaks * slope + bias , ids
-
-    def kernelinitializer(self,**kwa):
-        'uses ZeroCrossing for initialization (much faster)'
-        peaks  = ByHistogram(**self.kwargs)(**kwa)[0]
-        events = kwa.get("events",None)
-        # can merge close zpeaks from later subdivision by EM
-        data   = np.array([[np.nanmean(evt)]
-                           for cycle in events
-                           for evt in cycle])
-
-        return self._fromzestimate(data,peaks)
-
-    def _fromzestimate(self,data:np.ndarray,zpeaks:np.ndarray):
-        'estimates other params values from first estimates in z postion'
-        # group peaks too close
-        tomerge  = np.where(np.diff(zpeaks)>self.mergewindow)[0]
-        bins     = [zpeaks[0]-0.1]+[np.mean(zpeaks[i:i+2]) for i in tomerge]+[zpeaks[-1]+0.1]
-
-        # estimate rates, params using merged
-        rates,params   = self.paramsfromzbins(data,bins,mincount=0)
-        return rates , params
-
-    def paramsfromzbins(self,data,bins,mincount=None):
-        "given a list of bins along z axis, estimates the parameters"
-        mincount  = self.mincount if mincount is None else mincount
-        digi      = np.digitize(data[:,-1].ravel(),bins)
-        clas      = {idx:np.array([data[_1] for _1,_2 in enumerate(digi) if _2==idx])
-                     for idx in set(digi)}
-        params = np.vstack([list(itertools.chain.from_iterable(zip(np.nanmean(clas[idx],axis=0),
-                                                                   np.nanvar(clas[idx],axis=0))))
-                            for idx in set(digi)
-                            if len(clas[idx])>self.mincount])
-        rates = np.array([len(clas[idx]) for idx in set(digi)
-                          if len(clas[idx])>self.mincount])
-        return rates/np.sum(rates),params
-
-    def splitter(self,data,rates,params,upperbound=0.005**2):
-        'splits the peaks with great Z variance'
-        delta = np.array([0.001,0.])
-        rates, params = self.skfit(data,rates,params,self.emiter)
-        # if the number of events in rates is too low, skip this
-        # while np.logical_and(any(params[:,1]>upperbound),
-        # rates.ravel()*data.shape[0]>self.mincount):
-        dbgcount =0
-        pickle.dump((data,rates,params),open(f"dbug{dbgcount}.pk","wb"))
-        while any(params[:,1]>upperbound):
-            dbgcount +=1
-            idx = np.argmax(params[:,1])
-            # split the one with highest covariance
-            nparams         = np.vstack([params[:idx+1],params[idx:]])
-            nparams[idx]   -= delta
-            nparams[idx+1] += delta
-            nrates = np.vstack([rates[:idx+1],rates[idx:]])
-            nrates[idx:idx+2] /=2
-            # could be improved by reducing the number of peaks (and associated data)
-            # to optimized during emstep
-            rates, params = self.skfit(data,nrates,nparams,self.emiter)
-            pickle.dump((data,rates,params),open(f"dbug{dbgcount}.pk","wb"))
-            if params.shape[0]>200:
-                print("problem converging endless division")
-                break
-        return rates,params
-
-    def skfit(self,data,rates,params,emiter:int):
+    @staticmethod
+    def skfit(data,rates,params,emiter:int):
         "wraps call to sklearn fitter"
         gaussfitter = GaussianMixture(n_components = params.shape[0],
                                       means_init=params[:,0].reshape(-1,1),
@@ -396,6 +308,5 @@ class ByGauss(ByEM):
                                       max_iter=emiter,
                                       precisions_init=1/params[:,1].reshape(-1,1)\
         ).fit(data)
-        self.fitter = gaussfitter
         return gaussfitter.weights_.reshape(-1,1),\
             np.hstack([gaussfitter.means_,gaussfitter.covariances_])
