@@ -10,7 +10,7 @@ from   bokeh.plotting       import Figure
 import numpy                as     np
 
 from   data                 import Beads, Track
-from   view.plots.tasks     import TaskPlotCreator
+from   view.plots.tasks     import TaskPlotCreator, CACHE_TYPE
 
 from   ..computations       import extensions
 from   ._model              import (QualityControlModelAccess,
@@ -25,10 +25,13 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
     _theme:  DriftControlPlotTheme
     _config: DriftControlPlotConfig
     _fig:    Figure
-    def __init__(self, ctrl, mdl: QualityControlModelAccess, **kwa) -> None:
+    def __init__(self, ctrl, mdl: QualityControlModelAccess, **_) -> None:
+        super().__init__(ctrl)
         name = self.__class__.__name__.replace('PlotCreator', '')
-        kwa.setdefault("ylabel", f'T {name[1:].lower()} (°C)')
-        super().__init__(ctrl, name = name, **kwa)
+        self._display.name   = name
+        self._config.name    = name
+        self._theme  .name   = name
+        self._theme  .ylabel = f'T {name[1:].lower()} (°C)'
         self._tasks                 = mdl
         self._src: ColumnDataSource = {}
 
@@ -52,25 +55,25 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
         self.fixreset(self._fig.y_range)
         return self._fig
 
-    def _reset(self):
+    def _reset(self, cache:CACHE_TYPE):
         data = self._data()
-        for i, j in zip(self._src, data):
-            self._bkmodels[i]['data'] = j
+        cache.update({i: dict(data = j) for i, j in zip(self._src, data)})
 
-        self.setbounds(self._fig.x_range, 'x', (0., getattr(self._tasks.track, 'ncycles', 1)))
+        self.setbounds(cache, self._fig.x_range, 'x',
+                       (0., getattr(self._tasks.track, 'ncycles', 1)))
 
         xvals = data[0]['measures'][np.isfinite(data[0]['measures'])]
         xrng  = (np.min(xvals), np.max(xvals)) if len(xvals) else (0., 30.)
-        self.setbounds(self._fig.y_range, 'y', xrng)
+        self.setbounds(cache, self._fig.y_range, 'y', xrng)
         if len(xvals):
             perc, factor = self._config.yspan
             span         = np.percentile(xvals, perc)
             delta        = max(1e-5, span[1]-span[0])
             span         = span[0]-delta*factor, span[1]+delta*factor
-            self._bkmodels[self._fig.y_range].update(start = span[0], end = span[1])
+            cache[self._fig.y_range].update(start = span[0], end = span[1])
 
         alpha = self._theme.outlinealpha if self._warn(data) else 0.
-        self._bkmodels[self._fig]['outline_line_alpha'] = alpha
+        cache[self._fig]['outline_line_alpha'] = alpha
 
     @staticmethod
     def _defaults() -> Tuple[Dict[str, np.ndarray], ...]:
@@ -127,7 +130,8 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
     _theme: ExtensionPlotTheme
     def __init__(self, *args):
         super().__init__(*args)
-        self._plotmodel.theme = ExtensionPlotTheme(ylabel = 'δ(Φ3-Φ1) (µm)')
+        self._plotmodel.theme = ExtensionPlotTheme(ylabel = 'δ(Φ3-Φ1) (µm)',
+                                                   name   = self._theme.name)
         self._plotmodel.config.warningthreshold = 1.5e-2
         self._plotmodel.config.percentiles      = [25, 75]
 

@@ -14,7 +14,7 @@ from    utils               import initdefaults
 from    model.task          import RootTask
 from    model.task.application import TasksDisplay
 from    sequences.view      import OligoListWidget, SequencePathWidget
-from    view.plots          import DpxNumberFormatter
+from    view.plots          import DpxNumberFormatter, CACHE_TYPE
 from    view.base           import enableOnTrack
 from    modaldialog.view    import AdvancedWidgetMixin
 
@@ -47,11 +47,11 @@ class PeaksTableDisplay:
 
 class PeaksTableWidget:
     "Table of peaks in z and dna units"
+    __widget: DataTable
     def __init__(self, tasks:CyclesModelAccess) -> None:
-        self.__widget: DataTable = None
-        self.__theme             = PeaksTableTheme()
-        self.__display           = PeaksTableDisplay()
-        self.__tasks             = tasks
+        self.__theme   = PeaksTableTheme()
+        self.__display = PeaksTableDisplay()
+        self.__tasks   = tasks
 
     def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
@@ -77,7 +77,7 @@ class PeaksTableWidget:
 
         return [Paragraph(text = self.__theme.title), self.__widget]
 
-    def reset(self, resets):
+    def reset(self, resets:CACHE_TYPE):
         "updates the widget"
         resets[self.__widget.source]['data'] = self.__data()
 
@@ -121,12 +121,12 @@ class ConversionSliderTheme:
 
 class ConversionSlidersWidget:
     "Sliders for managing stretch and bias factors"
+    __stretch: Slider
+    __bias:    Slider
+    __figdata: ColumnDataSource
     def __init__(self, display) -> None:
         self.__display                   = display
         self.__theme                     = ConversionSliderTheme()
-        self.__stretch: Slider           = None
-        self.__bias:    Slider           = None
-        self.__figdata: ColumnDataSource = None
 
     def addinfo(self, histsource):
         "adds info to the widget"
@@ -145,7 +145,7 @@ class ConversionSlidersWidget:
         self.__bias    = widget('bias', -1., 1., 'Cycles:Bias')
         return [self.__stretch, self.__bias]
 
-    def reset(self, resets):
+    def reset(self, resets:CACHE_TYPE):
         "updates the widgets"
         ratio  = self.__theme.bias['ratio']
         if resets and self.__figdata in resets and 'data' in resets[self.__figdata]:
@@ -175,10 +175,10 @@ class DriftWidgetTheme:
 
 class DriftWidget:
     "Allows removing the drifts"
+    __widget: CheckboxButtonGroup
     def __init__(self, tasks:CyclesModelAccess) -> None:
         self.__theme = DriftWidgetTheme()
         self.__tasks = tasks
-        self.__widget: CheckboxButtonGroup = None
 
     def addtodoc(self, action) -> List[Widget]:
         "creates the widget"
@@ -197,7 +197,7 @@ class DriftWidget:
             if (ind not in value) != (task is None):
                 getattr(self.__tasks, name).update(disabled = ind not in value)
 
-    def reset(self, resets):
+    def reset(self, resets:CACHE_TYPE):
         "updates the widget"
         resets[self.__widget].update(**self.__data())
 
@@ -234,7 +234,7 @@ class AdvancedWidget(AdvancedWidgetMixin):
     def observe(self, _):
         "sets-up config observers"
 
-    def reset(self, resets):
+    def reset(self, resets:CACHE_TYPE):
         "resets the wiget when a new file is opened"
         AdvancedWidgetMixin.reset(resets)
 
@@ -287,9 +287,9 @@ class WidgetMixin(ABC):
                                 for i in ('align', 'drift', 'events')],
                                [layouts.widgetbox(widgets['advanced'], **mds)]], **mds)
 
-    def _resetwidget(self):
+    def _resetwidget(self, cache: CACHE_TYPE):
         for ite in self.__widgets.values():
-            ite.reset(self._bkmodels)
+            ite.reset(cache)
 
     def __slave_to_hover(self, widgets):
         jsc = CustomJS(code = "hvr.on_change_hover(table, stretch, bias, fig, ttip)",

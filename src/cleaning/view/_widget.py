@@ -15,7 +15,7 @@ from    utils               import initdefaults
 from    utils.gui           import parseints
 from    view.base           import enableOnTrack
 from    view.static         import ROUTE
-from    view.plots          import DpxNumberFormatter
+from    view.plots          import DpxNumberFormatter, CACHE_TYPE
 from    eventdetection.view import AlignmentWidget
 from    ._model             import DataCleaningModelAccess, DataCleaningTask
 
@@ -71,10 +71,10 @@ class CyclesListTheme:
 
 class CyclesListWidget:
     "Table containing stats per peaks"
+    __widget: DataTable
     def __init__(self, task) -> None:
-        self.__widget: DataTable  = None
-        self.__task               = task
-        self.__model              = CyclesListTheme()
+        self.__task  = task
+        self.__model = CyclesListTheme()
 
     def observe(self, ctrl):
         "sets-up observers"
@@ -99,7 +99,7 @@ class CyclesListWidget:
                                   name           = "Cleaning:List")
         return [self.__widget]
 
-    def reset(self, resets):
+    def reset(self, resets:CACHE_TYPE):
         "this widget has a source in common with the plots"
         itm  = self.__widget.source if resets is None else resets[self.__widget.source]
         data = self.__data()
@@ -140,9 +140,9 @@ class DownSamplingTheme:
 
 class DownsamplingWidget:
     "allows downsampling the graph for greater speed"
+    __widget: Slider
     def __init__(self) -> None:
-        self.__widget: Slider  = None
-        self.__model           = DownSamplingTheme()
+        self.__model = DownSamplingTheme()
 
     def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
@@ -161,7 +161,7 @@ class DownsamplingWidget:
             ctrl.theme.update(self.__model, value = new)
         self.__widget.on_change("value", _onchange_cb)
 
-    def reset(self, resets):
+    def reset(self, resets:CACHE_TYPE):
         "this widget has a source in common with the plots"
         itm  = self.__widget if resets is None else resets[self.__widget]
         itm.update(value = self.__model.value)
@@ -187,9 +187,9 @@ class DpxCleaning(Widget):
 
 class CleaningFilterWidget:
     "All inputs for cleaning"
+    __widget: DpxCleaning
     def __init__(self, model:DataCleaningModelAccess) -> None:
-        self.__model               = model
-        self.__widget: DpxCleaning = None
+        self.__model = model
 
     @staticmethod
     def observe(_):
@@ -221,7 +221,7 @@ class CleaningFilterWidget:
 
         return [self.__widget]
 
-    def reset(self, resets):
+    def reset(self, resets:CACHE_TYPE):
         "resets the widget when opening a new file, ..."
         task = self.__model.cleaning.task
         if task is None:
@@ -263,6 +263,6 @@ class WidgetMixin(ABC):
         enableOnTrack(self, widgets)
         return widgets
 
-    def _resetwidget(self):
+    def _resetwidget(self, cache: CACHE_TYPE):
         for ite in self.__widgets.values():
-            ite.reset(self._bkmodels)
+            ite.reset(cache)

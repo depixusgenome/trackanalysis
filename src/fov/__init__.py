@@ -17,7 +17,7 @@ from signalfilter           import rawprecision
 from utils                  import initdefaults
 from view.colors            import tohex
 from view.plots.tasks       import TaskPlotCreator, TaskPlotModelAccess
-from view.plots.base        import PlotView
+from view.plots.base        import PlotView, CACHE_TYPE
 
 class FoVPlotTheme(PlotTheme):
     "FoV plot theme"
@@ -72,6 +72,7 @@ class FoVPlotModel(PlotModel):
 class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
     "Plots a default bead and its FoV"
     _fig:         Figure
+    _theme:       FoVPlotTheme
     _beadssource: ColumnDataSource
     _imgsource:   ColumnDataSource
     _calibsource: ColumnDataSource
@@ -128,30 +129,30 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
             self.fixreset(rng)
         return self._fig
 
-    def _reset(self):
+    def _reset(self, cache:CACHE_TYPE):
         fov = self.__fov
         if fov is not None and self.__idfov != id(fov):
             self.__idfov = id(fov)
-            self.__imagedata()
+            self.__imagedata(cache)
 
-        self._bkmodels[self._beadssource].update(self.__beadsdata())
+        cache[self._beadssource].update(self.__beadsdata())
         sel  = self._beadssource.selected
         good = [self._model.bead] if self._model.bead is not None else []
         if getattr(sel, 'indices', None) != good:
             if sel is None:
-                self._bkmodels[self._beadssource].update(selected = Selection(indices = good))
+                cache[self._beadssource].update(selected = Selection(indices = good))
             else:
-                self._bkmodels[sel].update(indices = good)
+                cache[sel].update(indices = good)
 
-        self.__calibdata()
+        self.__calibdata(cache)
 
-    def __calibdata(self):
+    def __calibdata(self, cache:CACHE_TYPE):
         fov   = self.__fov
-        bead  = self._model.bead
+        ibead = self._model.bead
         img   = np.zeros((10, 10))
         dist  = (0, 0, 0, 0)
-        if fov is not None and bead in fov.beads:
-            bead  = fov.beads[bead]
+        if fov is not None and ibead in fov.beads:
+            bead  = fov.beads[ibead]
             img   = (bead.image if bead.image.size else
                      bead.thumbnail(self._theme.thumbnail, fov))
 
@@ -164,13 +165,13 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
                      rng[0] * size,
                      rng[1] * size]
 
-        self._bkmodels[self._calibsource].update(data = dict(image = [img],
-                                                             x     = [dist[0]],
-                                                             y     = [dist[1]],
-                                                             dw    = [dist[2]],
-                                                             dh    = [dist[3]]))
+        cache[self._calibsource].update(data = dict(image = [img],
+                                                    x     = [dist[0]],
+                                                    y     = [dist[1]],
+                                                    dw    = [dist[2]],
+                                                    dh    = [dist[3]]))
 
-    def __imagedata(self):
+    def __imagedata(self, cache):
         fov = self.__fov
         if fov is None:
             img  = np.zeros((10, 10))
@@ -179,12 +180,12 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
             img  = fov.image
             dist = fov.size()
 
-        self._bkmodels[self._imgsource].update(data = dict(image = [img],
-                                                           dw    = [dist[0]],
-                                                           dh    = [dist[1]]))
+        cache[self._imgsource].update(data = dict(image = [img],
+                                                  dw    = [dist[0]],
+                                                  dh    = [dist[1]]))
 
-        self.setbounds(self._fig.x_range, 'x', [0, max(dist[:2])])
-        self.setbounds(self._fig.y_range, 'y', [0, max(dist[:2])])
+        self.setbounds(cache, self._fig.x_range, 'x', [0, max(dist[:2])])
+        self.setbounds(cache, self._fig.y_range, 'y', [0, max(dist[:2])])
 
     def __tooltips(self):
         msgs                            = self._model.messages()

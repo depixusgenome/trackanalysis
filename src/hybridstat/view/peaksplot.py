@@ -13,7 +13,7 @@ import numpy                    as     np
 
 from view.base                  import enableOnTrack
 from view.colors                import tohex
-from view.plots                 import PlotView
+from view.plots                 import PlotView, CACHE_TYPE
 from view.plots.tasks           import TaskPlotCreator
 from sequences.view             import (SequenceTicker,
                                         SequenceHoverMixin)
@@ -158,7 +158,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         "specific setup for when this view is the main one"
         self._widgets['advanced'].ismain(_)
 
-    def _reset(self):
+    def _reset(self, cache:CACHE_TYPE):
         dicos = None
         try:
             dicos = self.__data()
@@ -167,18 +167,18 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                 dicos = self.__defaults()
 
             for i, j in dicos.items():
-                self._bkmodels[self._src[i]].update(data = j, column_names = list(j.keys()))
+                cache[self._src[i]].update(data = j, column_names = list(j.keys()))
 
-            self._hover .reset(self._bkmodels)
-            self._ticker.reset(self._bkmodels)
+            self._hover .reset(cache)
+            self._ticker.reset(cache)
             for widget in self._widgets.values():
-                widget.reset(self._bkmodels)
+                widget.reset(cache)
 
             data = dicos['']
             if len(data['z']) > 2:
-                self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
+                self.setbounds(cache, self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
             else:
-                self.setbounds(self._fig.y_range, 'y', (0., 1.))
+                self.setbounds(cache, self._fig.y_range, 'y', (0., 1.))
 
     def __create_fig(self):
         self._fig = self._theme.figure(y_range = Range1d(start = 0., end = 1.),

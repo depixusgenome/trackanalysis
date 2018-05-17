@@ -11,12 +11,15 @@ from    bokeh.models   import LinearAxis, ColumnDataSource, CustomJS, Range1d
 import  numpy                   as     np
 from    numpy.lib.index_tricks  import as_strided
 
+from    view.plots              import CACHE_TYPE
+from    ._bokehext              import DpxHoverModel
 from    ._model                 import CyclesPlotTheme, CyclesModelAccess
 
 class RawMixin(ABC):
     "Building the graph of cycles"
     _theme: CyclesPlotTheme
     _model: CyclesModelAccess
+    _hover: DpxHoverModel
     def __init__(self):
         "sets up this plotter's info"
         self._rawsource: ColumnDataSource = None
@@ -101,11 +104,11 @@ class RawMixin(ABC):
         self.__addcallbacks()
         return shape
 
-    def _resetraw(self):
+    def _resetraw(self, cache:CACHE_TYPE):
         data, shape = self._DEFAULT_DATA
         try:
             data, shape = self.__data()
         finally:
-            self._bkmodels[self._rawsource]['data'] = data
-            self._hover.resetraw(self._raw, data, shape, self._bkmodels)
+            cache[self._rawsource]['data'] = data
+            self._hover.resetraw(self._raw, data, shape, cache)
         return shape

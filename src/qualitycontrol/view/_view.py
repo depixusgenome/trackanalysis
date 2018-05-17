@@ -3,7 +3,7 @@
 "View module showing all messages concerning discarded beads"
 from    bokeh             import layouts
 from    model.plots       import PlotModel
-from    view.plots        import PlotView
+from    view.plots        import PlotView, CACHE_TYPE
 from    view.plots.tasks  import TaskPlotCreator
 from    ._widgets         import QualityControlWidgets
 from    ._plots           import QualityControlPlots
@@ -31,9 +31,9 @@ class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess, PlotM
         grid    = self._plots.addtodoc(doc, mode)
         return layouts.row(grid, widgets)
 
-    def _reset(self):
-        self._widgets.reset(self._bkmodels)
-        self._plots.reset(self._bkmodels)
+    def _reset(self, cache:CACHE_TYPE):
+        self._widgets.reset(cache)
+        self._plots.reset(cache)
 
 class QualityControlView(PlotView[QualityControlPlotCreator]):
     "a widget with all discards messages"

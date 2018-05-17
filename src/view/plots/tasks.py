@@ -4,14 +4,11 @@
 from typing                 import TypeVar
 from abc                    import abstractmethod
 from control.modelaccess    import TaskPlotModelAccess, TaskAccess
-from .base                  import PlotCreator, PlotModelType
+from .base                  import PlotCreator, PlotModelType, CACHE_TYPE
 
 TModelType = TypeVar('TModelType', bound = TaskPlotModelAccess)
 class TaskPlotCreator(PlotCreator[TModelType, PlotModelType]):
     "Base plotter for tracks"
-    def __init__(self, ctrl, *_, **kwa) -> None:
-        super().__init__(ctrl, **kwa)
-
     def _onchangetask(self, parent = None, task = None, **_):
         if self._model.impacts(parent, task):
             self.reset(False)
@@ -32,5 +29,5 @@ class TaskPlotCreator(PlotCreator[TModelType, PlotModelType]):
         pass
 
     @abstractmethod
-    def _reset(self):
+    def _reset(self, cache:CACHE_TYPE):
         pass

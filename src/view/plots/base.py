@@ -27,6 +27,7 @@ from    .bokehext               import DpxKeyedRow
 LOGS        = getLogger(__name__)
 ModelType   = TypeVar('ModelType', bound = PlotModelAccess)
 RANGE_TYPE  = Tuple[Optional[float], Optional[float]]
+CACHE_TYPE  = Dict[Model, Any]
 
 def checksizes(fcn):
     "Checks that the ColumnDataSource have same sizes"
@@ -87,12 +88,10 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
 
     def __init__(self, ctrl, *_) -> None:
         "sets up this plotter's info"
-        super().__init__()
         key = type(self).key()
-        self._model: ControlModelType             = templateattribute(self, 0)(ctrl)
-        self._plotmodel: PlotModelType            = templateattribute(self, 1)(name = key)
-        self._ctrl                                = ctrl
-        self._bkmodels: Dict[Model,Dict[str,Any]] = self._OrderedDict()
+        self._model:     ControlModelType = templateattribute(self, 0)(ctrl)
+        self._plotmodel: PlotModelType    = templateattribute(self, 1)(name = key)
+        self._ctrl                        = ctrl
 
     def defaultsizingmode(self, kwa = None, **kwargs):
         "the default sizing mode"
@@ -112,26 +111,24 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         action = BokehView.action.type(self._ctrl, test = test)
         return action if fcn is None else action(fcn)
 
-    def delegatereset(self, bkmodels):
+    def delegatereset(self, cache:CACHE_TYPE):
         "Stops on_change events for a time"
-        oldbk           = self._bkmodels
-        self._bkmodels  = bkmodels
         old, self.state = self.state, PlotState.resetting
         try:
-            self._reset()
+            self._reset(cache)
         finally:
-            self._bkmodels = oldbk
             self.state     = old
 
     @contextmanager
-    def resetting(self):
+    def resetting(self, cache = None):
         "Stops on_change events for a time"
-        self._bkmodels.clear()
         old, self.state = self.state, PlotState.resetting
         i = j = None
         try:
-            yield self
-            for i, j in self._bkmodels.items():
+            if cache is None:
+                cache = self._OrderedDict()
+            yield cache
+            for i, j in cache.items():
                 try:
                     upd = getattr(i, 'update', None)
                     if upd is None:
@@ -146,7 +143,6 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                 except Exception as exc:
                     raise RuntimeError(f'Error updating {i} = {j}') from exc
         finally:
-            self._bkmodels.clear()
             self.state = old
 
     @staticmethod
@@ -194,12 +190,13 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
 
         return attrs
 
-    def setbounds(self, rng, axis, arr, reinit = True):
+    def setbounds(self, cache:CACHE_TYPE, # pylint: disable=too-many-arguments
+                  rng, axis, arr, reinit = True):
         "Sets the range boundaries"
         vals = self.newbounds(rng, axis, arr)
         if reinit and hasattr(rng, 'reinit'):
             vals['reinit'] = not rng.reinit
-        self._bkmodels[rng] = vals
+        cache[rng] = vals
 
     def bounds(self, arr):
         "Returns boundaries for a column"
@@ -263,25 +260,25 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         # use this for single-thread debugging
         LOGS.info("Running in single-thread mode")
         def __doreset(self, ctrl):
-            with self.resetting():
+            with self.resetting() as cache:
                 self._model.reset()
-                self._reset()
+                self._reset(cache)
             ctrl.display.handle('rendered', args = {'plot': self})
     else:
         def __doreset(self, ctrl):
             with self.resetting():
-                self._bkmodels.clear()
                 self._model.reset()
 
             old, self.state = self.state, PlotState.abouttoreset
             durations       = [0.]
             async def _reset_and_render():
+                cache = self._OrderedDict()
                 def _reset():
                     start = time()
                     self.state = PlotState.resetting
                     with BokehView.computation.type(ctrl, calls = self.__doreset):
                         try:
-                            self._reset()
+                            self._reset(cache)
                         except Exception as exc: # pylint: disable=broad-except
                             args = getattr(exc, 'args', tuple())
                             if len(args) == 2 and args[1] == "warning":
@@ -296,12 +293,10 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
 
                 def _render():
                     start = time()
-                    ret   = tuple(self._bkmodels.items())
-                    self._bkmodels.clear()
-                    if ret:
+                    if cache:
                         with BokehView.computation.type(ctrl, calls = self.__doreset):
-                            with self.resetting():
-                                self._bkmodels.update(ret)
+                            with self.resetting(cache):
+                                pass
                     ctrl.display.handle('rendered', args = {'plot': self})
                     LOGS.debug("%s.reset done in %.3f+%.3f",
                                type(self).__qualname__, durations[-1], time() - start)
@@ -325,7 +320,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         "creates the plot structure"
 
     @abstractmethod
-    def _reset(self):
+    def _reset(self, cache:CACHE_TYPE):
         "initializes the plot for a new file"
 
 PlotType = TypeVar('PlotType', bound = PlotCreator)

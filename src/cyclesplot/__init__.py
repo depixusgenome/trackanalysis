@@ -7,7 +7,7 @@ from    bokeh               import layouts
 from    control             import Controller
 from    control.taskio      import ConfigTrackIO, GrFilesIO
 
-from    view.plots          import PlotView
+from    view.plots          import PlotView, CACHE_TYPE
 from    view.plots.tasks    import TaskPlotCreator
 
 from   ._bokehext           import DpxHoverModel
@@ -45,14 +45,14 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel],
         layout = [self._createwidget(), self._keyedlayout(ctrl, self._raw, self._hist)]
         return layout
 
-    def _reset(self):
+    def _reset(self, cache: CACHE_TYPE):
         shape = self._DEFAULT_DATA[1]
         try:
-            shape = self._resetraw()
+            shape = self._resetraw(cache)
         finally:
-            data  = self._bkmodels[self._rawsource]['data']
-            self._resethist(data, shape)
-            self._resetwidget()
+            data  = cache[self._rawsource]['data']
+            self._resethist(cache, data, shape)
+            self._resetwidget(cache)
 
     def ismain(self, ctrl):
         WidgetMixin.ismain(self, ctrl)

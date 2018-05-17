@@ -10,7 +10,7 @@ from    bokeh          import layouts
 import  numpy                   as     np
 
 from    utils.array             import repeat
-from    view.plots              import PlotView, DpxHoverTool
+from    view.plots              import PlotView, DpxHoverTool, CACHE_TYPE
 from    view.plots.tasks        import TaskPlotCreator
 from    view.colors             import tohex
 from    control                 import Controller
@@ -63,6 +63,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
+        print(self.__dict__)
         WidgetMixin.__init__(self)
 
     def _addtodoc(self, ctrl, *_):
@@ -91,16 +92,16 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
                                     **mode)
         return self._keyedlayout(ctrl, fig, left = left)
 
-    def _reset(self):
+    def _reset(self, cache: CACHE_TYPE):
         items, nans     = None, None
         try:
             items, nans = GuiDataCleaningProcessor.runbead(self._model)
         finally:
             data        = self.__data(items, nans)
-            self.setbounds(self.__fig.x_range, 'x', data['t'])
-            self.setbounds(self.__fig.y_range, 'y', data['z'])
-            self._bkmodels[self.__source]['data'] = data
-            self._resetwidget()
+            self.setbounds(cache, self.__fig.x_range, 'x', data['t'])
+            self.setbounds(cache, self.__fig.y_range, 'y', data['z'])
+            cache[self.__source]['data'] = data
+            self._resetwidget(cache)
 
     def __data(self, items, nans) -> Dict[str, np.ndarray]:
         if items is None or len(items) == 0 or not any(len(i) for _, i in items):

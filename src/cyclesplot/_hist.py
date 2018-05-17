@@ -4,21 +4,25 @@
 
 import  warnings
 from    abc            import ABC
+from    typing         import Any
 
 from    bokeh.plotting import Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 
-import  numpy        as np
+import  numpy          as np
 
-from    view.plots     import checksizes
-from    sequences.view import SequenceTicker, estimatebias
 from    model.level    import PHASE
+from    sequences.view import SequenceTicker, estimatebias
+from    view.plots     import checksizes, CACHE_TYPE
+from    ._bokehext     import DpxHoverModel
 from    ._model        import CyclesModelAccess, CyclesPlotTheme
 
 class HistMixin(ABC):
     "Building a projection of phase 5 onto the Z axis"
     _theme: CyclesPlotTheme
     _model: CyclesModelAccess
+    _hover: DpxHoverModel
+    _ctrl:  Any
     def __init__(self):
         "sets up this plotter's info"
         self._histsource: ColumnDataSource = None
@@ -29,7 +33,7 @@ class HistMixin(ABC):
     def __data(self, data, shape): # pylint: disable=too-many-locals
         bins  = np.array([-1, 1])
         zeros = np.zeros((1,), dtype = 'f4')
-        items = (zeros,) # type: ignore
+        items: Any = (zeros,) # type: ignore
         if shape != (1, 0):
             phase = PHASE.measure
             zvals = data['z'].reshape(shape)
@@ -102,18 +106,18 @@ class HistMixin(ABC):
         self._ticker.observe(ctrl)
         self._hover.observe(ctrl)
         def _fcn():
-            with self.resetting():
-                self._ticker.reset(self._bkmodels)
-                self._hover.resethist(self._bkmodels)
+            with self.resetting() as cache:
+                self._ticker.reset(cache)
+                self._hover.resethist(cache)
         ctrl.theme.observe('sequence', _fcn)
 
-    def _resethist(self, data, shape):
+    def _resethist(self, cache:CACHE_TYPE, data, shape):
         hist = self.__data(data, shape)
 
         self._ctrl.display.update(self._model.cycles.display,
                                   estimatedbias = estimatebias(hist['bottom'], hist['cycles']))
-        self._hover.resethist(self._bkmodels)
-        self._ticker.reset(self._bkmodels)
+        self._hover.resethist(cache)
+        self._ticker.reset(cache)
 
-        self._bkmodels[self._histsource]['data'] = hist
-        self.setbounds(self._hist.y_range, 'y', data['z'])
+        cache[self._histsource]['data'] = hist
+        getattr(self, 'setbounds')(cache, self._hist.y_range, 'y', data['z'])
