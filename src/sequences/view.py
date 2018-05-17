@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Create a grid displaying a sequence"
-from    typing         import List, Optional, Tuple, Callable
+from    typing         import List, Optional, Tuple
 import  numpy   as np
 
 import  bokeh.core.properties as props
@@ -240,18 +240,20 @@ class SequencePathWidget:
     "Dropdown for choosing a fasta file"
     __dialog: FileDialog
     __widget: Dropdown
-    __click:  Callable[[str], None]
     def __init__(self):
         self.__list: List[str] = []
         self.__theme           = SequencePathTheme()
         self.__model           = SequenceModel()
 
-    def addtodoc(self, action) -> List[Widget]:
+    def addtodoc(self, ctrl, *_) -> List[Widget]:
         "creates the widget"
         self.__widget = Dropdown(name  = 'Cycles:Sequence',
                                  width = self.__theme.width,
                                  **self.__data())
-        self.__widget.on_click(action(self.__click)) # type: ignore
+        @ctrl.action
+        def _onclick(new):
+            self.__onclick(ctrl, new)
+        self.__widget.on_click(_onclick)
         return [Paragraph(text = self.__theme.label), self.__widget]
 
     def observe(self, ctrl):
@@ -262,7 +264,6 @@ class SequencePathWidget:
                                    filetypes = 'fasta|*')
         self.__theme  = ctrl.theme.  add(self.__theme,   True)
         self.__model  = SequenceModel.create(ctrl)
-        self.__click  = lambda new: self.__onclick(ctrl, new)
 
         fcn           = lambda **_: self.__widget.update(**self.__data())
         ctrl.theme.  observe(self.__model.config,  fcn)
@@ -334,7 +335,6 @@ class OligoListTheme:
 class OligoListWidget:
     "Input for defining a list of oligos"
     __widget: AutocompleteInput
-    __click:  Callable[[str], None]
     def __init__(self):
         self.__theme = OligoListTheme()
         self.__model = SequenceModel()
@@ -343,12 +343,11 @@ class OligoListWidget:
         "sets-up config observers"
         self.__theme = ctrl.theme.add(self.__theme)
         self.__model = SequenceModel.create(ctrl)
-        self.__click = lambda new: self.__model.setnewprobes(ctrl, new)
         fcn          = lambda **_: self.__widget.update(**self.__data())
         ctrl.theme  .observe(self.__model.config,  fcn)
         ctrl.display.observe(self.__model.display, fcn)
 
-    def addtodoc(self, action) -> List[Widget]:
+    def addtodoc(self, ctrl, *_) -> List[Widget]:
         "creates the widget"
         self.__widget = AutocompleteInput(**self.__data(),
                                           placeholder = self.__theme.tooltip,
@@ -356,8 +355,10 @@ class OligoListWidget:
                                           width       = self.__theme.width,
                                           name        = 'Cycles:Oligos')
 
-        fcn  = action(lambda attr, old, new: self.__click(new)) # type: ignore
-        self.__widget.on_change('value', fcn)
+        @ctrl.action
+        def _onclick_cb(attr, old, new):
+            self.__model.setnewprobes(ctrl, new)
+        self.__widget.on_change('value', _onclick_cb)
         return [self.__widget]
 
     def reset(self, resets):

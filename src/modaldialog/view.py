@@ -93,13 +93,13 @@ class AdvancedWidgetMixin(ABC):
         "nothing to do"
         return
 
-    def addtodoc(self, action) -> List[Widget]:
+    def addtodoc(self, ctrl, *_) -> List[Widget]:
         "creates the widget"
         self.__widget = Button(width  = self._theme.width,
                                height = self._theme.height,
                                label  = self._theme.button)
         self.__widget.on_click(self.on_click)
-        self.__action = action().withcalls(self._title())
+        self.__action = ctrl.action().withcalls(self._title())
         return [self.__widget]
 
     def __enter__(self):

@@ -6,6 +6,7 @@ from    typing                  import Tuple, List, TypeVar, Generic
 from    bokeh.models            import (RadioButtonGroup, CheckboxGroup, Widget,
                                         Paragraph)
 
+from    view.plots              import CACHE_TYPE
 from    utils                   import initdefaults
 from    utils.inspection        import templateattribute
 from    .processor              import AlignmentTactic
@@ -22,19 +23,19 @@ class WidgetTheme:
 T  = TypeVar("T", RadioButtonGroup, CheckboxGroup)
 class BaseWidget(Generic[T]):
     "Allows aligning the cycles on a given phase"
+    __widget: T
     def __init__(self, model, **kwa):
         name        = self.__class__.__name__.lower()
         self._theme = WidgetTheme(name = name, **kwa)
         self._task  = getattr(model, name.replace('widget', ''), model)
-        self.__widget: T = None
 
-    def addtodoc(self, action) -> List[Widget]:
+    def addtodoc(self, ctrl) -> List[Widget]:
         "creates the widget"
         name          = self.__class__.__name__.replace("Widget", "")
         itm           = templateattribute(self, 0)
         self.__widget = itm(labels = self._theme.labels, name = f'Cycles:{name}',
                             **self._data())
-        self.__widget.on_click(action(self._onclick_cb))
+        self.__widget.on_click(ctrl.action(self._onclick_cb))
 
         if self._theme.title:
             return [Paragraph(text = self._theme.title), self.__widget]
@@ -43,6 +44,10 @@ class BaseWidget(Generic[T]):
     def observe(self, ctrl):
         "do nothing"
         self._theme = ctrl.theme.add(self._theme, True)
+
+    def reset(self, cache:CACHE_TYPE):
+        "resets the widget"
+        cache[self.__widget].update(data = self._data())
 
     def _onclick_cb(self, value):
         "action to be performed when buttons are clicked"

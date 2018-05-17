@@ -86,7 +86,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         self._theme.addcallbacks(self._ctrl, fig)
 
         mode    = self.defaultsizingmode(width = self._theme.widgetwidth)
-        widgets = self._createwidget(fig)
+        widgets = self._createwidget(ctrl, fig)
         left    = layouts.widgetbox(widgets['cleaning']+widgets['table']
                                     +widgets['align']+widgets['sampling'],
                                     **mode)

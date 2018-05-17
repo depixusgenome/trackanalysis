@@ -34,10 +34,10 @@ _TEXT = """
 
 class SummaryWidget:
     "summary info on the track"
+    __widget: Div
     def __init__(self, model:QualityControlModelAccess) -> None:
-        self.__widget: Div = None
-        self.__tasks       = model
-        self.__model       = {'text': _TEXT}
+        self.__tasks = model
+        self.__model = {'text': _TEXT}
 
     def observe(self, ctrl):
         "do nothing"
@@ -84,14 +84,14 @@ class MessagesListWidgetTheme:
 
 class MessagesListWidget:
     "Table containing stats per peaks"
+    __widget: DataTable
+    __theme : MessagesListWidgetTheme
     def __init__(self, model:QualityControlModelAccess) -> None:
-        self.__widget: DataTable = None
-        self.__tasks             = model
-        self.__theme             = MessagesListWidgetTheme()
+        self.__tasks = model
 
     def observe(self, ctrl):
         "do nothing"
-        ctrl.theme.add(self.__theme)
+        self.__theme = ctrl.theme.add(MessagesListWidgetTheme())
 
     def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
@@ -142,8 +142,8 @@ class QualityControlWidgets:
         for widget in self.__dict__.values():
             widget.reset(bkmodels)
 
-    def addtodoc(self, action, mode):
+    def addtodoc(self, ctrl, mode):
         "returns all created widgets"
-        get = lambda i: getattr(self, i).addtodoc(action)
+        get = lambda i: getattr(self, i).addtodoc(ctrl)
         return layouts.widgetbox(sum((get(i) for i in ('summary', 'messages')), []),
                                  **mode)

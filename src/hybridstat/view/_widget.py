@@ -51,12 +51,12 @@ class ReferenceWidget:
         self.__files = FileList(ctrl)
         ctrl.theme.add(self.__theme)
 
-    def addtodoc(self, action, *_) -> List[Widget]:
+    def addtodoc(self, ctrl, *_) -> List[Widget]:
         "creates the widget"
         self.__widget = Dropdown(name  = 'HS:reference',
                                  width = self.__theme.width,
                                  **self.__data())
-        @action
+        @ctrl.action
         def _py_cb(new):
             inew = int(new)
             val  = None if inew < 0 else [i for _, i in self.__files()][inew]
@@ -83,12 +83,6 @@ class ReferenceWidget:
         index = -1 if key is None else [i for _, i in lst].index(key)
         return dict(menu  = menu, label = menu[index][0], value = str(index))
 
-class PeaksOligoListWidget(OligoListWidget):
-    "deals with oligos"
-    def addtodoc(self, action, *_) -> List[Widget]: # pylint: disable=arguments-differ
-        "creates the widget"
-        return super().addtodoc(action)
-
 class PeaksSequencePathWidget(SequencePathWidget):
     "Widget for setting the sequence to use"
     def __init__(self, mdl):
@@ -101,10 +95,6 @@ class PeaksSequencePathWidget(SequencePathWidget):
             lst  = [i for i in lst if i in dist]
             return sorted(lst, key = lambda i: dist[i].value)
         return super()._sort(lst)
-
-    def addtodoc(self, action, *_) -> List[Widget]: # pylint: disable=arguments-differ
-        "creates the widget"
-        return super().addtodoc(action)
 
     def callbacks(self,             # type: ignore # pylint: disable=arguments-differ
                   hover: SequenceHoverMixin,
@@ -394,20 +384,20 @@ class PeakIDPathWidget:
                                 storage   = 'constraints.path',
                                 filetypes = '*|xlsx')
 
-    def addtodoc(self, action, # type: ignore # pylint: disable=arguments-differ
+    def addtodoc(self, ctrl, # type: ignore # pylint: disable=arguments-differ
                  _) -> List[Widget]:
         "creates the widget"
         self.__widget = PathInput(width = self.__theme.width, title = self.__theme.title,
                                   placeholder = "", value = "",
                                   name = 'Peaks:IDPath')
 
-        @action
+        @ctrl.action
         def _onclick_cb(attr, old, new):
             path = self.__dlg.open()
             if path is not None:
                 self.__widget.value = str(Path(path).resolve())
 
-        @action
+        @ctrl.action
         def _onchangetext_cb(attr, old, new):
             path = self.__widget.value.strip()
             if path == '':
@@ -519,11 +509,6 @@ class AdvancedWidget(AdvancedTaskMixin):
         "resets the widget when a new file is opened, ..."
         AdvancedTaskMixin.reset(resets)
 
-    def addtodoc(self, action, _   # type: ignore # pylint: disable=arguments-differ
-                ) -> List[Widget]:
-        "creates the widget"
-        return AdvancedTaskMixin.addtodoc(self, action)
-
     @staticmethod
     def observe(_):
         "sets up observers"
@@ -545,7 +530,7 @@ def createwidgets(ctrl, mdl: PeaksPlotModelAccess) -> Dict[str, Any]:
     "returns a dictionnary of widgets"
     return dict(seq      = PeaksSequencePathWidget(mdl),
                 ref      = ReferenceWidget(mdl),
-                oligos   = PeaksOligoListWidget(),
+                oligos   = OligoListWidget(),
                 stats    = PeaksStatsWidget(mdl),
                 peaks    = PeakListWidget(mdl),
                 cstrpath = PeakIDPathWidget(mdl),

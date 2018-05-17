@@ -72,13 +72,13 @@ class CyclesListTheme:
 class CyclesListWidget:
     "Table containing stats per peaks"
     __widget: DataTable
+    __model : CyclesListTheme
     def __init__(self, task) -> None:
         self.__task  = task
-        self.__model = CyclesListTheme()
 
     def observe(self, ctrl):
         "sets-up observers"
-        ctrl.theme.add(self.__model)
+        self.__model = ctrl.theme.add(CyclesListTheme())
 
     def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
@@ -141,25 +141,22 @@ class DownSamplingTheme:
 class DownsamplingWidget:
     "allows downsampling the graph for greater speed"
     __widget: Slider
-    def __init__(self) -> None:
-        self.__model = DownSamplingTheme()
-
-    def addtodoc(self, _) -> List[Widget]:
+    __model : DownSamplingTheme
+    def addtodoc(self, ctrl) -> List[Widget]:
         "creates the widget"
         cnf   = self.__model
         self.__widget = Slider(**{getattr(cnf, i)
                                   for i in ('title', 'value', 'start', 'end')},
                                callback_policy = "mouseup")
-        return [self.__widget]
-
-    def observe(self, ctrl):
-        "sets-up observers"
-        ctrl.theme.add(self.__model)
-
         @ctrl.action
         def _onchange_cb(attr, old, new):
             ctrl.theme.update(self.__model, value = new)
         self.__widget.on_change("value", _onchange_cb)
+        return [self.__widget]
+
+    def observe(self, ctrl):
+        "sets-up observers"
+        self.__model = ctrl.theme.add(DownSamplingTheme())
 
     def reset(self, resets:CACHE_TYPE):
         "this widget has a source in common with the plots"
@@ -194,13 +191,12 @@ class CleaningFilterWidget:
     @staticmethod
     def observe(_):
         "sets-up observers"
-        return
 
-    def addtodoc(self, action) -> List[Widget]:
+    def addtodoc(self, ctrl) -> List[Widget]:
         "creates the widget"
         self.__widget = DpxCleaning(name = "Cleaning:Filter")
 
-        @action
+        @ctrl.action
         def _on_cb(attr, old, new):
             self.__model.cleaning.update(**{attr: new})
 
@@ -209,12 +205,12 @@ class CleaningFilterWidget:
                      'maxextent',   'maxsaturation'):
             self.__widget.on_change(name, _on_cb)
 
-        @action
+        @ctrl.action
         def _on_subtract_cb(attr, old, new):
             self.__model.subtracted.beads = parseints(new)
         self.__widget.on_change('subtracted', _on_subtract_cb)
 
-        @action
+        @ctrl.action
         def _on_subtract_cur_cb(attr, old, new):
             self.__model.subtracted.switch(self.__model.bead)
         self.__widget.on_change('subtractcurrent', _on_subtract_cur_cb)
@@ -257,8 +253,8 @@ class WidgetMixin(ABC):
                 self.reset(False)
         ctrl.theme.observe("downsampling", _ondownsampling)
 
-    def _createwidget(self, fig):
-        widgets = {i: j.addtodoc(self.action) for i, j in self.__widgets.items()}
+    def _createwidget(self, ctrl, fig):
+        widgets = {i: j.addtodoc(ctrl) for i, j in self.__widgets.items()}
         self.__widgets['cleaning'].setfigure(fig)
         enableOnTrack(self, widgets)
         return widgets

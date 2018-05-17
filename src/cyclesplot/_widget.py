@@ -125,8 +125,8 @@ class ConversionSlidersWidget:
     __bias:    Slider
     __figdata: ColumnDataSource
     def __init__(self, display) -> None:
-        self.__display                   = display
-        self.__theme                     = ConversionSliderTheme()
+        self.__display = display
+        self.__theme   = ConversionSliderTheme()
 
     def addinfo(self, histsource):
         "adds info to the widget"
@@ -180,12 +180,12 @@ class DriftWidget:
         self.__theme = DriftWidgetTheme()
         self.__tasks = tasks
 
-    def addtodoc(self, action) -> List[Widget]:
+    def addtodoc(self, ctrl) -> List[Widget]:
         "creates the widget"
         self.__widget = CheckboxButtonGroup(labels = self.__theme.labels,
                                             name   = 'Cycles:DriftWidget',
                                             **self.__data())
-        self.__widget.on_click(action(self._onclick_cb))
+        self.__widget.on_click(ctrl.action(self._onclick_cb))
 
         return [Paragraph(text = self.__theme.title), self.__widget]
 
@@ -234,14 +234,6 @@ class AdvancedWidget(AdvancedWidgetMixin):
     def observe(self, _):
         "sets-up config observers"
 
-    def reset(self, resets:CACHE_TYPE):
-        "resets the wiget when a new file is opened"
-        AdvancedWidgetMixin.reset(resets)
-
-    def addtodoc(self, action) -> List[Widget]:
-        "creates the widget"
-        return AdvancedWidgetMixin.addtodoc(self, action)
-
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
     def __init__(self, ctrl):
@@ -266,10 +258,10 @@ class WidgetMixin(ABC):
         for widget in self.__widgets.values():
             widget.observe(ctrl)
 
-    def _createwidget(self):
+    def _createwidget(self, ctrl):
         self.__widgets['sliders'].addinfo(self._histsource)
 
-        widgets = {i: j.addtodoc(self.action) for i, j in self.__widgets.items()}
+        widgets = {i: j.addtodoc(ctrl) for i, j in self.__widgets.items()}
 
         enableOnTrack(self, self._hist, self._raw, widgets)
 
