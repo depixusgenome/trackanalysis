@@ -130,6 +130,7 @@ class DownSamplingTheme:
     name     = "downsampling"
     title    = "Downsampling"
     tooltips = "Display only 1 out of every few data points"
+    policy   = "mouseup"
     start    = 0
     value    = 5
     end      = 5
@@ -144,10 +145,9 @@ class DownsamplingWidget:
     __model : DownSamplingTheme
     def addtodoc(self, ctrl) -> List[Widget]:
         "creates the widget"
-        cnf   = self.__model
-        self.__widget = Slider(**{getattr(cnf, i)
-                                  for i in ('title', 'value', 'start', 'end')},
-                               callback_policy = "mouseup")
+        self.__widget = Slider(**{i: getattr(self.__model, i.split('_')[-1])
+                                  for i in ('title', 'value', 'start', 'end',
+                                            'callback_policy')})
         @ctrl.action
         def _onchange_cb(attr, old, new):
             ctrl.theme.update(self.__model, value = new)

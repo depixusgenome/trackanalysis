@@ -63,7 +63,6 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
-        print(self.__dict__)
         WidgetMixin.__init__(self)
 
     def _addtodoc(self, ctrl, *_):
@@ -83,7 +82,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         fig.add_layout(axis, 'above')
 
         self.fixreset(fig.y_range)
-        self._theme.addcallbacks(self._ctrl, fig)
+        self._display.addcallbacks(self._ctrl, fig)
 
         mode    = self.defaultsizingmode(width = self._theme.widgetwidth)
         widgets = self._createwidget(ctrl, fig)

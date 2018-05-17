@@ -47,7 +47,7 @@ class BaseWidget(Generic[T]):
 
     def reset(self, cache:CACHE_TYPE):
         "resets the widget"
-        cache[self.__widget].update(data = self._data())
+        cache[self.__widget].update(self._data())
 
     def _onclick_cb(self, value):
         "action to be performed when buttons are clicked"
