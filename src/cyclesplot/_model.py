@@ -137,7 +137,7 @@ class CyclesDriftTaskAccess(TaskAccess,
 
 class CyclesModelAccess(SequencePlotModelAccess):
     "Model for Cycles View"
-    def __init__(self, ctrl, key: str = None) -> None:
+    def __init__(self, ctrl) -> None:
         super().__init__(ctrl)
         self.cycles         = CyclesPlotModel.create(ctrl)
         self.alignment      = ExtremumAlignmentTaskAccess(self)

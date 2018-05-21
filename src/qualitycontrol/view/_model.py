@@ -69,10 +69,10 @@ class QualityControlConfig:
 
 class QualityControlModelAccess(TaskPlotModelAccess):
     "access to data cleaning"
-    def __init__(self, ctrl, key: str = None) -> None:
-        super().__init__(ctrl, key)
+    def __init__(self, ctrl) -> None:
+        super().__init__(ctrl)
         self.cleaning  = DataCleaningTaskAccess(self)
-        self.__config   = ctrl.theme.add(QualityControlConfig(),     False)
+        self.__config  = ctrl.theme.add(QualityControlConfig(),    False)
         self.__display = ctrl.display.add(QualityControlDisplay(), False)
 
     def buildmessages(self):
