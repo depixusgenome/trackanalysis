@@ -14,7 +14,7 @@ LOGS  = getLogger(__name__)
 class DAQMessageTheme:
     "Message theme"
     _SIZ    = 'height: 28px; margin-top: 0px;'
-    name    = "message"
+    name    = "daq.message"
     period  = 50
     width   = 350
     busy    = "Please wait ..."

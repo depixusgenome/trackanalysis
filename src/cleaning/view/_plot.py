@@ -63,7 +63,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
-        WidgetMixin.__init__(self)
+        WidgetMixin.__init__(self, ctrl, self._model)
 
     def _addtodoc(self, ctrl, *_):
         self.__source = ColumnDataSource(data = self.__data(None, None))
@@ -118,7 +118,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
                    color = self.__color(order, nans, val))
         assert all(len(i) == val.size for  i in res.values())
 
-        dsampl = self._ctrl.theme.get('downsampling', 'value', 0)
+        dsampl = self._ctrl.theme.get('cleaning.downsampling', 'value', 0)
         if dsampl:
             res = {i: j[::dsampl] for i, j in res.items()}
         return res

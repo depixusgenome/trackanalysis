@@ -36,7 +36,7 @@ class PeaksPlotTheme(PlotTheme):
     """
     cleaning plot theme
     """
-    name            = "hybridstatpeaks"
+    name            = "hybridstat.peaks"
     figsize         = 500, 750, "fixed"
     xtoplabel       = 'Duration (s)'
     xlabel          = 'Rate (%)'
@@ -60,7 +60,7 @@ class PeaksPlotTheme(PlotTheme):
 
 class PeaksPlotDisplay(PlotDisplay):
     "CyclesPlotDisplay"
-    name                              = "hybridstatpeaks"
+    name                              = "hybridstat.peaks"
     distances : Dict[str, Distance]   = dict()
     peaks:      Dict[str, np.ndarray] = dict()
     estimatedstretch                  = 1./8.8e-4
@@ -78,11 +78,11 @@ class PeaksPlotModel(PlotModel):
     theme   = PeaksPlotTheme()
     display = PeaksPlotDisplay()
 
-class FitToReferenceTheme:
+class FitToReferenceConfig:
     """
     stuff needed to display the FitToReferenceTask
     """
-    name          = 'fittoreference'
+    name          = 'hybridstat.fittoreference'
     histmin       = 1e-4
     peakprecision = 1e-2
     @initdefaults(frozenset(locals()))
@@ -101,7 +101,7 @@ class FitToReferenceStore:
     DEFAULTS = dict(ident        = None,   reference = None,
                     fitdata      = _DUMMY, peaks     = _DUMMY,
                     interpolator = _DUMMY)
-    name               = 'fittoreference'
+    name               = 'hybridstat.fittoreference'
     ident        : Any = None
     reference    : Any = None
     fitdata      : Any = _DUMMY
@@ -116,7 +116,7 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     def __init__(self, ctrl):
         super().__init__(ctrl)
         self.__store = FitToReferenceStore()
-        self.__theme = FitToReferenceTheme()
+        self.__theme = FitToReferenceConfig()
 
     @property
     def params(self) -> Optional[Tuple[float, float]]:
@@ -254,11 +254,11 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
             self._ctrl.display.update(self.__store, **args)
         return True, 'ident' in args
 
-class FitToHairpinTheme:
+class FitToHairpinConfig:
     """
     stuff needed to display the FitToHairpinTask
     """
-    name        = 'fittohairpin'
+    name        = 'hybridstat.fittohairpin'
     fit         = FitToHairpinTask.DEFAULT_FIT()
     match       = FitToHairpinTask.DEFAULT_MATCH()
     constraints = deepcopy(FitToHairpinTask.DEFAULT_CONSTRAINTS)
@@ -271,7 +271,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
     "access to the FitToHairpinTask"
     def __init__(self, ctrl):
         super().__init__(ctrl)
-        self.__defaults = ctrl.theme.add(FitToHairpinTheme(), True)
+        self.__defaults = ctrl.theme.add(FitToHairpinConfig(), True)
 
     def setobservers(self, mdl, ctrl):
         "observes the global model"
@@ -336,11 +336,9 @@ class PeakSelectorTaskAccess(TaskAccess, tasktype = PeakSelectorTask):
 # pylint: disable=too-many-instance-attributes
 class PeaksPlotModelAccess(SequencePlotModelAccess):
     "Access to peaks"
-    def __init__(self, ctrl, key: str = None) -> None:
-        if key is None:
-            key = '.plot.peaks'
-        super().__init__(ctrl, key)
-        self.peaksmodel      = PeaksPlotModel.create(key, ctrl)
+    def __init__(self, ctrl):
+        super().__init__(ctrl)
+        self.peaksmodel      = PeaksPlotModel.create(ctrl)
         self.subtracted      = BeadSubtractionAccess(self)
         self.alignment       = ExtremumAlignmentTaskAccess(self)
         self.eventdetection  = EventDetectionTaskAccess(self)

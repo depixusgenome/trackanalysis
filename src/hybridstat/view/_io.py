@@ -68,7 +68,7 @@ class _SafeProc(TaskViewProcessor[_SafeTask, _SafeDict, BEADKEY]):
 FileDialogModel.types['pkz'] = (u'pickled report', '.pkz')
 class ConfigXlsxIOTheme:
     "ConfigXlsxIOTheme"
-    name   = 'configxlsxiotheme'
+    name   = 'hybridstat.configxlsxio'
     start  = ('Report in progress ...', 'normal')
     errors = {'running': ("Can only create one report at a time", "warning")}
 

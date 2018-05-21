@@ -11,7 +11,7 @@ from   .model        import DAQBead
 
 class BeadsTableTheme(BaseModel):
     "summary info on the field of view"
-    name        = 'beadstable'
+    name        = 'daq.beadstable'
     width       = 80
     height      = 200
     columns     = [['x', 'X (µm)',         '0.000'],

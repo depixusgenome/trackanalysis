@@ -44,6 +44,13 @@ class SequenceModel:
     def __init__(self, **_):
         pass
 
+    def addto(self, ctrl, noerase = False):
+        "add to the controller"
+        self.config  = ctrl.theme.  add(self.config,  noerase)
+        self.display = ctrl.display.add(self.display, noerase)
+        self.tasks   = ctrl.display.add(self.tasks,   noerase)
+        return self
+
     def setnewkey(self, ctrl, new):
         "sets new probes"
         if new == self.currentkey:
@@ -94,20 +101,16 @@ class SequenceModel:
         "get current probe"
         return self.display.probes.get(self.tasks.roottask, None)
 
-    @classmethod
-    def create(cls, ctrl) -> 'SequenceDisplay':
-        "create a new object from existing ones"
-        self = cls()
-        self.config  = ctrl.theme.  add(self.config,  True)
-        self.display = ctrl.display.add(self.display, True)
-        self.tasks   = ctrl.display.add(self.tasks,   True)
-        return self
-
 class SequencePlotModelAccess(TaskPlotModelAccess):
     "access to the sequence path and the oligo"
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
-        self.__seq = SequenceModel.create(ctrl)
+        self.__seq = SequenceModel()
+
+    def addto(self, ctrl, name = "tasks"):
+        "set _tasksmodel to same as main"
+        super().addto(ctrl, name)
+        self.__seq.addto(ctrl, False)
 
     @property
     def sequencemodel(self):

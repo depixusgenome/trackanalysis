@@ -56,7 +56,7 @@ class BeadSubtractionModalDescriptor:
 
 class CyclesListTheme:
     "Cycles List Model"
-    name    = "cycleslist"
+    name    = "cleaning.cycleslist"
     order   = ('population', 'hfsigma', 'extent', 'aberrant',
                'pingpong', 'saturation', 'good')
     width   = 65
@@ -73,12 +73,13 @@ class CyclesListWidget:
     "Table containing stats per peaks"
     __widget: DataTable
     __model : CyclesListTheme
-    def __init__(self, task) -> None:
+    def __init__(self, ctrl, task) -> None:
         self.__task  = task
-
-    def observe(self, ctrl):
-        "sets-up observers"
         self.__model = ctrl.theme.add(CyclesListTheme())
+
+    @staticmethod
+    def observe(_):
+        "sets-up observers"
 
     def addtodoc(self, _) -> List[Widget]:
         "creates the widget"
@@ -127,7 +128,7 @@ class CyclesListWidget:
 
 class DownSamplingTheme:
     "stuff for downsampling"
-    name     = "downsampling"
+    name     = "cleaning.downsampling"
     title    = "Downsampling"
     tooltips = "Display only 1 out of every few data points"
     policy   = "mouseup"
@@ -143,6 +144,9 @@ class DownsamplingWidget:
     "allows downsampling the graph for greater speed"
     __widget: Slider
     __model : DownSamplingTheme
+    def __init__(self, ctrl):
+        self.__model = ctrl.theme.add(DownSamplingTheme())
+
     def addtodoc(self, ctrl) -> List[Widget]:
         "creates the widget"
         self.__widget = Slider(**{i: getattr(self.__model, i.split('_')[-1])
@@ -154,9 +158,9 @@ class DownsamplingWidget:
         self.__widget.on_change("value", _onchange_cb)
         return [self.__widget]
 
-    def observe(self, ctrl):
+    @staticmethod
+    def observe(_):
         "sets-up observers"
-        self.__model = ctrl.theme.add(DownSamplingTheme())
 
     def reset(self, resets:CACHE_TYPE):
         "this widget has a source in common with the plots"
@@ -238,11 +242,11 @@ class CleaningFilterWidget:
 
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
-    def __init__(self):
-        self.__widgets = dict(table    = CyclesListWidget(self._model.cleaning),
-                              align    = AlignmentWidget(self._model.alignment),
-                              cleaning = CleaningFilterWidget(self._model),
-                              sampling = DownsamplingWidget())
+    def __init__(self, ctrl, model):
+        self.__widgets = dict(table    = CyclesListWidget(ctrl, model.cleaning),
+                              align    = AlignmentWidget(ctrl, model.alignment),
+                              cleaning = CleaningFilterWidget(model),
+                              sampling = DownsamplingWidget(ctrl))
 
     def _widgetobservers(self, ctrl):
         for widget in self.__widgets.values():
@@ -251,7 +255,7 @@ class WidgetMixin(ABC):
         def _ondownsampling(old = None, **_):
             if 'value' in old:
                 self.reset(False)
-        ctrl.theme.observe("downsampling", _ondownsampling)
+        ctrl.theme.observe("cleaning.downsampling", _ondownsampling)
 
     def _createwidget(self, ctrl, fig):
         widgets = {i: j.addtodoc(ctrl) for i, j in self.__widgets.items()}

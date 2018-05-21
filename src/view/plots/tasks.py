@@ -16,13 +16,16 @@ class TaskPlotCreator(PlotCreator[TModelType, PlotModelType]):
     def _onchangedisplay(self, old = None, **_):
         self.reset('roottask' in old)
 
-    def observe(self, ctrl):
-        "sets-up model observers"
-        super().observe(ctrl)
-        self._model.settaskmodel(ctrl, "tasks")
-        ctrl.display.observe("tasks", self._onchangedisplay)
+    def observetasks(self, ctrl, name = "tasks"):
+        "sets-up task model observers"
+        ctrl.display.observe(name, self._onchangedisplay)
         if any(isinstance(i, TaskAccess) for i in self._model.__dict__.values()):
             ctrl.tasks.observe("updatetask", "addtask", "removetask", self. _onchangetask)
+
+    def observe(self, ctrl, noerase = True):
+        "sets-up model observers"
+        super().observe(ctrl, noerase)
+        self.observetasks(ctrl)
 
     @abstractmethod
     def _addtodoc(self, ctrl, doc):

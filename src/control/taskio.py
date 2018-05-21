@@ -70,7 +70,7 @@ class ConfigTrackIO(TrackIO):
             return None
 
         items = [tmp[0][0]]
-        for name in self._ctrl.theme.get("taskio", "tasks"):
+        for name in self._ctrl.theme.get("tasks.io", "tasks"):
             task = self._ctrl.theme.get("tasks", "tasks").get(name, None)
             if not getattr(task, 'disabled', True):
                 items.append(deepcopy(task))

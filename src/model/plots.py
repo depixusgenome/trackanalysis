@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "The basic architecture"
+from copy   import deepcopy
 from enum   import Enum
 from typing import Tuple, Optional, Iterator, List, Any, Dict, cast, TYPE_CHECKING
 
@@ -250,22 +251,28 @@ class PlotModel:
     theme       = PlotTheme()
     display     = PlotDisplay()
     config: Any = None
-    def __init__(self, name, **kwa):
-        self.theme   = type(self.__class__.theme)(name = name, **kwa)
-        self.display = type(self.__class__.display)(name = name, **kwa)
-        if self.__class__.config:
-            self.config  = type(self.__class__.config)(name = name+"config", **kwa)
+    def __init__(self):
+        self.theme   = deepcopy(self.theme)
+        self.display = deepcopy(self.display)
+        self.config  = deepcopy(self.config)
+        assert self.theme.name
+        assert self.display.name
+        assert self.config is None or self.config.name
 
-    def observe(self, ctrl, noerase = True):
+    def addto(self, ctrl, noerase = True):
         "sets-up model observers"
         self.theme   = ctrl.theme  .add(self.theme, noerase)
         self.display = ctrl.display.add(self.display, noerase)
         if self.config:
             self.config = ctrl.theme  .add(self.config, noerase)
 
+    def observe(self, ctrl, noerase = True):
+        "sets-up model observers"
+        self.addto(ctrl, noerase)
+
     @classmethod
-    def create(cls, ctrl, key, **kwa):
+    def create(cls, ctrl, **kwa):
         "creates the model and registers it"
-        self = cls(key, **kwa)
+        self = cls(**kwa)
         self.observe(ctrl, True)
         return self

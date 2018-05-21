@@ -29,7 +29,7 @@ class CyclesModelConfig:
 
 class CyclesPlotTheme(PlotTheme):
     "theme for cycles"
-    name       = "cyclestheme"
+    name       = "cycles"
     raw        = {'dark':  PlotAttrs('color', 'circle', .1, alpha = .5,
                                      palette = 'YlOrBr'),
                   'basic': PlotAttrs('color', 'circle', .1, alpha = .5,
@@ -138,8 +138,8 @@ class CyclesDriftTaskAccess(TaskAccess,
 class CyclesModelAccess(SequencePlotModelAccess):
     "Model for Cycles View"
     def __init__(self, ctrl, key: str = None) -> None:
-        super().__init__(ctrl, key)
-        self.cycles         = CyclesPlotModel.create(ctrl, key)
+        super().__init__(ctrl)
+        self.cycles         = CyclesPlotModel.create(ctrl)
         self.alignment      = ExtremumAlignmentTaskAccess(self)
         self.driftperbead   = BeadsDriftTaskAccess(self)
         self.driftpercycle  = CyclesDriftTaskAccess(self)

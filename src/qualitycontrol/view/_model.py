@@ -33,7 +33,7 @@ class QualityControlDisplay:
     def __init__(self, **_):
         pass
 
-class QualityControlTheme:
+class QualityControlConfig:
     "QualityControlDisplay"
     name            = "qc"
     fixedbeadextent = .2
@@ -72,8 +72,8 @@ class QualityControlModelAccess(TaskPlotModelAccess):
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
         self.cleaning  = DataCleaningTaskAccess(self)
-        self.__theme   = ctrl.theme.add(QualityControlTheme(), True)
-        self.__display = ctrl.display.add(QualityControlDisplay(), True)
+        self.__config   = ctrl.theme.add(QualityControlConfig(),     False)
+        self.__display = ctrl.display.add(QualityControlDisplay(), False)
 
     def buildmessages(self):
         "creates beads and warnings where applicable"
@@ -102,7 +102,7 @@ class QualityControlModelAccess(TaskPlotModelAccess):
 
     def fixedbeads(self) -> Set[BEADKEY]:
         "returns bead ids with extent == all cycles"
-        return self.__theme.fixedbeads(self._ctrl.tasks, self.roottask)
+        return self.__config.fixedbeads(self._ctrl.tasks, self.roottask)
 
     def messages(self) -> Dict[str, List]:
         "returns beads and warnings where applicable"
@@ -117,7 +117,7 @@ class QualityControlModelAccess(TaskPlotModelAccess):
 
 class DriftControlPlotTheme(PlotTheme):
     "drift control plot theme"
-    name             = "driftcontrol"
+    name             = "qc.driftcontrol.plot"
     measures         = PlotAttrs('lightblue',  'line', 2, alpha     = .75)
     median           = PlotAttrs('lightgreen', 'line', 2, line_dash = 'dashed')
     pop10            = PlotAttrs('lightgreen', 'line', 2, line_dash = [4])
@@ -137,7 +137,7 @@ class DriftControlPlotTheme(PlotTheme):
 
 class DriftControlPlotConfig:
     "allows configuring the drift control plots"
-    name              = "driftcontrolconfig"
+    name              = "qc.driftcontrol"
     percentiles       = [10, 50, 90]
     yspan             = [5, 95], 0.3
     phases            = PHASE.initial, PHASE.pull
@@ -149,11 +149,12 @@ class DriftControlPlotConfig:
 
 class DriftControlPlotModel(PlotModel):
     "qc plot model"
-    theme  = DriftControlPlotTheme()
-    config = DriftControlPlotConfig()
+    theme   = DriftControlPlotTheme()
+    config  = DriftControlPlotConfig()
 
 class ExtensionPlotTheme(DriftControlPlotTheme):
     "drift control plot theme"
+    name       = "qc.extension"
     measures   = PlotAttrs('lightblue', 'circle', 2, alpha = .75)
     ybars      = PlotAttrs('lightblue', 'vbar', 1,   alpha = .75)
     ymed       = PlotAttrs('lightblue', 'vbar', 1,   fill_alpha = 0.)

@@ -40,7 +40,7 @@ class DpxDAQCamera(layouts.Row): # pylint: disable=too-many-ancestors
 
 class CameraTheme:
     "how to display the beads"
-    name      = 'camera'
+    name      = 'daq.camera'
     xlabel    = "x (µm)"
     ylabel    = "y (µm)"
     names     = PlotAttrs("lightblue", "text", x_offset = 5)
@@ -70,7 +70,7 @@ class CameraTheme:
 
 class CameraDisplay:
     "information about the current bead, ..."
-    name        = 'camera'
+    name        = 'daq.camera'
     currentbead = None
 
     @initdefaults(frozenset(locals()) - {'name'})

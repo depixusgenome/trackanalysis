@@ -325,7 +325,6 @@ class BaseTaskController(Controller):
 
 class TaskController(BaseTaskController):
     "Task controller class which knows about globals"
-    __model:      Any
     __readconfig: Any
     __ctrl:       Any
     def setup(self, ctrl):
@@ -338,7 +337,7 @@ class TaskController(BaseTaskController):
 
         getter = lambda x:    getattr(self, '_'+x)
         setter = lambda x, y: setattr(self, '_'+x, y)
-        mdl    = lambda x, y: ctrl.theme.get("taskio", x, y)
+        mdl    = lambda x, y: ctrl.theme.get("tasks.io", x, y)
         if getter('procs') is None:
             setter('procs', register(mdl("processortypes", [])))
 
@@ -347,8 +346,6 @@ class TaskController(BaseTaskController):
 
         if getter('savers') is None:
             setter('savers', [i(ctrl) for i in mdl("outputtypes", [])])
-
-        self.__model = ctrl.theme.model('tasks')
 
         @ctrl.display.observe
         def _ontasks(old = None, **_):
@@ -378,7 +375,8 @@ class TaskController(BaseTaskController):
                 index = _m_none, side = 0):
         "opens a new file"
         if index == 'auto':
-            index = self.__model.defaulttaskindex(self.tasklist(parent), task, side)
+            mdl   = self.__ctrl.theme.model("tasks")
+            index = mdl.defaulttaskindex(self.tasklist(parent), task, side)
         return super().addtask(parent, task, index)
 
     def __undos__(self, wrapper):

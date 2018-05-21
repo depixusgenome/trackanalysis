@@ -12,8 +12,8 @@ from    utils.inspection        import templateattribute
 from    .processor              import AlignmentTactic
 
 class WidgetTheme:
-    "tWidgetTheme"
-    name   = "alignmentwidget"
+    "WidgetTheme"
+    name   = "alignment"
     labels = ['ø', 'best', 'Φ1', 'Φ3']
     title  = 'Alignment'
     @initdefaults(frozenset(locals()))
@@ -24,9 +24,9 @@ T  = TypeVar("T", RadioButtonGroup, CheckboxGroup)
 class BaseWidget(Generic[T]):
     "Allows aligning the cycles on a given phase"
     __widget: T
-    def __init__(self, model, **kwa):
+    def __init__(self, ctrl, model, **kwa):
         name        = self.__class__.__name__.lower()
-        self._theme = WidgetTheme(name = name, **kwa)
+        self._theme = ctrl.theme.add(WidgetTheme(name = name, **kwa))
         self._task  = getattr(model, name.replace('widget', ''), model)
 
     def addtodoc(self, ctrl) -> List[Widget]:
@@ -41,9 +41,9 @@ class BaseWidget(Generic[T]):
             return [Paragraph(text = self._theme.title), self.__widget]
         return [self.__widget]
 
-    def observe(self, ctrl):
+    @staticmethod
+    def observe(_):
         "do nothing"
-        self._theme = ctrl.theme.add(self._theme, True)
 
     def reset(self, cache:CACHE_TYPE):
         "resets the widget"
@@ -106,12 +106,12 @@ class AlignmentModalDescriptor:
 
 class EventDetectionWidgetTheme:
     "EventDetectionWidgetTheme"
-    name   = "eventdetectionwidget"
+    name   = "eventdetection"
 
 class EventDetectionWidget(BaseWidget[CheckboxGroup]):
     "Allows displaying only events"
-    def __init__(self, model):
-        super().__init__(model, labels = ['Find events'], title = None)
+    def __init__(self, ctrl, model):
+        super().__init__(ctrl, model, labels = ['Find events'], title = None)
 
     def _onclick_cb(self, value):
         "action to be performed when buttons are clicked"

@@ -31,6 +31,7 @@ from ._model                    import PeaksPlotModelAccess
 
 class ReferenceWidgetTheme:
     "ref widget theme"
+    name  = "hybridstat.fittoreference.widget"
     title = 'Reference Track'
     none  = 'None'
     width = 120
@@ -41,15 +42,16 @@ class ReferenceWidgetTheme:
 class ReferenceWidget:
     "Dropdown for choosing the reference"
     __files : FileList
+    __theme : ReferenceWidgetTheme
     __widget: Dropdown
-    def __init__(self, model) -> None:
-        self.__theme = ReferenceWidgetTheme()
+    def __init__(self, ctrl, model) -> None:
+        self.__theme = ctrl.theme.add(ReferenceWidgetTheme())
         self.__model = model
-
-    def observe(self, ctrl):
-        "sets up observers"
         self.__files = FileList(ctrl)
-        ctrl.theme.add(self.__theme)
+
+    @staticmethod
+    def observe(_):
+        "sets up observers"
 
     def addtodoc(self, ctrl, *_) -> List[Widget]:
         "creates the widget"
@@ -85,12 +87,12 @@ class ReferenceWidget:
 
 class PeaksSequencePathWidget(SequencePathWidget):
     "Widget for setting the sequence to use"
-    def __init__(self, mdl):
-        super().__init__()
-        self._model = mdl
+    def __init__(self, ctrl, mdl: PeaksPlotModelAccess) -> None:
+        super().__init__(ctrl)
+        self.__model = mdl
 
     def _sort(self, lst) -> List[str]: # type: ignore
-        dist = self._model.distances
+        dist = self.__model.distances
         if len(dist):
             lst  = [i for i in lst if i in dist]
             return sorted(lst, key = lambda i: dist[i].value)
@@ -123,6 +125,7 @@ _LINE = """
 
 class PeaksStatsWidgetTheme:
     "PeaksStatsWidgetTheme"
+    name        = "hybridstat.peaks.stats"
     line        = _LINE
     openhairpin =  ' & open hairpin'
     orientation = u'-+ '
@@ -146,13 +149,14 @@ class PeaksStatsWidgetTheme:
 class PeaksStatsWidget:
     "Table containing stats per peaks"
     __widget: PeaksStatsDiv
-    def __init__(self, model:PeaksPlotModelAccess) -> None:
+    __theme : PeaksStatsWidgetTheme
+    def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
         self.__model = model
-        self.__theme = PeaksStatsWidgetTheme()
+        self.__theme = ctrl.theme.add(PeaksStatsWidgetTheme())
 
-    def observe(self, ctrl):
+    @staticmethod
+    def observe(_):
         "sets up observers"
-        ctrl.theme.add(self.__theme)
 
     def addtodoc(self, *_) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
@@ -264,7 +268,8 @@ class PeaksStatsWidget:
         return ret
 
 class PeakListTheme:
-    "PeakListWidgetTheme"
+    "PeakListTheme"
+    name       = "hybridstat.peaks.list"
     height     = 400
     colwidth   = 60
     refid      = '0.0000'
@@ -284,9 +289,10 @@ class PeakListTheme:
 class PeakListWidget:
     "Table containing stats per peaks"
     __widget: DataTable
-    def __init__(self, model:PeaksPlotModelAccess) -> None:
+    __theme:  PeakListTheme
+    def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
         self.__model = model
-        self.__theme = PeakListTheme()
+        self.__theme = ctrl.theme.add(PeakListTheme())
 
     def __cols(self):
         fmt   = lambda i: (StringFormatter(text_align = 'center',
@@ -305,9 +311,9 @@ class PeakListWidget:
             cols[ind].formatter.format = fmt
         return cols
 
-    def observe(self, ctrl):
+    @staticmethod
+    def observe(_):
         "sets up observers"
-        ctrl.theme.add(self.__theme)
 
     def addtodoc(self, _, src) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
         "creates the widget"
@@ -327,6 +333,7 @@ class PeakListWidget:
 
 class PeakIDPathTheme:
     "PeakIDPathTheme"
+    name       = "hybridstat.peaks.idpath"
     title      = 'Id file path'
     filechecks = 500
     width      = 120
@@ -339,10 +346,11 @@ class PeakIDPathWidget:
     "Selects an id file"
     __widget: PathInput
     __dlg   : FileDialog
-    def __init__(self, model:PeaksPlotModelAccess) -> None:
+    __theme : PeakIDPathTheme
+    def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
         self.keeplistening  = True
         self.__model        = model
-        self.__theme        = PeakIDPathTheme()
+        self.__theme        = ctrl.theme.add(PeakIDPathTheme())
 
     def listentofile(self, doc, action):
         "sets-up a periodic callback which checks whether the id file has changed"
@@ -379,7 +387,6 @@ class PeakIDPathWidget:
 
     def observe(self, ctrl):
         "sets up observers"
-        ctrl.theme.add(self.__theme)
         self.__dlg = FileDialog(ctrl,
                                 storage   = 'constraints.path',
                                 filetypes = '*|xlsx')
@@ -418,7 +425,8 @@ class PeakIDPathWidget:
                 else:
                     startfile(path)
 
-            self.__model.constraintspath = str(Path(path).resolve())
+            ctrl.display.update(self.__model.peaksmodel.display,
+                                constraintspath = str(Path(path).resolve()))
 
         self.__widget.on_change('click', _onclick_cb)
         self.__widget.on_change('value', _onchangetext_cb)
@@ -528,10 +536,10 @@ class AdvancedWidget(AdvancedTaskMixin):
 
 def createwidgets(ctrl, mdl: PeaksPlotModelAccess) -> Dict[str, Any]:
     "returns a dictionnary of widgets"
-    return dict(seq      = PeaksSequencePathWidget(mdl),
-                ref      = ReferenceWidget(mdl),
-                oligos   = OligoListWidget(),
-                stats    = PeaksStatsWidget(mdl),
-                peaks    = PeakListWidget(mdl),
-                cstrpath = PeakIDPathWidget(mdl),
+    return dict(seq      = PeaksSequencePathWidget(ctrl, mdl),
+                ref      = ReferenceWidget(ctrl, mdl),
+                oligos   = OligoListWidget(ctrl, ),
+                stats    = PeaksStatsWidget(ctrl, mdl),
+                peaks    = PeakListWidget(ctrl, mdl),
+                cstrpath = PeakIDPathWidget(ctrl, mdl),
                 advanced = AdvancedWidget(ctrl, mdl))

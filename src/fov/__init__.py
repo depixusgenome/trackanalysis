@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"all FoV view aspects here"
-from typing                 import Dict, List, Any # pylint: disable=unused-import
+from typing                 import Dict, List
 import numpy as np
 from bokeh.models           import (ColumnDataSource, Range1d, TapTool, HoverTool,
                                     Selection)
@@ -11,7 +11,7 @@ from control                import Controller
 from control.action         import Action
 from control.beadscontrol   import DataSelectionBeadController
 from data                   import BEADKEY
-from model.plots            import PlotAttrs, PlotTheme, PlotModel
+from model.plots            import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from qualitycontrol.view    import QualityControlModelAccess
 from signalfilter           import rawprecision
 from utils                  import initdefaults
@@ -21,7 +21,7 @@ from view.plots.base        import PlotView, CACHE_TYPE
 
 class FoVPlotTheme(PlotTheme):
     "FoV plot theme"
-    name        = "fovplot"
+    name        = "fov"
     beads       = PlotAttrs('color', 'circle',
                             alpha                   = .7,
                             nonselection_alpha      = .7,
@@ -67,7 +67,8 @@ class FoVPlotTheme(PlotTheme):
 
 class FoVPlotModel(PlotModel):
     "FoV plot model"
-    theme = FoVPlotTheme()
+    theme   = FoVPlotTheme()
+    display = PlotDisplay(name = "fov")
 
 class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
     "Plots a default bead and its FoV"

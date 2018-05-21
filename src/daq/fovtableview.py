@@ -27,7 +27,7 @@ _TEXT = "".join(_BASE % i for i in (("Cycle",        "cycle"),
 
 class FoVTableTheme(BaseModel):
     "summary info on the field of view"
-    name        = 'fovtable'
+    name        = 'daq.fovtable'
     template    = _TEXT
     period      = 1.
     width       = 120

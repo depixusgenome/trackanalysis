@@ -23,11 +23,11 @@ class HistMixin(ABC):
     _model: CyclesModelAccess
     _hover: DpxHoverModel
     _ctrl:  Any
-    def __init__(self):
+    def __init__(self, ctrl):
         "sets up this plotter's info"
         self._histsource: ColumnDataSource = None
         self._hist:       Figure           = None
-        self._ticker                       = SequenceTicker()
+        self._ticker                       = SequenceTicker(ctrl)
 
     @checksizes
     def __data(self, data, shape): # pylint: disable=too-many-locals
@@ -97,7 +97,7 @@ class HistMixin(ABC):
                                      left   = "left",   right = "cycles",
                                      x_range_name = "cycles")
 
-        self._ticker.create(self._hist, self._model, self)
+        self._ticker.create(self._ctrl, self._hist, self._model, self)
 
         self._hover.createhist(self._hist, self._model, self)
         self._hover.slaveaxes(self._hist, self._histsource)

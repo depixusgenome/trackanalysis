@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 "Deals with global information"
 from functools              import partial
-from model.task.application import TasksModel
+from model.task.application import TasksModel, TaskIOTheme
 
 class TasksView:
     "View listing all tasks global info"
-    def __init__(self, **kwa):
-        self._model = TasksModel(**kwa)
+    def __init__(self, ctrl):
+        self._model = TasksModel()
+        self._model.addto(ctrl, False)
+        ctrl.theme.add(TaskIOTheme(), False)
 
     def _onclosetrack(self, ctrl, **_):
         inst = next(ctrl.tasks.tasklist(...), None)
@@ -20,6 +22,7 @@ class TasksView:
 
     def observe(self, ctrl):
         "observing the controller"
-        self._model.addtocontroller(ctrl, False)
+        self._model.addto(ctrl, False)
+        ctrl.theme.add(TaskIOTheme(), False)
         ctrl.tasks.observe(closetrack = partial(self._onclosetrack, ctrl),
                            opentrack  = partial(self._onopentrack,  ctrl))

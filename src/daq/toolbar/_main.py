@@ -14,7 +14,7 @@ from ._messages     import DAQMessagesView
 
 class DAQRecordTheme:
     "record theme"
-    name            = "recording"
+    name            = "daq.recording"
     title           = "Record path"
     filetypes       = "h5"
     description     = 'record files'
@@ -55,7 +55,7 @@ class DAQRecordFileDialog(BaseFileDialog):
             spawn(_run)
 
         theme                          = self._theme
-        self.defaults[theme.filetypes] = (theme.description, '.'+theme.filetypes)
+        self._config.types[theme.filetypes] = (theme.description, '.'+theme.filetypes)
         tbar.on_change(name, _onclick_cb)
 
 class DAQToolbar:

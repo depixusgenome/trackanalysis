@@ -16,6 +16,7 @@ from ._io                   import setupio
 
 class HybridStatTheme:
     "HybridStatTheme"
+    name                   = "hybridstat"
     width                  = 500
     height                 = 60
     titles: Dict[str, str] = {}
@@ -29,12 +30,12 @@ class HybridStatView(BokehView):
         super().__init__(ctrl = ctrl, **kwa)
         self._tabs   = None
         self._roots  = [] # type: ignore
-        self.__theme = HybridStatTheme()
-        self._panels = [FoVPlotView         (ctrl = ctrl, **kwa),
-                        QualityControlView  (ctrl = ctrl, **kwa),
-                        CleaningView        (ctrl = ctrl, **kwa),
-                        CyclesPlotView      (ctrl = ctrl, **kwa),
-                        PeaksPlotView       (ctrl = ctrl, **kwa)]
+        self.__theme = ctrl.theme.add(HybridStatTheme())
+        self._panels = [FoVPlotView         (ctrl, **kwa),
+                        QualityControlView  (ctrl, **kwa),
+                        CleaningView        (ctrl, **kwa),
+                        CyclesPlotView      (ctrl, **kwa),
+                        PeaksPlotView       (ctrl, **kwa)]
 
         titles = self.__theme.titles
         for panel in self._panels:
@@ -65,7 +66,7 @@ class HybridStatView(BokehView):
         "Allows setting-up stuff only when the view is the main one"
         self.__select(CleaningView) .ismain(ctrl)
         self.__select(PeaksPlotView).ismain(ctrl)
-        ctrl.theme.updatedefaults("taskio", tasks = self.TASKS)
+        ctrl.theme.updatedefaults("tasks.io", tasks = self.TASKS)
         def _advanced():
             for panel in self._panels:
                 if self.__state(panel) is PlotState.active:

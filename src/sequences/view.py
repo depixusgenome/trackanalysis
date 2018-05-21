@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Create a grid displaying a sequence"
-from    typing         import List, Optional, Tuple
+from    typing         import List, Optional, Tuple, Any
 import  numpy   as np
 
 import  bokeh.core.properties as props
@@ -21,6 +21,7 @@ from   .modelaccess         import SequenceModel
 
 class SequenceTickerTheme:
     "sequence ticker theme"
+    name     = "sequence.ticker"
     standoff = -2
     grid     = dict(dark = dict(color = ('lightgray', 'lightgreen'),
                                 width = (1,          1),
@@ -55,12 +56,12 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 
     __implementation__ = "sequenceticker.coffee"
 
-    def __init__(self, **kwa):
+    def __init__(self, ctrl, **kwa):
         super().__init__(**kwa)
         self.__defaults:dict = dict()
         self.__withbase:list = []
         self.__model         = None
-        self.__theme         = SequenceTickerTheme()
+        self.__theme         = ctrl.theme.add(SequenceTickerTheme(), False)
         self.__fig           = None
         self.__axis: SequenceTicker = None
 
@@ -69,15 +70,15 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
         u"returns the fixed axis"
         return self.__axis
 
-    def observe(self, ctrl):
+    @staticmethod
+    def observe(_):
         "add observers"
-        self.__theme = ctrl.theme.add(self.__theme, True)
 
-    def create(self, fig, mdl, loc = 'right'):
+    def create(self, ctrl, fig, mdl, loc = 'right'):
         "Sets the ticks according to the configuration"
         self.__model = mdl
         self.__fig   = fig
-        self.__axis  = type(self)()
+        self.__axis  = type(self)(ctrl)
 
         fig.extra_y_ranges        = {"bases": Range1d(start = 0., end = 1.)}
         fig.add_layout(LinearAxis(y_range_name = "bases",
@@ -129,6 +130,7 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 
 class SequenceHoverTheme:
     "sequence hover theme"
+    name     = "sequence.hover"
     radius   = 1.
     policy   = 'follow_mouse'
     tooltips = '@z{1.1111} ↔ @values: @text'
@@ -140,11 +142,11 @@ class SequenceHoverTheme:
 
 class SequenceHoverMixin:
     "controls keypress actions"
-    def __init__(self):
-        self.__source: ColumnDataSource = None
-        self.__tool:   DpxHoverTool     = None
-        self.__theme                    = SequenceHoverTheme()
-        self._model                     = None
+    __source: ColumnDataSource
+    __tool:   DpxHoverTool
+    _model:   Any
+    def __init__(self, ctrl):
+        self.__theme = ctrl.theme.add(SequenceHoverTheme(), False)
 
     @staticmethod
     def impl(name, fields, extra = None):
@@ -153,9 +155,9 @@ class SequenceHoverMixin:
         code = implementation(__file__, args, NAME  = name, extra = extra)
         return code
 
-    def observe(self, ctrl):
+    @staticmethod
+    def observe(_):
         "add observers"
-        self.__theme = ctrl.theme.add(self.__theme, True)
 
     @property
     def source(self):
@@ -226,6 +228,7 @@ class SequenceHoverMixin:
 
 class SequencePathTheme:
     "SequencePathWidgetTheme"
+    name        = "sequence.path"
     name        = "sequencetheme"
     dlgtitle    = 'Open a fasta file'
     label       = 'Selected DNA sequence'
@@ -240,10 +243,12 @@ class SequencePathWidget:
     "Dropdown for choosing a fasta file"
     __dialog: FileDialog
     __widget: Dropdown
-    def __init__(self):
+    __theme:  SequencePathTheme
+    __model:  SequenceModel
+    def __init__(self, ctrl):
         self.__list: List[str] = []
-        self.__theme           = SequencePathTheme()
-        self.__model           = SequenceModel()
+        self.__theme           = ctrl.theme.add(SequencePathTheme())
+        self.__model           = SequenceModel().addto(ctrl)
 
     def addtodoc(self, ctrl, *_) -> List[Widget]:
         "creates the widget"
@@ -262,8 +267,6 @@ class SequencePathWidget:
                                    storage   = "sequence",
                                    title     = self.__theme.dlgtitle,
                                    filetypes = 'fasta|*')
-        self.__theme  = ctrl.theme.  add(self.__theme,   True)
-        self.__model  = SequenceModel.create(ctrl)
 
         fcn           = lambda **_: self.__widget.update(**self.__data())
         ctrl.theme.  observe(self.__model.config,  fcn)
@@ -324,7 +327,7 @@ class SequencePathWidget:
 
 class OligoListTheme:
     "OligoListTheme"
-    name      = 'probestheme'
+    name      = "sequence.probes"
     title     = 'Oligos'
     tooltip   = 'comma-separated list'
     width     = 120
@@ -335,15 +338,15 @@ class OligoListTheme:
 class OligoListWidget:
     "Input for defining a list of oligos"
     __widget: AutocompleteInput
-    def __init__(self):
-        self.__theme = OligoListTheme()
-        self.__model = SequenceModel()
+    __theme:  OligoListTheme
+    __model:  SequenceModel
+    def __init__(self, ctrl):
+        self.__theme = ctrl.theme.add(OligoListTheme())
+        self.__model = SequenceModel().addto(ctrl)
 
     def observe(self, ctrl):
         "sets-up config observers"
-        self.__theme = ctrl.theme.add(self.__theme)
-        self.__model = SequenceModel.create(ctrl)
-        fcn          = lambda **_: self.__widget.update(**self.__data())
+        fcn = lambda **_: self.__widget.update(**self.__data())
         ctrl.theme  .observe(self.__model.config,  fcn)
         ctrl.display.observe(self.__model.display, fcn)
 

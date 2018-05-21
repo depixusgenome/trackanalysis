@@ -67,7 +67,7 @@ class DecentralizedController(Controller):
         "add a model to be updated & observed through this controller"
         name = self._objname(obj)
         if name in self._objects:
-            if noerase:
+            if noerase and self.model(name) is not obj:
                 raise KeyError(f"key already registered: {name}")
             elif not isinstance(self.model(name), type(obj)):
                 raise TypeError(f"key already registered to a different type: {name}")

@@ -86,24 +86,18 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
             self[key]   = value
             return value
 
-    def __init__(self, ctrl, *_) -> None:
+    def __init__(self, ctrl, addto = True) -> None:
         "sets up this plotter's info"
-        key = type(self).key()
         self._model:     ControlModelType = templateattribute(self, 0)(ctrl)
-        self._plotmodel: PlotModelType    = templateattribute(self, 1)(name = key)
+        self._plotmodel: PlotModelType    = templateattribute(self, 1)()
         self._ctrl                        = ctrl
+        if addto:
+            self._plotmodel.addto(ctrl)
+            self._model.addto(ctrl)
 
     def defaultsizingmode(self, kwa = None, **kwargs):
         "the default sizing mode"
         return _defaultsizingmode(self, kwa = kwa, **kwargs)
-
-    @classmethod
-    def key(cls):
-        "the key to this plot creator"
-        name = cls.__name__.lower()
-        if 'plot' in name:
-            name = name[:name.rfind('plot')]
-        return ".plot." + name
 
     def action(self, fcn = None):
         u"decorator which starts a user action but only if state is set to active"
@@ -310,10 +304,10 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                                        right  = right,
                                        bottom = bottom,)
 
-    def observe(self, ctrl):
+    def observe(self, ctrl, noerase = True):
         "sets-up model observers"
         if self._plotmodel:
-            self._plotmodel.observe(ctrl)
+            self._plotmodel.observe(ctrl, noerase)
 
     @abstractmethod
     def _addtodoc(self, ctrl, doc):
@@ -356,11 +350,11 @@ class PlotView(Generic[PlotType], BokehView):
     def _ismain(self, ctrl, tasks = None, ioopen = None, iosave = None):
         "Set-up things if this view is the main one"
         self._plotter.ismain(ctrl)
-        cnf = ctrl.theme.model("taskio", True)
+        cnf = ctrl.theme.model("tasks.io", True)
         if cnf is None:
-            ctrl.theme.add(TaskIOTheme().setup(tasks, ioopen, iosave))
+            ctrl.theme.add(TaskIOTheme().setup(tasks, ioopen, iosave), False)
         else:
-            diff = cnf.diff(cnf.setup(tasks, ioopen, iosave))
+            diff = cnf.setup(tasks, ioopen, iosave).diff(cnf)
             if diff:
                 ctrl.theme.updatedefaults(cnf, **diff)
 

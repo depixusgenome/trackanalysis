@@ -157,11 +157,10 @@ class BaseSuperController:
 
     def _configio(self):
         cnf  = ConfigurationIO(self)
-
         maps = self._getmaps()
 
         # 1. write the whole config down
-        cnf.writeuserconfig(maps,                     "defaults",   True,  index = 1)
+        cnf.writeuserconfig(maps, "defaults",   True,  index = 1)
 
         # 2. read & write the user-provided config: discards unknown keys
         cnf.writeuserconfig(cnf.readconfig(maps, "userconfig"), "userconfig", False, index = 0)
@@ -174,14 +173,21 @@ class BaseSuperController:
     def _getmaps(self):
         maps = {'theme':  {'appsize': self.APPSIZE, 'appname': self.APPNAME.capitalize()},
                 'config': {'catcherror': DisplayController.CATCHERROR}}
-        for i, j in  self.theme.config.items():
-            maps['theme.'+i] = j
+        keys = {i for i, j in self.theme.current.items()
+                if type(j).__name__.endswith("Config")}
+        outs = {f'{"config" if i in keys else "theme"}{i}': j
+                for i, j in self.theme.config.items()}
+        for i, j in maps.items():
+            j.update(outs.pop(i, {}))
+        maps.update(outs)
         return maps
 
     def _setmaps(self, maps):
         for i, j in maps.items():
             if i.startswith('theme.') and i[6:] in self.theme and j:
                 self.theme.update(i[6:], **j)
+            elif i.startswith('config.') and i[7:] in self.theme and j:
+                self.theme.update(i[7:], **j)
 
     def _observeargs(self):
         raise NotImplementedError()

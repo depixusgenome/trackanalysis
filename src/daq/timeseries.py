@@ -25,7 +25,7 @@ _ZERO = np.empty(0, dtype = [('_','f4')])
 
 class TimeSeriesTheme:
     "information about the time series displayed"
-    name      = "timeseries"
+    name      = "daq.timeseries"
     labels    = {"zmag":    "Magnets (µm)",
                  "time":    "Frames",
                  "x":       "X (µm)",
@@ -166,7 +166,7 @@ class TimeSeriesViewMixin(ABC):
 
 class BeadTimeSeriesDisplay:
     "Information about the current bead displayed"
-    name         = "beadtimeseries"
+    name         = "daq.timeseries.bead"
     xvar         = 'time'
     leftvar      = "z"
     rightvar     = "zmag"
@@ -178,7 +178,7 @@ class BeadTimeSeriesDisplay:
 class BeadTimeSeriesModel(DisplayModel[BeadTimeSeriesDisplay, TimeSeriesTheme]):
     "model for display the time series"
     def __init__(self, **_):
-        super().__init__(name = 'beadtimeseries', **_)
+        super().__init__(name = 'daq.timeseries.bead', **_)
 
 class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesModel]):
     "display the current bead"
@@ -310,7 +310,7 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
 
 class FoVTimeSeriesDisplay:
     "Information about the current fov parameter displayed"
-    name     = "fovtimeseries"
+    name     = "daq.timeseries.fov"
     xvar     = 'time'
     leftvar  = "tsample"
     rightvar = "zmag"
@@ -321,7 +321,7 @@ class FoVTimeSeriesDisplay:
 class FoVTimeSeriesModel(DisplayModel[FoVTimeSeriesDisplay, TimeSeriesTheme]):
     "model for display the time series"
     def __init__(self, **_):
-        super().__init__(name = 'fovtimeseries', **_)
+        super().__init__(name = 'daq.timeseries.fov', **_)
 
 class FoVTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[FoVTimeSeriesModel]):
     "display the current fov parameter"

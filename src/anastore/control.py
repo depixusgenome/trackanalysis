@@ -13,7 +13,7 @@ LOGS = getLogger(__name__)
 class AnaIO(TaskIO):
     "Ana IO"
     EXT = ('ana',)
-    def open(self, path:Union[str, Tuple[str,...]], model:tuple):
+    def open(self, path:Union[str, Tuple[str,...]], model:tuple): # type: ignore
         u"opens an ana file"
         if isinstance(path, tuple):
             if len(path) != 1:
@@ -36,9 +36,9 @@ class AnaIO(TaskIO):
             raise IOError("Nothing to save", "warning")
         return True
 
-class ConfigAnaIOTheme:
+class ConfigAnaIOConfig:
     "define how to save the json data"
-    name         = "configanaio"
+    name         = "anaio"
     indent       = 4
     ensure_ascii = False
     sort_keys    = True
@@ -52,7 +52,7 @@ class ConfigAnaIO(AnaIO):
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
         self._ctrl  = ctrl
-        self._model = ConfigAnaIOTheme()
+        self._model = ConfigAnaIOConfig()
         ctrl.theme.add(self._model)
 
     def save(self, path:str, models):

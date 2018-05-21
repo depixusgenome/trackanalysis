@@ -149,7 +149,7 @@ class ProtocolButton(BaseProtocolButton[PROTOCOL]):
     _TITLE: ClassVar[str]
     def __init__(self, **kwa):
         self._model = templateattribute(self, 0)(**kwa)
-        self._theme = DAQProtocolTheme(name  = self._model.name+"theme",
+        self._theme = DAQProtocolTheme(name  = "daq."+self._model.name,
                                        title = self._TITLE,
                                        **kwa)
 
@@ -202,7 +202,7 @@ class DAQManualButton(BaseProtocolButton[DAQManualConfig]):
               ["Speed", *(f'%(speed.{i}).3f' for i in ('vmin', 'vmax', 'inc'))]]
     def __init__(self, **kwa):
         self._model = DAQManualConfig(**kwa)
-        self._theme = DAQProtocolTheme(name  = self._model.name+"theme",
+        self._theme = DAQProtocolTheme(name  = "daq."+self._model.name,
                                        body  = self._BODY,
                                        title = self._TITLE,
                                        **kwa)
@@ -299,7 +299,7 @@ class DAQNetworkButton:
               ["Bead",   "%(beads.address[0])250s", "%(beads.address[1])d",
                "%(beads.multicast)120s"]]
     def __init__(self, **kwa):
-        self._theme = DAQProtocolTheme(name       = "networktheme",
+        self._theme = DAQProtocolTheme(name       = "daq.network",
                                        body       = self._BODY,
                                        title      = self._TITLE,
                                        firstwidth = 120, **kwa)

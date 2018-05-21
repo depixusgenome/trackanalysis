@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 class BeadToolbarTheme:
     "BeadToolbarTheme"
-    name         = "beadtoolbar"
+    name         = "toolbar"
     openlabel    = 'Open'
     savelabel    = 'Save'
     quitlabel    = 'Quit'
@@ -59,7 +59,7 @@ class TrackFileDialog(FileDialog):
     def setup(self, ctrl, _):
         "sets the document"
         self.filetypes = '*|'+TaskIO.extensions(ctrl, 'openers')
-        self.title     = ctrl.theme.get("beadtoolbar", 'opentitle')
+        self.title     = ctrl.theme.get("toolbar", 'opentitle')
 
     async def run(self, ctrl, doc):
         "runs the dialog"
@@ -108,7 +108,7 @@ class SaveFileDialog(FileDialog):
     def setup(self, ctrl, _):
         "sets the document"
         self.filetypes = TaskIO.extensions(ctrl, 'savers')
-        self.title     = ctrl.theme.get("beadtoolbar", 'savetitle')
+        self.title     = ctrl.theme.get("toolbar", 'savetitle')
 
     async def run(self, ctrl, doc):
         "runs the dialog"
@@ -144,7 +144,7 @@ class DpxToolbar(Widget):
 class MessageTheme:
     "Message theme"
     _SIZ    = 'height: 28px; margin-top: 0px;'
-    name    = "message"
+    name    = "toolbar.message"
     period  = 50
     width   = 350
     busy    = "Please wait ..."
@@ -171,20 +171,15 @@ class MessageDisplay:
 
 class MessagesView:
     "Everything related to messages"
-    def __init__(self, **_):
-        self._theme        = MessageTheme(**_)
-        self._display      = MessageDisplay(**_)
+    def __init__(self, ctrl, **_):
+        self._theme        = ctrl.theme.add(MessageTheme(**_))
+        self._display      = ctrl.display.add(MessageDisplay(**_))
         self._last:list    = [None, None, self._theme.timeout['normal']]
         self._tbar         = None
         self._doc:Document = None
 
     def observe(self, ctrl):
         "initializes globals"
-        if self._theme in ctrl.theme:
-            return
-
-        ctrl.theme.add(self._theme)
-        ctrl.display.add(self._display)
         busy  = self._theme.busy, 'normal'
 
         @ctrl.display.observe
@@ -205,7 +200,7 @@ class MessagesView:
                       value      = None,
                       catcherror = None, **_):
             if not recursive and value is not None:
-                LOGS.info('stop')
+                LOGS.debug('stop')
                 ctrl.display.update(self._display, message = value)
                 catcherror[0] = getattr(ctrl, 'CATCHERROR', True)
 
@@ -371,7 +366,7 @@ class FileList:
             return task.key
 
         lst = task.path
-        cnf = ctrl.theme.model("beadtoolbar")
+        cnf = ctrl.theme.model("toolbar")
         if isinstance(lst, (tuple, list)):
             if len(lst) > 1:
                 # pylint: disable=eval-used
@@ -448,14 +443,12 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         for cls in self._HELPERS:
             cls.init(ctrl)
 
-        self.__messages = MessagesView()
-        self.__theme    = BeadToolbarTheme()
-        self.__tbar     = None
+        self.__messages = MessagesView(ctrl)
+        self.__theme    = ctrl.theme.add(BeadToolbarTheme())
 
     def observe(self, ctrl):
         "sets up observers"
         self.__messages.observe(ctrl)
-        ctrl.theme.add(self.__theme, True)
         self.__diagopen = TrackFileDialog(self._ctrl)
         self.__diagsave = SaveFileDialog(self._ctrl)
 

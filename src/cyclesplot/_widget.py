@@ -23,7 +23,7 @@ from    ._model             import CyclesModelAccess, CyclesPlotTheme
 
 class PeaksTableTheme:
     "peaks table theme"
-    name    = "peakstable"
+    name    = "cycles.peakstable"
     height  = 100
     width   = 60
     title   = 'dna ↔ nm'
@@ -48,9 +48,9 @@ class PeaksTableDisplay:
 class PeaksTableWidget:
     "Table of peaks in z and dna units"
     __widget: DataTable
-    def __init__(self, tasks:CyclesModelAccess) -> None:
-        self.__theme   = PeaksTableTheme()
-        self.__display = PeaksTableDisplay()
+    def __init__(self, ctrl, tasks:CyclesModelAccess) -> None:
+        self.__theme   = ctrl.theme.add(PeaksTableTheme())
+        self.__display = ctrl.display.add(PeaksTableDisplay())
         self.__tasks   = tasks
 
     def addtodoc(self, _) -> List[Widget]:
@@ -111,7 +111,7 @@ class PeaksTableWidget:
 
 class ConversionSliderTheme:
     "Conversion slider table theme"
-    name    = "conversionslider"
+    name    = "cycles.conversionslider"
     stretch = dict(start = 900,  step  = 5, end = 1400, title = 'Stretch (base/µm)')
     bias    = dict(step  = 1e-4, ratio = .25, offset = .05, title = 'Bieas (µm)')
     width   = 60
@@ -124,9 +124,9 @@ class ConversionSlidersWidget:
     __stretch: Slider
     __bias:    Slider
     __figdata: ColumnDataSource
-    def __init__(self, display) -> None:
+    def __init__(self, ctrl, display) -> None:
         self.__display = display
-        self.__theme   = ConversionSliderTheme()
+        self.__theme   = ctrl.theme.add(ConversionSliderTheme())
 
     def addinfo(self, histsource):
         "adds info to the widget"
@@ -170,14 +170,15 @@ class ConversionSlidersWidget:
 
 class DriftWidgetTheme:
     "drift widget theme"
+    name   = 'cycles.drift'
     labels = ['Per bead', 'Per cycle']
     title  = 'Drift Removal'
 
 class DriftWidget:
     "Allows removing the drifts"
     __widget: CheckboxButtonGroup
-    def __init__(self, tasks:CyclesModelAccess) -> None:
-        self.__theme = DriftWidgetTheme()
+    def __init__(self, ctrl, tasks:CyclesModelAccess) -> None:
+        self.__theme = ctrl.theme.add(DriftWidgetTheme())
         self.__tasks = tasks
 
     def addtodoc(self, ctrl) -> List[Widget]:
@@ -201,9 +202,9 @@ class DriftWidget:
         "updates the widget"
         resets[self.__widget].update(**self.__data())
 
-    def observe(self, ctrl):
+    @staticmethod
+    def observe(_):
         "sets-up config observers"
-        ctrl.theme.add(self.__theme)
 
     def __data(self) -> dict:
         value = [] # type: List[int]
@@ -236,15 +237,15 @@ class AdvancedWidget(AdvancedWidgetMixin):
 
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
-    def __init__(self, ctrl):
-        self.__widgets = dict(table    = PeaksTableWidget(self._model),
-                              sliders  = ConversionSlidersWidget(self._model),
-                              seq      = SequencePathWidget(),
-                              oligos   = OligoListWidget(),
-                              align    = AlignmentWidget(self._model.alignment),
-                              drift    = DriftWidget(self._model),
-                              events   = EventDetectionWidget(self._model.eventdetection),
-                              advanced = AdvancedWidget(ctrl, self._model))
+    def __init__(self, ctrl, model):
+        self.__widgets = dict(table    = PeaksTableWidget(ctrl, model),
+                              sliders  = ConversionSlidersWidget(ctrl, model),
+                              seq      = SequencePathWidget(ctrl),
+                              oligos   = OligoListWidget(ctrl),
+                              align    = AlignmentWidget(ctrl, model.alignment),
+                              drift    = DriftWidget(ctrl, model),
+                              events   = EventDetectionWidget(ctrl, model.eventdetection),
+                              advanced = AdvancedWidget(ctrl, model))
 
     def ismain(self, ctrl):
         "setup for when this is the main show"
@@ -281,7 +282,7 @@ class WidgetMixin(ABC):
 
     def _resetwidget(self, cache: CACHE_TYPE):
         for ite in self.__widgets.values():
-            ite.reset(cache)
+            ite.reset(cache) # type: ignore
 
     def __slave_to_hover(self, widgets):
         jsc = CustomJS(code = "hvr.on_change_hover(table, stretch, bias, fig, ttip)",

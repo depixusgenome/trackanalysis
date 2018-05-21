@@ -85,7 +85,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         super().__init__(ctrl)
         self._src: Dict[str, ColumnDataSource] = {}
         self._widgets                          = createwidgets(ctrl, self._model)
-        self._ticker                           = SequenceTicker()
+        self._ticker                           = SequenceTicker(ctrl)
         self._hover                            = PeaksSequenceHover()
 
     @property

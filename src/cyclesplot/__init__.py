@@ -16,7 +16,7 @@ from   ._raw                import RawMixin
 from   ._hist               import HistMixin
 from   ._widget             import WidgetMixin
 
-class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel],
+class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # type: ignore
                         HistMixin, RawMixin, WidgetMixin):
     "Displays cycles and their projection"
     _model: CyclesModelAccess
@@ -25,8 +25,8 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel],
         "sets up this plotter's info"
         super().__init__(ctrl)
         RawMixin   .__init__(self)
-        HistMixin  .__init__(self)
-        WidgetMixin.__init__(self, ctrl)
+        HistMixin  .__init__(self, ctrl)
+        WidgetMixin.__init__(self, ctrl, self._model)
 
     def _addtodoc(self, ctrl, doc):
         "returns the figure"

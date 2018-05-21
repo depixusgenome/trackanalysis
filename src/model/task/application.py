@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 DEFAULT_TASKS: Dict[str, Task] = {}
 
-class TasksTheme(ConfigObject):
+class TasksConfig(ConfigObject):
     """
     permanent globals on tasks
     """
@@ -77,7 +77,7 @@ class TaskIOTheme(ConfigObject):
     """
     Info used when opening track files
     """
-    name = "taskio"
+    name = "tasks.io"
     tasks:      List[str] = []
     inputs:     List[str] = ['anastore.control.AnaIO',
                              'control.taskio.ConfigGrFilesIO',
@@ -131,19 +131,15 @@ class TaskIOTheme(ConfigObject):
         modname, clsname = name[:name.rfind('.')], name[name.rfind('.')+1:]
         return getattr(__import__(modname, fromlist = [clsname]), clsname)
 
-
 class TasksModel:
     "tasks related stuff"
-    theme   = TasksTheme()
-    display = TasksDisplay()
+    def __init__(self):
+        self.config  = TasksConfig()
+        self.display = TasksDisplay()
 
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
-
-    def addtocontroller(self, ctrl, noerase = True):
+    def addto(self, ctrl, noerase = True):
         """
         adds the current obj to the controller
         """
-        self.theme   = ctrl.theme.model  (self.theme.name,   noerase)
-        self.display = ctrl.display.model(self.display.name, noerase)
+        self.config  = ctrl.theme.model  (self.config,  noerase)
+        self.display = ctrl.display.model(self.display, noerase)

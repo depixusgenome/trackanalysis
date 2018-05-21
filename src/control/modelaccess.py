@@ -6,7 +6,7 @@ from typing                 import (Tuple, Optional, Iterator, Union, Any,
 from copy                   import copy as shallowcopy
 
 from model.task             import RootTask, Task
-from model.task.application import DEFAULT_TASKS, TasksDisplay, TasksTheme, TasksModel
+from model.task.application import DEFAULT_TASKS, TasksModel
 from data.track             import Track
 from data.views             import TrackView
 from data.views             import BEADKEY
@@ -19,8 +19,7 @@ from .event                 import Controller
 
 class PlotModelAccess:
     "Default plot model"
-    def __init__(self, model:Union[Controller, 'PlotModelAccess'], key = None) -> None:
-        self._key   = key
+    def __init__(self, model:Union[Controller, 'PlotModelAccess']) -> None:
         self._model = model
         self._ctrl  = getattr(model, '_ctrl', model)
 
@@ -36,6 +35,10 @@ class PlotModelAccess:
     def themename(self) -> str:
         "return the theme name"
         return self._ctrl.theme.get("main", "themename", "dark")
+
+    def addto(self, ctrl, name = "tasks"):
+        "add to controller"
+        pass
 
 class ReplaceProcessors(CacheReplacement):
     """
@@ -64,20 +67,19 @@ class ReplaceProcessors(CacheReplacement):
 
 class TaskPlotModelAccess(PlotModelAccess):
     "Contains all access to model items likely to be set by user actions"
-    def __init__(self, model:Union[Controller, 'PlotModelAccess'], key = None) -> None:
-        super().__init__(model, key)
-        self._tasksmodel = TasksModel(theme   = TasksTheme  (name = key),
-                                      display = TasksDisplay(name = key))
+    def __init__(self, model:Union[Controller, 'PlotModelAccess']) -> None:
+        super().__init__(model)
+        self._tasksmodel = TasksModel()
 
-    def settaskmodel(self, ctrl, name):
+    def addto(self, ctrl, name = "tasks"):
         "set _tasksmodel to same as main"
-        lst = ('display', 'theme')
-        if name not in ctrl.theme:
-            for i in lst:
-                getattr(self._tasksmodel , i).name = name
-                getattr(ctrl, i).add(getattr(self._tasksmodel, i))
+        lst = (('display', 'display'), ('config', 'theme'))
+        for i, j in lst:
+            itm = getattr(self._tasksmodel , i)
+            itm.name = name
+            setattr(self._tasksmodel, i, getattr(ctrl, j).add(itm, False))
 
-        objs = [(i, getattr(ctrl, i).model(getattr(self._tasksmodel, i))) for i in lst]
+        objs = [(i, getattr(ctrl, j).model(getattr(self._tasksmodel, i))) for i, j in lst]
         done = set()
         itms = {self}
         while len(itms):
@@ -118,7 +120,7 @@ class TaskPlotModelAccess(PlotModelAccess):
         if root is not self.roottask:
             return False
 
-        order = tuple(self._tasksmodel.theme.taskorder)
+        order = tuple(self._tasksmodel.config.taskorder)
         order = order[order.index(type(task)):]
         return any(val.tasktype in order for val in self.__dict__.values()
                    if isinstance(val, TaskAccess))
@@ -150,7 +152,7 @@ class TaskAccess(TaskPlotModelAccess):
     attrs:      ClassVar[Tuple[Tuple[str, Any],...]]
     side:       ClassVar[int]
     configname: ClassVar[str]
-    def __init__(self, ctrl: PlotModelAccess, **_) -> None:
+    def __init__(self, ctrl: PlotModelAccess) -> None:
         super().__init__(ctrl)
         assert isinstance(self.configtask, self.tasktype)
 
@@ -174,12 +176,12 @@ class TaskAccess(TaskPlotModelAccess):
     @property
     def configtask(self) -> Task:
         "returns the config task"
-        return self._tasksmodel.theme.tasks[self.configname]
+        return self._tasksmodel.config.tasks[self.configname]
 
     @configtask.setter
     def configtask(self, values: Union[Task, Dict[str,Task]]):
         "returns the config task"
-        task = self._tasksmodel.theme.tasks[self.configname]
+        task = self._tasksmodel.config.tasks[self.configname]
         kwa  = diffobj(task, values) if isinstance(values, Task) else values
         kwa  = self._configattributes(kwa)
         if not kwa:
@@ -198,8 +200,7 @@ class TaskAccess(TaskPlotModelAccess):
     @property
     def index(self) -> Optional[Task]:
         "returns the index the new task should have"
-        theme = self._tasksmodel.theme
-        return theme.defaulttaskindex(self.tasklist, self.tasktype, self.side)
+        return self._tasksmodel.config.defaulttaskindex(self.tasklist, self.tasktype, self.side)
 
     @property
     def cache(self) -> Callable[[],Any]:
@@ -240,11 +241,6 @@ class TaskAccess(TaskPlotModelAccess):
     def check(self, task, parent = NoArgs) -> bool:
         "wether this controller deals with this task"
         return self._check(task, parent) and not task.disabled
-
-    def observe(self, *args, **kwa):
-        "observes the provided task"
-        check = lambda parent = None, task = None, **_: self.check(task, parent)
-        self._ctrl.tasks.observe(*args, argstest = check, **kwa)
 
     @property
     def _task(self) -> Optional[Task]:

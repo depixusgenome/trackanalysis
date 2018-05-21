@@ -31,9 +31,6 @@ class DpxKeyEvent(Model):
         if ctrl is not None:
             self.observe(ctrl)
 
-    def addtocontroller(self, ctrl):
-        "adds models to the controller"
-
     def close(self):
         "Removes the controller"
         self._keys.clear()

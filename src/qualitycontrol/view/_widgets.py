@@ -41,7 +41,7 @@ class SummaryWidget:
 
     def observe(self, ctrl):
         "do nothing"
-        ctrl.theme.add("qcsummarywidget", {'text': self.__model})
+        ctrl.theme.add("qc.summary", {'text': self.__model})
 
     def addtodoc(self, _):
         "creates the widget"
@@ -68,6 +68,7 @@ class SummaryWidget:
 
 class MessagesListWidgetTheme:
     "MessagesListWidgetTheme"
+    name     = "qc.messages"
     height   = 500
     labels   = {'extent'     : 'Δz',
                 'pingpong'   : 'Σ|dz|',

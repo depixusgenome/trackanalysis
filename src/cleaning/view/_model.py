@@ -5,7 +5,7 @@ from typing                     import Optional, List, Set, cast
 import numpy as np
 
 from utils                      import NoArgs, initdefaults
-from model.plots                import PlotAttrs, PlotTheme, PlotModel
+from model.plots                import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 # pylint: disable=unused-import
 from control.modelaccess        import TaskPlotModelAccess, TaskAccess
 from eventdetection.processor   import ExtremumAlignmentTask
@@ -97,8 +97,8 @@ class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
 
 class DataCleaningModelAccess(TaskPlotModelAccess):
     "Model for Cycles View"
-    def __init__(self, ctrl, key: str = None) -> None:
-        super().__init__(ctrl, key)
+    def __init__(self, ctrl) -> None:
+        super().__init__(ctrl)
         self.alignment  = ExtremumAlignmentTaskAccess(self)
         self.cleaning   = DataCleaningAccess(self)
         self.subtracted = BeadSubtractionAccess(self)
@@ -107,6 +107,7 @@ class CleaningPlotTheme(PlotTheme):
     """
     cleaning plot theme
     """
+    name             = "cleaning"
     points           = PlotAttrs('color',  'circle', 1, alpha   = .5)
     figsize          = 500, 800, 'fixed'
     widgetwidth      = 470
@@ -131,3 +132,4 @@ class CleaningPlotModel(PlotModel):
     cleaning plot model
     """
     theme   = CleaningPlotTheme()
+    display = PlotDisplay(name = "cleaning")

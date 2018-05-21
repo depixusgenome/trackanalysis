@@ -27,11 +27,11 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
     _fig:    Figure
     def __init__(self, ctrl, mdl: QualityControlModelAccess, **_) -> None:
         super().__init__(ctrl)
-        name = self.__class__.__name__.replace('PlotCreator', '')
-        self._display.name   = name
-        self._config.name    = name
+        name = "qc."+self.__class__.__name__.lower().replace("plotcreator", "")
+        self._display.name   = name+".plot"
+        self._config .name   = name
         self._theme  .name   = name
-        self._theme  .ylabel = f'T {name[1:].lower()} (°C)'
+        self._theme  .ylabel = f'T {name[3:].lower()} (°C)'
         self._tasks                 = mdl
         self._src: ColumnDataSource = {}
 
@@ -187,7 +187,7 @@ class QualityControlPlots:
     def observe(self, _):
         "sets up observers"
         for i in self.__dict__.values():
-            i.observe(_)
+            i.observe(_, False)
 
     def reset(self, bkmodels):
         "resets the plots"
