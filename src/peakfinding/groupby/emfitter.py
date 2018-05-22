@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
 import itertools
+import warnings
 from abc import abstractmethod
 from functools import partial
 from typing import Dict, Tuple
@@ -11,12 +12,16 @@ from sklearn.mixture import GaussianMixture
 
 from utils import initdefaults
 
-from .._core          import empz_x, emrunner, emscore, emlogscore  # pylint: disable = import-error
+from .._core import (empz_x,emrunner,emscore)  # pylint: disable = import-error
+
 from .histogramfitter import ByHistogram  # pylint: disable = unused-import
-# create abstract class with different fitting algorithms
+
+# needs cleaning
 
 # needs a new splitter algorithm.
-# if a peak needs splitting, subselect assigned data and do an EM fit on the subset (should at least be faster)
+# if a peak needs splitting,
+# subselect assigned data and
+# do an EM fit on the subset (should at least be faster)
 # split local?
 
 class EMFlagger:
@@ -94,14 +99,15 @@ class EMFlagger:
         return self.find(**kwa)
 
 
+# make a base class common to ByEM, ByEmMutu, ByEMfromKernel
 class ByEM(EMFlagger): # needs cleaning
     '''
     finds peaks and groups events using Expectation Maximization
     the number of components is estimated using BIC criteria
     '''
     emiter     = 1000
-    tol        = 0.5  # loglikelihood tolerance # need to provide to c code
-    decimals   = 4    # rounding values
+    tol        = 1e-5  # loglikelihood tolerance # need to provide to c code
+    decimals   = 4     # rounding values
     upperbound = 0.005**2 # in microns**2
     mergewindow = 0.005
     withtime = True
@@ -113,7 +119,7 @@ class ByEM(EMFlagger): # needs cleaning
     def findfromzestimates(self,**kwa):
         "estimates starting parameters using kernel density"
         rates, params = self.kernelinitializer(**kwa)
-        return self.splitter(rates,params,upperbound=self.upperbound)[-2:]
+        return self.splitter(rates,params)[-2:]
 
     def find(self, **kwa):
         """
@@ -132,8 +138,9 @@ class ByEM(EMFlagger): # needs cleaning
     def fromzestimate(self,data:np.ndarray,zpeaks:np.ndarray):
         "calls fittingalgo based on estimation of zpeaks"
         # group peaks too close
+        zpeaks   = np.sort(zpeaks)
         tomerge  = np.where(np.diff(zpeaks)>self.mergewindow)[0]
-        bins     = [min(data[:,0])]+[np.mean(zpeaks[i:i+2]) for i in tomerge]+[max(data[:,0])]
+        bins     = [min(data[:,0])]+[np.mean(zpeaks[i:i+2]) for i in tomerge]+[max(data[:,0])+0.1]
 
         # estimate rates, params using merged
         return self.paramsfromzbins(data,bins,mincount=0)
@@ -194,9 +201,9 @@ class ByEM(EMFlagger): # needs cleaning
         return np.sum(np.log(np.sum(rates*score,axis=0)))
 
     @staticmethod
-    def cfit(data,rates,params,emiter,lowerbound=1e-4):
+    def cfit(data,rates,params,emiter,tol,lowerbound=1e-4): # pylint: disable = too-many-arguments
         'fitting using c calls'
-        out = emrunner(data,rates,params,emiter,lowerbound)
+        out = emrunner(data,rates,params,emiter,lowerbound,tol)
         return out.rates, out.params
 
     @classmethod
@@ -211,17 +218,33 @@ class ByEM(EMFlagger): # needs cleaning
         return list(map(lambda x:next(x[1])[-1],itertools.groupby(sortedinfo,key=lambda x:x[0])))
 
     # could split all parameters with upper bound too high
-    def splitter(self,rates,params,upperbound=0.005**2):
+    def splitter(self,rates,params):
         'splits the peaks with great Z variance'
-        rates, params = self.fittingalgo(self.data,rates,params,self.emiter)
-        while any(params[:,1]>upperbound):
+        warnings.warn("using this function, with a symmetric splitting is not a good idea")
+        rates, params = self.fittingalgo(self.data,rates,params,self.emiter,self.tol)
+        while any(params[:,1]>self.upperbound):
             idx = np.argmax(params[:,1])
             # split the one with highest covariance
             nrates,nparams = self.splitparams(rates,params,idx)
             # could be improved by reducing the number of peaks (and associated data)
             # to optimized during emstep
-            rates, params = self.fittingalgo(self.data,nrates,nparams,self.emiter)
+            rates, params = self.fittingalgo(self.data,nrates,nparams,self.emiter,self.tol)
         return rates,params
+
+class ByEMfromKernel(ByEM):
+    """
+    Ones could use aic, aicc or bic as a criteria to select the number of parameters
+    but the data is usually too low
+    Need to find an additional constraint to help convergence
+    to explore :
+    * kernel density estimates with smaller bandwidth
+    * threshold on hybridisation rate
+    """
+    def splitter(self,rates,params):
+        """
+        defines rules to split a peak
+        """
+        pass
 
 class ByEmMutu(ByEM):
     ''' uses mutual information theory to decide whether peaks should be splitted or not'''
@@ -254,7 +277,7 @@ class ByEmMutu(ByEM):
         splits the peaks with great Z variance
         if mutual information allows keep the split of peaks
         '''
-        rates, params = self.fittingalgo(self.data,rates,params,self.emiter)
+        rates, params = self.fittingalgo(self.data,rates,params,self.emiter,self.tol)
         notchecked = np.array([True]*params.shape[0])
 
         while any(notchecked):
@@ -263,7 +286,7 @@ class ByEmMutu(ByEM):
                 nrates,nparams = self.splitparams(rates,params,idx)
 
                 # thermalise, thermalise only the splitted peaks to save time
-                nrates,nparams = self.fittingalgo(self.data,nrates, nparams, self.emiter)
+                nrates,nparams = self.fittingalgo(self.data,nrates,nparams,self.emiter,self.tol)
                 sco = self.score(self.data,nparams[[idx,idx+1]])
 
                 # check mutual information
