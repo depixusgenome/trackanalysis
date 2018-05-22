@@ -1,27 +1,50 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing all messages concerning discarded beads"
+from    typing            import cast
 from    bokeh             import layouts
-from    model.plots       import PlotModel
+from    model.plots       import PlotState
+from    utils             import initdefaults
 from    view.plots        import PlotView, CACHE_TYPE
 from    view.plots.tasks  import TaskPlotCreator
 from    ._widgets         import QualityControlWidgets
 from    ._plots           import QualityControlPlots
 from    ._model           import QualityControlModelAccess
 
-class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess, PlotModel]):
+class _StateDescriptor:
+    def __get__(self, inst, owner):
+        return getattr(inst, '_state').state if inst else self
+
+    @staticmethod
+    def setdefault(inst, value):
+        "sets the default value"
+        getattr(inst, '_ctrl').display.updatedefaults("qc.state", state = PlotState(value))
+
+    def __set__(self, inst, value):
+        getattr(inst, '_ctrl').display.update("qc.state", state = PlotState(value))
+
+class QCPlotState:
+    "qc plot state"
+    state = PlotState.active
+    name  = "qc.state"
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess, None]):
     "Creates plots for discard list"
-    _RESET = frozenset()         # type: frozenset
-    def __init__(self, ctrl = None, *args): # pylint: disable=keyword-arg-before-vararg
-        super().__init__(ctrl, *args)
-        self._widgets   = QualityControlWidgets(self._model)
-        self._plots     = QualityControlPlots  (ctrl, self._model)
-        self._plotmodel = None
+    _RESET: frozenset = frozenset()
+    state = cast(PlotState, _StateDescriptor())
+    def __init__(self, ctrl):
+        super().__init__(ctrl, addto = False)
+        self._widgets = QualityControlWidgets(ctrl, self._model)
+        self._plots   = QualityControlPlots  (ctrl, self._model)
+        self._state   = QCPlotState()
+        ctrl.display.add(QCPlotState())
 
     def observe(self, ctrl):
         "observes the model"
         super().observe(ctrl)
-        self._widgets.observe(ctrl)
         self._plots  .observe(ctrl)
 
     def _addtodoc(self, ctrl, doc):

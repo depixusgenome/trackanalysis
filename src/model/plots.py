@@ -257,7 +257,8 @@ class PlotModel:
         self.config  = deepcopy(self.config)
         assert self.theme.name
         assert self.display.name
-        assert self.config is None or self.config.name
+        if self.config is not None:
+            assert self.config.name and self.config.name != self.theme.name
 
     def addto(self, ctrl, noerase = True):
         "sets-up model observers"
@@ -266,7 +267,7 @@ class PlotModel:
         if self.config:
             self.config = ctrl.theme  .add(self.config, noerase)
 
-    def observe(self, ctrl, noerase = True):
+    def observe(self, ctrl, noerase = False):
         "sets-up model observers"
         self.addto(ctrl, noerase)
 

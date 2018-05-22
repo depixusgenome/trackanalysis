@@ -36,7 +36,7 @@ class PlotModelAccess:
         "return the theme name"
         return self._ctrl.theme.get("main", "themename", "dark")
 
-    def addto(self, ctrl, name = "tasks"):
+    def addto(self, ctrl, name = "tasks", noerase = False):
         "add to controller"
         pass
 
@@ -71,13 +71,13 @@ class TaskPlotModelAccess(PlotModelAccess):
         super().__init__(model)
         self._tasksmodel = TasksModel()
 
-    def addto(self, ctrl, name = "tasks"):
+    def addto(self, ctrl, name = "tasks", noerase = False):
         "set _tasksmodel to same as main"
         lst = (('display', 'display'), ('config', 'theme'))
         for i, j in lst:
             itm = getattr(self._tasksmodel , i)
             itm.name = name
-            setattr(self._tasksmodel, i, getattr(ctrl, j).add(itm, False))
+            setattr(self._tasksmodel, i, getattr(ctrl, j).add(itm, noerase))
 
         objs = [(i, getattr(ctrl, j).model(getattr(self._tasksmodel, i))) for i, j in lst]
         done = set()

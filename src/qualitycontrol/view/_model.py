@@ -9,7 +9,7 @@ from   control.modelaccess  import TaskPlotModelAccess, TaskAccess
 from   cleaning.processor   import (DataCleaningTask, # pylint: disable=unused-import
                                     DataCleaningProcessor)
 from   model.level          import PHASE
-from   model.plots          import PlotAttrs, PlotTheme, PlotModel
+from   model.plots          import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from   utils                import initdefaults
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
@@ -151,10 +151,23 @@ class DriftControlPlotModel(PlotModel):
     "qc plot model"
     theme   = DriftControlPlotTheme()
     config  = DriftControlPlotConfig()
+    display = PlotDisplay(name = "qc")
+
+class ExtensionPlotConfig(DriftControlPlotConfig):
+    "allows configuring the drift control plots"
+    name              = "qc.extension"
+    ybarspercentiles  = [25, 75]
+    yspan             = [5, 95], 0.3
+    phases            = PHASE.initial, PHASE.pull
+    warningthreshold  = 1.5e-2
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
 
 class ExtensionPlotTheme(DriftControlPlotTheme):
     "drift control plot theme"
-    name       = "qc.extension"
+    name       = "qc.extension.plot"
+    ylabel     = 'δ(Φ3-Φ1) (µm)'
     measures   = PlotAttrs('lightblue', 'circle', 2, alpha = .75)
     ybars      = PlotAttrs('lightblue', 'vbar', 1,   alpha = .75)
     ymed       = PlotAttrs('lightblue', 'vbar', 1,   fill_alpha = 0.)

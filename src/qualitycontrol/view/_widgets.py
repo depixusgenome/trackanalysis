@@ -32,16 +32,20 @@ _TEXT = """
 <p></p>
 """.strip().replace("    ", "").replace("\n", "")
 
+class QCSummaryTheme:
+    "qc summary theme"
+    name = "qc.summary"
+    text = _TEXT
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
 class SummaryWidget:
     "summary info on the track"
     __widget: Div
-    def __init__(self, model:QualityControlModelAccess) -> None:
+    def __init__(self, ctrl, model:QualityControlModelAccess) -> None:
         self.__tasks = model
-        self.__model = {'text': _TEXT}
-
-    def observe(self, ctrl):
-        "do nothing"
-        ctrl.theme.add("qc.summary", {'text': self.__model})
+        self.__model = ctrl.theme.add(QCSummaryTheme(), False)
 
     def addtodoc(self, _):
         "creates the widget"
@@ -59,12 +63,12 @@ class SummaryWidget:
         nbeads = 0  if track is None else sum(1 for i in track.beadsonly.keys())
         bad    = sorted(self.__tasks.badbeads())
         fixed  = sorted(self.__tasks.fixedbeads())
-        return self.__model['text'].format(ncycles   = 0 if track is None else track.ncycles,
-                                           nbeads    = nbeads,
-                                           ngood     = nbeads - len(bad),
-                                           nbad      = len(bad),
-                                           listbad   = ', '.join(str(i) for i in bad),
-                                           listfixed = ', '.join(str(i) for i in fixed))
+        return self.__model.text.format(ncycles   = 0 if track is None else track.ncycles,
+                                        nbeads    = nbeads,
+                                        ngood     = nbeads - len(bad),
+                                        nbad      = len(bad),
+                                        listbad   = ', '.join(str(i) for i in bad),
+                                        listfixed = ', '.join(str(i) for i in fixed))
 
 class MessagesListWidgetTheme:
     "MessagesListWidgetTheme"
@@ -87,11 +91,8 @@ class MessagesListWidget:
     "Table containing stats per peaks"
     __widget: DataTable
     __theme : MessagesListWidgetTheme
-    def __init__(self, model:QualityControlModelAccess) -> None:
+    def __init__(self, ctrl, model:QualityControlModelAccess) -> None:
         self.__tasks = model
-
-    def observe(self, ctrl):
-        "do nothing"
         self.__theme = ctrl.theme.add(MessagesListWidgetTheme())
 
     def addtodoc(self, _) -> List[Widget]:
@@ -129,14 +130,9 @@ class MessagesListWidget:
 
 class QualityControlWidgets:
     "All widgets"
-    def __init__(self, mdl):
-        self.messages = MessagesListWidget(mdl)
-        self.summary  = SummaryWidget(mdl)
-
-    def observe(self, ctrl):
-        "observes the model"
-        for widget in self.__dict__.values():
-            widget.observe(ctrl)
+    def __init__(self, ctrl, mdl):
+        self.messages = MessagesListWidget(ctrl, mdl)
+        self.summary  = SummaryWidget(ctrl, mdl)
 
     def reset(self, bkmodels):
         "resets the widgets"

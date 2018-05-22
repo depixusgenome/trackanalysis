@@ -66,7 +66,7 @@ class _ModelDescriptor:
         self._name  = name[1:]
 
     def __get__(self, inst, owner):
-        return getattr(getattr(inst, '_plotmodel'), self._name) if inst else self
+        return getattr(getattr(inst, '_plotmodel'), self._name, None) if inst else self
 
     def __set__(self, inst, value):
         getattr(inst, '_ctrl').display.update(self.__get__(inst, None), **value)
@@ -79,21 +79,34 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
     _theme   = cast(PlotTheme,   _ModelDescriptor())
     _display = cast(PlotDisplay, _ModelDescriptor())
     _config  = cast(Any,         _ModelDescriptor())
-    _doc     : Document
+    _doc      : Document
+    _model    : ControlModelType
+    _plotmodel: Optional[PlotModelType]
     class _OrderedDict(OrderedDict):
         def __missing__(self, key):
             value: Dict = OrderedDict()
             self[key]   = value
             return value
 
-    def __init__(self, ctrl, addto = True) -> None:
+    def __init__(self, ctrl, addto = True, noerase = True) -> None:
         "sets up this plotter's info"
-        self._model:     ControlModelType = templateattribute(self, 0)(ctrl)
-        self._plotmodel: PlotModelType    = templateattribute(self, 1)()
-        self._ctrl                        = ctrl
+        def _cls(i, *j):
+            cls = templateattribute(self, i)
+            return cls(*j) if cls else None
+
+        self._ctrl      = ctrl
+        self._model     = _cls(0, ctrl)
+        self._plotmodel = _cls(1)
+
         if addto:
-            self._plotmodel.addto(ctrl)
-            self._model.addto(ctrl)
+            self.addto(ctrl, noerase = noerase)
+
+    def addto(self, ctrl, noerase = True):
+        "adds the models to the controller"
+        if self._plotmodel:
+            self._plotmodel.addto(ctrl, noerase = noerase)
+        if self._model:
+            self._model.addto(ctrl, noerase = noerase)
 
     def defaultsizingmode(self, kwa = None, **kwargs):
         "the default sizing mode"
@@ -304,7 +317,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                                        right  = right,
                                        bottom = bottom,)
 
-    def observe(self, ctrl, noerase = True):
+    def observe(self, ctrl, noerase = False):
         "sets-up model observers"
         if self._plotmodel:
             self._plotmodel.observe(ctrl, noerase)

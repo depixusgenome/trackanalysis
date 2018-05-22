@@ -195,6 +195,7 @@ class BaseTaskController(Controller):
 
         if parent not in self._items:
             return None
+
         track = self._items[parent].data[0].cache()
         if track is None:
             self._items[parent].run(parent) # create cache if needed
