@@ -5,6 +5,7 @@
   collection of functions too costly for python
   implementing the EM step in c++ for speed up
   TO DO : 
+  * replace bigrates with matrix_row views 
   * replace expression with diagproba
   * use log probabilities
   * use cholesky decomposition for covariance matrix
@@ -174,9 +175,17 @@ namespace peakfinding{
 	}
 
 	matrix getpz_x(const matrix& score,const  matrix& rates){
-	    auto	ones	 = matrix(1,score.size2(),1.);
-	    auto	bigrates = blas::prod(rates,ones); // can be optimized // replace with view
-	    matrix	pz_x	 = blas::element_prod(score,bigrates);
+	    // before
+	    // auto	ones	 = matrix(1,score.size2(),1.);
+	    // auto	bigrates = blas::prod(rates,ones);
+	    // matrix	pz_x	 = blas::element_prod(score,bigrates);
+	    // after
+	    matrix pz_x = score;
+	    for (unsigned r=0u;r<rates.size1();++r){
+		blas::matrix_row<matrix> viewrow(pz_x,r);
+		viewrow*=rates(r,0);
+	    }
+	    
 	    blas::vector<double> norm(pz_x.size2(),0.);
 	    for (unsigned r=0u, nrows=pz_x.size1();r<nrows;++r)
 	    	norm+=blas::row(pz_x,r);
@@ -210,15 +219,17 @@ namespace peakfinding{
 		     matrix &rates,
 		     matrix &params,
 		     unsigned nsteps,
-		     double lowercov){
-	    matrix score = scoreparams(data,params);
-	    double prevll=llikelihood(score, rates);
+		     double lowercov,
+		     double tol){
+	    matrix score	= scoreparams(data,params);
+	    double prevll	= llikelihood(score, rates);
 	    double newll;
 	    for (unsigned ite=0u;ite<nsteps;++ite){
 		oneemstep(data,rates,params,lowercov);
 		score = scoreparams(data,params);
 		newll = llikelihood(score, rates);
-		if (newll-prevll<1e-4) return;
+		// std::cout<<ite<<" "<<newll-prevll<<std::endl;
+		if (newll-prevll<tol) return;
 		prevll=newll;
 	    }
 	}

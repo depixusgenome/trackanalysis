@@ -28,7 +28,8 @@ namespace peakfinding{
 			  ndarray pyrates,
 			  ndarray pyparams,
 			  unsigned nsteps,
-			  double lowercov){
+			  double lowercov,
+			  double tol){
 	    // convert to matrices, run n times, return
 	    auto    infopar	= pyparams.request();
 	    auto    infodat	= pydata.request();
@@ -36,7 +37,7 @@ namespace peakfinding{
 	    matrix    rates	= arraytomatrix(pyrates);
 	    matrix    data	= arraytomatrix(pydata);
 	    
-	    emsteps(data,rates,params,nsteps,lowercov);
+	    emsteps(data,rates,params,nsteps,lowercov,tol);
 	    // updated score to match with rates & params
 	    auto    score = scoreparams(data,params);
 	    // back to numpy array
@@ -96,8 +97,8 @@ namespace peakfinding{
 
 	void pymodule(py::module &mod){
 	    auto doc = R"_(Runs Expectation Maximization N times)_";
-	    mod.def("emrunner",[](ndarray data,ndarray rates,ndarray params,unsigned nsteps,double lower)
-	     	    {return emrunner(data,rates,params,nsteps,lower);},doc);
+	    mod.def("emrunner",[](ndarray data,ndarray rates,ndarray params,unsigned nsteps,double lower, double tol)
+	     	    {return emrunner(data,rates,params,nsteps,lower,tol);},doc);
 	    mod.def("normpdf",[](double loc,double var, double pos){return normpdf(loc,var,pos);},
 		    R"_(compute pdf of normal distribution)_");
 	    mod.def("exppdf",[](double loc,double scale, double pos){return exppdf(loc,scale,pos);},

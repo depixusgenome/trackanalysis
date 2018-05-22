@@ -21,7 +21,7 @@ namespace peakfinding{
 	double pdfparam(blas::vector<double> ,blas::vector<double>);
 	double logpdfparam(blas::vector<double> ,blas::vector<double>);
 	void   oneemstep(matrix&, matrix&, matrix&,double);
-	void   emsteps(matrix&, matrix&, matrix&,unsigned,double);
+	void   emsteps(matrix&, matrix&, matrix&,unsigned,double,double);
 	double scoreparam(blas::vector<double> ,blas::vector<double>);
 	matrix scoreparams(const matrix &, const matrix &);
 	matrix logscoreparams(const matrix &, const matrix &);
