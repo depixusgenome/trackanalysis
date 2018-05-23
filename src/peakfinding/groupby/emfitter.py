@@ -3,10 +3,10 @@
 "Creates a histogram from available events"
 import itertools
 import warnings
-from abc import abstractmethod
-from functools import partial
-from typing import Dict, Tuple
-
+from abc         import abstractmethod
+from functools   import partial
+from typing      import Dict, Tuple, Union, Iterable
+from collections import Sequence
 import numpy as np
 from sklearn.mixture import GaussianMixture
 
@@ -28,10 +28,10 @@ class EMFlagger:
     'flag peak corresponding to events'
     withtime=True
     def __init__(self,**kwa):
-        self.kwargs = kwa
-        self.mincount= kwa.get("mincount",5)
-        self.events= None
-        self.data=None
+        self.kwargs   = kwa
+        self.mincount = kwa.get("mincount",5)
+        self.events   = None
+        self.data     = None
 
     def __strip(self, params, events):
         '''
@@ -97,7 +97,6 @@ class EMFlagger:
                                   for evt in cycle])
 
         return self.find(**kwa)
-
 
 # make a base class common to ByEM, ByEmMutu, ByEMfromKernel
 class ByEM(EMFlagger): # needs cleaning
@@ -231,20 +230,20 @@ class ByEM(EMFlagger): # needs cleaning
             rates, params = self.fittingalgo(self.data,nrates,nparams,self.emiter,self.tol)
         return rates,params
 
-class ByEMfromKernel(ByEM):
-    """
-    Ones could use aic, aicc or bic as a criteria to select the number of parameters
-    but the data is usually too low
-    Need to find an additional constraint to help convergence
-    to explore :
-    * kernel density estimates with smaller bandwidth
-    * threshold on hybridisation rate
-    """
-    def splitter(self,rates,params):
-        """
-        defines rules to split a peak
-        """
-        pass
+# class ByEMfromKernel(ByEM):
+#     """
+#     Ones could use aic, aicc or bic as a criteria to select the number of parameters
+#     but the data is usually too low
+#     Need to find an additional constraint to help convergence
+#     to explore :
+#     * kernel density estimates with smaller bandwidth
+#     * threshold on hybridisation rate
+#     """
+#     def splitter(self,rates,params):
+#         """
+#         defines rules to split a peak
+#         """
+#         pass
 
 class ByEmMutu(ByEM):
     ''' uses mutual information theory to decide whether peaks should be splitted or not'''
@@ -323,3 +322,52 @@ class ByGauss(ByEM):
         ).fit(data)
         return gaussfitter.weights_.reshape(-1,1),\
             np.hstack([gaussfitter.means_,gaussfitter.covariances_])
+
+
+class RandInit(ByEM):
+    """
+    starting positions of peaks are chosen randomly
+    used for demo and testing selection criteria
+    if nsamples is not specified estimates number of peaks from kerneldensity
+    """
+    nsamples : Union[int,Iterable[int]] = None
+    repeats = 10
+    withtime = True
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        self.fittingalgo = self.cfit
+        super().__init__(**kwa)
+
+    def find(self,**kwa):
+        "initializes with n different samples from data"
+        if self.nsamples is None:
+            self.nsamples  = len(ByHistogram(**self.kwargs)(**kwa)[0])
+
+        rates, params = self.__fit()
+        peaks, ids    = self.group(rates.ravel()*self.data.shape[0],params,self.events)
+
+        _, bias,slope = kwa.get("hist",(np.array([]),0,1))
+
+        return peaks * slope + bias , ids
+
+    def nrandinit(self,nsamples:int):
+        """
+        returns the randomly initialized rates, params with lower bic
+        """
+        inits = [np.random.choice(self.data[:,0],nsamples) for i in range(self.repeats)]
+        bicpeaks = []
+        for peaks in inits:
+            rates,params = self.fromzestimate(self.data,peaks)
+            rates,params = self.fittingalgo(self.data,rates,params,self.emiter,self.tol)
+            score        = self.score(self.data,params)
+            bic          = self.bic(score,rates,params)
+            bicpeaks.append((bic,rates,params))
+
+        return sorted(bicpeaks,key=lambda x:x[0])[0]
+
+    def __fit(self):
+        if isinstance(self.nsamples,Iterable):
+            return sorted([self.nrandinit(_) for _ in self.nsamples],
+                          key=lambda x: x[0])[0][-2:]
+
+        return self.nrandinit(self.nsamples)[-2:]
