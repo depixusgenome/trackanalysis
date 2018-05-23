@@ -29,7 +29,7 @@ class CyclesModelConfig:
 
 class CyclesPlotTheme(PlotTheme):
     "theme for cycles"
-    name       = "cycles"
+    name       = "cycles.plot"
     raw        = {'dark':  PlotAttrs('color', 'circle', .1, alpha = .5,
                                      palette = 'YlOrBr'),
                   'basic': PlotAttrs('color', 'circle', .1, alpha = .5,
@@ -102,7 +102,7 @@ class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
     "Access to the event detection task"
     def __init__(self, mdl):
         super().__init__(mdl)
-        self.__model = self._ctrl.theme.add(CyclesModelConfig(), True)
+        self.__model = self._ctrl.theme.model(CyclesModelConfig())
 
     @property
     def task(self) -> Optional[EventDetectionTask]:

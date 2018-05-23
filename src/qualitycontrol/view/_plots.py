@@ -137,7 +137,7 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
     def __init__(self, ctrl, mdl: QualityControlModelAccess) -> None:
         super().__init__(ctrl, mdl, False)
         self._plotmodel.theme  = ExtensionPlotTheme()
-        self._plotmodel.config = ExtensionPlotConfig() 
+        self._plotmodel.config = ExtensionPlotConfig()
         self.addto(ctrl, False)
 
     def _addtodoc(self, *_):

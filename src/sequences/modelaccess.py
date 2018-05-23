@@ -15,6 +15,7 @@ class SequenceConfig:
     name                                       = "sequence"
     path: str                                  = None
     sequences: Dict[str, str]                  = {}
+    probes:    Sequence[str]                   = []
     history  : List[Union[str, Sequence[str]]] = []
     maxlength                                  = 10
 
@@ -27,7 +28,7 @@ class SequenceDisplay:
     configuration for probrs
     """
     name                                     = "sequence"
-    hpins:  Dict[int, str]                   = None
+    hpins:  Dict[int, str]                   = {}
     probes: Dict[Any, Union[str, List[str]]] = {}
 
     @initdefaults(frozenset(locals()))
@@ -70,7 +71,9 @@ class SequenceModel:
         old  = dict(self.display.probes)
         if ols != old.get(self.tasks.roottask, None):
             old[self.tasks.roottask] = ols
-            ctrl.display.update(self.display, probes = ols)
+            ctrl.display.update(self.display, probes = old)
+        if ols != self.config.probes:
+            ctrl.theme.update(self.config, probes = ols)
 
     def setnewsequencepath(self, ctrl, path) -> bool:
         "sets a new path if it is correct"
@@ -97,20 +100,20 @@ class SequenceModel:
         return self.display.hpins.get(self.tasks.bead, self._defaultkey)
 
     @property
-    def currentprobes(self) -> Optional[Sequence[str]]:
+    def currentprobes(self) -> Sequence[str]:
         "get current probe"
-        return self.display.probes.get(self.tasks.roottask, None)
+        return self.display.probes.get(self.tasks.roottask, self.config.probes)
 
 class SequencePlotModelAccess(TaskPlotModelAccess):
     "access to the sequence path and the oligo"
-    def __init__(self, ctrl, key: str = None) -> None:
-        super().__init__(ctrl, key)
+    def __init__(self, ctrl) -> None:
         self.__seq = SequenceModel()
+        super().__init__(ctrl)
 
-    def addto(self, ctrl, name = "tasks"):
+    def addto(self, ctrl, name = "tasks", noerase = False):
         "set _tasksmodel to same as main"
-        super().addto(ctrl, name)
-        self.__seq.addto(ctrl, False)
+        super().addto(ctrl, name, noerase)
+        self.__seq.addto(ctrl, noerase = noerase)
 
     @property
     def sequencemodel(self):

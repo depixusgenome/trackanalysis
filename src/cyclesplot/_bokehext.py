@@ -18,19 +18,15 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
     bias      = props.Float(0.)
     stretch   = props.Float(0.)
     updating  = props.String('')
+    _rawsource: ColumnDataSource
+    _rawglyph:  GlyphRenderer
+    _model:     Any
 
     impl      = SequenceHoverMixin.impl
     __implementation__ = impl('DpxHoverModel',
                               ('shape: [p.Array, [2,1]],'
                                'cycle: [p.Int, -1],'),
                               __file__)
-
-    def __init__(self, **kwa) -> None:
-        super().__init__(**kwa) # type: ignore
-        SequenceHoverMixin.__init__(self)
-        self._rawsource: ColumnDataSource = None
-        self._rawglyph:  GlyphRenderer    = None
-        self._model:     Any              = None
 
     @staticmethod
     def _createrawdata(data, shape):
@@ -66,10 +62,6 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                         glyph  = self._rawglyph)
             code = "hvr.launch_hover(rawsrc, hvrsrc, glyph)"
             source.callback = CustomJS(code = code, args = args)
-
-    def createhist(self, fig, mdl):
-        "Creates the hover tool for histograms"
-        self.create(fig, mdl, 'cycles')
 
     def slaveaxes(self, fig, src):
         "slaves a histogram's axes to its y-axis"

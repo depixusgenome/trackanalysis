@@ -23,11 +23,14 @@ class HistMixin(ABC):
     _model: CyclesModelAccess
     _hover: DpxHoverModel
     _ctrl:  Any
+    _histsource: ColumnDataSource
+    _hist:       Figure
     def __init__(self, ctrl):
         "sets up this plotter's info"
-        self._histsource: ColumnDataSource = None
-        self._hist:       Figure           = None
-        self._ticker                       = SequenceTicker(ctrl)
+        self._ticker = SequenceTicker()
+        self._hover  = DpxHoverModel()
+        self._ticker.init(ctrl)
+        self._hover.init(ctrl)
 
     @checksizes
     def __data(self, data, shape): # pylint: disable=too-many-locals
@@ -50,7 +53,7 @@ class HistMixin(ABC):
                 rng = (np.nanmin([np.nanmin(i) for i in items]),
                        np.nanmax([np.nanmax(i) for i in items]))
             if all(np.isfinite(i) for i in rng):
-                width = self._model.cycles.theme.binwidth
+                width = self._model.cycles.config.binwidth
                 bins  = np.arange(rng[0]-width*.5, rng[1]+width*1.01, width, dtype = 'f4')
                 if bins[-2] > rng[1]:
                     bins = bins[:-1]
@@ -62,7 +65,7 @@ class HistMixin(ABC):
             else:
                 items = (zeros,)
 
-        threshold = self._model.cycles.theme.minframes
+        threshold = self._model.cycles.config.minframes
         return dict(frames  = np.sum(items, axis = 0),
                     cycles  = np.sum([np.int32(i > threshold) for i in items], axis = 0),
                     left    = zeros,
@@ -97,19 +100,18 @@ class HistMixin(ABC):
                                      left   = "left",   right = "cycles",
                                      x_range_name = "cycles")
 
-        self._ticker.create(self._ctrl, self._hist, self._model, self)
-
-        self._hover.createhist(self._hist, self._model, self)
+        self._ticker.create(self._ctrl, self._hist, self._model, "right")
+        self._hover.create(self._hist, self._model, 'cycles')
         self._hover.slaveaxes(self._hist, self._histsource)
 
+    def _oncyclessequence(self, **_):
+        with self.resetting() as cache:
+            self._ticker.reset(cache)
+            self._hover.resethist(cache)
+
+
     def _histobservers(self, ctrl):
-        self._ticker.observe(ctrl)
-        self._hover.observe(ctrl)
-        def _fcn():
-            with self.resetting() as cache:
-                self._ticker.reset(cache)
-                self._hover.resethist(cache)
-        ctrl.theme.observe('sequence', _fcn)
+        ctrl.theme.observe('sequence', self._oncyclessequence)
 
     def _resethist(self, cache:CACHE_TYPE, data, shape):
         hist = self.__data(data, shape)

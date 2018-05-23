@@ -212,8 +212,8 @@ class PlotDisplay:
     def addcallbacks(self, ctrl, fig):
         "adds Range callbacks"
         updating = [False]
-        def _get(attr):
-            axis = getattr(fig, attr+'_range')
+        def _get(axname):
+            axis = getattr(fig, axname+'_range')
 
             def _on_cb(attr, old, new):
                 if self.state is PlotState.active:
@@ -223,7 +223,7 @@ class PlotDisplay:
                         vals = tuple(None if abs(i-j) < rng else j
                                      for i, j in zip(axis.bounds, vals))
                     updating[0] = True
-                    ctrl.display.update(self, **{attr+'bounds': vals})
+                    ctrl.display.update(self, **{axname+'bounds': vals})
                     updating[0] = False
 
             axis.on_change('start', _on_cb)
@@ -258,7 +258,8 @@ class PlotModel:
         assert self.theme.name
         assert self.display.name
         if self.config is not None:
-            assert self.config.name and self.config.name != self.theme.name
+            assert self.config.name, self
+            assert self.config.name != self.theme.name, self
 
     def addto(self, ctrl, noerase = True):
         "sets-up model observers"

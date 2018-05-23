@@ -81,7 +81,7 @@ class RawMixin(ABC):
 
     def __addcallbacks(self):
         fig = self._raw
-        self._plotmodel.theme.addcallbacks(self._ctrl, fig)
+        self._plotmodel.display.addcallbacks(self._ctrl, fig)
         fig.x_range.callback = CustomJS(code = "hvr.on_change_raw_bounds(cb_obj, trng)",
                                         args = dict(hvr  = self._hover,
                                                     trng = fig.extra_x_ranges["time"]))
@@ -96,7 +96,7 @@ class RawMixin(ABC):
         self._theme.raw[self._model.themename].addto(self._raw, x = 't', y = 'z',
                                                      source = self._rawsource)
 
-        self._hover.createraw(self._raw, self._rawsource, shape, self._model)
+        self._hover.createraw(self._raw, self._rawsource, shape, self._model, self._theme)
         self._raw.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
 
         axis = LinearAxis(x_range_name="time", axis_label = self._theme.xtoplabel)

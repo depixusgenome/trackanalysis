@@ -15,8 +15,7 @@ from view.base                  import enableOnTrack
 from view.colors                import tohex
 from view.plots                 import PlotView, CACHE_TYPE
 from view.plots.tasks           import TaskPlotCreator
-from sequences.view             import (SequenceTicker,
-                                        SequenceHoverMixin)
+from sequences.view             import SequenceTicker, SequenceHoverMixin
 from peakfinding.histogram      import interpolator
 
 from ._model                    import PeaksPlotModelAccess, PeaksPlotModel
@@ -85,8 +84,10 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         super().__init__(ctrl)
         self._src: Dict[str, ColumnDataSource] = {}
         self._widgets                          = createwidgets(ctrl, self._model)
-        self._ticker                           = SequenceTicker(ctrl)
+        self._ticker                           = SequenceTicker()
         self._hover                            = PeaksSequenceHover()
+        self._ticker.init(ctrl)
+        self._hover.init(ctrl)
 
     @property
     def model(self):

@@ -65,11 +65,11 @@ class TrackFileDialog(FileDialog):
         "runs the dialog"
         paths = await threadmethod(self.open)
         if paths is not None:
-            def _fcn():
+            def _toolbaropen():
                 with ctrl.action:
                     self.__store(paths, True) # pylint: disable=not-callable
                     ctrl.tasks.opentrack(paths)
-            doc.add_next_tick_callback(_fcn)
+            doc.add_next_tick_callback(_toolbaropen)
 
 class SaveFileDialog(FileDialog):
     "A file dialog that adds a default save path"
@@ -114,11 +114,11 @@ class SaveFileDialog(FileDialog):
         "runs the dialog"
         paths = await threadmethod(self.save)
         if paths is not None:
-            def _fcn():
+            def _toolbarsave():
                 with ctrl.action:
                     self.__store(paths, False) # pylint: disable=not-callable
                     ctrl.tasks.savetrack(paths)
-            doc.add_next_tick_callback(_fcn)
+            doc.add_next_tick_callback(_toolbarsave)
 
 class DpxToolbar(Widget):
     "Toolbar model"

@@ -41,11 +41,11 @@ class DAQRecordFileDialog(BaseFileDialog):
         "runs the dialog"
         path = await threadmethod(self.save)
         if path is not None:
-            def _fcn():
+            def _daqfileopen():
                 with ctrl.action:
                     ctrl.theme.update(self._theme, initialdir = self.initialdir)
                     ctrl.daq.record(True, path)
-            doc.add_next_tick_callback(_fcn)
+            doc.add_next_tick_callback(_daqfileopen)
 
     def addtodoc(self, ctrl, doc, tbar, name):
         "add action to the toolbar"

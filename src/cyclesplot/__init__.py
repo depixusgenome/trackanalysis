@@ -23,15 +23,13 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # t
     _hover: DpxHoverModel
     def __init__(self, ctrl:Controller) -> None:
         "sets up this plotter's info"
-        super().__init__(ctrl)
+        super().__init__(ctrl, noerase = False)
         RawMixin   .__init__(self)
         HistMixin  .__init__(self, ctrl)
         WidgetMixin.__init__(self, ctrl, self._model)
 
     def _addtodoc(self, ctrl, doc):
         "returns the figure"
-        self._hover = DpxHoverModel()
-
         fcn = lambda attr, old, new: self._model.newparams(**{attr: new})
         self._hover.on_change("stretch", fcn)
         self._hover.on_change("bias",    fcn)
@@ -61,7 +59,8 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # t
         super().observe(ctrl)
         self._histobservers(ctrl)
         self._widgetobservers(ctrl)
-        ctrl.theme.observe(self._model.cycles.theme, lambda **_: self.reset(False))
+        ctrl.theme.observe(self._model.cycles.theme,  lambda **_: self.reset(False))
+        ctrl.theme.observe(self._model.cycles.config, lambda **_: self.reset(False))
 
 class CyclesPlotView(PlotView[CyclesPlotCreator]):
     "Cycles plot view"

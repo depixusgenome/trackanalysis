@@ -5,9 +5,10 @@ from    typing         import List, Optional, Tuple, Any
 import  numpy   as np
 
 import  bokeh.core.properties as props
-from    bokeh.models    import (LinearAxis, ColumnDataSource, Range1d, Widget,
-                                BasicTicker, Dropdown, Paragraph, CustomJS,
-                                AutocompleteInput)
+from    bokeh.plotting      import Figure
+from    bokeh.models        import (LinearAxis, ColumnDataSource, Range1d, Widget,
+                                    BasicTicker, Dropdown, Paragraph, CustomJS,
+                                    AutocompleteInput)
 
 from   utils                import initdefaults
 from   utils.gui            import implementation
@@ -53,32 +54,32 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
     minor      = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
     key        = props.String(default = '')
     usedefault = props.Bool(default = True)
+    __defaults:  dict
+    __withbase:  list
+    __model:     Any
+    __theme:     SequenceTickerTheme
+    __fig:       Figure
+    __axis:      'SequenceTicker'
 
     __implementation__ = "sequenceticker.coffee"
 
-    def __init__(self, ctrl, **kwa):
-        super().__init__(**kwa)
+    def init(self, ctrl):
+        "init private fields"
         self.__defaults:dict = dict()
         self.__withbase:list = []
-        self.__model         = None
         self.__theme         = ctrl.theme.add(SequenceTickerTheme(), False)
-        self.__fig           = None
-        self.__axis: SequenceTicker = None
 
     @property
     def axis(self):
         u"returns the fixed axis"
         return self.__axis
 
-    @staticmethod
-    def observe(_):
-        "add observers"
-
     def create(self, ctrl, fig, mdl, loc = 'right'):
         "Sets the ticks according to the configuration"
         self.__model = mdl
         self.__fig   = fig
-        self.__axis  = type(self)(ctrl)
+        self.__axis  = type(self)()
+        self.__axis.init(ctrl)
 
         fig.extra_y_ranges        = {"bases": Range1d(start = 0., end = 1.)}
         fig.add_layout(LinearAxis(y_range_name = "bases",
@@ -142,10 +143,12 @@ class SequenceHoverTheme:
 
 class SequenceHoverMixin:
     "controls keypress actions"
+    __theme:  SequenceHoverTheme
     __source: ColumnDataSource
     __tool:   DpxHoverTool
     _model:   Any
-    def __init__(self, ctrl):
+    def init(self, ctrl):
+        "initialize"
         self.__theme = ctrl.theme.add(SequenceHoverTheme(), False)
 
     @staticmethod
@@ -154,10 +157,6 @@ class SequenceHoverMixin:
         args = ('@define {', '@define {\n        '+fields)
         code = implementation(__file__, args, NAME  = name, extra = extra)
         return code
-
-    @staticmethod
-    def observe(_):
-        "add observers"
 
     @property
     def source(self):
@@ -234,7 +233,7 @@ class SequencePathTheme:
     label       = 'Selected DNA sequence'
     missingkey  = 'Select sequence'
     missingpath = 'Find path'
-    width       = 120
+    width       = 280
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -330,7 +329,7 @@ class OligoListTheme:
     name      = "sequence.probes"
     title     = 'Oligos'
     tooltip   = 'comma-separated list'
-    width     = 120
+    width     = 280
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass

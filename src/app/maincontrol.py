@@ -175,7 +175,7 @@ class BaseSuperController:
                 'config': {'catcherror': DisplayController.CATCHERROR}}
         keys = {i for i, j in self.theme.current.items()
                 if type(j).__name__.endswith("Config")}
-        outs = {f'{"config" if i in keys else "theme"}{i}': j
+        outs = {f'{"config." if i in keys else "theme."}{i}': j
                 for i, j in self.theme.config.items()}
         for i, j in maps.items():
             j.update(outs.pop(i, {}))

@@ -94,6 +94,7 @@ class BaseFileDialog:
                 if getattr(self, key) is not None and key[0] != '_'}
         info.pop('defaults', None)
         info.pop('config',   None)
+        info.pop('access',   None)
 
         self._parse_filetypes(info)
         self._parse_extension(info)
@@ -169,6 +170,8 @@ class FileDialog(BaseFileDialog):
         get    = lambda i: ctrl.theme.get("filedialog", "storage", {}).get(i, None)
         exists = cls.exists
         def _defaultpath(rets, bcheck: bool = True):
+            if rets is None:
+                return
             vals: Dict[str, str] = {}
             itr   = (rets,) if isinstance(rets, str) else rets
             first = None
@@ -185,7 +188,7 @@ class FileDialog(BaseFileDialog):
                     first = ret
             if storage is not None:
                 vals[storage] = str(first)
-            ctrl.theme.update("filedialog", **vals)
+            ctrl.theme.update("filedialog", storage = vals)
 
         return _defaultpath
 

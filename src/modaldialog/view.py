@@ -19,7 +19,7 @@ class AdvancedWidgetTheme:
     name   = "advancedwidget"
     width  = 60
     height = 20
-    label = "advanced"
+    label  = "advanced"
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -31,7 +31,7 @@ class AdvancedWidgetMixin(ABC):
     __action: type
     def __init__(self, ctrl):
         ctrl.theme.updatedefaults('keystroke', advanced = 'Alt-a')
-        self._theme = ctrl.add(AdvancedWidgetTheme(), True)
+        self._theme = ctrl.theme.add(AdvancedWidgetTheme(), False)
 
     @abstractmethod
     def _body(self) -> T_BODY:
@@ -97,9 +97,9 @@ class AdvancedWidgetMixin(ABC):
         "creates the widget"
         self.__widget = Button(width  = self._theme.width,
                                height = self._theme.height,
-                               label  = self._theme.button)
+                               label  = self._theme.label)
         self.__widget.on_click(self.on_click)
-        self.__action = ctrl.action().withcalls(self._title())
+        self.__action = ctrl.action.withcalls(self._title())
         return [self.__widget]
 
     def __enter__(self):

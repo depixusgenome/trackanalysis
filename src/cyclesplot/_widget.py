@@ -19,13 +19,13 @@ from    view.base           import enableOnTrack
 from    modaldialog.view    import AdvancedWidgetMixin
 
 from    eventdetection.view import AlignmentWidget, EventDetectionWidget
-from    ._model             import CyclesModelAccess, CyclesPlotTheme
+from    ._model             import CyclesModelAccess, CyclesPlotTheme, CyclesModelConfig
 
 class PeaksTableTheme:
     "peaks table theme"
     name    = "cycles.peakstable"
     height  = 100
-    width   = 60
+    width   = 280
     title   = 'dna ↔ nm'
     columns = [CyclesPlotTheme.yrightlabel, CyclesPlotTheme.ylabel]
     zstep   = 1e-4
@@ -83,9 +83,6 @@ class PeaksTableWidget:
 
     def observe(self, ctrl):
         "sets-up config observers"
-        ctrl.theme.add(self.__theme)
-        ctrl.display.add(self.__display)
-
         fcn = lambda **_: setattr(self.__widget.source, 'data', self.__data())
         ctrl.theme  .observe("sequence", fcn)
         ctrl.display.observe("sequence", fcn)
@@ -97,7 +94,7 @@ class PeaksTableWidget:
         self.__widget.source.js_on_change("data", jsc) # pylint: disable=no-member
 
     def __data(self):
-        info = self.__display[self.__tasks.sequencemodel.tasks].peaks
+        info = self.__display[self.__tasks.sequencemodel.tasks]
         hyb  = self.__tasks.hybridisations(None)
         if hyb is not None  and len(hyb) > 2 and info is None:
             info =  hyb['position'][0], hyb['position'][-1]
@@ -114,7 +111,7 @@ class ConversionSliderTheme:
     name    = "cycles.conversionslider"
     stretch = dict(start = 900,  step  = 5, end = 1400, title = 'Stretch (base/µm)')
     bias    = dict(step  = 1e-4, ratio = .25, offset = .05, title = 'Bieas (µm)')
-    width   = 60
+    width   = 280
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -202,10 +199,6 @@ class DriftWidget:
         "updates the widget"
         resets[self.__widget].update(**self.__data())
 
-    @staticmethod
-    def observe(_):
-        "sets-up config observers"
-
     def __data(self) -> dict:
         value = [] # type: List[int]
         if self.__tasks.driftperbead.task  is not None:
@@ -214,26 +207,53 @@ class DriftWidget:
             value += [1]
         return dict(active = value)
 
+class _AdvancedDescriptor:
+    _CNF = CyclesModelConfig.name
+    _name: str
+    def __init__(self, label:str, fmt:str) -> None:
+        self._label = label
+        self._fmt   = fmt
+
+    def __set_name__(self, _, name):
+        self._name = name[1:]
+
+    def __get__(self, inst, _):
+        return getattr(inst, '_ctrl').theme.get(self._CNF, self._name) if inst else self
+
+    def __set__(self, inst, value):
+        return getattr(inst, '_ctrl').theme.update(self._CNF, **{self._name: value})
+
+    def getdefault(self, inst):
+        "return the default value"
+        return getattr(inst, '_ctrl').theme.get(self._CNF, self._name, defaultmodel = True)
+
+    @property
+    def line(self) -> Tuple[str, str]:
+        "return the line for this descriptor"
+        return self._label, f'%(_{self._name}){self._fmt}'
+
 class AdvancedWidget(AdvancedWidgetMixin):
     "access to the modal dialog"
-    def __init__(self, ctrl, model:CyclesModelAccess) -> None:
-        self._model = model
+    def __init__(self, ctrl) -> None:
+        self._ctrl = ctrl
         super().__init__(ctrl)
+
+    _binwidth  = _AdvancedDescriptor('Histogram bin width', '.3f')
+    _minframes = _AdvancedDescriptor('Minimum frames per position', 'd')
 
     @staticmethod
     def _title() -> str:
         return 'Cycles Plot Configuration'
 
-    @staticmethod
-    def _body() -> Tuple[Tuple[str,str],...]:
-        return (('Histogram bin width',         '%(cycles.theme.binwidth).3f'),
-                ('Minimum frames per position', '%(cycles.theme.minframes)d'))
+    @classmethod
+    def _body(cls) -> Tuple[Tuple[str,str],...]:
+        out = tuple(i.line for i in cls.__dict__.values()
+                    if isinstance(i, _AdvancedDescriptor))
+        print(out)
+        return out
 
     def _args(self, **kwa):
-        return super()._args(model = self._model, **kwa)
-
-    def observe(self, _):
-        "sets-up config observers"
+        return super()._args(model = self, **kwa)
 
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
@@ -245,7 +265,7 @@ class WidgetMixin(ABC):
                               align    = AlignmentWidget(ctrl, model.alignment),
                               drift    = DriftWidget(ctrl, model),
                               events   = EventDetectionWidget(ctrl, model.eventdetection),
-                              advanced = AdvancedWidget(ctrl, model))
+                              advanced = AdvancedWidget(ctrl))
 
     def ismain(self, ctrl):
         "setup for when this is the main show"
@@ -257,7 +277,8 @@ class WidgetMixin(ABC):
 
     def _widgetobservers(self, ctrl):
         for widget in self.__widgets.values():
-            widget.observe(ctrl)
+            if hasattr(widget, 'observe'):
+                widget.observe(ctrl)
 
     def _createwidget(self, ctrl):
         self.__widgets['sliders'].addinfo(self._histsource)
