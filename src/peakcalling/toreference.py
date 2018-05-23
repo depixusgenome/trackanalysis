@@ -273,20 +273,11 @@ class CorrectedHistogramFit(HistogramFit):
             peaks   = self._getpeaks(left, vals)
 
         self._apply_maxthreshold(vals)
-        data = self._to_data(hist, vals)
-        if self.pivot == Pivot.bottom:
-            minv   = peaks[0]
-            vals   = data.xaxis + data.minv - minv,  data.yaxis
-            peaks  = peaks   - minv
-        elif self.pivot == Pivot.top:
-            minv   = peaks[-1]
-            vals   = data.xaxis + data.minv - minv,  data.yaxis
-            peaks  = peaks   - minv
-        elif self.pivot == Pivot.absolute:
-            vals   = data.xaxis + data.minv,  data.yaxis
-            minv   = 0.
-
-        return ChiSquareData(data.fcn, vals[0], vals[1], minv, peaks)
+        minv = (peaks[0]    if self.pivot == Pivot.bottom else
+                peaks[-1]   if self.pivot == Pivot.top    else
+                0.)
+        data = self._to_data(hist, (vals[0] + hist.minvalue - minv, vals[1]))
+        return ChiSquareData(data.fcn, data.xaxis, data.yaxis, minv, peaks-minv)
 
     def optimize(self, aleft, aright) -> Distance:
         "find best stretch & bias to fit right against left"
