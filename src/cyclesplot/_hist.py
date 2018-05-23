@@ -100,7 +100,8 @@ class HistMixin(ABC):
                                      left   = "left",   right = "cycles",
                                      x_range_name = "cycles")
 
-        self._ticker.create(self._ctrl, self._hist, self._model, "right")
+        self._ticker.create(self._ctrl, self._hist, self._model,
+                            self._model.cycles.theme.yrightlabel, "right")
         self._hover.create(self._hist, self._model, 'cycles')
         self._hover.slaveaxes(self._hist, self._histsource)
 

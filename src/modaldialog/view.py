@@ -17,7 +17,7 @@ T_BODY = Tuple[Tuple[str, str],...]
 class AdvancedWidgetTheme:
     "AdvancedWidgetTheme"
     name   = "advancedwidget"
-    width  = 60
+    width  = 280
     height = 20
     label  = "advanced"
     @initdefaults(frozenset(locals()))

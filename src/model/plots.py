@@ -273,8 +273,8 @@ class PlotModel:
         self.addto(ctrl, noerase)
 
     @classmethod
-    def create(cls, ctrl, **kwa):
+    def create(cls, ctrl, noerase = True):
         "creates the model and registers it"
-        self = cls(**kwa)
-        self.observe(ctrl, True)
+        self = cls()
+        self.addto(ctrl, noerase = noerase)
         return self

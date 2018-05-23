@@ -36,7 +36,7 @@ class PeaksPlotTheme(PlotTheme):
     """
     cleaning plot theme
     """
-    name            = "hybridstat.peaks"
+    name            = "hybridstat.peaks.plot"
     figsize         = 500, 750, "fixed"
     xtoplabel       = 'Duration (s)'
     xlabel          = 'Rate (%)'
@@ -58,12 +58,19 @@ class PeaksPlotTheme(PlotTheme):
     def __init__(self, **_):
         super().__init__(**_)
 
+class PeaksPlotConfig:
+    "PeaksPlotConfig"
+    name             = "hybridstat.peaks"
+    estimatedstretch = 1./8.8e-4
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
 class PeaksPlotDisplay(PlotDisplay):
-    "CyclesPlotDisplay"
+    "PeaksPlotDisplay"
     name                              = "hybridstat.peaks"
     distances : Dict[str, Distance]   = dict()
     peaks:      Dict[str, np.ndarray] = dict()
-    estimatedstretch                  = 1./8.8e-4
     estimatedbias                     = 0.
     constraintspath: Any              = None
     useparams: bool                   = False
@@ -77,6 +84,7 @@ class PeaksPlotModel(PlotModel):
     """
     theme   = PeaksPlotTheme()
     display = PeaksPlotDisplay()
+    config  = PeaksPlotConfig()
 
 class FitToReferenceConfig:
     """
@@ -159,7 +167,8 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     def reference(self, val):
         "sets the root task for the reference data"
         if val is not self.reference:
-            info = FitToReferenceStore(reference = self.reference).__dict__
+            info = FitToReferenceStore(reference = val).__dict__
+            info.pop('name')
             self._ctrl.display.update(self.__store, **info)
 
     @property
@@ -181,6 +190,7 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
         def _ontask(parent = None, **_):
             if parent == self.reference:
                 info = FitToReferenceStore(reference = self.reference).__dict__
+                info.pop('name')
                 ctrl.display.update(self.__store, **info)
                 self.resetmodel()
         ctrl.tasks.observe("updatetask", "addtask", "removetask", _ontask)
@@ -215,7 +225,6 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     @staticmethod
     def _configattributes(_):
         return {}
-
 
     def __computefitdata(self) -> Tuple[bool, bool]:
         args  = {} # type: Dict[str, Any]
@@ -269,9 +278,9 @@ class FitToHairpinConfig:
 
 class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
     "access to the FitToHairpinTask"
-    def __init__(self, ctrl):
-        super().__init__(ctrl)
-        self.__defaults = ctrl.theme.add(FitToHairpinConfig(), True)
+    def __init__(self, ctrl, mdl):
+        super().__init__(mdl)
+        self.__defaults = ctrl.theme.add(FitToHairpinConfig(), False)
 
     def setobservers(self, mdl, ctrl):
         "observes the global model"
@@ -302,7 +311,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
     def default(self, mdl, usr = True):
         "returns the default identification task"
         if isinstance(mdl, str):
-            return self._ctrl.get(self.__defaults, mdl, defaultmodel = not usr)
+            return self._ctrl.theme.get(self.__defaults, mdl, defaultmodel = not usr)
 
         ols = mdl.oligos
         if ols is None or len(ols) == 0 or len(mdl.sequences(...)) == 0:
@@ -338,19 +347,19 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
     "Access to peaks"
     def __init__(self, ctrl):
         super().__init__(ctrl)
-        self.peaksmodel      = PeaksPlotModel.create(ctrl)
+        self.peaksmodel      = PeaksPlotModel.create(ctrl, False)
         self.subtracted      = BeadSubtractionAccess(self)
         self.alignment       = ExtremumAlignmentTaskAccess(self)
         self.eventdetection  = EventDetectionTaskAccess(self)
         self.peakselection   = PeakSelectorTaskAccess(self)
         self.fittoreference  = FitToReferenceAccess(self)
-        self.identification  = FitToHairpinAccess(self)
+        self.identification  = FitToHairpinAccess(ctrl, self)
 
     @property
     def stretch(self) -> float:
         "return the stretch for the current bead"
         dist = self.peaksmodel.display.distances
-        est  = self.peaksmodel.theme.estimatedstretch
+        est  = self.peaksmodel.config.estimatedstretch
         key  = self.sequencemodel.currentkey
         return getattr(dist.get(key, None), 'stretch', est)
 
@@ -358,7 +367,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
     def bias(self) -> float:
         "return the bias for the current bead"
         dist = self.peaksmodel.display.distances
-        est  = self.peaksmodel.theme.estimatedbias
+        est  = self.peaksmodel.display.estimatedbias
         key  = self.sequencemodel.currentkey
         return getattr(dist.get(key, None), 'bias', est)
 

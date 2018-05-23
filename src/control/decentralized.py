@@ -4,16 +4,27 @@
 from  typing            import Dict, Any
 from  collections       import ChainMap
 from  copy              import deepcopy
+import numpy            as     np
 from  utils             import initdefaults
 from  utils.logconfig   import getLogger
 from  .event            import Controller
 LOGS   = getLogger(__name__)
 DELETE = type('DELETE', (), {})
 
+def _good(model, i, j):
+    if not hasattr(model, i):
+        return False
+    obj = getattr(model, i)
+    if isinstance(j, np.ndarray) or isinstance(obj, np.ndarray):
+        return True
+    try:
+        return getattr(model, i) != j
+    except ValueError:
+        return True # numpy error
+
 def updatemodel(self, model, kwa, force = False, deflt = None):
     "update the model"
-    kwa = {i:j for i, j in kwa.items()
-           if hasattr(model, i) and getattr(model, i) != j}
+    kwa = {i:j for i, j in kwa.items() if _good(model, i, j)}
 
     if len(kwa) == 0 and not force:
         return None

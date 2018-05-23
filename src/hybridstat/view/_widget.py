@@ -27,14 +27,14 @@ from view.toolbar               import FileList
 from sequences.view             import (SequenceTicker, SequenceHoverMixin,
                                         OligoListWidget, SequencePathWidget)
 from modaldialog.view           import AdvancedTaskMixin, T_BODY
-from ._model                    import PeaksPlotModelAccess
+from ._model                    import PeaksPlotModelAccess, FitToReferenceStore
 
 class ReferenceWidgetTheme:
     "ref widget theme"
     name  = "hybridstat.fittoreference.widget"
     title = 'Reference Track'
     none  = 'None'
-    width = 120
+    width = 280
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -49,9 +49,12 @@ class ReferenceWidget:
         self.__model = model
         self.__files = FileList(ctrl)
 
-    @staticmethod
-    def observe(_):
+    def observe(self, ctrl):
         "sets up observers"
+        def _observe(old = None, **_):
+            if 'reference' in old:
+                self.__widget.update(**self.__data())
+        ctrl.display.observe(FitToReferenceStore.name, _observe)
 
     def addtodoc(self, ctrl, *_) -> List[Widget]:
         "creates the widget"
@@ -89,10 +92,10 @@ class PeaksSequencePathWidget(SequencePathWidget):
     "Widget for setting the sequence to use"
     def __init__(self, ctrl, mdl: PeaksPlotModelAccess) -> None:
         super().__init__(ctrl)
-        self.__model = mdl
+        self.__peaks = mdl
 
     def _sort(self, lst) -> List[str]: # type: ignore
-        dist = self.__model.distances
+        dist = self.__peaks.distances
         if len(dist):
             lst  = [i for i in lst if i in dist]
             return sorted(lst, key = lambda i: dist[i].value)
@@ -153,10 +156,6 @@ class PeaksStatsWidget:
     def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
         self.__model = model
         self.__theme = ctrl.theme.add(PeaksStatsWidgetTheme())
-
-    @staticmethod
-    def observe(_):
-        "sets up observers"
 
     def addtodoc(self, *_) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
@@ -311,10 +310,6 @@ class PeakListWidget:
             cols[ind].formatter.format = fmt
         return cols
 
-    @staticmethod
-    def observe(_):
-        "sets up observers"
-
     def addtodoc(self, _, src) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
         "creates the widget"
         cols  = self.__cols()
@@ -336,7 +331,7 @@ class PeakIDPathTheme:
     name       = "hybridstat.peaks.idpath"
     title      = 'Id file path'
     filechecks = 500
-    width      = 120
+    width      = 225
     tableerror = ('File extension must be .xlsx', 'warning')
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -349,7 +344,7 @@ class PeakIDPathWidget:
     __theme : PeakIDPathTheme
     def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
         self.keeplistening  = True
-        self.__model        = model
+        self.__peaks        = model
         self.__theme        = ctrl.theme.add(PeakIDPathTheme())
 
     def listentofile(self, doc, action):
@@ -358,13 +353,13 @@ class PeakIDPathWidget:
 
         @action
         def _do_resetmodel():
-            self.__model.identification.resetmodel(self.__model)
+            self.__peaks.identification.resetmodel(self.__peaks)
 
         def _callback():
             if not self.keeplistening:
                 return
 
-            path = self.__model.constraintspath
+            path = self.__peaks.constraintspath
             if path is None:
                 finfo[0] = None
                 return
@@ -408,7 +403,7 @@ class PeakIDPathWidget:
         def _onchangetext_cb(attr, old, new):
             path = self.__widget.value.strip()
             if path == '':
-                self.__model.constraintspath = None
+                ctrl.display.update(self.__peaks.peaksmodel.display, constraintspath = None)
                 return
 
             elif not Path(path).exists():
@@ -416,16 +411,16 @@ class PeakIDPathWidget:
                     raise IOError(*self.__theme.tableerror)
                 try:
                     writecolumns(path, "Summary",
-                                 [('Bead', [self.__model.bead]),
-                                  ('Reference', [self.__model.sequencekey]),
-                                  ('Stretch (base/µm)', [self.__model.stretch]),
-                                  ('Bias (µm)', [self.__model.bias])])
+                                 [('Bead', [self.__peaks.bead]),
+                                  ('Reference', [self.__peaks.sequencekey]),
+                                  ('Stretch (base/µm)', [self.__peaks.stretch]),
+                                  ('Bias (µm)', [self.__peaks.bias])])
                 except:
                     raise
                 else:
                     startfile(path)
 
-            ctrl.display.update(self.__model.peaksmodel.display,
+            ctrl.display.update(self.__peaks.peaksmodel.display,
                                 constraintspath = str(Path(path).resolve()))
 
         self.__widget.on_change('click', _onclick_cb)
@@ -437,7 +432,7 @@ class PeakIDPathWidget:
     def reset(self, resets):
         "resets the wiget when a new file is opened, ..."
         txt  = ''
-        path = self.__model.constraintspath
+        path = self.__peaks.constraintspath
         if path is not None and Path(path).exists():
             txt = str(Path(path).resolve())
         (self.__widget if resets is None else resets[self.__widget]).update(value = txt)
@@ -516,10 +511,6 @@ class AdvancedWidget(AdvancedTaskMixin):
     def reset(self, resets):
         "resets the widget when a new file is opened, ..."
         AdvancedTaskMixin.reset(resets)
-
-    @staticmethod
-    def observe(_):
-        "sets up observers"
 
     _subtracted = BeadSubtractionModalDescriptor()
     _alignment  = AlignmentModalDescriptor()

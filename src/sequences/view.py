@@ -74,7 +74,7 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
         u"returns the fixed axis"
         return self.__axis
 
-    def create(self, ctrl, fig, mdl, loc = 'right'):
+    def create(self, ctrl, fig, mdl, axlabel, loc = 'right'): # pylint: disable=too-many-arguments
         "Sets the ticks according to the configuration"
         self.__model = mdl
         self.__fig   = fig
@@ -83,7 +83,7 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 
         fig.extra_y_ranges        = {"bases": Range1d(start = 0., end = 1.)}
         fig.add_layout(LinearAxis(y_range_name = "bases",
-                                  axis_label   = mdl.cycles.theme.yrightlabel,
+                                  axis_label   = axlabel,
                                   ticker       = self.__axis),
                        loc)
 

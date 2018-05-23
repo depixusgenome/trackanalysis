@@ -81,7 +81,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     "Creates plots for peaks"
     _fig: Figure
     def __init__(self, ctrl):
-        super().__init__(ctrl)
+        super().__init__(ctrl, noerase = False)
         self._src: Dict[str, ColumnDataSource] = {}
         self._widgets                          = createwidgets(ctrl, self._model)
         self._ticker                           = SequenceTicker()
@@ -153,7 +153,8 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         super().observe(ctrl)
         self._model.setobservers(ctrl)
         for widget in self._widgets.values():
-            widget.observe(ctrl)
+            if hasattr(widget, 'observe'):
+                widget.observe(ctrl)
 
     def ismain(self, _):
         "specific setup for when this view is the main one"
@@ -192,7 +193,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                           )
         self._fig.xaxis[0].axis_label_text_color = self._theme.peakscount.color
         self._fig.add_layout(axis, 'above')
-        self._plotmodel.theme.addcallbacks(self._ctrl, self._fig)
+        self._plotmodel.display.addcallbacks(self._ctrl, self._fig)
 
     def __add_curves(self):
         self._src = {i: ColumnDataSource(j) for i, j in self.__data().items()}
@@ -219,17 +220,17 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         if len(tool) == 1:
             tool[0].renderers = rends[::-1]
 
-        self._hover.create(self._fig, self._model, self)
+        self._hover.create(self._fig, self._model)
         doc.add_root(self._hover)
-        self._ticker.create(self._fig, self._model, self)
+        self._ticker.create(self._ctrl, self._fig, self._model,
+                            self._model.peaksmodel.theme.yrightlabel, "right")
         self._hover.jsslaveaxes(self._fig, self._src['peaks'])
 
     def __setup_widgets(self, doc):
-        action  = self.action
-        wdg     = {i: j.addtodoc(action, self._src['peaks'])
+        wdg     = {i: j.addtodoc(self._ctrl, self._src['peaks'])
                    for i, j in self._widgets.items()}
         enableOnTrack(self, self._fig, wdg)
-        self._widgets['cstrpath'].listentofile(doc, action)
+        self._widgets['cstrpath'].listentofile(doc, self._ctrl.action)
 
 
         self._widgets['advanced'].callbacks(self._doc)
