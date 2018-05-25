@@ -236,15 +236,19 @@ class BrownianMotion(Object):
 
     def __call__(self,
                  cnf   : 'Experiment',
-                 events: np.ndarray,
+                 events: np.ndarray = None,
                  seed  : RAND_STATE = None) -> np.ndarray:
         """
         Add brownian motion
         """
         if not self.sigma:
-            return
+            return np.zeros((0, 0), dtype = 'f4')
 
         noise = randstate(seed).normal
+        if events is None:
+            brown  = noise(0., self.sigma, (cnf.ncycles, len(cnf.positions)))
+            brown += cnf.positions
+            return brown
         if len(events.shape) == 1 or events.shape[1] == len(cnf.bindings):
             brown = noise(0., self.sigma, events.shape)
         else:
@@ -261,6 +265,7 @@ class BrownianMotion(Object):
         if self.walk:
             brown = np.cumsum(brown, axis = 1)
         events += brown
+        return events
 
 class _BindingAttribute:
     __slots__        = ('name', 'dtype')
@@ -409,6 +414,16 @@ class Experiment(Object):
         "reset *all* attributes"
         self.__init__(**kwa)
 
+    def eventpositions(self, seed: RAND_STATE = None) -> np.ndarray:
+        """
+        Creates events positions
+        """
+        if self.brownianmotion is None:
+            evts  = np.zeros((self.ncycles, len(self.positions)), dtype = 'f4')
+            evts += self.positions
+            return evts
+        return self.brownianmotion(self, seed = seed)
+
     def events(self, seed: RAND_STATE = None) -> np.ndarray:
         """
         Creates events using provided positions, rates and durations.
@@ -428,6 +443,8 @@ class Experiment(Object):
         roff[~ron] = 0.
         roff[np.cumsum(roff, axis = 1) > self.phases['measure']] = 0.
         return roff
+
+    eventdurations = events
 
     def bead(self,
              evts:  np.ndarray = None,
