@@ -275,8 +275,9 @@ class _BindingAttribute:
         self.dtype = np.dtype(dtype)
 
     def __set_name__(self, _, name):
+        assert name[-1] == 's'
         self.name = name[:-1]
-        self.NAMES.append(self.name)
+        self.NAMES.append(name)
 
     def __get__(self, inst, owner):
         name = self.name
@@ -404,7 +405,7 @@ class Experiment(Object):
     positions      = cast(Sequence[float],           _BindingAttribute())
     onrates        = cast(Sequence[Optional[float]], _BindingAttribute())
     offrates       = cast(Sequence[Optional[float]], _BindingAttribute())
-    nature         = cast(Sequence[str],             _BindingAttribute('<U16'))
+    natures        = cast(Sequence[str],             _BindingAttribute('<U16'))
     singlestrand   = cast(Binding,                   _SingleStrandBinding())
     def __init__(self, **kwa):
         super().__init__(**kwa)
