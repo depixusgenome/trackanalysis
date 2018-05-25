@@ -425,7 +425,7 @@ class Experiment(Object):
             return evts
         return self.brownianmotion(self, seed = seed)
 
-    def events(self, seed: RAND_STATE = None) -> np.ndarray:
+    def eventdurations(self, seed: RAND_STATE = None) -> np.ndarray:
         """
         Creates events using provided positions, rates and durations.
         """
@@ -445,7 +445,22 @@ class Experiment(Object):
         roff[np.cumsum(roff, axis = 1) > self.phases['measure']] = 0.
         return roff
 
-    eventdurations = events
+    def events(self, seed: RAND_STATE = None) -> np.ndarray:
+        "return a list of event data"
+        durs = self.eventdurations(seed = seed)
+
+        data = np.zeros(np.sum(durs), dtype = 'f4')
+        if self.brownianmotion:
+            self.brownianmotion(self, data)
+
+        evts = np.split(data, durs.ravel())
+        npos = len(self.positions)
+        pos  = self.positions
+        for i, j in enumerate(evts):
+            j[:] += pos[i % npos]
+
+        return np.array([[k for k in evts[i:i+npos] if len(k)]
+                         for i in range(0, len(evts), npos)])
 
     def bead(self,
              evts:  np.ndarray = None,
@@ -458,7 +473,7 @@ class Experiment(Object):
         """
         rnd  = randstate(seed)
         if evts is None:
-            evts = self.events(rnd)
+            evts = self.eventdurations(rnd)
         bead = self.__beadstructure(evts)
 
         if self.strandclosing:

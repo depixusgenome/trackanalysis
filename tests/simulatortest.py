@@ -88,12 +88,12 @@ def test_bypeaksevents_simulator():
 def test_bindings():
     "test bindings"
     exp  = _bind.Experiment(brownianmotion = None, ncycles = 100, onrates = 1., offrates = 100.)
-    vals = exp.events(seed = 0)
+    vals = exp.eventdurations(seed = 0)
     assert vals.shape == (100, len(exp.bindings))
     assert np.all(np.cumsum(vals, axis = 1) <= exp.phases['measure'])
 
     exp  = _bind.Experiment(brownianmotion = None, ncycles = 100, onrates = 1., offrates = 0.)
-    vals = exp.events(seed = 0)
+    vals = exp.eventdurations(seed = 0)
     assert vals.shape == (100, len(exp.bindings))
     assert np.all(np.cumsum(vals, axis = 1) <= exp.phases['measure'])
     assert np.all(np.cumsum(vals, axis = 1) > 0)
