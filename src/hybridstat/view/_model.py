@@ -360,7 +360,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         "return the stretch for the current bead"
         dist = self.peaksmodel.display.distances
         est  = self.peaksmodel.config.estimatedstretch
-        key  = self.sequencemodel.currentkey
+        key  = self.sequencekey
         return getattr(dist.get(key, None), 'stretch', est)
 
     @property
@@ -368,7 +368,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         "return the bias for the current bead"
         dist = self.peaksmodel.display.distances
         est  = self.peaksmodel.display.estimatedbias
-        key  = self.sequencemodel.currentkey
+        key  = self.sequencekey
         return getattr(dist.get(key, None), 'bias', est)
 
     @property
@@ -416,17 +416,19 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
             disp = cpy.peaksmodel.display
             if dtl is None:
                 disp.distances     = {}
-                disp.peaks         = createpeaks(self, [])
+                disp.peaks         = createpeaks(cpy, [])
                 disp.estimatedbias = 0.
             else:
                 tsk   = cast(PeakSelectorTask, self.peakselection.task)
                 peaks = tuple(tsk.details2output(cast(PeakSelectorDetails, dtl)))
 
                 disp.distances     = tmp.distances if self.identification.task else {}
-                disp.peaks         = createpeaks(self, peaks)
+                disp.peaks         = createpeaks(cpy, peaks)
                 disp.estimatedbias = disp.peaks['z'][0]
             info = {i: getattr(disp, i) for i in ('distances', 'peaks', 'estimatedbias')}
             self._ctrl.display.update(self.peaksmodel.display, **info)
+            if dtl is not None:
+                self.sequencemodel.setnewkey(self._ctrl, cpy.sequencekey)
         return dtl
 
     def reset(self) -> bool: # type: ignore

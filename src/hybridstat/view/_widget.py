@@ -49,11 +49,12 @@ class ReferenceWidget:
         self.__model = model
         self.__files = FileList(ctrl)
 
-    def observe(self, ctrl):
+    def callbacks(self, ctrl, doc):
         "sets up observers"
         def _observe(old = None, **_):
             if 'reference' in old:
-                self.__widget.update(**self.__data())
+                data = self.__data()
+                doc.add_next_tick_callback(lambda: self.__widget.update(**data))
         ctrl.display.observe(FitToReferenceStore.name, _observe)
 
     def addtodoc(self, ctrl, *_) -> List[Widget]:
@@ -101,12 +102,14 @@ class PeaksSequencePathWidget(SequencePathWidget):
             return sorted(lst, key = lambda i: dist[i].value)
         return super()._sort(lst)
 
-    def callbacks(self,             # type: ignore # pylint: disable=arguments-differ
+    # type: ignore # pylint: disable=arguments-differ,too-many-arguments
+    def callbacks(self, ctrl, doc,
                   hover: SequenceHoverMixin,
                   tick1: SequenceTicker,
                   div:   'PeaksStatsDiv',
                   table: DataTable):
         "sets-up callbacks for the tooltips and grids"
+        super().callbacks(ctrl, doc, None, None)
         code = "hvr.on_change_sequence(src, peaks, stats, tick1, tick2, cb_obj)"
         args = dict(hvr   = hover, src   = hover.source, peaks = table,
                     stats = div,   tick1 = tick1,        tick2 = tick1.axis)
@@ -347,11 +350,11 @@ class PeakIDPathWidget:
         self.__peaks        = model
         self.__theme        = ctrl.theme.add(PeakIDPathTheme())
 
-    def listentofile(self, doc, action):
+    def callbacks(self, ctrl, doc):
         "sets-up a periodic callback which checks whether the id file has changed"
         finfo = [None, None]
 
-        @action
+        @ctrl.action
         def _do_resetmodel():
             self.__peaks.identification.resetmodel(self.__peaks)
 

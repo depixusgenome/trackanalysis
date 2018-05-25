@@ -280,14 +280,15 @@ class WidgetMixin(ABC):
             if hasattr(widget, 'observe'):
                 widget.observe(ctrl)
 
-    def _createwidget(self, ctrl):
+    def _createwidget(self, ctrl, doc):
         self.__widgets['sliders'].addinfo(self._histsource)
 
         widgets = {i: j.addtodoc(ctrl) for i, j in self.__widgets.items()}
 
         enableOnTrack(self, self._hist, self._raw, widgets)
 
-        self.__widgets['seq']     .callbacks(self._hover, self._ticker)
+        self.__widgets['oligos']  .callbacks(ctrl, doc)
+        self.__widgets['seq']     .callbacks(ctrl, doc, self._hover, self._ticker)
         self.__widgets['sliders'] .callbacks(self._hover)
         self.__widgets['table']   .callbacks(self._hover)
         self.__widgets['advanced'].callbacks(self._doc)

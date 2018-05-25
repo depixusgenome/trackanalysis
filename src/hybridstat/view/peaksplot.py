@@ -146,7 +146,8 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         self.__create_fig()
         rends = self.__add_curves()
         self.__setup_tools(doc, rends)
-        return self._keyedlayout(ctrl, self._fig, left = self.__setup_widgets(doc))
+        return self._keyedlayout(ctrl, self._fig,
+                                 left = self.__setup_widgets(ctrl, doc))
 
     def observe(self, ctrl):
         "observes the model"
@@ -226,18 +227,14 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                             self._model.peaksmodel.theme.yrightlabel, "right")
         self._hover.jsslaveaxes(self._fig, self._src['peaks'])
 
-    def __setup_widgets(self, doc):
-        wdg     = {i: j.addtodoc(self._ctrl, self._src['peaks'])
-                   for i, j in self._widgets.items()}
+    def __setup_widgets(self, ctrl, doc):
+        widgets = self._widgets
+        wdg     = {i: j.addtodoc(ctrl, self._src['peaks']) for i, j in widgets.items()}
         enableOnTrack(self, self._fig, wdg)
-        self._widgets['cstrpath'].listentofile(doc, self._ctrl.action)
-
-
-        self._widgets['advanced'].callbacks(self._doc)
-        self._widgets['seq'].callbacks(self._hover,
-                                       self._ticker,
-                                       wdg['stats'][-1],
-                                       wdg['peaks'][-1])
+        widgets['oligos'].callbacks(ctrl, doc)
+        widgets['cstrpath'].callbacks(ctrl, doc)
+        widgets['seq'].callbacks(ctrl, doc, self._hover, self._ticker,
+                                 wdg['stats'][-1], wdg['peaks'][-1])
 
         mode     = self.defaultsizingmode()
         wbox     = lambda x: layouts.widgetbox(children = x, **mode)

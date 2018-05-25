@@ -54,12 +54,9 @@ class SequenceModel:
 
     def setnewkey(self, ctrl, new):
         "sets new probes"
-        if new == self.currentkey:
-            return
-
         hpins = dict(self.display.hpins)
         hpins[self.tasks.bead] = new
-        ctrl.theme.update(self.display, hpins = hpins)
+        ctrl.display.update(self.display, hpins = hpins)
 
     def setnewprobes(self, ctrl, new):
         "sets new probes"
@@ -140,7 +137,7 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
         seqs = self.__seq.config.sequences
         if sequence is Ellipsis:
             return dict(seqs)
-        return seqs.get(self.__seq.currentkey if sequence is None else sequence, None)
+        return seqs.get(self.sequencekey if sequence is None else sequence, None)
 
     def hybridisations(self, sequence = ...):
         "returns the peaks"

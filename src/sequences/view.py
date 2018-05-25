@@ -267,10 +267,6 @@ class SequencePathWidget:
                                    title     = self.__theme.dlgtitle,
                                    filetypes = 'fasta|*')
 
-        fcn           = lambda **_: self.__widget.update(**self.__data())
-        ctrl.theme.  observe(self.__model.config,  fcn)
-        ctrl.display.observe(self.__model.display, fcn)
-
     def reset(self, resets):
         "updates the widget"
         resets[self.__widget].update(**self.__data())
@@ -280,16 +276,23 @@ class SequencePathWidget:
         "returns the widget"
         return self.__widget
 
-    def callbacks(self, hover: SequenceHoverMixin, tick1: SequenceTicker):
+    def callbacks(self, ctrl, doc, hover: SequenceHoverMixin, tick1: SequenceTicker):
         "sets-up callbacks for the tooltips and grids"
-        jsc = CustomJS(code = ("if(src.column_names.indexOf(cb_obj.value) > -1)"
-                               "{ cb_obj.label     = cb_obj.value;"
-                               "  tick1.key        = cb_obj.value;"
-                               "  tick2.key        = cb_obj.value;"
-                               "  src.data['text'] = src.data[cb_obj.value];"
-                               "  src.change.emit(); }"),
-                       args = dict(tick1 = tick1, tick2 = tick1.axis, src = hover.source))
-        self.__widget.js_on_change('value', jsc)
+        def _observer(**_):
+            data = self.__data()
+            doc.add_next_tick_callback(lambda : self.__widget.update(**data))
+        ctrl.theme  .observe(self.__model.config,  _observer)
+        ctrl.display.observe(self.__model.display, _observer)
+
+        if hover is not None:
+            jsc = CustomJS(code = ("if(src.column_names.indexOf(cb_obj.value) > -1)"
+                                   "{ cb_obj.label     = cb_obj.value;"
+                                   "  tick1.key        = cb_obj.value;"
+                                   "  tick2.key        = cb_obj.value;"
+                                   "  src.data['text'] = src.data[cb_obj.value];"
+                                   "  src.change.emit(); }"),
+                           args = dict(tick1 = tick1, tick2 = tick1.axis, src = hover.source))
+            self.__widget.js_on_change('value', jsc)
         return self.__widget
 
     @staticmethod
@@ -343,11 +346,13 @@ class OligoListWidget:
         self.__theme = ctrl.theme.add(OligoListTheme())
         self.__model = SequenceModel().addto(ctrl)
 
-    def observe(self, ctrl):
+    def callbacks(self, ctrl, doc):
         "sets-up config observers"
-        fcn = lambda **_: self.__widget.update(**self.__data())
-        ctrl.theme  .observe(self.__model.config,  fcn)
-        ctrl.display.observe(self.__model.display, fcn)
+        def _observer(**_):
+            data = self.__data()
+            doc.add_next_tick_callback(lambda : self.__widget.update(**data))
+        ctrl.theme  .observe(self.__model.config,  _observer)
+        ctrl.display.observe(self.__model.display, _observer)
 
     def addtodoc(self, ctrl, *_) -> List[Widget]:
         "creates the widget"
