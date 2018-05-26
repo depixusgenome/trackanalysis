@@ -39,9 +39,8 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # t
         shape = self._createraw()
         self._createhist(self._rawsource.data, shape, self._raw.y_range)
         if 'fixed' in self.defaultsizingmode().values():
-            return [self._keyedlayout(ctrl, self._raw, self._hist),
-                    self._createwidget(ctrl, doc)]
-        return [self._createwidget(ctrl, doc), self._keyedlayout(ctrl, self._raw, self._hist)]
+            return [self._keyedlayout(ctrl, self._raw, self._hist), self._createwidget(ctrl)]
+        return [self._createwidget(ctrl), self._keyedlayout(ctrl, self._raw, self._hist)]
 
     def _reset(self, cache: CACHE_TYPE):
         shape = self._DEFAULT_DATA[1]

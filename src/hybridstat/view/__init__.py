@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "all view aspects here"
-from typing                 import Dict
-from functools              import partial
-from bokeh.models           import Tabs, Panel, Spacer
-from bokeh                  import layouts
-from view.base              import BokehView
-from model.plots            import PlotState
-from cleaning.view          import CleaningView
-from qualitycontrol.view    import QualityControlView
-from fov                    import FoVPlotView
-from cyclesplot             import CyclesPlotView
-from .peaksplot             import PeaksPlotView
-from ._io                   import setupio
+from collections         import OrderedDict
+from functools           import partial
+from typing              import Dict
+
+from bokeh               import layouts
+from bokeh.models        import Panel, Spacer, Tabs
+
+from cleaning.view       import CleaningView
+from cyclesplot          import CyclesPlotView
+from fov                 import FoVPlotView
+from model.plots         import PlotState
+from qualitycontrol.view import QualityControlView
+from view.base           import BokehView
+
+from ._io                import setupio
+from .peaksplot          import PeaksPlotView
 
 class HybridStatTheme:
     "HybridStatTheme"
@@ -25,17 +29,19 @@ class HybridStatView(BokehView):
     "A view with all plots"
     TASKS = ((lambda lst: tuple(j for i, j in enumerate(lst) if j not in lst[:i]))
              (CleaningView.TASKS+PeaksPlotView.TASKS))
+    KEYS : Dict[type, str]   = OrderedDict()
+    KEYS[FoVPlotView]        = 'fov'
+    KEYS[QualityControlView] = 'qc'
+    KEYS[CleaningView]       = 'cleaning'
+    KEYS[CyclesPlotView]     = 'cycles'
+    KEYS[PeaksPlotView]      = 'peaks'
     def __init__(self, ctrl = None, **kwa):
         "Sets up the controller"
         super().__init__(ctrl = ctrl, **kwa)
         self._tabs   = None
         self._roots  = [] # type: ignore
         self.__theme = ctrl.theme.add(HybridStatTheme())
-        self._panels = [FoVPlotView         (ctrl, **kwa),
-                        QualityControlView  (ctrl, **kwa),
-                        CleaningView        (ctrl, **kwa),
-                        CyclesPlotView      (ctrl, **kwa),
-                        PeaksPlotView       (ctrl, **kwa)]
+        self._panels = [cls(ctrl, **kwa) for cls in self.KEYS]
 
         titles = self.__theme.titles
         for panel in self._panels:
@@ -49,9 +55,9 @@ class HybridStatView(BokehView):
             desc.setdefault(panel.plotter, (PlotState.active if panel is cur else
                                             PlotState.disabled))
 
-    @staticmethod
-    def __key(panel):
-        return panel.plotter.key().split('.')[-1]
+    @classmethod
+    def __key(cls, panel):
+        return cls.KEYS[type(panel)]
 
     @staticmethod
     def __state(panel, val = None):
@@ -108,11 +114,12 @@ class HybridStatView(BokehView):
                     name   = 'Hybridstat:Tabs',
                     **mode)
 
+        print(ind)
         @ctrl.display.observe
         def _onapplicationstarted():
             doc.add_root(self._roots[ind])
 
-        @self.action
+        @ctrl.action
         def _py_cb(attr, old, new):
             self._panels[old].activate(False)
             doc.remove_root(self._roots[old])
@@ -128,12 +135,5 @@ class HybridStatView(BokehView):
     def observe(self, ctrl):
         "observing the controller"
         super().observe(ctrl)
-        def _fcn(ind, panel, old = None, **_):
-            if 'state' not in old:
-                return
-            if panel.state == PlotState.active and self._tabs is not None:
-                self._tabs.active = ind
-
-        for ind, panel in enumerate(self._panels):
+        for panel in self._panels:
             panel.observe(ctrl)
-            ctrl.display.observe(getattr(panel, '_display'), partial(_fcn, ind, panel))

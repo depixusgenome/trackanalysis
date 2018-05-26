@@ -62,7 +62,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
     __fig:    Figure
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
-        super().__init__(ctrl)
+        super().__init__(ctrl, noerase = False)
         WidgetMixin.__init__(self, ctrl, self._model)
 
     def _addtodoc(self, ctrl, *_):

@@ -203,9 +203,9 @@ class Event:
 
         if all(isfunction(name) for name in names):
             # dealing with tuples and lists
-            for val in names:
+            for val in names[:-1]:
                 _fromfcn(val)
-            return None
+            return _fromfcn(names[-1])
 
         return add(names[:-1], names[-1])
 

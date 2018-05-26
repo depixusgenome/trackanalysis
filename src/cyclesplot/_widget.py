@@ -53,7 +53,7 @@ class PeaksTableWidget:
         self.__display = ctrl.display.add(PeaksTableDisplay())
         self.__tasks   = tasks
 
-    def addtodoc(self, _) -> List[Widget]:
+    def addtodoc(self, mainview, ctrl) -> List[Widget]:
         "creates the widget"
         width  = self.__theme.width
         fmt    = DpxNumberFormatter(format = self.__theme.zformat, text_align = 'right')
@@ -75,22 +75,22 @@ class PeaksTableWidget:
                                   height         = self.__theme.height,
                                   name           = "Cycles:Peaks")
 
+        @ctrl.theme.observe
+        @ctrl.display.observe
+        def _onsequence(**_):
+            if mainview.isactive():
+                data = self.__data()
+                mainview.calllater(lambda: setattr(self.__widget.source, 'data', data))
+
         return [Paragraph(text = self.__theme.title), self.__widget]
 
     def reset(self, resets:CACHE_TYPE):
         "updates the widget"
         resets[self.__widget.source]['data'] = self.__data()
 
-    def observe(self, ctrl):
-        "sets-up config observers"
-        fcn = lambda **_: setattr(self.__widget.source, 'data', self.__data())
-        ctrl.theme  .observe("sequence", fcn)
-        ctrl.display.observe("sequence", fcn)
-
     def callbacks(self, hover):
         "adding callbacks"
-        jsc = CustomJS(code = "hvr.on_change_peaks_table(cb_obj)",
-                       args = dict(hvr = hover))
+        jsc = CustomJS(code = "hvr.on_change_peaks_table(cb_obj)", args = dict(hvr = hover))
         self.__widget.source.js_on_change("data", jsc) # pylint: disable=no-member
 
     def __data(self):
@@ -129,7 +129,7 @@ class ConversionSlidersWidget:
         "adds info to the widget"
         self.__figdata = histsource
 
-    def addtodoc(self, _) -> List[Widget]:
+    def addtodoc(self, *_) -> List[Widget]:
         "creates the widget"
         widget = lambda x, s, e, n: Slider(value = getattr(self.__display, x),
                                            title = getattr(self.__theme,  x)['title'],
@@ -178,12 +178,12 @@ class DriftWidget:
         self.__theme = ctrl.theme.add(DriftWidgetTheme())
         self.__tasks = tasks
 
-    def addtodoc(self, ctrl) -> List[Widget]:
+    def addtodoc(self, mainview, ctrl) -> List[Widget]:
         "creates the widget"
         self.__widget = CheckboxButtonGroup(labels = self.__theme.labels,
                                             name   = 'Cycles:DriftWidget',
                                             **self.__data())
-        self.__widget.on_click(ctrl.action(self._onclick_cb))
+        self.__widget.on_click(mainview.actionifactive(ctrl)(self._onclick_cb))
 
         return [Paragraph(text = self.__theme.title), self.__widget]
 
@@ -280,15 +280,14 @@ class WidgetMixin(ABC):
             if hasattr(widget, 'observe'):
                 widget.observe(ctrl)
 
-    def _createwidget(self, ctrl, doc):
+    def _createwidget(self, ctrl):
         self.__widgets['sliders'].addinfo(self._histsource)
 
-        widgets = {i: j.addtodoc(ctrl) for i, j in self.__widgets.items()}
+        widgets = {i: j.addtodoc(self, ctrl) for i, j in self.__widgets.items()}
 
         enableOnTrack(self, self._hist, self._raw, widgets)
 
-        self.__widgets['oligos']  .callbacks(ctrl, doc)
-        self.__widgets['seq']     .callbacks(ctrl, doc, self._hover, self._ticker)
+        self.__widgets['seq']     .callbacks(self._hover, self._ticker)
         self.__widgets['sliders'] .callbacks(self._hover)
         self.__widgets['table']   .callbacks(self._hover)
         self.__widgets['advanced'].callbacks(self._doc)

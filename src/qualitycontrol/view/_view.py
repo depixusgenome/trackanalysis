@@ -40,7 +40,7 @@ class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess, None]
         self._widgets = QualityControlWidgets(ctrl, self._model)
         self._plots   = QualityControlPlots  (ctrl, self._model)
         self._state   = QCPlotState()
-        ctrl.display.add(QCPlotState())
+        ctrl.display.add(self._state)
 
     def observe(self, ctrl):
         "observes the model"
@@ -65,3 +65,8 @@ class QualityControlView(PlotView[QualityControlPlotCreator]):
     def ismain(self, ctrl):
         "Cleaning and alignment, ... are set-up by default"
         self._ismain(ctrl, tasks = self.TASKS)
+
+    @staticmethod
+    def observestate(ctrl, fcn):
+        "observe state"
+        ctrl.display.observe("qc.state", fcn)

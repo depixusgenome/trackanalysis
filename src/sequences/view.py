@@ -244,17 +244,25 @@ class SequencePathWidget:
     __widget: Dropdown
     __theme:  SequencePathTheme
     __model:  SequenceModel
-    def __init__(self, ctrl):
+    def __init__(self, ctrl, noerase = False):
         self.__list: List[str] = []
-        self.__theme           = ctrl.theme.add(SequencePathTheme())
-        self.__model           = SequenceModel().addto(ctrl)
+        self.__theme           = ctrl.theme.add(SequencePathTheme(), noerase = noerase)
+        self.__model           = SequenceModel().addto(ctrl, noerase = noerase)
 
-    def addtodoc(self, ctrl, *_) -> List[Widget]:
+    def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
         "creates the widget"
         self.__widget = Dropdown(name  = 'Cycles:Sequence',
                                  width = self.__theme.width,
                                  **self.__data())
-        @ctrl.action
+
+        def _observer(**_):
+            if mainview.isactive():
+                data = self.__data()
+                mainview.calllater(lambda : self.__widget.update(**data))
+        ctrl.theme  .observe(self.__model.config,  _observer)
+        ctrl.display.observe(self.__model.display, _observer)
+
+        @mainview.actionifactive(ctrl)
         def _onclick(new):
             self.__onclick(ctrl, new)
         self.__widget.on_click(_onclick)
@@ -276,14 +284,8 @@ class SequencePathWidget:
         "returns the widget"
         return self.__widget
 
-    def callbacks(self, ctrl, doc, hover: SequenceHoverMixin, tick1: SequenceTicker):
+    def callbacks(self, hover: SequenceHoverMixin, tick1: SequenceTicker):
         "sets-up callbacks for the tooltips and grids"
-        def _observer(**_):
-            data = self.__data()
-            doc.add_next_tick_callback(lambda : self.__widget.update(**data))
-        ctrl.theme  .observe(self.__model.config,  _observer)
-        ctrl.display.observe(self.__model.display, _observer)
-
         if hover is not None:
             jsc = CustomJS(code = ("if(src.column_names.indexOf(cb_obj.value) > -1)"
                                    "{ cb_obj.label     = cb_obj.value;"
@@ -342,19 +344,11 @@ class OligoListWidget:
     __widget: AutocompleteInput
     __theme:  OligoListTheme
     __model:  SequenceModel
-    def __init__(self, ctrl):
-        self.__theme = ctrl.theme.add(OligoListTheme())
-        self.__model = SequenceModel().addto(ctrl)
+    def __init__(self, ctrl, noerase = False):
+        self.__theme = ctrl.theme.add(OligoListTheme(), noerase = noerase)
+        self.__model = SequenceModel().addto(ctrl, noerase = noerase)
 
-    def callbacks(self, ctrl, doc):
-        "sets-up config observers"
-        def _observer(**_):
-            data = self.__data()
-            doc.add_next_tick_callback(lambda : self.__widget.update(**data))
-        ctrl.theme  .observe(self.__model.config,  _observer)
-        ctrl.display.observe(self.__model.display, _observer)
-
-    def addtodoc(self, ctrl, *_) -> List[Widget]:
+    def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
         "creates the widget"
         self.__widget = AutocompleteInput(**self.__data(),
                                           placeholder = self.__theme.tooltip,
@@ -362,10 +356,17 @@ class OligoListWidget:
                                           width       = self.__theme.width,
                                           name        = 'Cycles:Oligos')
 
-        @ctrl.action
+        @mainview.actionifactive(ctrl)
         def _onclick_cb(attr, old, new):
             self.__model.setnewprobes(ctrl, new)
         self.__widget.on_change('value', _onclick_cb)
+
+        def _observer(**_):
+            if mainview.isactive():
+                data = self.__data()
+                mainview.calllater(lambda : self.__widget.update(**data))
+        ctrl.theme  .observe(self.__model.config,  _observer)
+        ctrl.display.observe(self.__model.display, _observer)
         return [self.__widget]
 
     def reset(self, resets):

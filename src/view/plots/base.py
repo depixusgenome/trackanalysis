@@ -112,10 +112,21 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         "the default sizing mode"
         return _defaultsizingmode(self, kwa = kwa, **kwargs)
 
+    def isactive(self, *_1, **_2) -> bool:
+        "whether the state is set to active"
+        return self.state == PlotState.active
+
+    def calllater(self, fcn):
+        "calls a method later"
+        self._doc.add_next_tick_callback(fcn)
+
+    def actionifactive(self, ctrl):
+        u"decorator which starts a user action but only if state is set to active"
+        return ctrl.action.type(ctrl, test = self.isactive)
+
     def action(self, fcn = None):
         u"decorator which starts a user action but only if state is set to active"
-        test   = lambda *_1, **_2: self.state is PlotState.active
-        action = BokehView.action.type(self._ctrl, test = test)
+        action = BokehView.action.type(self._ctrl, test = self.isactive)
         return action if fcn is None else action(fcn)
 
     def delegatereset(self, cache:CACHE_TYPE):
@@ -307,7 +318,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                     ctrl.display.handle('rendered', args = {'plot': self})
                     LOGS.debug("%s.reset done in %.3f+%.3f",
                                type(self).__qualname__, durations[-1], time() - start)
-                self._doc.add_next_tick_callback(_render)
+                self.calllater(_render)
 
             spawn(_reset_and_render)
 
@@ -384,6 +395,10 @@ class PlotView(Generic[PlotType], BokehView):
     def observe(self, ctrl):
         "sets up observers"
         self._plotter.observe(ctrl)
+
+    def observestate(self, ctrl, fcn):
+        "sets up state observers"
+        ctrl.display.observe(getattr(self._plotter, '_display').name, fcn)
 
     def addtodoc(self, ctrl, doc):
         "adds items to doc"

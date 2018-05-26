@@ -49,24 +49,25 @@ class ReferenceWidget:
         self.__model = model
         self.__files = FileList(ctrl)
 
-    def callbacks(self, ctrl, doc):
-        "sets up observers"
-        def _observe(old = None, **_):
-            if 'reference' in old:
-                data = self.__data()
-                doc.add_next_tick_callback(lambda: self.__widget.update(**data))
-        ctrl.display.observe(FitToReferenceStore.name, _observe)
-
-    def addtodoc(self, ctrl, *_) -> List[Widget]:
+    def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
         "creates the widget"
+
         self.__widget = Dropdown(name  = 'HS:reference',
                                  width = self.__theme.width,
                                  **self.__data())
-        @ctrl.action
+
+        @mainview.actionifactive(ctrl)
         def _py_cb(new):
             inew = int(new)
             val  = None if inew < 0 else [i for _, i in self.__files()][inew]
             self.__model.fittoreference.reference = val
+
+        def _observe(old = None, **_):
+            if 'reference' in old and mainview.isactive():
+                data = self.__data()
+                mainview.calllater(lambda: self.__widget.update(**data))
+
+        ctrl.display.observe(FitToReferenceStore.name, _observe)
 
         self.__widget.on_click(_py_cb)
         return [Paragraph(text = self.__theme.title), self.__widget]
@@ -102,14 +103,12 @@ class PeaksSequencePathWidget(SequencePathWidget):
             return sorted(lst, key = lambda i: dist[i].value)
         return super()._sort(lst)
 
-    # type: ignore # pylint: disable=arguments-differ,too-many-arguments
-    def callbacks(self, ctrl, doc,
+    def callbacks(self,  # type: ignore # pylint: disable=arguments-differ
                   hover: SequenceHoverMixin,
                   tick1: SequenceTicker,
                   div:   'PeaksStatsDiv',
                   table: DataTable):
         "sets-up callbacks for the tooltips and grids"
-        super().callbacks(ctrl, doc, None, None)
         code = "hvr.on_change_sequence(src, peaks, stats, tick1, tick2, cb_obj)"
         args = dict(hvr   = hover, src   = hover.source, peaks = table,
                     stats = div,   tick1 = tick1,        tick2 = tick1.axis)
@@ -313,7 +312,7 @@ class PeakListWidget:
             cols[ind].formatter.format = fmt
         return cols
 
-    def addtodoc(self, _, src) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
+    def addtodoc(self, _1, _2, src) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
         "creates the widget"
         cols  = self.__cols()
         self.__widget = DataTable(source         = src,
@@ -385,24 +384,22 @@ class PeakIDPathWidget:
 
     def observe(self, ctrl):
         "sets up observers"
-        self.__dlg = FileDialog(ctrl,
-                                storage   = 'constraints.path',
-                                filetypes = '*|xlsx')
+        self.__dlg = FileDialog(ctrl, storage = 'constraints.path', filetypes = '*|xlsx')
 
-    def addtodoc(self, ctrl, # type: ignore # pylint: disable=arguments-differ
+    def addtodoc(self, mainview, ctrl, # type: ignore # pylint: disable=arguments-differ
                  _) -> List[Widget]:
         "creates the widget"
         self.__widget = PathInput(width = self.__theme.width, title = self.__theme.title,
                                   placeholder = "", value = "",
                                   name = 'Peaks:IDPath')
 
-        @ctrl.action
+        @mainview.actionifactive(ctrl)
         def _onclick_cb(attr, old, new):
             path = self.__dlg.open()
             if path is not None:
                 self.__widget.value = str(Path(path).resolve())
 
-        @ctrl.action
+        @mainview.actionifactive(ctrl)
         def _onchangetext_cb(attr, old, new):
             path = self.__widget.value.strip()
             if path == '':

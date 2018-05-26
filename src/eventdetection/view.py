@@ -24,18 +24,18 @@ T  = TypeVar("T", RadioButtonGroup, CheckboxGroup)
 class BaseWidget(Generic[T]):
     "Allows aligning the cycles on a given phase"
     __widget: T
-    def __init__(self, ctrl, model, **kwa):
+    def __init__(self, ctrl, model, noerase = False, **kwa):
         name        = self.__class__.__name__.lower()
-        self._theme = ctrl.theme.add(WidgetTheme(name = name, **kwa))
+        self._theme = ctrl.theme.add(WidgetTheme(name = name, **kwa), noerase)
         self._task  = getattr(model, name.replace('widget', ''), model)
 
-    def addtodoc(self, ctrl) -> List[Widget]:
+    def addtodoc(self, mainview, ctrl) -> List[Widget]:
         "creates the widget"
         name          = self.__class__.__name__.replace("Widget", "")
         itm           = templateattribute(self, 0)
         self.__widget = itm(labels = self._theme.labels, name = f'Cycles:{name}',
                             **self._data())
-        self.__widget.on_click(ctrl.action(self._onclick_cb))
+        self.__widget.on_click(mainview.actionifactive(ctrl)(self._onclick_cb))
 
         if self._theme.title:
             return [Paragraph(text = self._theme.title), self.__widget]

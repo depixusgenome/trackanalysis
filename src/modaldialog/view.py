@@ -93,7 +93,7 @@ class AdvancedWidgetMixin(ABC):
         "nothing to do"
         return
 
-    def addtodoc(self, ctrl, *_) -> List[Widget]:
+    def addtodoc(self, _1, ctrl, *_) -> List[Widget]:
         "creates the widget"
         self.__widget = Button(width  = self._theme.width,
                                height = self._theme.height,

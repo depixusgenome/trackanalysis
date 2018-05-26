@@ -229,12 +229,10 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
 
     def __setup_widgets(self, ctrl, doc):
         widgets = self._widgets
-        wdg     = {i: j.addtodoc(ctrl, self._src['peaks']) for i, j in widgets.items()}
+        wdg     = {i: j.addtodoc(self, ctrl, self._src['peaks']) for i, j in widgets.items()}
         enableOnTrack(self, self._fig, wdg)
-        widgets['oligos'].callbacks(ctrl, doc)
         widgets['cstrpath'].callbacks(ctrl, doc)
-        widgets['seq'].callbacks(ctrl, doc, self._hover, self._ticker,
-                                 wdg['stats'][-1], wdg['peaks'][-1])
+        widgets['seq'].callbacks(self._hover, self._ticker, wdg['stats'][-1], wdg['peaks'][-1])
 
         mode     = self.defaultsizingmode()
         wbox     = lambda x: layouts.widgetbox(children = x, **mode)
