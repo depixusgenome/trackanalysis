@@ -114,7 +114,6 @@ class HybridStatView(BokehView):
                     name   = 'Hybridstat:Tabs',
                     **mode)
 
-        print(ind)
         @ctrl.display.observe
         def _onapplicationstarted():
             doc.add_root(self._roots[ind])

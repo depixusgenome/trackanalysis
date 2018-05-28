@@ -247,10 +247,8 @@ class AdvancedWidget(AdvancedWidgetMixin):
 
     @classmethod
     def _body(cls) -> Tuple[Tuple[str,str],...]:
-        out = tuple(i.line for i in cls.__dict__.values()
-                    if isinstance(i, _AdvancedDescriptor))
-        print(out)
-        return out
+        return tuple(i.line for i in cls.__dict__.values()
+                     if isinstance(i, _AdvancedDescriptor))
 
     def _args(self, **kwa):
         return super()._args(model = self, **kwa)
