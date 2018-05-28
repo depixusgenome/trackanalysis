@@ -348,7 +348,8 @@ class RandInit(ByEM):
 
         return sorted(bicpeaks,key=lambda x:x[0])[0]
 
-    def __fit(self):
+    def fitnsamples(self):
+        "returns the best fit across multiple samples"
         if isinstance(self.nsamples,Iterable):
             return sorted([self.nrandinit(_) for _ in self.nsamples],
                           key=lambda x: x[0])[0][-2:]
