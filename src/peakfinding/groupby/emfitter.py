@@ -131,8 +131,9 @@ class ByEM(EMFlagger): # needs cleaning
         """
         rates, params = self.findfromzestimates(**kwa)
         peaks, ids    = self.group(rates.ravel()*self.data.shape[0],params,self.events)
-        _, bias,slope = kwa.get("hist",(np.array([]),0,1))
-        return peaks * slope + bias , ids
+        # _, bias,slope = kwa.get("hist",(np.array([]),0,1))
+        # return peaks * slope + bias , ids
+        return peaks, ids
 
     def fromzestimate(self,data:np.ndarray,zpeaks:np.ndarray):
         "calls fittingalgo based on estimation of zpeaks"
@@ -229,21 +230,6 @@ class ByEM(EMFlagger): # needs cleaning
             # to optimized during emstep
             rates, params = self.fittingalgo(self.data,nrates,nparams,self.emiter,self.tol)
         return rates,params
-
-# class ByEMfromKernel(ByEM):
-#     """
-#     Ones could use aic, aicc or bic as a criteria to select the number of parameters
-#     but the data is usually too low
-#     Need to find an additional constraint to help convergence
-#     to explore :
-#     * kernel density estimates with smaller bandwidth
-#     * threshold on hybridisation rate
-#     """
-#     def splitter(self,rates,params):
-#         """
-#         defines rules to split a peak
-#         """
-#         pass
 
 class ByEmMutu(ByEM):
     ''' uses mutual information theory to decide whether peaks should be splitted or not'''
@@ -346,9 +332,7 @@ class RandInit(ByEM):
         rates, params = self.__fit()
         peaks, ids    = self.group(rates.ravel()*self.data.shape[0],params,self.events)
 
-        _, bias,slope = kwa.get("hist",(np.array([]),0,1))
-
-        return peaks * slope + bias , ids
+        return peaks, ids
 
     def nrandinit(self,nsamples:int):
         """
