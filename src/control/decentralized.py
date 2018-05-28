@@ -215,9 +215,15 @@ class DecentralizedController(Controller):
     def config(self) -> Dict[str, ChainMap]:
         "returns a chainmap with default values & their changes"
         right = self.current
-        return {i: ChainMap({j: k for j, k in right[i].items() if k != dflt[j]},
-                            dflt)
+        return {i: ChainMap({j: k for j, k in right[i].items() if k != dflt[j]}, dflt)
                 for i, dflt in self.defaults.items()}
+
+    def getconfig(self, name:str) -> ChainMap:
+        "return a chainmap for a single object"
+        name = self._objname(name)
+        cur  = self.__get({name: self._objects[name]})[name]
+        dfl  = self.__get({name: self._defaults[name]})[name]
+        return ChainMap({j: k for j, k in cur.items() if k != dfl[j]}, dfl)
 
     @staticmethod
     def __get(dico)-> Dict[str, Dict[str, Any]]:

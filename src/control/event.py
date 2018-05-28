@@ -209,6 +209,28 @@ class Event:
 
         return add(names[:-1], names[-1])
 
+    class _OneShot:
+        def __init__(self, hdls,  name, fcn):
+            self._hdls = hdls
+            self._name = name
+            self._fcn  = fcn
+
+        def __call__(self, *args, **kwa):
+            assert self in self._hdls[self._name]
+            self._hdls[self._name].discard(self)
+            fcn = self._fcn
+            self.__dict__.clear() # make sure the function cannot be called again
+            return fcn(*args, **kwa)
+
+    def oneshot(self, name: str, fcn):
+        """
+        one shot observation
+        """
+        name = name.lower().strip()
+        shot = self._OneShot(self._handlers, name, fcn)
+        self.__add_func([name], shot)
+        assert shot in self._handlers[name]
+
     def close(self):
         "Clear all handlers"
         self._handlers.clear()

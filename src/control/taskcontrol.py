@@ -355,23 +355,6 @@ class TaskController(BaseTaskController):
 
         self.__ctrl = ctrl
 
-    def opentrack(self,
-                  task : Union[str, RootTask, Dict[str,str]] = None,
-                  model: Union[dict, Iterable[Task]]         = tuple()):
-        if isinstance(model, dict):
-            assert task is None
-            if len(model.get('tasks', (()))[0]):
-                super().opentrack(model = model.pop("tasks")[0])
-
-                from anastore.configuration import readconfig
-                maps = readconfig(model, patchname = "config")
-                with self.__ctrl.action:
-                    for i, j in maps.items():
-                        if i.startswith('theme.') and i[6:] in self.__ctrl.theme and j:
-                            self.__ctrl.theme.update(i[6:], **j)
-        else:
-            super().opentrack(task, cast(Iterable[Task], model))
-
     def addtask(self, parent:RootTask, task:Task, # pylint: disable=arguments-differ
                 index = _m_none, side = 0):
         "opens a new file"

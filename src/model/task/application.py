@@ -79,7 +79,7 @@ class TaskIOTheme(ConfigObject):
     """
     name = "tasks.io"
     tasks:      List[str] = []
-    inputs:     List[str] = ['anastore.control.AnaIO',
+    inputs:     List[str] = ['anastore.control.ConfigAnaIO',
                              'control.taskio.ConfigGrFilesIO',
                              'control.taskio.ConfigTrackIO']
     outputs:    List[str] = ['anastore.control.ConfigAnaIO']
