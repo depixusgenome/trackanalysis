@@ -6,7 +6,6 @@ import warnings
 from abc         import abstractmethod
 from functools   import partial
 from typing      import Dict, Tuple, Union, Iterable
-from collections import Sequence
 import numpy as np
 from sklearn.mixture import GaussianMixture
 

@@ -58,7 +58,7 @@ def test_emstep():
                        [0,11,0.,8.8e+01]])
     rates           = 0.5*np.ones((2,1))
     EMFITTER.emiter = 100
-    _,rates,params  = EMFITTER.cfit(DATA,rates,params,EMFITTER.emiter)
+    rates,params  = EMFITTER.cfit(DATA,rates,params,EMFITTER.emiter,tol=1e-4)
     assert_allclose(params,np.array([[6.099034e-02,1.401e-06,0.,3.75365918e+01],
                                      [7.441417e-02,1.00e-06,0.,1.15579996e+02]]),
                     rtol=1e-4)

@@ -449,18 +449,23 @@ class Experiment(Object):
         "return a list of event data"
         durs = self.eventdurations(seed = seed)
 
-        data = np.zeros(np.sum(durs), dtype = 'f4')
+        data = np.zeros(int(np.sum(durs)), dtype = 'f4')
         if self.brownianmotion:
-            self.brownianmotion(self, data)
+            self.brownianmotion(self, data, seed = seed)
 
-        evts = np.split(data, durs.ravel())
+        evts = np.array(np.split(data, np.cumsum(durs).ravel().astype(int)))[:-1]
         npos = len(self.positions)
         pos  = self.positions
-        for i, j in enumerate(evts):
-            j[:] += pos[i % npos]
+        for i,j in enumerate(pos):
+            evts[i::npos]+=j
 
-        return np.array([[k for k in evts[i:i+npos] if len(k)]
-                         for i in range(0, len(evts), npos)])
+        # # start of each event
+        # starts = np.hstack([np.zeros((len(durs),1)),np.apply_along_axis(np.cumsum,1,durs[:,:-1])])
+        # starts = starts.astype(int)
+
+        # return [[(u,v) for u,v in zip(starts[i],j) if len(v)]
+        #         for i,j in enumerate(evts.reshape(-1,npos))]
+        return [[k for k in j if len(k)] for j in evts.reshape(-1,npos)]
 
     def bead(self,
              evts:  np.ndarray = None,
