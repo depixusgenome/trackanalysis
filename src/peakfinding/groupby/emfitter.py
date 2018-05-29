@@ -107,7 +107,7 @@ class ByEM(EMFlagger): # needs cleaning
     tol        = 1e-5  # loglikelihood tolerance # need to provide to c code
     decimals   = 4     # rounding values
     upperbound = 0.005**2 # in microns**2
-    mergewindow = 0.005
+    mergewindow = 0.00 # in microns
     withtime = True
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -200,7 +200,7 @@ class ByEM(EMFlagger): # needs cleaning
         return np.sum(np.log(np.sum(rates*score,axis=0)))
 
     @staticmethod
-    def cfit(data,rates,params,emiter,tol,lowerbound=1e-4): # pylint: disable = too-many-arguments
+    def cfit(data,rates,params,emiter,tol,lowerbound=1e-9): # pylint: disable = too-many-arguments
         'fitting using c calls'
         out = emrunner(data,rates,params,emiter,lowerbound,tol)
         return out.rates, out.params
@@ -328,7 +328,7 @@ class RandInit(ByEM):
         if self.nsamples is None:
             self.nsamples  = len(ByHistogram(**self.kwargs)(**kwa)[0])
 
-        rates, params = self.__fit()
+        rates, params = self.fitnsamples()
         peaks, ids    = self.group(rates.ravel()*self.data.shape[0],params,self.events)
 
         return peaks, ids
