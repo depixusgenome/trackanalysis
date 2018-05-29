@@ -3,14 +3,15 @@
 """
 Saves stuff from session to session
 """
-from   typing              import Tuple, List
-from   copy                import deepcopy
+from   typing                  import Tuple, List
+from   copy                    import deepcopy
 
-from   utils               import initdefaults
-from   utils.decoration    import addto
-from   data.__scripting__  import Track
-from   model.__scripting__ import Tasks, Task
-from   .                   import default
+from   utils                   import initdefaults
+from   utils.decoration        import addto
+from   data.__scripting__      import Track
+from   model.__scripting__     import Tasks, Task
+from   model.task.application  import TasksConfig
+from   .                       import default
 
 class ScriptingTheme:
     """
@@ -31,13 +32,32 @@ class ScriptingTheme:
 class ScriptingView:
     "Dummy view for scripting"
     APPNAME = 'Scripting'
-    def __init__(self, **kwa):
-        self._ctrl  = kwa['ctrl']
+    def __init__(self, ctrl):
+        self._ctrl  = ctrl
         self._ctrl.theme.add(ScriptingTheme())
+        self._ctrl.theme.add(TasksConfig())
+
+    def getmodel(self, mdl, name = None, defaultmodel = False, **kwa):
+        "returns the config accessor"
+        theme = self._ctrl.theme
+        if kwa:
+            assert name is None
+            theme.update(mdl, **kwa)
+        if name:
+            return theme.get(mdl, name, defaultmodel = defaultmodel)
+        return theme.model(mdl, defaultmodel)
+
+    def scriptingmodel(self, name = None, defaultmodel = False, **kwa):
+        "returns the config accessor"
+        return self.getmodel(ScriptingTheme, name, defaultmodel, **kwa)
+
+    def tasksmodel(self, name = None, defaultmodel = False, **kwa):
+        "returns the config accessor"
+        return self.getmodel(TasksConfig, name, defaultmodel, **kwa)
 
     def writeuserconfig(self):
         "writes the config to disk"
-        if self._ctrl.theme.get("scripting", "save"):
+        if self.scriptingmodel("save"):
             self._ctrl.writeuserconfig()
 
     def observe(self, _):
@@ -57,18 +77,23 @@ class ScriptingView:
         return self._ctrl
 
 @addto(Tasks, staticmethod)
-def getconfig():
+def scriptingmodel(name = None, defaultmodel = False, **kwa):
     "returns the config accessor"
-    return scriptapp.control.theme.model("scripting")
+    return scriptapp.scriptingmodel(name, defaultmodel, **kwa)
+
+@addto(Tasks, staticmethod)
+def tasksmodel(name = None, defaultmodel = False, **kwa):
+    "returns the config accessor"
+    return scriptapp.tasksmodel(name, defaultmodel, **kwa)
 
 @addto(Tasks, classmethod)
 def save(cls, task: Task):
     "saves the task to the default config"
     cpy = deepcopy(task)
     if getattr(cpy, '__scripting_save__', lambda: True)():
-        out                 = dict(cls.control.theme.model("tasks").tasks)
+        out                 = dict(cls.tasksmodel().tasks)
         out[cls(task).name] = cpy
-        cls.control.theme.update("tasks", tasks = out)
+        cls.tasksmodel(tasks = out)
         scriptapp.writeuserconfig()
 
 @addto(Tasks)
@@ -85,7 +110,7 @@ def __call__(self, *resets, __old__ = Tasks.__call__, **kwa) -> Task:
     if Ellipsis in resets:
         cnf = self.default()
     else:
-        cnf = self.control.theme.get("tasks", "tasks").get(self.name, None)
+        cnf = self.tasksmodel("tasks").get(self.name, None)
     if cnf is None:
         return __old__(self, *resets, **kwa)
     res = __old__(self, *resets, current = cnf, **kwa)
@@ -94,22 +119,21 @@ def __call__(self, *resets, __old__ = Tasks.__call__, **kwa) -> Task:
 @addto(Tasks, classmethod)
 def defaulttaskorder(cls, __old__ = Tasks.defaulttaskorder) -> Tuple[type, ...]:
     "returns the default task order"
-    order = cls.control.theme.get("scripting", "order", None)
-    return __old__(order)
+    return __old__(cls.scriptingmodel("order"))
 
 @addto(Tasks, classmethod)
 def __taskorder__(cls, __old__ = Tasks.__taskorder__):
-    always = cls.control.theme.get("scripting", "alignalways")
+    always = cls.scriptingmodel("alignalways")
     old    = __old__()
     return ((cls.alignment,) + old) if always else old
 
 @addto(Tasks, classmethod)
 def __cleaning__(cls):
-    ret = cls.control.theme.get("scripting", "cleaning", None)
+    ret = cls.scriptingmodel("cleaning")
     if ret is None:
         ret = Tasks.__base_cleaning__()
 
-    if cls.control.theme.get("scripting", "alignalways"):
+    if cls.scriptingmodel("alignalways"):
         # Remove alignment as it is not an optional task.
         # It will be added back in __tasklist__
         ret = tuple(i for i in ret if i is not Tasks.alignment)
@@ -119,7 +143,7 @@ def __cleaning__(cls):
 def defaulttasklist(obj, upto, cleaned:bool = None, __old__ = Tasks.defaulttasklist):
     "Returns a default task list depending on the type of raw data"
     cnf = getattr(obj, 'tasks', None)
-    if not cnf:
+    if cnf is None or cnf.isempty():
         return __old__(obj, upto, cleaned)
     with cnf.context(scriptapp.control):
         return __old__(obj, upto, cleaned)

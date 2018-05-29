@@ -3,6 +3,7 @@
 "Decentralized controller"
 from  typing            import Dict, Any
 from  collections       import ChainMap
+from  contextlib        import contextmanager
 from  copy              import deepcopy
 import numpy            as     np
 from  utils             import initdefaults
@@ -111,6 +112,24 @@ class DecentralizedController(Controller):
 
     def __getitem__(self, val):
         return self.model(val)
+
+    @contextmanager
+    def localcontext(self, **kwa):
+        "allows changing the context locally. This is **not** thread safe."
+        defaults = self.defaults
+        current  = self.current
+        try:
+            for i, j in kwa.items():
+                self.update(i, **j)
+
+            yield self
+        finally:
+            for i, j in defaults.items():
+                j.pop('name', None)
+                self.updatedefaults(i, **j)
+            for i, j in current.items():
+                j.pop('name', None)
+                self.update(i, **j)
 
     def get(self, val, attr, defaultvalue = '--raise--', defaultmodel = False):
         "gets an attribute from a model"
