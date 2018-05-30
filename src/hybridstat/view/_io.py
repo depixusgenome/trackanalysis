@@ -31,7 +31,7 @@ LOGS = getLogger(__name__)
 class _PeaksIOMixin:
     def __init__(self, ctrl):
         type(self).__bases__ [1].__init__(self, ctrl) # type: ignore
-        self.__model = PeaksPlotModelAccess(ctrl)
+        self.__ctrl = ctrl
 
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         "opens a track file and adds a alignment"
@@ -39,7 +39,7 @@ class _PeaksIOMixin:
         items = type(self).__bases__[1].open(self, path, model) # type: ignore
 
         if items is not None:
-            task = self.__model.defaultidenfication
+            task = PeaksPlotModelAccess(self.__ctrl, True).defaultidenfication
             if task is not None:
                 items[0] += (task,)
         return items
@@ -80,12 +80,12 @@ class ConfigXlsxIO(TaskIO):
     def __init__(self, ctrl):
         super().__init__(ctrl)
         self.__ctrl  = ctrl
-        self.__model = PeaksPlotModelAccess(ctrl)
         self.__theme = ctrl.theme.add(ConfigXlsxIOTheme(), True)
 
     def save(self, path:str, models):
         "creates a Hybridstat report"
-        curr   = self.__ctrl.display.get("tasks", "roottask")
+        pksmdl = PeaksPlotModelAccess(self.__ctrl, True)
+        curr   = pksmdl.roottask
         models = [i for i in models if curr is i[0]]
         if not len(models):
             raise IOError("Nothing to save", "warning")
@@ -107,12 +107,12 @@ class ConfigXlsxIO(TaskIO):
                 startfile(path)
             self.__msg(exc)
 
-        model = self.__complete_model(list(models[0]))
+        model = self.__complete_model(list(models[0]), pksmdl)
         try:
             LOGS.info('%s saving %s', type(self).__name__, path)
             ret = self._run(dict(path      = path,
-                                 oligos    = self.__model.oligos,
-                                 sequences = self.__model.sequences(...)),
+                                 oligos    = pksmdl.oligos,
+                                 sequences = pksmdl.sequences(...)),
                             model,
                             _end)
         except IOError as exc:
@@ -126,28 +126,27 @@ class ConfigXlsxIO(TaskIO):
             self.__msg(self.__theme.start)
         return ret
 
-    def __complete_model(self, model):
+    def __complete_model(self, model, pksmdl):
         ind = next((i for i, j in enumerate(model) if isinstance(j, DataCleaningTask)),
                    None)
         if ind is not None:
             model.insert(ind+1, ExceptionCatchingTask(exceptions = [DataCleaningException]))
 
-        if isinstance(model[-1], self.__model.identification.tasktype):
+        if isinstance(model[-1], pksmdl.identification.tasktype):
             return model
 
-        missing = (self.__model.eventdetection,
-                   self.__model.peakselection) # type: Tuple
-        if self.__model.fittoreference.task is not None:
-            missing += (self.__model.fittoreference,)
-        if self.__model.identification.task is not None:
-            missing += (self.__model.identification,)
+        missing: tuple = (pksmdl.eventdetection, pksmdl.peakselection)
+        if pksmdl.fittoreference.task is not None:
+            missing += (pksmdl.fittoreference,)
+        if pksmdl.identification.task is not None:
+            missing += (pksmdl.identification,)
 
         while len(missing):
             if not isinstance(model[-1], tuple(i.tasktype for i in missing)):
                 return model + [deepcopy(i.configtask) for i in missing]
             missing = missing[1:]
 
-        ref = self.__model.fittoreference.reference
+        ref = pksmdl.fittoreference.reference
         ind = next((i for i, j in enumerate(model) if isinstance(j, FitToReferenceTask)),
                    None)
         if ref is not None and ind is not None:

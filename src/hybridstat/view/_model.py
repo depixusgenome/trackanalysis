@@ -121,10 +121,15 @@ class FitToReferenceStore:
 
 class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     "access to the FitToReferenceTask"
-    def __init__(self, ctrl):
-        super().__init__(ctrl)
+    def __init__(self, mdl):
+        super().__init__(mdl)
         self.__store = FitToReferenceStore()
         self.__theme = FitToReferenceConfig()
+
+    def addto(self, ctrl, noerase): # pylint: disable=arguments-differ
+        "add to the controller"
+        self.__store = ctrl.display.add(self.__store, noerase)
+        self.__theme = ctrl.theme.add(self.__theme, noerase)
 
     @property
     def params(self) -> Optional[Tuple[float, float]]:
@@ -179,9 +184,6 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
 
     def setobservers(self, ctrl):
         "observes the global model"
-        ctrl.theme.add(self.__theme)
-        ctrl.display.add(self.__store)
-
         def _onref(old = None, **_):
             if 'reference' in old:
                 self.resetmodel()
@@ -278,9 +280,13 @@ class FitToHairpinConfig:
 
 class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
     "access to the FitToHairpinTask"
-    def __init__(self, ctrl, mdl):
+    def __init__(self, mdl):
         super().__init__(mdl)
-        self.__defaults = ctrl.theme.add(FitToHairpinConfig(), False)
+        self.__defaults = FitToHairpinConfig()
+
+    def addto(self, ctrl, noerase): # pylint: disable=arguments-differ
+        "add to the controller"
+        self.__defaults = ctrl.theme.add(self.__defaults, noerase)
 
     def setobservers(self, mdl, ctrl):
         "observes the global model"
@@ -345,7 +351,7 @@ class PeakSelectorTaskAccess(TaskAccess, tasktype = PeakSelectorTask):
 # pylint: disable=too-many-instance-attributes
 class PeaksPlotModelAccess(SequencePlotModelAccess):
     "Access to peaks"
-    def __init__(self, ctrl):
+    def __init__(self, ctrl, addto = False):
         super().__init__(ctrl)
         self.peaksmodel      = PeaksPlotModel.create(ctrl, False)
         self.subtracted      = BeadSubtractionAccess(self)
@@ -353,7 +359,16 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         self.eventdetection  = EventDetectionTaskAccess(self)
         self.peakselection   = PeakSelectorTaskAccess(self)
         self.fittoreference  = FitToReferenceAccess(self)
-        self.identification  = FitToHairpinAccess(ctrl, self)
+        self.identification  = FitToHairpinAccess(self)
+        if addto:
+            self.addto(ctrl, noerase = False)
+
+    def addto(self, ctrl, name = "tasks", noerase = False):
+        "set _tasksmodel to same as main"
+        super().addto(ctrl, name, noerase)
+        self.fittoreference.addto(ctrl, noerase)
+        self.identification.addto(ctrl, noerase)
+
 
     @property
     def stretch(self) -> float:

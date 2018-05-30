@@ -116,7 +116,7 @@ class TrackInfo:
     durations:       Sequence[int]       = []
     def __init__(self, track: Optional[Track]) -> None:
         if track is not None:
-            self.path          = track.path
+            self.path          = str(track.path)
             self.framerate     = track.framerate
             self.ncycles       = track.ncycles
             self.durations     = track.phase.duration(..., PHASE.measure)
