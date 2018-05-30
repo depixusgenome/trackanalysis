@@ -15,7 +15,7 @@ from .._core import (empz_x,emrunner,emscore)  # pylint: disable = import-error
 
 from .histogramfitter import ByHistogram  # pylint: disable = unused-import
 
-# needs cleaning
+## needs cleaning
 
 # needs a new splitter algorithm.
 # if a peak needs splitting,
@@ -23,14 +23,17 @@ from .histogramfitter import ByHistogram  # pylint: disable = unused-import
 # do an EM fit on the subset (should at least be faster)
 # split local?
 
+## precision in cfit is probably ok but need to detect singularities
+
 class EMFlagger:
     'flag peak corresponding to events'
     withtime=True
     def __init__(self,**kwa):
-        self.kwargs   = kwa
-        self.mincount = kwa.get("mincount",5)
-        self.events   = None
-        self.data     = None
+        self.kwargs    = kwa
+        self.mincount  = kwa.get("mincount",5)
+        self.events    = None
+        self.data      = None
+        self.precision = 1e-5  # std deviation
 
     def __strip(self, params, events):
         '''
@@ -86,6 +89,7 @@ class EMFlagger:
     def __call__(self,**kwa):
         self.kwargs = kwa
         self.events = kwa.get("events",None)
+        self.precision = kwa.get("precision",self.precision)
         if self.withtime:
             self.data  = np.array([[np.nanmean(evt),len(evt)]
                                    for cycle in self.events
@@ -108,11 +112,22 @@ class ByEM(EMFlagger): # needs cleaning
     decimals   = 4     # rounding values
     upperbound = 0.005**2 # in microns**2
     mergewindow = 0.00 # in microns
-    withtime = True
+    withtime    = True
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         self.fittingalgo = self.cfit
         super().__init__(**kwa)
+
+
+    def fit(self,data,rates,params):
+        "call the fitting algo"
+        return self.fittingalgo(data,
+                                rates,
+                                params,
+                                self.emiter,
+                                self.tol,
+                                self.precision**2)
 
     def findfromzestimates(self,**kwa):
         "estimates starting parameters using kernel density"
@@ -200,9 +215,9 @@ class ByEM(EMFlagger): # needs cleaning
         return np.sum(np.log(np.sum(rates*score,axis=0)))
 
     @staticmethod
-    def cfit(data,rates,params,emiter,tol,lowerbound=1e-9): # pylint: disable = too-many-arguments
+    def cfit(data,rates,params,emiter,tol,precision=1e-9): # pylint: disable = too-many-arguments
         'fitting using c calls'
-        out = emrunner(data,rates,params,emiter,lowerbound,tol)
+        out = emrunner(data,rates,params,emiter,precision,tol)
         return out.rates, out.params
 
     @classmethod
@@ -220,14 +235,17 @@ class ByEM(EMFlagger): # needs cleaning
     def splitter(self,rates,params):
         'splits the peaks with great Z variance'
         warnings.warn("using this function, with a symmetric splitting is not a good idea")
-        rates, params = self.fittingalgo(self.data,rates,params,self.emiter,self.tol)
+        rates, params = self.fit(self.data,
+                                 rates,
+                                 params)
+
         while any(params[:,1]>self.upperbound):
             idx = np.argmax(params[:,1])
             # split the one with highest covariance
             nrates,nparams = self.splitparams(rates,params,idx)
             # could be improved by reducing the number of peaks (and associated data)
             # to optimized during emstep
-            rates, params = self.fittingalgo(self.data,nrates,nparams,self.emiter,self.tol)
+            rates, params = self.fit(self.data,nrates,nparams)
         return rates,params
 
 class ByEmMutu(ByEM):
@@ -261,7 +279,7 @@ class ByEmMutu(ByEM):
         splits the peaks with great Z variance
         if mutual information allows keep the split of peaks
         '''
-        rates, params = self.fittingalgo(self.data,rates,params,self.emiter,self.tol)
+        rates, params = self.fit(self.data,rates,params)
         notchecked = np.array([True]*params.shape[0])
 
         while any(notchecked):
@@ -270,7 +288,12 @@ class ByEmMutu(ByEM):
                 nrates,nparams = self.splitparams(rates,params,idx)
 
                 # thermalise, thermalise only the splitted peaks to save time
-                nrates,nparams = self.fittingalgo(self.data,nrates,nparams,self.emiter,self.tol)
+                nrates,nparams = self.fittingalgo(self.data,
+                                                  nrates,
+                                                  nparams,
+                                                  self.emiter,
+                                                  self.tol,
+                                                  self.precision)
                 sco = self.score(self.data,nparams[[idx,idx+1]])
 
                 # check mutual information
@@ -341,7 +364,7 @@ class RandInit(ByEM):
         bicpeaks = []
         for peaks in inits:
             rates,params = self.fromzestimate(self.data,peaks)
-            rates,params = self.fittingalgo(self.data,rates,params,self.emiter,self.tol)
+            rates,params = self.fit(self.data,rates,params)
             score        = self.score(self.data,params)
             bic          = self.bic(score,rates,params)
             bicpeaks.append((bic,rates,params))

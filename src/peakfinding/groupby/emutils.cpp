@@ -5,10 +5,8 @@
   collection of functions too costly for python
   implementing the EM step in c++ for speed up
   TO DO : 
-  * replace bigrates with matrix_row views 
   * replace expression with diagproba
-  * use log probabilities
-  * use cholesky decomposition for covariance matrix
+  * use cholesky decomposition for llikelihood
 */
 
 namespace peakfinding{
@@ -17,7 +15,6 @@ namespace peakfinding{
 	double PI=3.14159;
 	
 	double llikelihood(const matrix& score, const matrix& rates){
-	    // using matrix_row instead
 	    matrix tmp = score;
 	    for (unsigned r=0u;r<rates.size1();++r){
 		blas::matrix_row<matrix> viewrow(tmp,r);
@@ -42,7 +39,7 @@ namespace peakfinding{
 	    return loc>pos?0:exp((loc-pos)/scale)/scale;
 	}
 	double lognormpdf(double loc,double var,double pos){
-	    return -0.5*(pow(pos-loc,2)/var); //-log(sqrt(2*PI*var));
+	    return -0.5*(pow(pos-loc,2)/var)-0.5*log(2*PI*var);
 	}
 	
 	double logexppdf(double loc,double scale,double pos){
@@ -175,22 +172,16 @@ namespace peakfinding{
 	}
 
 	matrix getpz_x(const matrix& score,const  matrix& rates){
-	    // before
-	    // auto	ones	 = matrix(1,score.size2(),1.);
-	    // auto	bigrates = blas::prod(rates,ones);
-	    // matrix	pz_x	 = blas::element_prod(score,bigrates);
-	    // after
 	    matrix pz_x = score;
 	    for (unsigned r=0u;r<rates.size1();++r){
 		blas::matrix_row<matrix> viewrow(pz_x,r);
 		viewrow*=rates(r,0);
 	    }
 	    
+	    // renormalize probability per peak
 	    blas::vector<double> norm(pz_x.size2(),0.);
 	    for (unsigned r=0u, nrows=pz_x.size1();r<nrows;++r)
 	    	norm+=blas::row(pz_x,r);
-
-	    // renormalize probability per peak
 	    for (unsigned r=0u, nrows=pz_x.size1(); r<nrows;++r){ 
 	    	for (unsigned c=0u, ncols=pz_x.size2();c<ncols;++c){
 	    	    pz_x(r,c)/=norm(c);
