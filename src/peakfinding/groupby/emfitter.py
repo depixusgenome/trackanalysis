@@ -26,7 +26,6 @@ class ByEM(BaseEM):
     finds peaks and groups events using Expectation Maximization
     the number of components is estimated using BIC criteria
     '''
-    decimals   = 4     # rounding values
     upperbound = 0.005**2 # in microns**2
     withtime   = True
 
@@ -51,8 +50,6 @@ class ByEM(BaseEM):
         """
         rates, params = self.findfromzestimates(**kwa)
         peaks, ids    = self.group(rates.ravel()*self.data.shape[0],params,self.events)
-        # _, bias,slope = kwa.get("hist",(np.array([]),0,1))
-        # return peaks * slope + bias , ids
         return peaks, ids
 
 
@@ -61,18 +58,6 @@ class ByEM(BaseEM):
         peaks  = ByHistogram(**self.kwargs)(**kwa)[0]
         return self.fromzestimate(self.data,peaks)
 
-    @classmethod
-    def rmduplicates(cls,params,rates):
-        '''
-        this removes only using z coordinates, but
-        removing duplicates requires extension to t (and x, y if available)
-        until then leads to incorrect convergence
-        '''
-        rounded    = enumerate(zip(np.round(np.hstack(params[:,0,0]),decimals=cls.decimals),rates))
-        sortedinfo = sorted(((*val,idx) for idx,val in rounded),key=lambda x:(x[0],-x[1]))
-        return list(map(lambda x:next(x[1])[-1],itertools.groupby(sortedinfo,key=lambda x:x[0])))
-
-    # could split all parameters with upper bound too high
     def splitter(self,rates,params):
         'splits the peaks with great Z variance'
         warnings.warn("using this function, with a symmetric splitting is not a good idea")
@@ -87,63 +72,6 @@ class ByEM(BaseEM):
             # could be improved by reducing the number of peaks (and associated data)
             # to optimized during emstep
             rates, params = self.fit(self.data,nrates,nparams)
-        return rates,params
-
-class ByEmMutu(ByEM):
-    ''' uses mutual information theory to decide whether peaks should be splitted or not'''
-
-    @staticmethod
-    def mutualinformation(score:np.ndarray,
-                          rates:np.ndarray):
-        '''
-        computes the mutual information of the peaks
-        if element i,j has >0 then  i,j are dependent (i.e. represents the same data)
-        '''
-        pz_x = np.matrix(empz_x(score,rates))
-        pij  = np.array(pz_x*pz_x.T)/pz_x.shape[1]
-        return pij*np.log2( (pij/np.mean(pz_x,axis=1)).T/np.mean(pz_x,axis=1) )
-
-    def isbetter(self,score:np.ndarray,rates:np.ndarray)->bool:
-        '''
-        defines condition on mutualinformation
-        returns True if peaks are better split,
-        False otherwise
-        '''
-        info    = self.mutualinformation(score,rates)
-        offdiag = np.array([info[i] for i in zip(*np.triu_indices_from(info,k=1))])
-        if any(offdiag>-1e-4):
-            return False
-        return True
-
-    def mutualsplit(self,rates,params):
-        '''
-        splits the peaks with great Z variance
-        if mutual information allows keep the split of peaks
-        '''
-        rates, params = self.fit(self.data,rates,params)
-        notchecked = np.array([True]*params.shape[0])
-
-        while any(notchecked):
-            print(f"params.shape={params.shape}")
-            for idx in (i for i,j in enumerate(notchecked) if j):
-                nrates,nparams = self.splitparams(rates,params,idx)
-
-                # thermalise, thermalise only the splitted peaks to save time
-                nrates,nparams = self.fittingalgo(self.data,
-                                                  nrates,
-                                                  nparams,
-                                                  self.emiter,
-                                                  self.tol,
-                                                  self.precision)
-                sco = self.score(self.data,nparams[[idx,idx+1]])
-
-                # check mutual information
-                if self.isbetter(sco,nrates[[idx,idx+1]]):
-                    notchecked   = np.insert(notchecked,idx,True)
-                    rates,params = nrates,nparams
-                    break
-                notchecked[idx]=False
-
         return rates,params
 
 
@@ -219,3 +147,22 @@ class RandInit(BaseEM):
                           key=lambda x: x[0])[0][-2:]
 
         return self.nrandinit(self.nsamples)[-2:]
+
+class MultiSplit(ByEM):
+    "same as ByEM but splits in 2 or more peaks at a time"
+
+    def splitter(self,rates,params):
+        'splits the peaks with great Z variance'
+        warnings.warn("using this function, with a symmetric splitting is not a good idea")
+        rates, params = self.fit(self.data,
+                                 rates,
+                                 params)
+
+        while any(params[:,1]>self.upperbound):
+            idx = np.argmax(params[:,1])
+            # split the one with highest covariance
+            nrates,nparams = self.splitparams(rates,params,idx)
+            # could be improved by reducing the number of peaks (and associated data)
+            # to optimized during emstep
+            rates, params = self.fit(self.data,nrates,nparams)
+        return rates,params
