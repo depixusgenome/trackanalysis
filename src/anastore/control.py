@@ -62,6 +62,9 @@ class ConfigAnaIO(AnaIO):
     def open(self, path:Union[str, Tuple[str,...]], model:tuple): # type: ignore
         "opens an ana file"
         out = super().open(path, model)
+        if not out:
+            return None
+
         if isinstance(out, list) and len(out) == 1 and isinstance(out[0], dict):
             out = out[0]
             seq = out.pop('sequence', {})
