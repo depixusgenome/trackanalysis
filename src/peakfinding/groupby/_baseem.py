@@ -163,13 +163,13 @@ class BaseEM(EMFlagger):
         params = np.vstack([list(itertools.chain.from_iterable(zip(np.nanmean(clas[idx],axis=0),
                                                                    np.nanvar(clas[idx],axis=0))))
                             for idx in set(digi)
-                            if len(clas[idx])>self.mincount])
+                            if len(clas[idx])>mincount])
         if self.withtime:
             params[:,-2] = 0.
-            params[:,-1] = [np.nanstd(clas[idx][-1])
+            params[:,-1] = [np.nanvar(clas[idx][-1])
                             for idx in set(digi)
-                            if len(clas[idx])>self.mincount]
+                            if len(clas[idx])>mincount]
         rates = np.array([[len(clas[idx])] for idx in set(digi)
-                          if len(clas[idx])>self.mincount])
+                          if len(clas[idx])>mincount])
 
         return rates/np.sum(rates),params
