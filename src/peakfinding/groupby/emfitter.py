@@ -18,8 +18,11 @@ from ._baseem import BaseEM
 # if a peak needs splitting,
 # subselect assigned data and
 # do an EM fit on the subset (should at least be faster)
-# split local?
+# there might be convergence issues if 
+# split local? 
 
+# check if the computation of the score and llikelihood is really long
+# if yes , use Cholesky
 
 class ByEM(BaseEM):
     '''
@@ -55,7 +58,7 @@ class ByEM(BaseEM):
 
     def kernelinitializer(self,**kwa):
         'uses ZeroCrossing for initialization faster'
-        peaks  = ByHistogram(**self.kwargs)(**kwa)[0]
+        peaks = ByHistogram(**self.kwargs)(**kwa)[0]
         return self.fromzestimate(self.data,peaks)
 
     def splitter(self,rates,params):
@@ -108,7 +111,7 @@ class RandInit(BaseEM):
     if nsamples is not specified estimates number of peaks from kerneldensity
     """
     nsamples : Union[int,Iterable[int]] = None
-    repeats = 10
+    repeats  = 10
     withtime = True
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -148,8 +151,11 @@ class RandInit(BaseEM):
 
         return self.nrandinit(self.nsamples)[-2:]
 
-class MultiSplit(ByEM):
-    "same as ByEM but splits in 2 or more peaks at a time"
+class BicSplit(ByEM):
+    """
+    tries to split each peak
+    we keep splitting until the bic is worse
+    """
 
     def splitter(self,rates,params):
         'splits the peaks with great Z variance'
@@ -157,12 +163,20 @@ class MultiSplit(ByEM):
         rates, params = self.fit(self.data,
                                  rates,
                                  params)
-
-        while any(params[:,1]>self.upperbound):
-            idx = np.argmax(params[:,1])
-            # split the one with highest covariance
+        notchecked    = params[:,1]>self.precision**2
+        warnings.warn("must add condition on the number of elements in a peak before splitting")
+        # if rates[idx]*data.shape[0]<2 * self.mincount do not split
+        bic           = self.bic(self.score(self.data,params),rates,params)
+        while any(notchecked):
+            idx = next(i for i,v in enumerate(notchecked) if v)
             nrates,nparams = self.splitparams(rates,params,idx)
-            # could be improved by reducing the number of peaks (and associated data)
-            # to optimized during emstep
-            rates, params = self.fit(self.data,nrates,nparams)
+            nrates,nparams = self.fit(self.data,nrates,nparams)
+            nbic = self.bic(self.score(self.data,nparams),nrates,nparams)
+            if nbic<bic:
+                bic,rates,params = nbic,nrates,nparams
+                notchecked       = np.insert(notchecked,idx,True)
+                print(f"splitting {params[idx,0]} in two")
+            else:
+                notchecked[idx] = False
+
         return rates,params

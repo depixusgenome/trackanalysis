@@ -5,7 +5,7 @@
 from typing import Union
 
 from .._core          import exppdf, normpdf # pylint:disable=import-error
-from .emfitter        import ByEM, ByEmMutu, ByGauss
+from .emfitter        import ByEM, ByGauss
 from .gaussianfitter  import ByGaussianMix
 from .histogramfitter import (ZeroCrossingPeakFinder,
                               SubPixelPeakPosition,

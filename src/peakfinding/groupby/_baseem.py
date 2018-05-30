@@ -15,7 +15,7 @@ class EMFlagger:
     'flag peak corresponding to events'
     def __init__(self,**kwa):
         self.kwargs    = kwa
-        self.mincount  = kwa.get("mincount",5)
+        self.mincount  = kwa.get("mincount",3)
 
     def __strip(self, params, events):
         '''
@@ -152,7 +152,7 @@ class BaseEM(EMFlagger):
         bins     = [min(data[:,0])]+[np.mean(zpeaks[i:i+2]) for i in tomerge]+[max(data[:,0])+0.1]
 
         # estimate rates, params using merged
-        return self.paramsfromzbins(data,bins,mincount=0)
+        return self.paramsfromzbins(data,bins,mincount=1)
 
     def paramsfromzbins(self,data,bins,mincount=None):
         "given a list of bins along z axis, estimates the parameters"
