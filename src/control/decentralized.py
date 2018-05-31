@@ -4,7 +4,7 @@
 from  typing            import Dict, Any
 from  collections       import ChainMap
 from  contextlib        import contextmanager
-from  copy              import deepcopy
+from  copy              import deepcopy, copy
 import numpy            as     np
 from  utils             import initdefaults
 from  utils.logconfig   import getLogger
@@ -116,8 +116,8 @@ class DecentralizedController(Controller):
     @contextmanager
     def localcontext(self, **kwa):
         "allows changing the context locally. This is **not** thread safe."
-        defaults = self.defaults
-        current  = self.current
+        defaults = {i: copy(j) for i, j in self.defaults.items()}
+        current  = {i: copy(j) for i, j in self.current.items()}
         try:
             for i, j in kwa.items():
                 self.update(i, **j)

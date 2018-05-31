@@ -2,12 +2,8 @@
 # -*- coding: utf-8 -*-
 "Test control"
 # pylint: disable=import-error,missing-docstring
-from    pathlib                 import Path
 from    typing                  import Dict, Callable, cast
-import  tempfile
 import  numpy
-import pytest
-from    control.globalscontrol  import GlobalsController
 from    control.event           import Event, EmitPolicy
 from    control.taskcontrol     import TaskController
 from    control.processor       import Processor, Cache, Runner
@@ -380,74 +376,6 @@ def test_task_expandandcollapse():
     assert type(val)    is numpy.ndarray
     assert type(val[0]) is Cycles
 
-def test_globals(): # pylint: disable=too-many-statements
-    "testing globals"
-    ctrl = GlobalsController()
-    ctrl.addGlobalMap("toto", titi = 1)
-    assert ctrl.getGlobal("toto").titi.get() == 1 # pylint: disable=no-member
-    assert ctrl.getGlobal("toto").titi == 1
-
-    ctrl.getGlobal("toto").titi = 2
-    assert ctrl.getGlobal("toto").titi.get() == 2 # pylint: disable=no-member
-    assert ctrl.getGlobal("toto").titi == 2
-
-    ctrl.updateGlobal("toto", titi = 3)
-    assert ctrl.getGlobal("toto").titi.get() == 3 # pylint: disable=no-member
-    assert ctrl.getGlobal("toto").titi  == 3
-
-    ctrl.updateGlobal("toto", titi = 3)
-    assert ctrl.getGlobal("toto").titi  == 3
-    del ctrl.getGlobal("toto")['titi']
-    assert ctrl.getGlobal("toto").titi == 1
-
-    del ctrl.getGlobal("toto").titi
-    assert ctrl.getGlobal("toto").titi == 1
-
-    ctrl.updateGlobal("toto", titi = 3)
-    assert ctrl.getGlobal("toto").titi  == 3
-    ctrl.getGlobal("toto").pop("titi")
-    assert ctrl.getGlobal("toto").titi == 1
-
-    with pytest.raises(KeyError):
-        ctrl.getGlobal("toto").mm.pp = 1
-
-    ctrl.getGlobal("toto").tintin.default = 11
-    ctrl.updateGlobal("toto", titi = 3)
-    ctrl.getGlobal("toto").tata.default = 11
-    ctrl.addGlobalMap("tut", tata = 11)
-    ctrl.getGlobal("toto").tata = 10
-    ctrl.getGlobal("tut").tata = 10
-    ctrl.addGlobalMap("toto.mm", tata = 11)
-    ctrl.getGlobal("toto.mm").tata = 10
-
-    path  = tempfile.mktemp()+"/config.txt"
-    cpath = lambda *_: Path(path)
-    assert not Path(path).exists()
-    ctrl.writeconfig(cpath)
-    assert Path(path).exists()
-
-    ctrl.getGlobal("toto").tintin.default = 10
-    del ctrl.getGlobal("toto").titi
-    del ctrl.getGlobal("toto.mm").tata
-    assert ctrl.getGlobal("toto.mm").tata == 11
-    assert ctrl.getGlobal("toto").titi == 1
-    ctrl.getGlobal("toto").titi.default = 2
-    ctrl.removeGlobalMap("tut")
-    with pytest.raises(KeyError):
-        ctrl.getGlobal("tut")
-
-    ctrl.readconfig(cpath)
-    assert ctrl.getGlobal("toto.mm").tata == 10
-    assert ctrl.getGlobal("toto").tintin == 10
-    assert ctrl.getGlobal("toto").titi == 3
-    del ctrl.getGlobal("toto").titi
-    assert ctrl.getGlobal("toto").titi == 2
-
-    with pytest.raises(KeyError):
-        ctrl.getGlobal("tut")
-    with pytest.raises(KeyError):
-        ctrl.getGlobal("toto").tutu.get()
-
 def test_replacement():
     "test replacement"
     class Task1(tasks.Task):
@@ -595,6 +523,15 @@ def test_decentralized():
         cmap  = ctrl.config['toto']
         assert len(cmap.maps[0]) == 0
         assert cmap.maps[1] == {'aval': 6, 'bval': ""}
+
+        with ctrl.localcontext(toto = dict(aval = 1)):
+            assert get(ctrl.model('toto'), 'aval') == 1
+            assert get(ctrl.model('toto'), 'bval') == ''
+            ctrl.update("toto", bval = "***")
+            assert get(ctrl.model('toto'), 'bval') == '***'
+        assert get(ctrl.model('toto'), 'aval') == 6
+        assert get(ctrl.model('toto'), 'bval') == ''
+
 
     _test(Toto())
     _test(Tata(aval = 2, bval = ""))
