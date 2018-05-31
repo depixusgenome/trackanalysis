@@ -117,7 +117,7 @@ class BaseEM(EMFlagger):
 
     def getdelta(self,dims):
         "delta value for a peak parameter"
-        delta = np.array([0.001]*dims) # in microns
+        delta = np.array([0.0001]*dims) # in microns
         delta[range(1,2,len(delta))] = 0.0 # no delta in cov
         if self.withtime:
             delta[-2:] = 0.0
@@ -125,12 +125,12 @@ class BaseEM(EMFlagger):
 
     def splitparams(self,rates,params,idx):
         """
-        splits a peak in two
+        splits a peak in two asymmetric peaks
         """
         delta = self.getdelta(params.shape[1])
         nparams         = np.vstack([params[:idx+1],params[idx:]])
-        nparams[idx]   -= delta
-        nparams[idx+1] += delta
+        nparams[idx]   -= delta*0.99
+        nparams[idx+1] += delta*1.01
         nrates = np.vstack([rates[:idx+1],rates[idx:]])
         nrates[idx:idx+2] /=2
         return nrates,nparams
