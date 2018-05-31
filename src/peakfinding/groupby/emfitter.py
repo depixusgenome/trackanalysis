@@ -2,24 +2,23 @@
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
 import itertools
-import warnings
-from typing      import Union, Iterable
+from typing import Iterable, List, Union
+
 import numpy as np
 from sklearn.mixture import GaussianMixture
 
 from utils import initdefaults
 
 from .._core import empz_x  # pylint: disable = import-error
-
-from .histogramfitter import ByHistogram
 from ._baseem import BaseEM
+from .histogramfitter import ByHistogram
 
 # needs a new splitter algorithm.
 # if a peak needs splitting,
 # subselect assigned data and
 # do an EM fit on the subset (should at least be faster)
-# there might be convergence issues if 
-# split local? 
+# there might be convergence issues if
+# split local?
 
 # check if the computation of the score and llikelihood is really long
 # if yes , use Cholesky
@@ -63,7 +62,6 @@ class ByEM(BaseEM):
 
     def splitter(self,rates,params):
         'splits the peaks with great Z variance'
-        warnings.warn("using this function, with a symmetric splitting is not a good idea")
         rates, params = self.fit(self.data,
                                  rates,
                                  params)
@@ -151,32 +149,45 @@ class RandInit(BaseEM):
 
         return self.nrandinit(self.nsamples)[-2:]
 
+# the ByEM splitter seems to work fine on its own but the criteria to stop splitting
+# is too crude
+# will need to combine :
+# * a kerneldensity a merge (mergewindow)
+# * ByEM split to avoid covariance too high
+# * a bicsplit split
 class BicSplit(ByEM):
     """
     tries to split each peak
     we keep splitting until the bic is worse
     """
+    def __tocheck(self,rates,tocheck)-> List[bool]:
+        """
+        must returns mutable list of bools.
+        """
+        toofew = np.round(self.data.shape[0]*rates)<self.mincount*2
+        return list(np.logical_and(toofew,tocheck))
 
     def splitter(self,rates,params):
-        'splits the peaks with great Z variance'
-        warnings.warn("using this function, with a symmetric splitting is not a good idea")
+        "splits the peaks with great Z variance"
         rates, params = self.fit(self.data,
                                  rates,
                                  params)
-        notchecked    = params[:,1]>self.precision**2
-        warnings.warn("must add condition on the number of elements in a peak before splitting")
-        # if rates[idx]*data.shape[0]<2 * self.mincount do not split
+        tocheck       = self.__tocheck(rates,params[:,1]>self.precision**2)
         bic           = self.bic(self.score(self.data,params),rates,params)
-        while any(notchecked):
-            idx = next(i for i,v in enumerate(notchecked) if v)
+        while any(tocheck):
+            idx = next(i for i,v in enumerate(tocheck) if v)
             nrates,nparams = self.splitparams(rates,params,idx)
             nrates,nparams = self.fit(self.data,nrates,nparams)
             nbic = self.bic(self.score(self.data,nparams),nrates,nparams)
             if nbic<bic:
                 bic,rates,params = nbic,nrates,nparams
-                notchecked       = np.insert(notchecked,idx,True)
+                tocheck          = np.insert(tocheck,idx,True)
+                # updating
+                tocheck          = self.__tocheck(rates,params[:,1]>self.precision**2)
+                print(f"tocheck={tocheck}")
                 print(f"splitting {params[idx,0]} in two")
             else:
-                notchecked[idx] = False
+                tocheck[idx] = False
+                print(f"tocheck={tocheck}")
 
         return rates,params
