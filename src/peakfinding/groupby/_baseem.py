@@ -14,7 +14,7 @@ from .._core import emrunner, emscore  # pylint: disable = import-error
 class EMFlagger:
     'flag peak corresponding to events'
     def __init__(self,**kwa):
-        self.kwargs    = kwa
+        self.kwargs    = None # kwa for call arguments instead
         self.mincount  = kwa.get("mincount",3)
 
     def __strip(self, params, events):
@@ -37,7 +37,7 @@ class EMFlagger:
 
     def group(self,counts,params,events):
         'counts, estimated number of events per peak'
-        keep   = counts > self.mincount
+        keep   = counts >= self.mincount
         params = params[keep]
         asort  = np.argsort(params[:,0])
         return self.__strip(params[asort],events)
@@ -135,14 +135,27 @@ class BaseEM(EMFlagger):
         nrates[idx:idx+2] /=2
         return nrates,nparams
 
+    # def fit(self,data,rates,params):
+    #     "call the fitting algo debugging"
+    #     nrates,nparams=self.fittingalgo(data,
+    #                                     rates,
+    #                                     params,
+    #                                     self.emiter,
+    #                                     self.tol,self.precision**2)
+
+    #     if any(np.isnan(nrates)):
+    #         pickle.dump((data,rates,params,self.kwargs),open("data.dbg","wb"))
+    #         print("to debug")
+    #     return nrates,nparams
+
     def fit(self,data,rates,params):
-        "call the fitting algo"
+        "call the fitting algo debugging"
         return self.fittingalgo(data,
                                 rates,
                                 params,
                                 self.emiter,
-                                self.tol,
-                                self.precision**2)
+                                self.tol,self.precision**2)
+
 
     def fromzestimate(self,data:np.ndarray,zpeaks:np.ndarray):
         "calls fittingalgo based on estimation of zpeaks"
@@ -154,22 +167,24 @@ class BaseEM(EMFlagger):
         # estimate rates, params using merged
         return self.paramsfromzbins(data,bins,mincount=1)
 
-    def paramsfromzbins(self,data,bins,mincount=None):
-        "given a list of bins along z axis, estimates the parameters"
+    def paramsfromdigits(self,data,digits,mincount):
+        "estimates params from digitized data, digits"
         mincount  = self.mincount if mincount is None else mincount
-        digi      = np.digitize(data[:,0].ravel(),bins)
-        clas      = {idx:np.array([data[_1] for _1,_2 in enumerate(digi) if _2==idx])
-                     for idx in set(digi)}
+        grouping = [(idx,np.array([data[_1] for _1,_2 in enumerate(digits) if _2==idx]))
+                    for idx in set(digits) if idx!=np.iinfo('i4').max]
+        clas = {i:j for i,j in grouping if len(j)>=mincount}
         params = np.vstack([list(itertools.chain.from_iterable(zip(np.nanmean(clas[idx],axis=0),
                                                                    np.nanvar(clas[idx],axis=0))))
-                            for idx in set(digi)
-                            if len(clas[idx])>mincount])
+                            for idx in clas.keys()])
         if self.withtime:
             params[:,-2] = 0.
             params[:,-1] = [np.nanvar(clas[idx][-1])
-                            for idx in set(digi)
-                            if len(clas[idx])>mincount]
-        rates = np.array([[len(clas[idx])] for idx in set(digi)
-                          if len(clas[idx])>mincount])
+                            for idx in clas.keys()]
+        rates = np.array([[len(clas[idx])] for idx in clas.keys()])
 
         return rates/np.sum(rates),params
+
+    def paramsfromzbins(self,data,bins,mincount=None):
+        "given a list of bins along z axis, estimates the parameters"
+        digits      = np.digitize(data[:,0].ravel(),bins)
+        return self.paramsfromdigits(data,digits,mincount=mincount)

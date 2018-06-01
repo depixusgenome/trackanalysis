@@ -5,7 +5,7 @@
 from typing import Union
 
 from .._core          import exppdf, normpdf # pylint:disable=import-error
-from .emfitter        import ByEM, ByGauss
+from .emfitter        import MaxCov, ByGauss, FullEm
 from .gaussianfitter  import ByGaussianMix
 from .histogramfitter import (ZeroCrossingPeakFinder,
                               SubPixelPeakPosition,
@@ -14,4 +14,4 @@ from .histogramfitter import (ZeroCrossingPeakFinder,
                               PeakFlagger)
 
 
-PeakFinder= Union[ByHistogram,ByGaussianMix,ByEM]
+PeakFinder= Union[ByHistogram,ByGaussianMix,MaxCov,FullEm]

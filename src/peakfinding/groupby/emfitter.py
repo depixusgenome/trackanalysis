@@ -1,34 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
-import itertools
 from typing import Iterable, List, Union
-
 import numpy as np
 from sklearn.mixture import GaussianMixture
 
 from utils import initdefaults
 
-from .._core import empz_x  # pylint: disable = import-error
 from ._baseem import BaseEM
 from .histogramfitter import ByHistogram
 
-# needs a new splitter algorithm.
-# if a peak needs splitting,
-# subselect assigned data and
-# do an EM fit on the subset (should at least be faster)
-# there might be convergence issues if
-# split local?
+# need to clean up initialization of params
 
-# check if the computation of the score and llikelihood is really long
-# if yes , use Cholesky
-
-class ByEM(BaseEM):
+class MaxCov(BaseEM):
     '''
     finds peaks and groups events using Expectation Maximization
-    the number of components is estimated using BIC criteria
+    peaks are subdivided until none have a covariance above uppercov
     '''
-    upperbound = 0.005**2 # in microns**2
+    uppercov   = 0.005**2 # in microns**2
     withtime   = True
 
     @initdefaults(frozenset(locals()))
@@ -57,16 +46,28 @@ class ByEM(BaseEM):
 
     def kernelinitializer(self,**kwa):
         'uses ZeroCrossing for initialization faster'
-        peaks = ByHistogram(**self.kwargs)(**kwa)[0]
-        return self.fromzestimate(self.data,peaks)
+        peaks,ids = ByHistogram(**self.kwargs)(**kwa)
+        # include mergewindow and replace ids
+        rpl = np.hstack([np.argwhere(np.diff(peaks)>self.mergewindow).ravel(),len(peaks)-1])
+        digits = np.hstack(ids)
+        for idx in range(len(peaks)):
+            digits[digits==idx]=rpl[rpl>=idx][0]
+        # mean peaks are updated
+        rates,params = self.paramsfromdigits(self.data,digits,self.mincount)
+        return rates,params
 
-    def splitter(self,rates,params):
+    def splitter(self,*args):
+        """
+        splits the peaks if bic is better
+        args: rates, params
+        """
+        return self._splitwidth(*args)
+
+    def _splitwidth(self,*args):
         'splits the peaks with great Z variance'
-        rates, params = self.fit(self.data,
-                                 rates,
-                                 params)
+        rates, params = self.fit(self.data,*args) # pylint: disable =no-value-for-parameter
 
-        while any(params[:,1]>self.upperbound):
+        while any(params[:,1]>self.uppercov):
             idx = np.argmax(params[:,1])
             # split the one with highest covariance
             nrates,nparams = self.splitparams(rates,params,idx)
@@ -76,7 +77,7 @@ class ByEM(BaseEM):
         return rates,params
 
 
-class ByGauss(ByEM):
+class ByGauss(MaxCov):
     '''
     finds peaks and groups events using Expectation Maximization
     uses sklearn EM implementation
@@ -149,29 +150,25 @@ class RandInit(BaseEM):
 
         return self.nrandinit(self.nsamples)[-2:]
 
-# the ByEM splitter seems to work fine on its own but the criteria to stop splitting
-# is too crude
-# will need to combine :
-# * a kerneldensity a merge (mergewindow)
-# * ByEM split to avoid covariance too high
-# * a bicsplit split
-class BicSplit(ByEM):
+class BicSplit(MaxCov):
     """
-    tries to split each peak
-    we keep splitting until the bic is worse
+    tries to split each peak iteratively
+    keeps splitting until the bic is worse
     """
+
     def __tocheck(self,rates,tocheck)-> List[bool]:
         """
         must returns mutable list of bools.
         """
-        toofew = np.round(self.data.shape[0]*rates)<self.mincount*2
-        return list(np.logical_and(toofew,tocheck))
+        enough = np.round(self.data.shape[0]*rates.ravel())>self.mincount*2
+        return list(np.logical_and(enough,tocheck))
 
-    def splitter(self,rates,params):
-        "splits the peaks with great Z variance"
-        rates, params = self.fit(self.data,
-                                 rates,
-                                 params)
+    def splitter(self,*args):
+        "splits the peaks if bic is better"
+        return self._splitwithbic(*args)
+
+    def _splitwithbic(self,*args):
+        rates, params = self.fit(self.data,*args) # pylint: disable=no-value-for-parameter
         tocheck       = self.__tocheck(rates,params[:,1]>self.precision**2)
         bic           = self.bic(self.score(self.data,params),rates,params)
         while any(tocheck):
@@ -184,10 +181,18 @@ class BicSplit(ByEM):
                 tocheck          = np.insert(tocheck,idx,True)
                 # updating
                 tocheck          = self.__tocheck(rates,params[:,1]>self.precision**2)
-                print(f"tocheck={tocheck}")
-                print(f"splitting {params[idx,0]} in two")
             else:
                 tocheck[idx] = False
-                print(f"tocheck={tocheck}")
 
         return rates,params
+
+
+class FullEm(BicSplit):
+    """
+    Covariance of parameters should have upper and lower boundaries.
+    Upper covariance boundaries are set and each parameter is subdivided using MaxCov
+    First calls MaxCov splitter to make sure that covariances parameters have an upper bound
+    then calls SplitBic.splitter to ensure than one should not further divide peaks
+    """
+    def splitter(self,*args):
+        return self._splitwithbic(*self._splitwidth(*args))
