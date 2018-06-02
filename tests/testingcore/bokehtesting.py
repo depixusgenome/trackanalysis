@@ -240,7 +240,6 @@ class _ManagedServerLoop:
         return self
 
     def __exit__(self, *_):
-        print("**** quit")
         if self.server is not None:
             self.quit()
         self.__warnings.__exit__(*_)

@@ -120,7 +120,8 @@ class ConfigurationIO:
                     ctrl.close()
 
                 for i in views:
-                    i.close()
+                    if hasattr(i, 'close'):
+                        i.close()
 
         logToFile(str(cls(Main).apppath()/"logs.txt"))
         return Main
