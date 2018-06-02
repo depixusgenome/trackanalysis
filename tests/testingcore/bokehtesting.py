@@ -175,7 +175,7 @@ class _ManagedServerLoop:
             ctrl      = server.MainView.MainControl(None)
             self.view = getattr(ctrl, '_open')(viewcls, doc, kwa).topview
             setattr(self.view, '_ctrl', ctrl)
-            return self.view
+            return ctrl
         server.MainView.MainControl.open = classmethod(_open)
 
         def _close(this, _func_ = server.MainView.close):
@@ -191,7 +191,7 @@ class _ManagedServerLoop:
         if not isinstance(app, type):
             from view.base import BokehView
             pred = lambda i: (isinstance(i, type)
-                              and i.__module__ == app.__name__
+                              and i.__module__.startswith(app.__name__)
                               and issubclass(i, BokehView))
             pot  = tuple(i for _, i in inspect.getmembers(app, pred))
             assert len(pot) == 1
@@ -279,9 +279,13 @@ class _ManagedServerLoop:
 
         self.cmd(_quit, andstop = False)
 
-    def load(self, path: Union[Sequence[str], str], andpress = True, **kwa):
+    def load(self, path: Union[Sequence[str], str], andpress = True, rendered = False, **kwa):
         "loads a path"
         import view.dialog  # pylint: disable=import-error
+        if rendered is True:
+            self.ctrl.display.observe("rendered", lambda *_1, **_2: self.wait())
+            kwa['andstop'] = False
+
         def _tkopen(*_1, **_2):
             return self.path(path)
         self.monkeypatch.setattr(view.dialog, '_tkopen', _tkopen)

@@ -505,11 +505,6 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         for cls in self._HELPERS:
             cls.setup(ctrl, tbar, doc)
 
-        ctrl.display.updatedefaults('keystroke',
-                                    open = lambda: _onbtn_cb('open', 0, 0),
-                                    save = lambda: _onbtn_cb('save', 0, 0),
-                                    quit = lambda: _onbtn_cb('quit', 0, 0))
-
         mods = self.defaultsizingmode(height = 30)
         return layouts.row([layouts.widgetbox(tbar, **mods)], **mods)
 

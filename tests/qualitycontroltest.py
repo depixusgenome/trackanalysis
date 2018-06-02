@@ -7,5 +7,12 @@ from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-imp
 def test_view_messages(bokehaction):
     "test the view"
     with bokehaction.launch('qualitycontrol.view', 'app.toolbar') as server:
-        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
-        server.load('big_legacy', andstop = False)
+        server.load('big_legacy', rendered = True)
+
+def test_view_fov(bokehaction):
+    "test the view"
+    with bokehaction.launch('fov.FoVPlotView', 'app.toolbar') as server:
+        server.load('big_legacy', rendered = True)
+
+if __name__ == '__main__':
+    test_view_messages(bokehaction(None))
