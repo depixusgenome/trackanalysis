@@ -240,6 +240,7 @@ class _ManagedServerLoop:
         return self
 
     def __exit__(self, *_):
+        print("**** quit")
         if self.server is not None:
             self.quit()
         self.__warnings.__exit__(*_)
@@ -264,8 +265,7 @@ class _ManagedServerLoop:
                 fcn(*args, **kwargs)
                 LOGS.debug(f"done running and not stopping")
         self.doc.add_next_tick_callback(_cmd)
-        if not self.loop._running: # pylint: disable=protected-access
-            self.loop.start()
+        self.loop.start()
 
     def wait(self, time = 2.):
         "wait some more"
