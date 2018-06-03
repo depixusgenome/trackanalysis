@@ -314,8 +314,7 @@ def test_message_creation():
 def test_view(bokehaction):
     "test the view"
     with bokehaction.launch('cleaning.view.CleaningView', 'app.toolbar') as server:
-        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
-        server.load('big_legacy', andstop = False)
+        server.load('big_legacy', rendered = True)
 
         assert server.task(DataCleaningTask).maxhfsigma != 0.002
         server.change('Cleaning:Filter', 'maxhfsigma', 0.002)
@@ -330,4 +329,4 @@ def test_view(bokehaction):
         server.wait()
 
 if __name__ == '__main__':
-    test_subtract()
+    test_view(bokehaction(None))

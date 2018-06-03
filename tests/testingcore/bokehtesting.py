@@ -126,7 +126,7 @@ class _ManagedServerLoop:
     """
     loop     = property(lambda self: self.server.io_loop)
     ctrl     = property(lambda self: getattr(self.view, '_ctrl'))
-    roottask = property(lambda self: self.ctrl.globals.project.track.get())
+    roottask = property(lambda self: self.ctrl.display.get("tasks", "roottask"))
     track    = property(lambda self: self.ctrl.tasks.track(self.roottask))
     def task(self, task):
         "returns a task"
