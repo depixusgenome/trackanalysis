@@ -141,5 +141,5 @@ class TasksModel:
         """
         adds the current obj to the controller
         """
-        self.config  = ctrl.theme.model  (self.config,  noerase)
-        self.display = ctrl.display.model(self.display, noerase)
+        self.config  = ctrl.theme  .add(self.config,  noerase)
+        self.display = ctrl.display.add(self.display, noerase)
