@@ -18,7 +18,7 @@ from peakcalling.processor.fittoreference import (FitToReferenceTask, FitToRefer
                                                   TaskViewProcessor, BEADKEY)
 
 from view.base                       import spawn, threadmethod
-from view.dialog                     import FileDialogConfig
+from view.dialog                     import FileDialogTheme
 
 from utils.logconfig                 import getLogger
 from utils.gui                       import startfile
@@ -65,7 +65,7 @@ class _SafeDict(FitToReferenceDict):
 class _SafeProc(TaskViewProcessor[_SafeTask, _SafeDict, BEADKEY]):
     "Changes the Z axis to fit the reference"
 
-FileDialogConfig.types['pkz'] = (u'pickled report', '.pkz')
+FileDialogTheme.types['pkz'] = (u'pickled report', '.pkz')
 class ConfigXlsxIOTheme:
     "ConfigXlsxIOTheme"
     name   = 'hybridstat.configxlsxio'

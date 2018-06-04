@@ -22,7 +22,7 @@ export class DpxKeyedRow extends Row
     _get_tool: (name) ->
         if @toolbar?
             if @toolbar instanceof ToolbarBox
-                for _, gest of @toolbar._toolbar.gestures
+                for _, gest of @toolbar.toolbar.gestures
                     for proxy in gest.tools
                         for tool in proxy.tools
                             if tool.type == name
@@ -47,7 +47,7 @@ export class DpxKeyedRow extends Row
         if tool?
             tbar = @fig.toolbar
             if @toolbar instanceof ToolbarBox
-                tbar = @toolbar._toolbar
+                tbar = @toolbar.toolbar
             else if @toolbar?
                 tbar = @toolbar
 
@@ -128,8 +128,8 @@ export class DpxKeyedRow extends Row
                 @_set_active("PanTool")
 
             else
-                [tool,axis,dir] = val.split(".")
-                @["_do_"+tool](dir == "low", @fig[axis+"_range"])
+                tool = if val[0...3] == "pan" then "pan" else "zoom"
+                @["_do_#{tool}"]("low" in val, @fig[(if "x" in val then "x" else "y")+"_range"])
 
     dokeyup: (evt) ->
         if @_curr?

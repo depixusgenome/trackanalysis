@@ -7,7 +7,6 @@ from typing     import Dict, Any
 import sys
 
 from tornado.platform.asyncio   import AsyncIOMainLoop
-from tornado.ioloop             import IOLoop
 from bokeh.application          import Application
 from bokeh.application.handlers import FunctionHandler
 from bokeh.server.server        import Server
@@ -178,7 +177,6 @@ def setup(locs,           #
               **kwa):
         "Creates a browser app"
         AsyncIOMainLoop().install()
-        IOLoop.instance().make_current()
         app = application(main, creator, controls, views)
         if apponly:
             return app
@@ -192,7 +190,6 @@ def setup(locs,           #
                **kwa):
         "Creates a desktop app"
         AsyncIOMainLoop().install()
-        IOLoop.instance().make_current()
         app = application(main, creator, controls, views)
         if apponly:
             return app

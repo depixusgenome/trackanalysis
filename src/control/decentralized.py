@@ -247,8 +247,11 @@ class DecentralizedController(Controller):
     @staticmethod
     def __get(dico)-> Dict[str, Dict[str, Any]]:
         "return a dict containing all objects info"
-        get = lambda i: i if isinstance(i, dict) else i.__dict__
-        return {i: get(j) for i, j in dico.items()}
+        get = lambda i: dict(i if isinstance(i, dict) else i.__dict__)
+        out = {i: get(j) for i, j in dico.items()}
+        for i in out.values():
+            i.pop("name", None)
+        return out
 
     def __update(self, key:str, name, kwa: Dict[str, Any]):
         "update a specific display and emits an event"

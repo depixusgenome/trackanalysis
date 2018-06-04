@@ -11,15 +11,14 @@ def test_cyclesplot(bokehaction):
     "test cyclesplot basic stuff"
     import anastore
     vals = [0.]*2
-    def _printrng(evts):
-        if 'y' in evts:
-            vals[:2] = [0. if i is None else i for i in evts['y'].value]
+    def _printrng(old = None, model = None, **_):
+        print(model.ybounds, model.xbounds)
+        if 'ybounds' in old:
+            vals[:2] = [0. if i is None else i for i in model.ybounds]
 
     with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.toolbar') as server:
-        server.ctrl.getGlobal('config').tasks.default = []
-        server.ctrl.observe("globals.project.plot.cycles", _printrng)
-        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
-        server.load('big_legacy', andstop = False)
+        server.ctrl.display.observe("cycles", _printrng)
+        server.load('big_legacy', rendered = True)
 
         krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
         def _press(val, *truth):
@@ -41,7 +40,7 @@ def test_cyclesplot(bokehaction):
         _press('Alt-ArrowDown',     0.258410, 0.464449)
         _press('Shift-ArrowDown',   0.,       0.)
 
-        curr = server.ctrl.getGlobal("project")
+        curr = server.ctrl.theme.model("tasks")
         assert curr.bead in (None, 0)
         server.press('PageUp', andstop = False)
         assert curr.bead == 1
@@ -49,14 +48,14 @@ def test_cyclesplot(bokehaction):
         server.change('Cycles:Oligos', 'value', ' TGGC  , aatt')
         assert server.widget['Cycles:Oligos'].value == 'aatt, tggc'
         cnf = anastore.load(server.ctrl.configpath(next(anastore.iterversions('config'))))
-        assert cnf['config']['tasks.oligos'] == ['aatt', 'tggc']
-        assert cnf['css.plot']['oligos.history'] == [['aatt', 'tggc']]
+        assert cnf['config.sequence']['probes'] == ['aatt', 'tggc']
+        assert cnf['config.sequence']['history'] == [['aatt', 'tggc']]
 
         server.change('Cycles:Oligos', 'value', '')
         assert server.widget['Cycles:Oligos'].value == ''
         cnf = anastore.load(server.ctrl.configpath(next(anastore.iterversions('config'))))
-        assert 'tasks.oligos' not in cnf.get('config', {})
-        assert cnf['css.plot']['oligos.history'] == [['aatt', 'tggc']]
+        assert not cnf['config.sequence'].get('probes', None)
+        assert cnf['config.sequence']['history'] == [['aatt', 'tggc']]
 
         server.load('hairpins.fasta', andpress = False)
         server.change('Cycles:Sequence', 'value', '←')
@@ -79,9 +78,7 @@ def test_cyclesplot2(bokehaction):
     "test cyclesplot data actions"
 
     with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.toolbar') as server:
-        server.ctrl.getGlobal('config').tasks.default = []
-        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
-        server.load('big_legacy', andstop = False)
+        server.load('big_legacy', rendered = True)
 
         fig  = server.widget['Cycles:Hist']()
         assert fig.extra_x_ranges['cycles'].end < 40
@@ -124,4 +121,4 @@ def test_cyclesplot2(bokehaction):
         server.wait()
 
 if __name__ == '__main__':
-    test_cyclesplot2(bokehaction(None))
+    test_cyclesplot(bokehaction(None))

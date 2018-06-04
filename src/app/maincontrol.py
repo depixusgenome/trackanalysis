@@ -173,8 +173,8 @@ class BaseSuperController:
     def _getmaps(self):
         maps = {'theme':  {'appsize': self.APPSIZE, 'appname': self.APPNAME.capitalize()},
                 'config': {'catcherror': DisplayController.CATCHERROR}}
-        keys = {i for i, j in self.theme.current.items()
-                if type(j).__name__.endswith("Config")}
+        keys = {i for i in self.theme.current.keys()
+                if type(self.theme.model(i)).__name__.endswith("Config")}
         outs = {f'{"config." if i in keys else "theme."}{i}': j
                 for i, j in self.theme.config.items()}
         for i, j in maps.items():

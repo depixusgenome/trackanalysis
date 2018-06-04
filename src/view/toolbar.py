@@ -18,7 +18,7 @@ from utils.gui            import parseints
 from utils.logconfig      import getLogger
 from control.taskio       import TaskIO
 from control.beadscontrol import DataSelectionBeadController
-from .dialog              import FileDialog
+from .dialog              import FileDialog, FileDialogTheme
 from .base                import BokehView, threadmethod, spawn
 from .static              import ROUTE
 LOGS  = getLogger(__name__)
@@ -444,7 +444,8 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
             cls.init(ctrl)
 
         self.__messages = MessagesView(ctrl)
-        self.__theme    = ctrl.theme.add(BeadToolbarTheme())
+        self.__theme    = ctrl.theme.add(BeadToolbarTheme(), False)
+        ctrl.theme.add(FileDialogTheme(), False)
 
     def observe(self, ctrl):
         "sets up observers"

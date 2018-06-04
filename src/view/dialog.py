@@ -10,7 +10,7 @@ from tkinter.filedialog import (askopenfilename   as _tkopen,
 from utils              import initdefaults
 
 _m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
-class FileDialogConfig:
+class FileDialogTheme:
     "file dialog info"
     name  = "filedialog"
     types = {'all':      ('all files',               '.*'),
@@ -46,7 +46,7 @@ class BaseFileDialog:
         self.initialfile     : Optional[str]  = kwa.get('initialfile',     None)
         self.multiple        : Optional[bool] = kwa.get('multiple',        None)
         self.title           : Optional[str]  = kwa.get('title',           None)
-        self._config  = FileDialogConfig()
+        self._config  = FileDialogTheme()
 
     @staticmethod
     def exists(path):

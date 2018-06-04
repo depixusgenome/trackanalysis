@@ -17,16 +17,17 @@ warnings.filterwarnings('ignore',
 with warnings.catch_warnings():
     warnings.filterwarnings('ignore', category = DeprecationWarning)
     import pytest
-    from bokeh.model           import Model
-    from bokeh.document        import Document
-    from bokeh.server.server   import Server
-    import bokeh.core.properties as     props
+    from bokeh.model                import Model
+    from bokeh.document             import Document
+    from bokeh.server.server        import Server
+    import bokeh.core.properties    as     props
 
 # pylint: disable=wrong-import-position
-from tornado.ioloop        import IOLoop
-from view.static           import ROUTE
-from view.keypress         import DpxKeyEvent
-from utils.logconfig       import getLogger
+from tornado.platform.asyncio       import AsyncIOMainLoop
+
+from utils.logconfig                import getLogger
+from view.static                    import ROUTE
+from view.keypress                  import DpxKeyEvent
 
 LOGS = getLogger()
 
@@ -200,8 +201,7 @@ class _ManagedServerLoop:
         return app, getattr(self.__import(mod), fcn)
 
     def __buildserver(self, kwa):
-        io_loop = IOLoop()
-        io_loop.make_current()
+        AsyncIOMainLoop().make_current()
 
         app, launch = self.__getlauncher()
         with warnings.catch_warnings():
