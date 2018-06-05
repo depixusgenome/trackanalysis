@@ -5,6 +5,7 @@
 from pytest                     import approx       # pylint: disable=no-name-in-module
 
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
+from app.configuration          import ConfigurationIO
 from view.plots                 import DpxKeyedRow
 
 def test_cyclesplot(bokehaction):
@@ -12,11 +13,10 @@ def test_cyclesplot(bokehaction):
     import anastore
     vals = [0.]*2
     def _printrng(old = None, model = None, **_):
-        print(model.ybounds, model.xbounds)
         if 'ybounds' in old:
             vals[:2] = [0. if i is None else i for i in model.ybounds]
 
-    with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.toolbar') as server:
+    with bokehaction.serve('cyclesplot.CyclesPlotView', 'app.toolbar') as server:
         server.ctrl.display.observe("cycles", _printrng)
         server.load('big_legacy', rendered = True)
 
@@ -32,28 +32,29 @@ def test_cyclesplot(bokehaction):
         assert fig.x_range.end                  > 2000.
         assert fig.extra_x_ranges['cycles'].end > 30.
 
-        _press('Shift- ',          0.,       0.)
-        _press('Shift-ArrowUp',    0.258410, 0.464449)
-        assert fig.x_range.end                  == approx(103, abs=.1)
-        assert fig.extra_x_ranges['cycles'].end == approx(4,   abs=.1)
-        _press('Alt-ArrowUp',       0.299618, 0.505657)
-        _press('Alt-ArrowDown',     0.258410, 0.464449)
+        _press('Shift- ',           0.,       0.)
+        _press('Shift-ArrowUp',     0.359869, 0.564043)
+        assert fig.x_range.end                  == approx(528, abs=.1)
+        assert fig.extra_x_ranges['cycles'].end == approx(18,   abs=.1)
+        _press('Alt-ArrowUp',       0.400703, 0.604878)
+        _press('Alt-ArrowDown',     0.359869, 0.564043)
         _press('Shift-ArrowDown',   0.,       0.)
 
-        curr = server.ctrl.theme.model("tasks")
+        curr = server.ctrl.display.model("tasks")
         assert curr.bead in (None, 0)
         server.press('PageUp', andstop = False)
         assert curr.bead == 1
 
         server.change('Cycles:Oligos', 'value', ' TGGC  , aatt')
         assert server.widget['Cycles:Oligos'].value == 'aatt, tggc'
-        cnf = anastore.load(server.ctrl.configpath(next(anastore.iterversions('config'))))
+        path = ConfigurationIO(server.ctrl).configpath(next(anastore.iterversions('config')))
+        cnf  = anastore.load(path)
         assert cnf['config.sequence']['probes'] == ['aatt', 'tggc']
         assert cnf['config.sequence']['history'] == [['aatt', 'tggc']]
 
         server.change('Cycles:Oligos', 'value', '')
         assert server.widget['Cycles:Oligos'].value == ''
-        cnf = anastore.load(server.ctrl.configpath(next(anastore.iterversions('config'))))
+        cnf = anastore.load(path)
         assert not cnf['config.sequence'].get('probes', None)
         assert cnf['config.sequence']['history'] == [['aatt', 'tggc']]
 
@@ -67,7 +68,7 @@ def test_cyclesplot(bokehaction):
                 == approx([166, 1113], abs = 1.))
 
         assert server.widget['Cycles:Stretch'].value == approx(1./8.8e-4, abs = 1e-1)
-        assert server.widget['Cycles:Bias'].value == approx(-.092152, abs = 1e-5)
+        assert server.widget['Cycles:Bias'].value == approx(.00137589, abs = 1e-5)
         server.change('Cycles:Bias',     'value', -.05)
         assert server.widget['Cycles:Bias'].value == approx(-.05, abs = 1e-5)
         server.change('Cycles:Stretch',  'value', 1050.)

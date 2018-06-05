@@ -129,7 +129,9 @@ export class DpxKeyedRow extends Row
 
             else
                 tool = if val[0...3] == "pan" then "pan" else "zoom"
-                @["_do_#{tool}"]("low" in val, @fig[(if "x" in val then "x" else "y")+"_range"])
+                rng  = if "x" in val then "x_range" else "y_range"
+                dir  = "low" == val[val.length-3...val.length]
+                @["_do_#{tool}"](dir, @fig[rng])
 
     dokeyup: (evt) ->
         if @_curr?

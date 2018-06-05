@@ -25,6 +25,7 @@ with warnings.catch_warnings():
 # pylint: disable=wrong-import-position
 from tornado.platform.asyncio       import AsyncIOMainLoop
 
+import app.configuration as _conf
 from utils.logconfig                import getLogger
 from view.static                    import ROUTE
 from view.keypress                  import DpxKeyEvent
@@ -371,7 +372,7 @@ class BokehAction:
         tmp = tempfile.mktemp()+"_test"
         class _Dummy:
             user_config_dir = lambda *_: tmp+"/"+_[-1]
-        sys.modules['appdirs'] = _Dummy
+        self.monkeypatch.setattr(_conf, 'appdirs', _Dummy)
 
     def serve(self, app:Union[type, str], mod:str  = 'default', **kwa) -> _ManagedServerLoop:
         "Returns a server managing context"
