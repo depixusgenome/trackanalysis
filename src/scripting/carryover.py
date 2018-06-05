@@ -4,23 +4,23 @@
 """
 defines rules of carry over
 """
-from collections import namedtuple
-from functools   import reduce
-from glob        import glob
-from os.path     import getmtime
-from typing      import List
-from holoviews   import Overlay,Curve
+import re
+from glob    import glob
+from os.path import getmtime
+from typing  import List, NamedTuple
 
-import numpy     as np
-import pandas    as pd
-import regex
+import numpy  as np
+import pandas as pd
+from holoviews import Curve, Overlay
 
 from sequences import Translator, overlap
 from utils     import initdefaults
 
 REVERSE = Translator().reversecomplement
 
-ChronoItem = namedtuple("ChronoItem",["time","key"])
+class ChronoItem(NamedTuple): # pylint: disable=missing-docstring
+    time : pd.Timestamp
+    key  : str
 
 class CarryOver:
     """
@@ -84,7 +84,7 @@ class CarryOver:
         """
         first,second=pair
         calls = [getattr(self,func) for func in dir(self) if func.startswith("rule")]
-        return reduce(np.logical_and,map(lambda x:x(first,second),calls))
+        return np.ufunc.reduce(np.logical_and,map(lambda x:x(first,second),calls))
 
     @staticmethod
     def _toxy(field: pd.Series):
@@ -101,7 +101,7 @@ class DuplicateData:
     '''
     def __init__(self,path,match,key:str="track")->None:
         self.match                  = match
-        self._pattern               = regex.compile(match) if isinstance(match,str) else match
+        self._pattern               = re.compile(match) if isinstance(match,str) else match
         self.path                   = path
         self.history:List[ChronoItem] = []
         self.key                    = key
@@ -123,9 +123,8 @@ class DuplicateData:
 
     def findhistory(self)->List[ChronoItem]:
         "finds chronological order of experiments using files mtime"
-        history = [ChronoItem(self.totimestamp(f),regex.match(self._pattern,f).groups()[0].upper())
-                   for f in glob(self.path)
-                   if regex.match(self._pattern,f)]
+        history = [ChronoItem(self.totimestamp(f),re.match(self._pattern,f).groups()[0].upper())
+                   for f in glob(self.path) if re.match(self._pattern,f)]
         self.history = sorted(history)
         return self.history
 
