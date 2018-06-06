@@ -14,7 +14,7 @@ from bokeh.models               import (DataTable, TableColumn, CustomJS,
 from signalfilter               import rawprecision
 
 from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
-from peakfinding.groupby        import ByEM, ByHistogram
+from peakfinding.groupby        import FullEm, ByHistogram
 from utils                      import initdefaults
 from utils.gui                  import startfile
 from excelreports.creation      import writecolumns
@@ -481,7 +481,7 @@ class _PeakDescriptor:
     def __set__(self,inst,value):
         mdl = getattr(inst,'_model')
         if value:
-            mdl.peakselection.update(finder=ByEM(mincount=getattr(inst,"_eventcount")))
+            mdl.peakselection.update(finder=FullEm(mincount=getattr(inst,"_eventcount")))
             return
         mdl.peakselection.update(finder=ByHistogram(mincount=getattr(inst,"_eventcount")))
 
