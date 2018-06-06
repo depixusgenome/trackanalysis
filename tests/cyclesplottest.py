@@ -18,7 +18,7 @@ def test_cyclesplot(bokehaction):
 
     with bokehaction.serve('cyclesplot.CyclesPlotView', 'app.toolbar') as server:
         server.ctrl.display.observe("cycles", _printrng)
-        server.load('big_legacy', rendered = True)
+        server.load('big_legacy')
 
         krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
         def _press(val, *truth):
@@ -58,7 +58,7 @@ def test_cyclesplot(bokehaction):
         assert not cnf['config.sequence'].get('probes', None)
         assert cnf['config.sequence']['history'] == [['aatt', 'tggc']]
 
-        server.load('hairpins.fasta', andpress = False)
+        server.load('hairpins.fasta')
         server.change('Cycles:Sequence', 'value', '←')
         assert (server.widget['Cycles:Peaks'].source.data['bases']
                 == approx([0, 1000], abs = 1.))
@@ -79,7 +79,7 @@ def test_cyclesplot2(bokehaction):
     "test cyclesplot data actions"
 
     with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.toolbar') as server:
-        server.load('big_legacy', rendered = True)
+        server.load('big_legacy')
 
         fig  = server.widget['Cycles:Hist']()
         assert fig.extra_x_ranges['cycles'].end < 40

@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 "Utils for testing views"
 from   typing    import Optional, Union, Sequence, Any, cast
-import sys
 import tempfile
 import warnings
 import inspect
@@ -279,7 +278,7 @@ class _ManagedServerLoop:
 
         self.cmd(_quit, andstop = False)
 
-    def load(self, path: Union[Sequence[str], str], andpress = True, rendered = False, **kwa):
+    def load(self, path: Union[Sequence[str], str], andpress = False, rendered = True, **kwa):
         "loads a path"
         import view.dialog  # pylint: disable=import-error
         if rendered is True:

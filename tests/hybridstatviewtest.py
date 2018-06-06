@@ -84,14 +84,14 @@ def test_peaks_xlsxio():
 def test_peaksplot(bokehaction):
     "test peaksplot"
     vals = [0.]*2
-    def _printrng(evts):
-        if 'y' in evts:
-            vals[:2] = [0. if i is None else i for i in evts['y'].value]
+    def _printrng(old = None, model = None, **_):
+        if 'ybounds' in old:
+            vals[:2] = [0. if i is None else i for i in model.ybounds]
+
     with bokehaction.launch('hybridstat.view.peaksplot.PeaksPlotView',
                             'app.toolbar') as server:
-        server.ctrl.observe("globals.project.plot.peaks", _printrng)
-        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
-        server.load('big_legacy', andstop = False)
+        server.ctrl.display.observe("hybridstat.peaks", _printrng)
+        server.load('big_legacy')
 
         krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
         def _press(val, *truth):
@@ -115,7 +115,7 @@ def test_peaksplot(bokehaction):
         assert all(np.isnan(src.data['distance']))
         assert all(i.strip() == '' for i in src.data['orient'])
         server.change('Cycles:Oligos', 'value', '')
-        server.load('hairpins.fasta', andpress = False)
+        server.load('hairpins.fasta')
         server.change('Cycles:Sequence', 'value', '←')
         assert all(np.isnan(src.data['distance']))
         assert all(i.strip() == '' for i in src.data['orient'])
@@ -150,41 +150,38 @@ def test_peaksplot(bokehaction):
         server.wait()
         assert found[0] == out
         assert Path(out).exists()
-        assert server.ctrl.globals.project.constraints.path.get() is not None
+        assert server.ctrl.display.get("hybridstat.peaks", "constraints") is not None
 
         server.cmd((lambda: setattr(server.widget['Peaks:IDPath'], 'value', "")),
                    andstop = False)
         server.wait()
-        assert server.ctrl.globals.project.constraints.path.get() is None
+        assert server.ctrl.display.get("hybridstat.peaks", "constraints") is None
 
 def test_reference(bokehaction):
     "test peaksplot"
     with bokehaction.launch('hybridstat.view.peaksplot.PeaksPlotView',
                             'app.toolbar') as server:
-        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
 
-        server.load('100bp_4mer/ref.pk',  andstop = False)
-        ref = server.ctrl.globals.project.track.get()
+        server.load('100bp_4mer/ref.pk')
+        ref = server.ctrl.display.get("tasks", "roottask")
 
-        server.load('100bp_4mer/AACG.pk', andstop = False)
+        server.load('100bp_4mer/AACG.pk')
 
-        store = server.ctrl.globals.project.tasks.fittoreference.gui
+        store = server.ctrl.display.model("Hybridstat.fittoreference")
         assert server.widget['HS:reference'].value == '-1'
-        assert store.reference.get() is None
+        assert store.reference is None
 
         server.change("HS:reference", 'value', "0")
         assert server.widget['HS:reference'].value == '0'
-        assert store.reference.get() is ref
+        assert store.reference is ref
 
-        server.load('hairpins.fasta', andpress = False)
+        server.load('hairpins.fasta')
         server.change('Cycles:Oligos', 'value', 'ctgt')
         server.wait()
 
 def test_hybridstat(bokehaction):
     "test hybridstat"
     with bokehaction.launch('hybridstat.view', 'app.toolbar') as server:
-        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
-
         tabs        = server.widget['Hybridstat:Tabs']
         indcleaning = next(i for i, j in enumerate(tabs.tabs) if j.title == 'Cleaning')
         indcyc      = next(i for i, j in enumerate(tabs.tabs) if j.title == 'Cycles')
@@ -192,7 +189,7 @@ def test_hybridstat(bokehaction):
             server.change('Hybridstat:Tabs', 'active', i)
 
         server.change('Hybridstat:Tabs', 'active', indcleaning)
-        server.load('big_legacy', andstop = False)
+        server.load('big_legacy')
 
         for i in range(len(server.widget['Hybridstat:Tabs'].tabs)):
             server.change('Hybridstat:Tabs', 'active', i)
