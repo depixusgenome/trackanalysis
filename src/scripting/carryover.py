@@ -7,7 +7,7 @@ defines rules of carry over
 import re
 from glob    import glob
 from os.path import getmtime
-from typing  import List, NamedTuple
+from typing  import List, NamedTuple, Tuple
 
 import numpy  as np
 import pandas as pd
@@ -33,6 +33,7 @@ class CarryOver:
     """
     delta      = 0.003 # in microns
     minoverlap = 2
+    cleanprop  = 0.5   # maximal fraction of events after cleaning
     @initdefaults(frozenset(locals()))
     def __init__(self,**_)->None:
         pass
@@ -45,11 +46,13 @@ class CarryOver:
         non consecutive experiments or peaks too far from one another
         """
         duplicates = ["track","eventcount","peakposition","modification"]
-        df1 = data.drop_duplicates(subset=duplicates).assign(kept=True).copy()
+        df1 = data.copy()
+        df1["track"]=df1["track"].str.lower()
+        df1 = df1.drop_duplicates(subset=duplicates).assign(kept=True).copy()
         df1.sort_values(by=["peakposition"],inplace=True)
 
         mtimes = sorted(set(df1["modification"]))
-        pairs: List = []
+        pairs: List[Tuple] = []
         for time1,time2 in zip(mtimes[:-1],mtimes[1:]):
             subdf1 = df1[(df1["modification"]==time1)|(df1["modification"]==time2)]
             pairs+=[(subdf1.iloc[i],subdf1.iloc[i+1]) for i in range(subdf1.shape[0]-1)
@@ -67,14 +70,15 @@ class CarryOver:
     def rulenooverlap(first:pd.Series,second:pd.Series,minoverlap=None)->bool:
         "False if oligos do overlap, True otherwise"
         name1,name2=first["track"],second["track"]
+        if name1==name2:
+            return False
         movl = min(len(name1),len(name2))-1 if minoverlap is None else minoverlap
         return not overlap(name1,name2,minoverlap=movl) and\
             not overlap(REVERSE(name1),REVERSE(name2),minoverlap=movl)
 
-    @staticmethod
-    def rulefewerevents(first:pd.Series,second:pd.Series)->bool:
+    def rulefewerevents(self,first:pd.Series,second:pd.Series)->bool:
         "True if there is fewer events in the latter experiment"
-        return first["eventcount"]>second["eventcount"]
+        return self.cleanprop*first["eventcount"]>=second["eventcount"]
 
     def applyrules(self,pair) -> bool:
         """
@@ -84,7 +88,7 @@ class CarryOver:
         """
         first,second=pair
         calls = [getattr(self,func) for func in dir(self) if func.startswith("rule")]
-        return np.ufunc.reduce(np.logical_and,map(lambda x:x(first,second),calls))
+        return np.ufunc.reduce(np.logical_and,list(map(lambda x:x(first,second),calls)))
 
     @staticmethod
     def _toxy(field: pd.Series):
