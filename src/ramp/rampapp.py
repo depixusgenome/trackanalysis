@@ -154,8 +154,8 @@ class Select:
         '''
 
         self.button = Button(label = label)
-        self.dial = view.dialog.FileDialog(filetypes = filetypes,
-                                           title = "please choose a ramp file")
+        self.dial = view.dialog.BaseFileDialog(filetypes = filetypes,
+                                               title = "please choose a ramp file")
 
 class MyDisplay: # pylint: disable=too-many-instance-attributes
     '''
@@ -309,7 +309,8 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
         '''
         called when User selects a new file
         '''
-        file_diag = view.dialog.FileDialog(filetypes = "trk", title = "please choose a ramp file")
+        file_diag = view.dialog.BaseFileDialog(filetypes = "trk",
+                                               title = "please choose a ramp file")
         self.filename = file_diag.open()
         self.divs["filestatus"].update("Loading new file..")
         self._update_rpdata_from_file(self.filename)
