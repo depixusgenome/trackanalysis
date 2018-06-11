@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 "Tests carryover detection"
 
-import sys;sys.modules["ACCEPT_SCRIPTING"]=True
 import pandas as pd
 
 from scripting import carryover
@@ -41,6 +40,6 @@ def test_find():
     names = [tuple(i["track"] for i in pair) for pair in pairs]
     assert ("agt","atc") in names
     assert ("tga","ccc") in names
-    
+
 if __name__ == "__main__":
     test_nooverlap()

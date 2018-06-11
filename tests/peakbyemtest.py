@@ -9,10 +9,10 @@ import pickle
 import numpy as np
 from numpy.testing       import assert_allclose
 
-from peakfinding.groupby import ByEM
+from peakfinding.groupby import MaxCov
 from testingcore         import path as utfilepath
 
-EMFITTER = ByEM()
+EMFITTER = MaxCov()
 DATA     = pickle.load(open(utfilepath('smallemdata'),"rb"))
 
 def test_ztscore():

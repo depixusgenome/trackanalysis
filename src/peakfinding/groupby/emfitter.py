@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
+from itertools import product
 from typing import Iterable, List, Union
+
 import numpy as np
+import scipy.stats
 from sklearn.mixture import GaussianMixture
 
 from utils import initdefaults
 
+from .._core import exppdf, normpdf # pylint: disable =import-error
 from ._baseem import BaseEM
 from .histogramfitter import ByHistogram
 
@@ -196,3 +200,42 @@ class FullEm(BicSplit):
     """
     def splitter(self,*args):
         return self._splitwithbic(*self._splitwidth(*args))
+
+class EmHybridization(FullEm):
+    """
+    likelihood penality on hybridization rates
+    """
+    @classmethod
+    def llikelihood(cls,score:np.ndarray,rates:np.ndarray):
+        "quick test to rewrite"
+        nevents = (rates*score.shape[1]).astype(int).ravel()
+        # checking for poisson pmf is loong
+        poisson = scipy.stats.poisson(mu=np.mean(nevents))
+        return super().llikelihood(score,rates)+np.sum(poisson.logpmf(nevents))
+
+# rewrite if it provides better results
+class Weighted(FullEm):
+    """
+    Spatial and duration dimensions are weighted differently
+    """
+    # where is the  weight
+    # to debug reuse same weights
+    @staticmethod
+    def _spatialpdf(datum,param):
+        loc,var=param[:2]
+        return normpdf(loc,var,datum[0])
+
+    @staticmethod
+    def _durationpdf(datum,param):
+        loc,scale=param[-2:]
+        return exppdf(loc,scale/2,datum[1]) # changed scale factor
+
+    @staticmethod
+    def _weightedpdf(datum,param):
+        return Weighted._spatialpdf(datum,param)*Weighted._durationpdf(datum,param)
+
+    @staticmethod
+    def score(data:np.ndarray,params:np.ndarray)->np.ndarray:
+        "overwrites standard score to account for different weights"
+        return np.array([Weighted._weightedpdf(j,i) for i,j
+                         in product(params,data)]).reshape(params.shape[0],-1)
