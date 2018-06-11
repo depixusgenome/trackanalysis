@@ -121,7 +121,8 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
 
     @classmethod
     def _compute(cls, cnf, frame, info): # pylint: disable=inconsistent-return-statements
-        res = cls.compute(frame, info, **cnf)
+        info = info[0], np.copy(info[1])
+        res  = cls.compute(frame, info, **cnf)
         if res is None:
             return info
         raise res
