@@ -100,7 +100,7 @@ class FitToHairpinTask(Task):
              match  : Type[PeakMatching]  = None
             ) -> 'FitToHairpinTask':
         "creates a BeadsByHairpin from a fasta file and a list of oligos"
-        if fit is None or fit is DefaultValue:
+        if not fit or fit is DefaultValue:
             fits = dict(cls.DEFAULT_FIT.read(path, oligos))
         elif isinstance(fit, type):
             fits = dict(cast(Type[HairpinFitter], fit).read(path, oligos))
@@ -109,7 +109,7 @@ class FitToHairpinTask(Task):
             fits = {i: updatecopy(ifit, True, peaks = j.peaks)
                     for i, j in ifit.read(path, oligos)}
 
-        imatch = (cls.DEFAULT_MATCH() if match in (None, DefaultValue) else
+        imatch = (cls.DEFAULT_MATCH() if not match or match is DefaultValue else
                   cast(Type[PeakMatching], match)() if isinstance(match, type) else
                   cast(PeakMatching, match))
 
@@ -222,13 +222,15 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
     # pylint: disable=arguments-differ
     @staticmethod
     def _run(_1, _2, res:FitBead) -> Dict[str, np.ndarray]: # type: ignore
-        out = {i: [] for i in ('cycle', 'peak', 'event')}   # type: Dict[str, List[np.ndarray]]
-        out.update({i: [] for i in res.distances})
+        out: Dict[str, List[np.ndarray]] = {i: [] for i in ('cycle', 'peak', 'avg', 'start')}
         for (peak, evts) in res.events:
-            out['cycle'].append(np.array([i for i, j in enumerate(evts) if len(j)]))
-            out['peak'] .append(np.full (sum(len(i) for i in evts), peak, dtype = 'f4'))
-            out['event'].append(np.array([np.nanmean(np.concatenate(i['data'])) for i in evts
-                                          if len(i)]))
-            for i, j in res.distances.items():
-                out[i].append((out['event'][-1]-j.bias)*j.stretch)
-        return {i: np.concatenate(j) for i, j in out.items()}
+            for i, evt in enumerate(evts):
+                if len(evt):
+                    out['cycle'].append(np.full(len(evt), i,    dtype = 'i4'))
+                    out['peak'] .append(np.full(len(evt), peak, dtype = 'f4'))
+                    out['avg']  .append([np.nanmean(j) for j in evt['data']])
+                    out['start'].append(evt['start'])
+        out2 = {i: np.concatenate(j) for i, j in out.items()}
+        out2.update({i: (out2['avg']-j.bias)*j.stretch
+                     for i, j in res.distances.items()})
+        return out2
