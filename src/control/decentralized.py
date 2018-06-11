@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Decentralized controller"
+import pickle
 from  typing            import Dict, Any
 from  collections       import ChainMap
 from  contextlib        import contextmanager
@@ -11,6 +12,17 @@ from  utils.logconfig   import getLogger
 from  .event            import Controller
 LOGS   = getLogger(__name__)
 DELETE = type('DELETE', (), {})
+
+def _isdiff(left, right):
+    if left == right:
+        return False
+    if isinstance(left, dict):
+        if set(left) != set(right):
+            return True
+        return any(_isdiff(right[i], j) for i, j in left.items())
+    if hasattr(left, '__dict__') and left.__dict__ == right.__dict__:
+        return False
+    return pickle.dumps(left) != pickle.dumps(right)
 
 def _good(model, i, j):
     if not hasattr(model, i):
@@ -234,7 +246,7 @@ class DecentralizedController(Controller):
     def config(self) -> Dict[str, ChainMap]:
         "returns a chainmap with default values & their changes"
         right = self.current
-        return {i: ChainMap({j: k for j, k in right[i].items() if k != dflt[j]}, dflt)
+        return {i: ChainMap({j: k for j, k in right[i].items() if _isdiff(k, dflt[j])}, dflt)
                 for i, dflt in self.defaults.items()}
 
     def getconfig(self, name:str) -> ChainMap:

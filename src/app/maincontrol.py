@@ -66,9 +66,9 @@ class BaseSuperController:
         for i in tuple(self.__dict__.values()) + (top, self.FLEXXAPP):
             getattr(i, 'close', lambda : None)()
 
-    def writeuserconfig(self, name = None, saveall = False, **kwa):
+    def writeuserconfig(self, name = None, saveall = False, index = 0, **kwa):
         "writes the config"
-        ConfigurationIO(self).writeuserconfig(self._getmaps(), name, saveall, **kwa)
+        ConfigurationIO(self).writeuserconfig(self._getmaps(), name, saveall, index = index, **kwa)
 
     @classmethod
     def launchkwargs(cls, **kwa) -> Dict[str, Any]:
