@@ -233,6 +233,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         enableOnTrack(self, self._fig, wdg)
         widgets['cstrpath'].callbacks(ctrl, doc)
         widgets['seq'].callbacks(self._hover, self._ticker, wdg['stats'][-1], wdg['peaks'][-1])
+        widgets['advanced'].callbacks(doc)
 
         mode     = self.defaultsizingmode()
         wbox     = lambda x: layouts.widgetbox(children = x, **mode)
