@@ -197,7 +197,7 @@ class SequenceHoverMixin:
             return
 
         data = self.__data()
-        resets[self.__source].update(column_names = list(data.keys()), data = data)
+        resets[self.__source].update(data = data)
         kwa.setdefault('framerate', getattr(self._model.track, 'framerate', 1./30.))
         kwa.setdefault('bias',      self._model.bias)
         kwa.setdefault('stretch',   self._model.stretch)

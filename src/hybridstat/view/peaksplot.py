@@ -170,7 +170,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                 dicos = self.__defaults()
 
             for i, j in dicos.items():
-                cache[self._src[i]].update(data = j, column_names = list(j.keys()))
+                cache[self._src[i]].update(data = j)
 
             self._hover .reset(cache)
             self._ticker.reset(cache)
