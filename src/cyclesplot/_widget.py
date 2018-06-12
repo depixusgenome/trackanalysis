@@ -232,6 +232,17 @@ class _AdvancedDescriptor:
         "return the line for this descriptor"
         return self._label, f'%(_{self._name}){self._fmt}'
 
+class _ThemeNameDescriptor(_AdvancedDescriptor):
+    _CNF = "main"
+    def __init__(self):
+        super().__init__("Background color", "c")
+
+    @property
+    def line(self) -> Tuple[str, str]:
+        "return the line for this descriptor"
+        return self._label, '%(_themename|dark:dark|basic:light)c'
+
+
 class AdvancedWidget(AdvancedWidgetMixin):
     "access to the modal dialog"
     def __init__(self, ctrl) -> None:
@@ -240,6 +251,7 @@ class AdvancedWidget(AdvancedWidgetMixin):
 
     _binwidth  = _AdvancedDescriptor('Histogram bin width', '.3f')
     _minframes = _AdvancedDescriptor('Minimum frames per position', 'd')
+    _themename = _ThemeNameDescriptor()
 
     @staticmethod
     def _title() -> str:

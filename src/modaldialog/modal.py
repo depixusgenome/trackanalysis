@@ -119,13 +119,15 @@ class ChoiceOption(Option):
             key   = match.group('name')
             ident = key+str(random.randint(0,100000))
             out   = '<select name="{}" id="{}">'.format(key, ident)
-            first = None
+            val   = ''
             for i in match.group('cols')[1:].split("|"):
-                if first is None:
-                    first = i.split(":")[0]
-                out += '<option value="{}">{}</option>'.format(*i.split(':'))
-            out += '</select><script>document.getElementById("{}").value = "{}"</script>'
-            return out.format(ident, cls.getvalue(model, key, first))
+                val = cls.getvalue(model, key, i.split(":")[0])
+                break
+
+            for i in match.group('cols')[1:].split("|"):
+                sel  = 'selected="selected" ' if i.startswith(str(val)) else ""
+                out += '<option {}value="{}">{}</option>'.format(sel, *i.split(':'))
+            return out.format(ident)+'</select>'
         return cls._PATT.sub(_replace, body)
 
 class CheckOption(Option):

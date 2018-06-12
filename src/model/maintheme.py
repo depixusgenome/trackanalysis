@@ -3,6 +3,7 @@
 """
 basic theme
 """
+from utils import initdefaults
 
 class MainTheme:
     """
@@ -24,6 +25,9 @@ class MainTheme:
                   }
     basic: dict = {}
     themename   = 'dark'
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
 
     @property
     def theme(self) -> dict:

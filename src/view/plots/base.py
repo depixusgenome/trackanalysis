@@ -273,7 +273,6 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
             with self.resetting():
                 self._model.reset()
 
-
     if SINGLE_THREAD: # pylint: disable=using-constant-test
         # use this for single-thread debugging
         LOGS.info("Running in single-thread mode")
@@ -332,6 +331,10 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         "sets-up model observers"
         if self._plotmodel:
             self._plotmodel.observe(ctrl, noerase)
+        @ctrl.theme.observe
+        def _onmain(old=None, **_):
+            if 'themename' in old:
+                self.reset(False)
 
     @abstractmethod
     def _addtodoc(self, ctrl, doc):

@@ -203,7 +203,7 @@ class DecentralizedController(Controller):
             kwa.update({i: getattr(dflt, i) for i in dels})
 
         if len(missing):
-            exc  = KeyError(f"Unknown keys {missing}")
+            exc  = KeyError(f"Unknown keys in {name}: {missing}")
             LOGS.debug(str(exc), stack_info = True)
             raise exc
 

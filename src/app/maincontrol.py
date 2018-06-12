@@ -142,6 +142,12 @@ class BaseSuperController:
         if theme:
             doc.theme = Theme(json = theme)
 
+        @self.theme.observe
+        def _onmain(old = None, ** _):
+            if 'themename' in old:
+                theme     = self.theme.model("main").theme
+                doc.theme = Theme(json = theme)
+
         while isinstance(roots, (tuple, list)) and len(roots) == 1:
             roots = roots[0]
 

@@ -65,7 +65,8 @@ class AdvancedWidgetMixin(ABC):
                 return title, '', val
 
             if '|' in val:
-                disp = val[val.find('(')+1:val.rfind(')')].split('|')[1+dflt].split(':')[1]
+                opts = val[val.find('(')+1:val.find(')')]
+                disp = dict(i.split(':') for i in opts.split('|')[1:])[str(dflt)]
             else:
                 try:
                     disp = (' '  if dflt is None  else
