@@ -29,9 +29,9 @@ def _fit(self, tpe, sequence, oligos, kwa):
         kwa['oligos']   = oligos
 
     last  = getattr(Tasks, tpe)(**kwa)
-    if not last.distances:
-        raise IndexError('No distances found')
-    return self.apply(*Tasks.defaulttasklist(self, None), *last)
+    if not last.fit:
+        raise IndexError('No fit found')
+    return self.apply(*Tasks.defaulttasklist(self, Tasks.peakselector), last)
 
 @addto(Track)
 def fittohairpin(self, sequence = None, oligos = None, **kwa) -> FitToHairpinDict:
@@ -51,7 +51,7 @@ def fittoreference(self, task: FitToReferenceTask = None, **kwa) -> FitToReferen
     """
     if task is not None and len(kwa):
         raise NotImplementedError()
-    return self.apply(Tasks.peakselector, # type: ignore
+    return self.apply(*Tasks.defaulttasklist(self, Tasks.peakselector),
                       (task if isinstance(task, FitToReferenceTask) else
                        FitToReferenceTask(**kwa)))
 
