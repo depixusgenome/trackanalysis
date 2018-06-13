@@ -94,21 +94,21 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
 
         self._imgsource   = ColumnDataSource(data = dict(image = [np.zeros((10, 10))],
                                                          dw    = [1], dh = [1]))
-        self.attrs(self._theme.image).addto(self._fig, **{i:i for i in ('image', 'dw', 'dh')},
-                                            source = self._imgsource)
+        self.addtofig(self._fig, 'image', **{i:i for i in ('image', 'dw', 'dh')},
+                      source = self._imgsource)
 
         self._calibsource = ColumnDataSource(data = dict(image = [np.zeros((10, 10))],
                                                          x     = [0], y  = [0],
                                                          dw    = [1], dh = [1]))
 
         vals = 'image', 'x', 'y', 'dw', 'dh'
-        self.attrs(self._theme.calibimg).addto(self._fig, **{i:i for i in vals},
-                                               source = self._calibsource)
+        self.addtofig(self._fig, 'calibimg', **{i:i for i in vals},
+                      source = self._calibsource)
 
         self._beadssource  = ColumnDataSource(**self.__beadsdata())
         args = dict(x = 'x', y = 'y', radius = self._theme.radius, source = self._beadssource)
-        gl1  = self.attrs(self._theme.beads).addto(self._fig, **args)
-        gl2  = self.attrs(self._theme.text) .addto(self._fig, **args, text = 'text')
+        gl1  = self.addtofig(self._fig, 'beads', **args)
+        gl2  = self.addtofig(self._fig, 'text',  **args, text = 'text')
         self._fig.select(TapTool)[0].renderers = [gl1, gl2]
         self._fig.select(HoverTool)[0].update(renderers = [gl1, gl2],
                                               tooltips  = self._theme.tooltips)

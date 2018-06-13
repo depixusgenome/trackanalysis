@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "The basic architecture"
 from    typing              import (Tuple, Optional, Type, Sequence, Union, Any,
-                                    Generic, Dict, TypeVar, List, Iterator, cast)
+                                    Generic, Dict, TypeVar, List, Iterator,
+                                    Iterable, cast)
 from    collections         import OrderedDict
 from    abc                 import abstractmethod
 from    contextlib          import contextmanager
@@ -283,6 +284,23 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
     def fig(attrs:PlotTheme) -> PlotThemeView:
         "shortcuts for PlotThemeView"
         return PlotThemeView(attrs)
+
+    def setcolor(self, name:Union[str, Iterable[Tuple[str, Any]]], rend = None, **attrs):
+        "shortcuts for PlotThemeView"
+        if isinstance(name, str):
+            assert rend is not None
+            PlotAttrsView(getattr(self._theme, name)).setcolor(rend, **attrs)
+        else:
+            for i, j in name:
+                PlotAttrsView(getattr(self._theme, i)).setcolor(j, **attrs)
+
+    def addtofig(self, fig, name, **attrs) -> GlyphRenderer:
+        "shortcuts for PlotThemeView"
+        if ('color' not in attrs
+                and isinstance(getattr(self._theme, 'colors', None), dict)
+                and name in getattr(self._theme, 'colors').get(self._model.themename, {})):
+            attrs['color'] = getattr(self._theme, 'colors')[self._model.themename][name]
+        return PlotAttrsView(getattr(self._theme, name)).addto(fig, **attrs)
 
     def figure(self, **attrs) -> Figure:
         "shortcuts for PlotThemeView"

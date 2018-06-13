@@ -243,7 +243,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                 args['line_color'] = 'color'
 
             args['color'] = self.__colors(key)
-            val = self.attrs(getattr(self._theme, key)).addto(self._fig, **args)
+            val = self.addtofig(self._fig, key, **args)
             if 'peaks' in key:
                 rends.append(val)
             self._rends.append((key, val))

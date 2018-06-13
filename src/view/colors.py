@@ -12,4 +12,4 @@ def tohex(clr:Union[Dict[Any,str], str]):
     "return the hex value"
     if isinstance(clr, dict):
         return {i: tohex(j) for i, j in clr.items()}
-    return clr if clr[0] == '#' else getattr(_bkclr, clr).to_hex()
+    return clr if len(clr) > 0 and clr[0] == '#' else getattr(_bkclr, clr).to_hex()

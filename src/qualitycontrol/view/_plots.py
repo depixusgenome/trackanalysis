@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Provides plots for temperatures and bead extensions"
 import warnings
-from   typing               import Dict, Optional, Tuple, List, cast
+from   typing               import Dict, Optional, Tuple, List, Any, cast
 
 from   bokeh                import layouts
 from   bokeh.models         import ColumnDataSource, Range1d
@@ -25,6 +25,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
     _theme:  DriftControlPlotTheme
     _config: DriftControlPlotConfig
     _src:    List[ColumnDataSource]
+    _rends:  List[Tuple[str, Any]]
     _fig:    Figure
     def __init__(self, ctrl, mdl: QualityControlModelAccess, addto = True) -> None:
         super().__init__(ctrl, addto = False)
@@ -47,11 +48,12 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
                                 name               = self.__class__.__name__)
         self._src = [ColumnDataSource(i) for i in self._data()]
 
-        self.attrs(self._theme.measures).addto(self._fig, y = 'measures', x = 'cycles',
-                                               source = self._src[0])
+        val = self.addtofig(self._fig, 'measures',
+                            y = 'measures', x = 'cycles', source = self._src[0])
+        self._rends = [('measures', val)]
         for pop in ('pop10', 'median', 'pop90'):
-            self.attrs(getattr(self._theme, pop)).addto(self._fig, x = 'cycles', y = pop,
-                                                        source = self._src[1])
+            val = self.addtofig(self._fig, pop, x = 'cycles', y = pop, source = self._src[1])
+            self._rends.append((pop, val))
 
         self.fixreset(self._fig.x_range)
         self.fixreset(self._fig.y_range)
@@ -76,6 +78,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
 
         alpha = self._theme.outlinealpha if self._warn(data) else 0.
         cache[self._fig]['outline_line_alpha'] = alpha
+        self.setcolor(self._rends, cache = cache)
 
     @staticmethod
     def reset(_):
@@ -143,8 +146,10 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
     def _addtodoc(self, *_):
         fig  = super()._addtodoc(_)
         args = dict(x = 'cycles', width  = self._theme.ybarswidth, source = self._src[-1])
-        self.attrs(self._theme.ybars).addto(fig, top = 'top',    bottom = 'bottom', **args)
-        self.attrs(self._theme.ymed) .addto(fig, top = 'median', bottom = 'median', **args)
+        val  = self.addtofig(fig, 'ybars', top = 'top',    bottom = 'bottom', **args)
+        self._rends.append(('ybars', val))
+        val  = self.addtofig(fig, 'ymed',  top = 'median', bottom = 'median', **args)
+        self._rends.append(('ybars', val))
 
         # set first of glyphs
         rends         = list(fig.renderers)

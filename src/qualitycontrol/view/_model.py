@@ -118,10 +118,18 @@ class QualityControlModelAccess(TaskPlotModelAccess):
 class DriftControlPlotTheme(PlotTheme):
     "drift control plot theme"
     name             = "qc.driftcontrol.plot"
-    measures         = PlotAttrs('lightblue',  'line', 2, alpha     = .75)
-    median           = PlotAttrs('lightgreen', 'line', 2, line_dash = 'dashed')
-    pop10            = PlotAttrs('lightgreen', 'line', 2, line_dash = [4])
-    pop90            = PlotAttrs('lightgreen', 'line', 2, line_dash = [4])
+    measures         = PlotAttrs('', 'line', 2, alpha     = .75)
+    median           = PlotAttrs('', 'line', 2, line_dash = 'dashed')
+    pop10            = PlotAttrs('', 'line', 2, line_dash = [4])
+    pop90            = PlotAttrs('', 'line', 2, line_dash = [4])
+    colors           = dict(dark  = dict(measures = 'lightblue',
+                                         median   = 'lightgreen',
+                                         pop10    = 'lightgreen',
+                                         pop90    = 'lightgreen'),
+                            basic = dict(measures = 'darkblue',
+                                         median   = 'darkgreen',
+                                         pop10    = 'darkgreen',
+                                         pop90    = 'darkgreen'))
     figsize          = 700, 150, 'fixed'
     outlinewidth     = 7
     outlinecolor     = 'red'
@@ -168,9 +176,12 @@ class ExtensionPlotTheme(DriftControlPlotTheme):
     "drift control plot theme"
     name       = "qc.extension.plot"
     ylabel     = 'δ(Φ3-Φ1) (µm)'
-    measures   = PlotAttrs('lightblue', 'circle', 2, alpha = .75)
-    ybars      = PlotAttrs('lightblue', 'vbar', 1,   alpha = .75)
-    ymed       = PlotAttrs('lightblue', 'vbar', 1,   fill_alpha = 0.)
+    measures   = PlotAttrs('', 'circle', 2, alpha = .75)
+    ybars      = PlotAttrs('', 'vbar', 1,   alpha = .75)
+    ymed       = PlotAttrs('', 'vbar', 1,   fill_alpha = 0.)
+    colors     = dict(DriftControlPlotTheme.colors)
+    colors['dark'] .update(ybars = 'lightblue', ymed = 'lightblue')
+    colors['basic'].update(ybars = 'darkblue',  ymed = 'darkblue')
     ybarswidth = .8
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
