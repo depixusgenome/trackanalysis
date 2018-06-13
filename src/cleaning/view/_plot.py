@@ -68,9 +68,9 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
     def _addtodoc(self, ctrl, *_):
         self.__source = ColumnDataSource(data = self.__data(None, None))
 
-        self.__fig = fig = self._theme.figure(y_range = Range1d,
-                                              x_range = Range1d,
-                                              name    = 'Clean:Cycles')
+        self.__fig = fig = self.figure(y_range = Range1d,
+                                       x_range = Range1d,
+                                       name    = 'Clean:Cycles')
         glyph = self.attrs(self._theme.points).addto(fig, x = 't', y = 'z',
                                                      source = self.__source)
         hover = fig.select(DpxHoverTool)

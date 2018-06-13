@@ -88,9 +88,9 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
         return None if trk is None or trk.fov.image is None else trk.fov
 
     def _addtodoc(self, *_):
-        self._fig = self._theme.figure(name    = 'FoV:Fig',
-                                       x_range = Range1d(0, 1),
-                                       y_range = Range1d(0, 1))
+        self._fig = self.figure(name    = 'FoV:Fig',
+                                x_range = Range1d(0, 1),
+                                y_range = Range1d(0, 1))
 
         self._imgsource   = ColumnDataSource(data = dict(image = [np.zeros((10, 10))],
                                                          dw    = [1], dh = [1]))

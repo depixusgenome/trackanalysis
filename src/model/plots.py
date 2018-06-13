@@ -3,7 +3,7 @@
 "The basic architecture"
 from copy   import deepcopy
 from enum   import Enum
-from typing import Tuple, Optional, List, Any, Dict, cast
+from typing import Tuple, Optional, Any, cast
 
 from utils  import initdefaults
 
@@ -49,45 +49,6 @@ class PlotTheme:
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
-
-    def figargs(self, **kwa) -> Dict[str, Any]:
-        "create a figure"
-        tips = kwa.pop('tooltips', self.tooltips)
-        args = {'toolbar_sticky':   self.toolbar['sticky'],
-                'toolbar_location': self.toolbar['location'],
-                'tools':            self.toolbar['items'],
-                'x_axis_label':     self.xlabel,
-                'y_axis_label':     self.ylabel,
-                'plot_width':       self.figsize[0],
-                'plot_height':      self.figsize[1],
-                'sizing_mode':      self.figsize[2]}
-        args.update(kwa)
-
-        tools:list = []
-        if isinstance(args['tools'], str):
-            tools = cast(str, args['tools']).split(',')
-        elif not args['tools']:
-            tools = []
-        else:
-            tools = cast(List[Any], args['tools'])
-
-        from view.plots.bokehext import DpxHoverTool
-        if 'dpxhover' in tools:
-            hvr   = DpxHoverTool(tooltips = tips) if tips else DpxHoverTool()
-            tools = [i if i != 'dpxhover' else hvr for i in tools]
-
-        args['tools'] = tools
-
-        from bokeh.models import Range1d
-        for name in ('x_range', 'y_range'):
-            if args.get(name, None) is Range1d:
-                args[name] = Range1d(start = 0., end = 1.)
-        return args
-
-    def figure(self, **kwa) -> 'Figure':
-        "creates a figure"
-        from bokeh.plotting import figure
-        return figure(**self.figargs(**kwa))
 
 class PlotDisplay:
     """

@@ -39,12 +39,12 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
 
     def _addtodoc(self, *_):
         "returns the figure"
-        self._fig = self._theme.figure(y_range = Range1d(start = 0., end = 20.),
-                                       x_range = Range1d(start = 0., end = 1e2),
-                                       outline_line_width = self._theme.outlinewidth,
-                                       outline_line_color = self._theme.outlinecolor,
-                                       outline_line_alpha = 0.,
-                                       name               = self.__class__.__name__)
+        self._fig = self.figure(y_range = Range1d(start = 0., end = 20.),
+                                x_range = Range1d(start = 0., end = 1e2),
+                                outline_line_width = self._theme.outlinewidth,
+                                outline_line_color = self._theme.outlinecolor,
+                                outline_line_alpha = 0.,
+                                name               = self.__class__.__name__)
         self._src = [ColumnDataSource(i) for i in self._data()]
 
         self.attrs(self._theme.measures).addto(self._fig, y = 'measures', x = 'cycles',
@@ -209,5 +209,6 @@ class QualityControlPlots:
         for i in plots[:-1]:
             i[0].xaxis.visible = False
 
-        tbar = getattr(self.tsample, '_theme').figargs()['toolbar_location']
+        tmp  = TSamplePlotCreator.fig(getattr(self.tsample, '_theme')).figargs()
+        tbar = tmp['toolbar_location']
         return layouts.gridplot(plots, **mode, toolbar_location = tbar)

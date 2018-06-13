@@ -73,12 +73,12 @@ class HistMixin(ABC):
                     top     = bins[1:])
 
     def _createhist(self, data, shape, yrng):
-        self._hist       = self._theme.figure(x_axis_label    = self._theme.histxlabel,
-                                              y_axis_location = None,
-                                              x_range         = Range1d(0, 5e4),
-                                              y_range         = yrng,
-                                              tooltips        = None,
-                                              name            = 'Cycles:Hist')
+        self._hist = self.figure(x_axis_label     = self._theme.histxlabel,
+                                 y_axis_location = None,
+                                 x_range         = Range1d(0, 5e4),
+                                 y_range         = yrng,
+                                 tooltips        = None,
+                                 name            = 'Cycles:Hist')
 
         hist             = self.__data(data, shape)
         self._histsource = ColumnDataSource(hist)

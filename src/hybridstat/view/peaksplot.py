@@ -212,9 +212,9 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                 self.attrs(getattr(self._theme, key)).setcolor(rend, cache = cache, **args)
 
     def __create_fig(self):
-        self._fig = self._theme.figure(y_range = Range1d(start = 0., end = 1.),
-                                       x_range = Range1d(start = 0., end = 1e3),
-                                       name    = 'Peaks:fig')
+        self._fig = self.figure(y_range = Range1d(start = 0., end = 1.),
+                                x_range = Range1d(start = 0., end = 1e3),
+                                name    = 'Peaks:fig')
         self._fig.extra_x_ranges = {"duration": Range1d(start = 0., end = 1.)}
         axis  = LinearAxis(x_range_name          = "duration",
                            axis_label            = self._theme.xtoplabel,

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Cycles plot view"
 
-from    typing         import Tuple
+from    typing         import Tuple, Callable
 from    abc            import ABC
 
 from    bokeh.plotting import Figure
@@ -20,6 +20,7 @@ class RawMixin(ABC):
     _theme: CyclesPlotTheme
     _model: CyclesModelAccess
     _hover: DpxHoverModel
+    attrs: Callable
     def __init__(self):
         "sets up this plotter's info"
         self._rawsource: ColumnDataSource = None
@@ -86,9 +87,9 @@ class RawMixin(ABC):
                                                     trng = fig.extra_x_ranges["time"]))
 
     def _createraw(self):
-        self._raw       = self._theme.figure(y_range = Range1d,
-                                             tools   = self._theme.toolbar['raw'],
-                                             name    = 'Cycles:Raw')
+        self._raw = self.figure(y_range = Range1d,
+                                tools   = self._theme.toolbar['raw'],
+                                name    = 'Cycles:Raw')
         raw, shape      = self.__data()
         self._rawsource = ColumnDataSource(data = raw)
 

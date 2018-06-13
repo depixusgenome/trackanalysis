@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 "The basic architecture"
 from    typing              import (Tuple, Optional, Type, Sequence, Union, Any,
-                                    Generic, Dict, TypeVar, List, Iterator,
-                                    TYPE_CHECKING, cast)
+                                    Generic, Dict, TypeVar, List, Iterator, cast)
 from    collections         import OrderedDict
 from    abc                 import abstractmethod
 from    contextlib          import contextmanager
@@ -15,6 +14,7 @@ import  numpy        as     np
 import  bokeh.palettes
 from    bokeh.document          import Document
 from    bokeh.models            import Range1d, Model, CustomJS, GlyphRenderer
+from    bokeh.plotting          import figure, Figure
 
 from    utils.logconfig         import getLogger
 from    utils.inspection        import templateattribute
@@ -26,7 +26,7 @@ from    ..base                  import (BokehView, threadmethod, spawn,
                                         defaultsizingmode as _defaultsizingmode,
                                         SINGLE_THREAD)
 from    ..colors                import tohex
-from    .bokehext               import DpxKeyedRow
+from    .bokehext               import DpxKeyedRow, DpxHoverTool
 
 LOGS        = getLogger(__name__)
 ModelType   = TypeVar('ModelType', bound = PlotModelAccess)
@@ -76,7 +76,7 @@ class _ModelDescriptor:
         getattr(inst, '_ctrl').display.update(self.__get__(inst, None), **value)
 
 class PlotAttrsView(PlotAttrs):
-    "Plot Attributes for one variable"
+    "implements PlotAttrs"
     def __init__(self, attrs:PlotAttrs)->None:
         super().__init__(**attrs.__dict__)
 
@@ -175,7 +175,7 @@ class PlotAttrsView(PlotAttrs):
     def _default(args):
         args.pop('palette')
 
-    def addto(self, fig, **kwa) -> 'GlyphRenderer':
+    def addto(self, fig, **kwa) -> GlyphRenderer:
         "adds itself to plot: defines color, size and glyph to use"
         args = dict(self.__dict__)
         args.pop('glyph')
@@ -202,6 +202,47 @@ class PlotAttrsView(PlotAttrs):
             rend.glyph.update(**colors)
         else:
             cache[rend.glyph].update(**colors)
+
+class PlotThemeView(PlotTheme):
+    "implements PlotTheme"
+    def __init__(self, attrs:PlotTheme)->None:
+        super().__init__(**attrs.__dict__)
+
+    def figargs(self, **kwa) -> Dict[str, Any]:
+        "create a figure"
+        tips = kwa.pop('tooltips', self.tooltips)
+        args = {'toolbar_sticky':   self.toolbar['sticky'],
+                'toolbar_location': self.toolbar['location'],
+                'tools':            self.toolbar['items'],
+                'x_axis_label':     self.xlabel,
+                'y_axis_label':     self.ylabel,
+                'plot_width':       self.figsize[0],
+                'plot_height':      self.figsize[1],
+                'sizing_mode':      self.figsize[2]}
+        args.update(kwa)
+
+        tools:list = []
+        if isinstance(args['tools'], str):
+            tools = cast(str, args['tools']).split(',')
+        elif not args['tools']:
+            tools = []
+        else:
+            tools = cast(List[Any], args['tools'])
+
+        if 'dpxhover' in tools:
+            hvr   = DpxHoverTool(tooltips = tips) if tips else DpxHoverTool()
+            tools = [i if i != 'dpxhover' else hvr for i in tools]
+
+        args['tools'] = tools
+
+        for name in ('x_range', 'y_range'):
+            if args.get(name, None) is Range1d:
+                args[name] = Range1d(start = 0., end = 1.)
+        return args
+
+    def figure(self, **kwa) -> Figure:
+        "creates a figure"
+        return figure(**self.figargs(**kwa))
 
 class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=too-many-public-methods
     "Base plotter class"
@@ -237,6 +278,15 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
     def attrs(attrs:PlotAttrs) -> PlotAttrsView:
         "shortcuts for PlotAttrsView"
         return PlotAttrsView(attrs)
+
+    @staticmethod
+    def fig(attrs:PlotTheme) -> PlotThemeView:
+        "shortcuts for PlotThemeView"
+        return PlotThemeView(attrs)
+
+    def figure(self, **attrs) -> Figure:
+        "shortcuts for PlotThemeView"
+        return PlotThemeView(self._theme).figure(**attrs)
 
     def addto(self, ctrl, noerase = True):
         "adds the models to the controller"
