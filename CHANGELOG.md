@@ -1,3 +1,12 @@
+# tag cycles_v5.2
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Theme
+
+The user can now change the background color using the *Advanced* menus. The
+size of the figures can also be adapted although the application must be
+restarted for this to take effect.
+
 # tag cycles_v5.1
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
