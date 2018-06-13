@@ -11,6 +11,8 @@ from    typing              import TypeVar, Generic, cast
 from    bokeh.document      import Document
 from    bokeh.models        import Model
 
+from    model.plots         import PlotAttrs
+from    .plots              import PlotAttrsView
 from    utils.logconfig     import getLogger
 from    utils.inspection    import templateattribute as _tattr
 from    .base               import threadmethod, spawn, SINGLE_THREAD
@@ -145,6 +147,11 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
         elif state is DisplayState.abouttoreset:
             with self.resetting():
                 self._model.reset(ctrl)
+
+    @staticmethod
+    def attrs(self, attrs:PlotAttrs) -> PlotAttrsView:
+        "shortcuts for PlotAttrsView"
+        return PlotAttrsView(attrs)
 
     if SINGLE_THREAD: # pylint: disable=using-constant-test
         # use this for single-thread debugging

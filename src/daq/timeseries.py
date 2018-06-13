@@ -93,20 +93,20 @@ class TimeSeriesViewMixin(ABC):
         if tool:
             fig.add_tools(tool)
 
-        rend = theme.leftattr.addto(fig,
-                                    x      = self.XLEFT,
-                                    y      = self.YLEFT,
-                                    source = self._leftsource)
+        rend = self.attrs(theme.leftattr).addto(fig,
+                                                x      = self.XLEFT,
+                                                y      = self.YLEFT,
+                                                source = self._leftsource)
         fig.y_range.renderers = [rend]
 
         fig.extra_y_ranges = {self.YRIGHT: DataRange1d()}
         fig.add_layout(LinearAxis(y_range_name = self.YRIGHT,
                                   axis_label   = self._rightlabel()), 'right')
-        rend = theme.rightattr.addto(fig,
-                                     x            = self.XRIGHT,
-                                     y            = self.YRIGHT,
-                                     source       = self._rightsource,
-                                     y_range_name = self.YRIGHT)
+        rend = self.attrs(theme.rightattr).addto(fig,
+                                                 x            = self.XRIGHT,
+                                                 y            = self.YRIGHT,
+                                                 source       = self._rightsource,
+                                                 y_range_name = self.YRIGHT)
         fig.extra_y_ranges[self.YRIGHT].renderers = [rend]
         self._fig = fig
         return [fig]

@@ -47,11 +47,11 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
                                        name               = self.__class__.__name__)
         self._src = [ColumnDataSource(i) for i in self._data()]
 
-        self._theme.measures.addto(self._fig, y = 'measures', x = 'cycles',
-                                   source = self._src[0])
+        self.attrs(self._theme.measures).addto(self._fig, y = 'measures', x = 'cycles',
+                                               source = self._src[0])
         for pop in ('pop10', 'median', 'pop90'):
-            getattr(self._theme, pop).addto(self._fig, x = 'cycles', y = pop,
-                                            source = self._src[1])
+            self.attrs(getattr(self._theme, pop)).addto(self._fig, x = 'cycles', y = pop,
+                                                        source = self._src[1])
 
         self.fixreset(self._fig.x_range)
         self.fixreset(self._fig.y_range)
@@ -143,8 +143,8 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
     def _addtodoc(self, *_):
         fig  = super()._addtodoc(_)
         args = dict(x = 'cycles', width  = self._theme.ybarswidth, source = self._src[-1])
-        self._theme.ybars.addto(fig, top = 'top',    bottom = 'bottom', **args)
-        self._theme.ymed .addto(fig, top = 'median', bottom = 'median', **args)
+        self.attrs(self._theme.ybars).addto(fig, top = 'top',    bottom = 'bottom', **args)
+        self.attrs(self._theme.ymed) .addto(fig, top = 'median', bottom = 'median', **args)
 
         # set first of glyphs
         rends         = list(fig.renderers)

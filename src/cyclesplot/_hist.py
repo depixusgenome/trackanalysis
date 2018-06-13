@@ -89,16 +89,16 @@ class HistMixin(ABC):
                            axis_label_text_color = self._theme.histcycles.line_color)
         self._hist.add_layout(axis, 'above')
 
-        self._theme.histframes.addto(self._hist,
-                                     source = self._histsource,
-                                     bottom = "bottom", top   = "top",
-                                     left   = "left",   right = "frames")
+        self.attrs(self._theme.histframes).addto(self._hist,
+                                                 source = self._histsource,
+                                                 bottom = "bottom", top   = "top",
+                                                 left   = "left",   right = "frames")
 
-        self._theme.histcycles.addto(self._hist,
-                                     source = self._histsource,
-                                     bottom = "bottom", top   = "top",
-                                     left   = "left",   right = "cycles",
-                                     x_range_name = "cycles")
+        self.attrs(self._theme.histcycles).addto(self._hist,
+                                                 source = self._histsource,
+                                                 bottom = "bottom", top   = "top",
+                                                 left   = "left",   right = "cycles",
+                                                 x_range_name = "cycles")
 
         self._ticker.create(self._ctrl, self._hist, self._model,
                             self._model.cycles.theme.yrightlabel, "right")

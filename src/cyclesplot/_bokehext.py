@@ -8,7 +8,7 @@ from    bokeh.model    import Model
 from    bokeh.models   import ColumnDataSource, GlyphRenderer, CustomJS, TapTool
 
 from    sequences.view import SequenceHoverMixin
-from    view.plots     import DpxHoverTool
+from    view.plots     import DpxHoverTool, PlotAttrsView
 
 class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-instance-attributes
     "controls keypress actions"
@@ -55,7 +55,8 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         if tap is not None and len(tap):
             self._rawsource = ColumnDataSource(self._createrawdata(source.data, shape))
             sel             = theme.selection[self._model.themename]
-            self._rawglyph  = sel.addto(fig,  x = 't', y = 'z', source = self._rawsource)
+            self._rawglyph  = PlotAttrsView(sel).addto(fig,  x = 't', y = 'z',
+                                                       source = self._rawsource)
             args = dict(hvr    = self,
                         hvrsrc = self._rawsource,
                         rawsrc = source,

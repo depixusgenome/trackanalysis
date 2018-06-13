@@ -99,12 +99,12 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
 
         fig   = self.__figure(ctrl)
         args  = {i: i for i in ('x', 'y', 'width', 'height')}
-        theme.roi.addto(fig, **args, source = self._source)
+        self.attrs(theme.roi).addto(fig, **args, source = self._source)
 
         args  = {i: i for i in ('x', 'y')}
-        theme.names.addto(fig, **args, text = 'beadid', source = self._source)
+        self.attrs(theme.names).addto(fig, **args, text = 'beadid', source = self._source)
 
-        rend       = theme.position.addto(fig, **args, source = self._ptsource)
+        rend       = self.attrs(theme.position).addto(fig, **args, source = self._ptsource)
         self._tool = PointDrawTool(renderers = [rend], empty_value = -1)
         fig.add_tools(self._tool)
 

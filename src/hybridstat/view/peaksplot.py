@@ -209,7 +209,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                 args = {'color': self.__colors(key)}
                 if 'peaks' in key:
                     args['line_color'] = 'color'
-                getattr(self._theme, key).setcolor(rend, cache = cache, **args)
+                self.attrs(getattr(self._theme, key)).setcolor(rend, cache = cache, **args)
 
     def __create_fig(self):
         self._fig = self._theme.figure(y_range = Range1d(start = 0., end = 1.),
@@ -243,7 +243,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                 args['line_color'] = 'color'
 
             args['color'] = self.__colors(key)
-            val = getattr(self._theme, key).addto(self._fig, **args)
+            val = self.attrs(getattr(self._theme, key)).addto(self._fig, **args)
             if 'peaks' in key:
                 rends.append(val)
             self._rends.append((key, val))

@@ -3,13 +3,9 @@
 "The basic architecture"
 from copy   import deepcopy
 from enum   import Enum
-from typing import Tuple, Optional, Iterator, List, Any, Dict, cast, TYPE_CHECKING
+from typing import Tuple, Optional, List, Any, Dict, cast
 
 from utils  import initdefaults
-if TYPE_CHECKING:
-    # pylint: disable=unused-import
-    from bokeh.models   import GlyphRenderer
-    from bokeh.plotting import Figure
 
 RANGE_TYPE  = Tuple[Optional[float], Optional[float]]
 
@@ -34,132 +30,6 @@ class PlotAttrs:
         self.size    = size
         self.palette = palette
         self.__dict__.update(kwa)
-
-    def iterpalette(self, count, *tochange, indexes = None) -> Iterator['PlotAttrs']:
-        "yields PlotAttrs with colors along the palette provided"
-        import  bokeh.palettes
-        info    = dict(self.__dict__)
-        palette = getattr(bokeh.palettes, self.palette, None)
-
-        if palette is None:
-            for _ in range(count):
-                yield PlotAttrs(**info)
-            return
-
-        colors = palette(count)
-        if indexes is not None:
-            colors = [colors[i] for i in indexes]
-
-        if len(tochange) == 0:
-            tochange = ('color',)
-
-        for color in colors:
-            info.update((name, color) for name in tochange)
-            yield PlotAttrs(**info)
-
-    def listpalette(self, count, indexes = None) -> List[str]:
-        "yields PlotAttrs with colors along the palette provided"
-        import  bokeh.palettes
-        palette = getattr(bokeh.palettes, self.palette, None)
-        if palette is None:
-            return [self.color]*count
-        elif isinstance(palette, dict):
-            colors: List[str] = max(palette.values(), key = len)
-            npal   = len(colors)
-            if indexes is None:
-                return [colors[int(i/count*npal)] for i in range(count)]
-            indexes    = tuple(indexes)
-            minv, maxv = min(indexes), max(indexes)
-            return [colors[int((i-minv)/(maxv-minv)*npal)] for i in indexes]
-        else:
-            colors  = palette(count)
-            return [colors[i] for i in indexes] if indexes is not None else colors
-
-    @classmethod
-    def _text(cls, args):
-        cls._default(args)
-        args.pop('size',   None)
-        args.pop('radius', None)
-        args['text_color'] = args.pop('color')
-
-    @classmethod
-    def _circle(cls, args):
-        cls._default(args)
-        if 'radius' in args:
-            args.pop('size')
-        clr = args.pop('color')
-        if clr:
-            for i in ('line_color', 'fill_color'):
-                args.setdefault(i, clr)
-
-    @classmethod
-    def _line(cls, args):
-        cls._default(args)
-        if 'color' in args:
-            args['line_color'] = args.pop('color')
-        args['line_width'] = args.pop('size')
-
-    @classmethod
-    def _patch(cls, args):
-        cls._triangle(args)
-        args['line_width'] = args.pop('size')
-
-    @classmethod
-    def _triangle(cls, args):
-        cls._default(args)
-        clr = args.pop('color')
-        if clr:
-            for i in ('line_color', 'fill_color'):
-                args.setdefault(i, clr)
-
-    _diamond  = _triangle
-    _vbar     = _patch
-    _quad     = _line
-
-    @classmethod
-    def _rect(cls, args):
-        cls._default(args)
-        args.pop('size')
-
-    @staticmethod
-    def _image(args):
-        color = args.pop('color')
-        args.pop('size')
-        if args['palette'] is None:
-            args['palette'] = color
-
-    @staticmethod
-    def _default(args):
-        args.pop('palette')
-
-    def addto(self, fig, **kwa) -> 'GlyphRenderer':
-        "adds itself to plot: defines color, size and glyph to use"
-        args = dict(self.__dict__)
-        args.pop('glyph')
-        args.update(kwa)
-        getattr(self, '_'+self.glyph, self._default)(args)
-        return getattr(fig, self.glyph)(**args)
-
-    def setcolor(self, rend, cache = None, **kwa):
-        "sets the color"
-        from view.colors import tohex
-        args = dict(self.__dict__)
-        args.pop('glyph')
-        args.update(kwa)
-        getattr(self, '_'+self.glyph, self._default)(args)
-        colors = {}
-        for i, j in args.items():
-            if 'color' not in i:
-                continue
-            try:
-                colors[i] = tohex(j)
-            except AttributeError:
-                pass
-
-        if cache is None:
-            rend.glyph.update(**colors)
-        else:
-            cache[rend.glyph].update(**colors)
 
 class PlotTheme:
     """

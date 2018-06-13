@@ -71,7 +71,8 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         self.__fig = fig = self._theme.figure(y_range = Range1d,
                                               x_range = Range1d,
                                               name    = 'Clean:Cycles')
-        glyph = self._theme.points.addto(fig, x = 't', y = 'z', source = self.__source)
+        glyph = self.attrs(self._theme.points).addto(fig, x = 't', y = 'z',
+                                                     source = self.__source)
         hover = fig.select(DpxHoverTool)
         if hover:
             hover[0].tooltips  = self._theme.tooltips
