@@ -94,4 +94,5 @@ if 'scripting' not in sys.modules:
         "This starts tests once browser window has finished loading"
         __implementation__ = "scripting.coffee"
         __javascript__     = ROUTE+"/jquery.min.js"
-        done = props.Int(0)
+        done       = props.Int(0)
+        resizedfig = props.Instance(Model)

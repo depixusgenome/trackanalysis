@@ -24,10 +24,12 @@ from view.dialog                import FileDialog
 from view.pathinput             import PathInput
 from view.plots                 import DpxNumberFormatter
 from view.toolbar               import FileList
+from cyclesplot                 import ThemeNameDescriptor, FigureSizeDescriptor
 from sequences.view             import (SequenceTicker, SequenceHoverMixin,
                                         OligoListWidget, SequencePathWidget)
 from modaldialog.view           import AdvancedTaskMixin, T_BODY
-from ._model                    import PeaksPlotModelAccess, FitToReferenceStore
+from ._model                    import (PeaksPlotModelAccess, FitToReferenceStore,
+                                        PeaksPlotTheme)
 
 class ReferenceWidgetTheme:
     "ref widget theme"
@@ -489,6 +491,7 @@ class AdvancedWidget(AdvancedTaskMixin):
         self._model = model
         super().__init__(ctrl)
         self._outp: Dict[str, Dict[str, Any]] = {}
+        self._ctrl = ctrl
 
     @staticmethod
     def _title() -> str:
@@ -506,6 +509,7 @@ class AdvancedWidget(AdvancedTaskMixin):
                 ('Exhaustive fit algorithm',         ' %(_fittype)b'),
                 ('Use a theoretical peak 0 in fits', ' %(_peak0)b'),
                 ('Max distance to theoretical peak', ' %(_dist2theo)d'),
+                *(getattr(cls, i).line for i in ('_themename', '_figwidth', '_figheight'))
                )
 
     def reset(self, resets):
@@ -524,6 +528,9 @@ class AdvancedWidget(AdvancedTaskMixin):
                               lambda i: isinstance(i, PeakGridFit),
                               lambda i: ((ChiSquareFit, PeakGridFit)[i](),))
     _dist2theo  = _IdAccessor('match', lambda i: i.window, lambda i: {'window': i})
+    _themename  = ThemeNameDescriptor()
+    _figwidth   = FigureSizeDescriptor(PeaksPlotTheme.name)
+    _figheight  = FigureSizeDescriptor(PeaksPlotTheme.name)
 
 def createwidgets(ctrl, mdl: PeaksPlotModelAccess) -> Dict[str, Any]:
     "returns a dictionnary of widgets"

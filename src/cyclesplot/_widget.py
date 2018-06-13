@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Widgets for configuration"
 
-from    typing              import List, Tuple, Dict, Optional
+from    typing              import List, Tuple, Dict, Optional, cast
 from    abc                 import ABC
 
 from    bokeh               import layouts
@@ -208,40 +208,69 @@ class DriftWidget:
         return dict(active = value)
 
 class _AdvancedDescriptor:
-    _CNF = CyclesModelConfig.name
-    _name: str
-    def __init__(self, label:str, fmt:str) -> None:
+    _LABEL  = '%(_{self._attrname}){self._fmt}'
+    _cnf    = CyclesModelConfig.name
+    _attrname: str
+    _ctrlname: str
+    def __init__(self, label:str, fmt:str, cnf:str = None) -> None:
         self._label = label
         self._fmt   = fmt
+        if cnf is not None:
+            self._cnf = cnf
 
     def __set_name__(self, _, name):
-        self._name = name[1:]
+        self._attrname = name[1:]
+        if not hasattr(self, '_ctrlname'):
+            self._ctrlname = self._attrname
 
     def __get__(self, inst, _):
-        return getattr(inst, '_ctrl').theme.get(self._CNF, self._name) if inst else self
+        return getattr(inst, '_ctrl').theme.get(self._cnf, self._ctrlname) if inst else self
 
     def __set__(self, inst, value):
-        return getattr(inst, '_ctrl').theme.update(self._CNF, **{self._name: value})
+        return getattr(inst, '_ctrl').theme.update(self._cnf, **{self._ctrlname: value})
 
     def getdefault(self, inst):
         "return the default value"
-        return getattr(inst, '_ctrl').theme.get(self._CNF, self._name, defaultmodel = True)
+        return getattr(inst, '_ctrl').theme.get(self._cnf, self._ctrlname, defaultmodel = True)
 
     @property
     def line(self) -> Tuple[str, str]:
         "return the line for this descriptor"
-        return self._label, f'%(_{self._name}){self._fmt}'
+        return self._label, self._LABEL.format(self = self)
 
-class _ThemeNameDescriptor(_AdvancedDescriptor):
-    _CNF = "main"
+class FigureSizeDescriptor(_AdvancedDescriptor):
+    "defines the figure height"
+    _cnf      = CyclesPlotTheme.name
+    _ctrlname = 'figsize'
+    _isheight = cast(bool, property(lambda self: 'height' in self._attrname))
+    def __init__(self, cnf = None):
+        super().__init__("", "d", cnf)
+
+    def __set_name__(self, _, name):
+        super().__set_name__(_, name)
+        self._label = 'Plot '+ ("height" if self._isheight else "width")
+
+    def __get__(self, inst, _):
+        if inst is None:
+            return self
+        out = super().__get__(inst, _)[self._isheight]
+        return out
+
+    def __set__(self, inst, value):
+        vals = list(super().__get__(inst, None))
+        vals[self._isheight] = int(value)
+        return super().__set__(inst, tuple(vals))
+
+    def getdefault(self, inst):
+        "return the default value"
+        return super().getdefault(inst)[self._isheight]
+
+class ThemeNameDescriptor(_AdvancedDescriptor):
+    "defines the theme to use"
+    _LABEL  = '%(_{self._attrname}|dark:dark|basic:light){self._fmt}'
+    _cnf    = "main"
     def __init__(self):
         super().__init__("Background color", "c")
-
-    @property
-    def line(self) -> Tuple[str, str]:
-        "return the line for this descriptor"
-        return self._label, '%(_themename|dark:dark|basic:light)c'
-
 
 class AdvancedWidget(AdvancedWidgetMixin):
     "access to the modal dialog"
@@ -251,7 +280,9 @@ class AdvancedWidget(AdvancedWidgetMixin):
 
     _binwidth  = _AdvancedDescriptor('Histogram bin width', '.3f')
     _minframes = _AdvancedDescriptor('Minimum frames per position', 'd')
-    _themename = _ThemeNameDescriptor()
+    _themename = ThemeNameDescriptor()
+    _figheight = FigureSizeDescriptor()
+    _figwidth  = FigureSizeDescriptor()
 
     @staticmethod
     def _title() -> str:

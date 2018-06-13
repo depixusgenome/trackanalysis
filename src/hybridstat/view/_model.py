@@ -48,10 +48,10 @@ class PeaksPlotTheme(PlotTheme):
                                 angle = np.pi/2.)
     peakscount      = PlotAttrs('lightblue', 'triangle', 15, fill_alpha = 0.5,
                                 angle = np.pi/2.)
-    colors          = dict(dark    = dict(reference = 'bisque', missing = 'red',
-                                          found     = 'black'),
-                           default = dict(reference = 'bisque', missing = 'red',
-                                          found     = 'gray'))
+    colors          = dict(dark  = dict(reference = 'bisque', missing = 'red',
+                                        found     = 'black'),
+                           basic = dict(reference = 'bisque', missing = 'red',
+                                        found     = 'gray'))
     toolbar          = dict(PlotTheme.toolbar)
     toolbar['items'] = 'ypan,ybox_zoom,reset,save,dpxhover,tap'
     @initdefaults(frozenset(locals()))

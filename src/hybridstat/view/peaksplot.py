@@ -157,6 +157,18 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             if hasattr(widget, 'observe'):
                 widget.observe(ctrl)
 
+        def _onchangefig(old = None, **_):
+            if 'figsize' in old:
+                @self.calllater
+                def _cb():
+                    root = next(i for i in self._doc.roots if hasattr(i, 'resizedfig'))
+                    self._fig.plot_width  = self._theme.figsize[0]
+                    self._fig.plot_height = self._theme.figsize[1]
+                    root.resizedfig = self._fig
+                    self.calllater(lambda: setattr(root, 'resizedfig', None))
+
+        ctrl.theme.observe(self._theme, _onchangefig)
+
     def ismain(self, _):
         "specific setup for when this view is the main one"
         self._widgets['advanced'].ismain(_)
