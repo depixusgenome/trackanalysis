@@ -12,9 +12,9 @@ from    bokeh.document      import Document
 from    bokeh.models        import Model
 
 from    model.plots         import PlotAttrs
-from    .plots              import PlotAttrsView
 from    utils.logconfig     import getLogger
 from    utils.inspection    import templateattribute as _tattr
+from    .plots              import PlotAttrsView
 from    .base               import threadmethod, spawn, SINGLE_THREAD
 
 LOGS    = getLogger(__name__)
@@ -149,7 +149,7 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
                 self._model.reset(ctrl)
 
     @staticmethod
-    def attrs(self, attrs:PlotAttrs) -> PlotAttrsView:
+    def attrs(attrs:PlotAttrs) -> PlotAttrsView:
         "shortcuts for PlotAttrsView"
         return PlotAttrsView(attrs)
 
