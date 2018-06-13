@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
-from typing                     import Dict
+from typing                     import Dict, List, Tuple
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
@@ -18,12 +18,13 @@ from view.plots.tasks           import TaskPlotCreator
 from sequences.view             import SequenceTicker, SequenceHoverMixin
 from peakfinding.histogram      import interpolator
 
-from ._model                    import PeaksPlotModelAccess, PeaksPlotModel
+from ._model                    import PeaksPlotModelAccess, PeaksPlotTheme, PeaksPlotModel
 from ._widget                   import createwidgets
 from ._io                       import setupio
 
 class PeaksSequenceHover(Model, SequenceHoverMixin):
     "tooltip over peaks"
+    _rends: List
     framerate = props.Float(1.)
     bias      = props.Float(0.)
     stretch   = props.Float(0.)
@@ -79,7 +80,9 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
 
 class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     "Creates plots for peaks"
-    _fig: Figure
+    _rends: List[Tuple]
+    _fig:   Figure
+    _theme: PeaksPlotTheme
     def __init__(self, ctrl):
         super().__init__(ctrl, noerase = False)
         self._src: Dict[str, ColumnDataSource] = {}
@@ -195,6 +198,19 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             else:
                 self.setbounds(cache, self._fig.y_range, 'y', (0., 1.))
 
+            clr = self.__colors('peakscount')
+            cache[self._fig.xaxis[0]].update(axis_label_text_color = clr)
+
+            clr  = self.__colors('peaksduration')
+            axis = next(i for i in self._fig.above if getattr(i, 'x_range_name', '') == 'duration')
+            cache[axis].update(axis_label_text_color = clr)
+
+            for key, rend in self._rends:
+                args = {'color': self.__colors(key)}
+                if 'peaks' in key:
+                    args['line_color'] = 'color'
+                getattr(self._theme, key).setcolor(rend, cache = cache, **args)
+
     def __create_fig(self):
         self._fig = self._theme.figure(y_range = Range1d(start = 0., end = 1.),
                                        x_range = Range1d(start = 0., end = 1e3),
@@ -202,16 +218,17 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         self._fig.extra_x_ranges = {"duration": Range1d(start = 0., end = 1.)}
         axis  = LinearAxis(x_range_name          = "duration",
                            axis_label            = self._theme.xtoplabel,
-                           axis_label_text_color = self._theme.peaksduration.color
+                           axis_label_text_color = self.__colors('peaksduration')
                           )
-        self._fig.xaxis[0].axis_label_text_color = self._theme.peakscount.color
+        self._fig.xaxis[0].axis_label_text_color = self.__colors('peakscount')
         self._fig.add_layout(axis, 'above')
         self._plotmodel.display.addcallbacks(self._ctrl, self._fig)
 
     def __add_curves(self):
-        self._src = {i: ColumnDataSource(j) for i, j in self.__data().items()}
+        self._src   = {i: ColumnDataSource(j) for i, j in self.__data().items()}
 
-        rends = []
+        self._rends = []
+        rends       = []
         for key in ('reference.count', 'count', 'events.count',
                     'peaks.count', 'peaks.duration'):
             src  = self._src.get(key.split('.')[0], self._src[''])
@@ -221,11 +238,15 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             if 'duration' in key:
                 args['x_range_name'] = 'duration'
 
+            key = key.replace('.', '')
             if 'peaks' in key:
                 args['line_color'] = 'color'
-            val = getattr(self._theme, key.replace('.', '')).addto(self._fig, **args)
+
+            args['color'] = self.__colors(key)
+            val = getattr(self._theme, key).addto(self._fig, **args)
             if 'peaks' in key:
                 rends.append(val)
+            self._rends.append((key, val))
         return rends
 
     def __setup_tools(self, doc, rends):

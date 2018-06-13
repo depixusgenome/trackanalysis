@@ -87,33 +87,34 @@ class PlotAttrs:
         cls._default(args)
         if 'radius' in args:
             args.pop('size')
+        clr = args.pop('color')
+        if clr:
+            for i in ('line_color', 'fill_color'):
+                args.setdefault(i, clr)
 
     @classmethod
     def _line(cls, args):
         cls._default(args)
+        if 'color' in args:
+            args['line_color'] = args.pop('color')
         args['line_width'] = args.pop('size')
 
     @classmethod
     def _patch(cls, args):
-        cls._default(args)
-        clr = args.pop('color')
-        if clr:
-            for i in ('line_color', 'fill_color'):
-                args.setdefault(i, clr)
-
+        cls._triangle(args)
         args['line_width'] = args.pop('size')
 
     @classmethod
-    def _vbar(cls, args):
+    def _triangle(cls, args):
         cls._default(args)
         clr = args.pop('color')
         if clr:
             for i in ('line_color', 'fill_color'):
                 args.setdefault(i, clr)
 
-        args['line_width'] = args.pop('size')
-
-    _quad = _line
+    _diamond  = _triangle
+    _vbar     = _patch
+    _quad     = _line
 
     @classmethod
     def _rect(cls, args):
@@ -138,6 +139,27 @@ class PlotAttrs:
         args.update(kwa)
         getattr(self, '_'+self.glyph, self._default)(args)
         return getattr(fig, self.glyph)(**args)
+
+    def setcolor(self, rend, cache = None, **kwa):
+        "sets the color"
+        from view.colors import tohex
+        args = dict(self.__dict__)
+        args.pop('glyph')
+        args.update(kwa)
+        getattr(self, '_'+self.glyph, self._default)(args)
+        colors = {}
+        for i, j in args.items():
+            if 'color' not in i:
+                continue
+            try:
+                colors[i] = tohex(j)
+            except AttributeError:
+                pass
+
+        if cache is None:
+            rend.glyph.update(**colors)
+        else:
+            cache[rend.glyph].update(**colors)
 
 class PlotTheme:
     """
