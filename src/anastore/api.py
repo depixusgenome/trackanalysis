@@ -83,7 +83,7 @@ def dump(info:Any, path:Union[str,Path,IO], patch = 'tasks', saveall = False, **
     u"Dumps data to json file. This includes the version number"
     if isinstance(path, (Path, str)):
         with open(str(Path(path).absolute()), 'w', encoding = 'utf-8') as stream:
-            return dump(info, stream, saveall = saveall, **kwa)
+            return dump(info, stream, patch = patch, saveall = saveall, **kwa)
     runner = lambda: _OutputRunner(saveall = saveall)
     return json.dump(_apply(info, patch, 'dumps', runner), path, **kwa)
 

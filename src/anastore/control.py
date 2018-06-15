@@ -68,19 +68,29 @@ class ConfigAnaIO(AnaIO):
         if isinstance(out, list) and len(out) == 1 and isinstance(out[0], dict):
             out = out[0]
             seq = out.pop('sequence', {})
-            def _fcn(model = None,  **_2):
-                if model[0] is not out['tasks'][0]:
-                    return
+            if 'path' in seq and not Path(seq['path']).exists():
+                seq.pop("path")
 
-                if seq.get('sequences') and 'path' not in seq or not Path(seq['path']).exists():
-                    seq['path'] = mkstemp()[1]
-                    with open(seq['path'], "w") as stream:
-                        for i, j in seq['sequences'].items():
-                            print(f"> {i}", file = stream)
-                            print(j, file = stream)
-                self._ctrl.theme.update("sequence", **seq)
-            self._ctrl.tasks.oneshot("opentrack", _fcn)
-        return [out['tasks']]
+            if 'sequences' in seq and 'path' not in seq:
+                seq['path'] = mkstemp()[1]
+                with open(seq['path'], "w") as stream:
+                    for i, j in seq['sequences'].items():
+                        print(f"> {i}", file = stream)
+                        print(j, file = stream)
+
+            elif 'path' in seq and 'sequences' not in seq:
+                try:
+                    import sequences
+                    seq['sequences'] = dict(sequences.read(seq['path']))
+                except: # pylint: disable=bare-except
+                    seq.pop('path')
+
+            if seq:
+                def _fcn(model = None,  **_2):
+                    if model[0] is out['tasks'][0][0]:
+                        self._ctrl.theme.update("sequence", **seq)
+                self._ctrl.tasks.oneshot("opentrack", _fcn)
+        return out['tasks']
 
     def save(self, path:str, models):
         "closes an ana file"
@@ -89,7 +99,8 @@ class ConfigAnaIO(AnaIO):
 
         if len(models):
             cnf = self._ctrl.theme.getconfig("sequence").maps[0]
-            dump(dict(tasks = models[0], sequence = cnf), path, **self._model.__dict__)
+            cnf.pop('history', None)
+            dump(dict(tasks = models, sequence = cnf), path, **self._model.__dict__)
         else:
             raise IOError("Nothing to save", "warning")
         return True

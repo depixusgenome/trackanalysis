@@ -33,8 +33,14 @@ def _v3(data:dict) -> dict:
                   r"cleaning.datacleaning.Min(\w+)",   dict(__name__ = repl))
     return data
 
+def _v4tasks(data:dict) -> dict:
+    cnf = data.get("config", ())
+    for  i, j in (("probes", "tasks.oligos"), ("path", "tasks.sequence.path")):
+        if j in cnf:
+            data.setdefault("sequence", {})[i] = cnf[j]
+    return data
 
-__TASKS__   = Patches(_v0task, _v1, _v2, _v3)
+__TASKS__   = Patches(_v0task, _v1, _v2, _v3, _v4tasks)
 
 def _v0cnf(data:dict) -> dict:
     data = _v0task(data)
