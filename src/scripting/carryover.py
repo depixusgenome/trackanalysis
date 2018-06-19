@@ -48,7 +48,8 @@ class CarryOver:
         duplicates = ["track","eventcount","peakposition","modification"]
         df1 = data.copy()
         df1["track"]=df1["track"].str.lower()
-        df1 = df1.drop_duplicates(subset=duplicates).assign(kept=True).copy()
+        df1 = df1.drop_duplicates(subset=duplicates).copy()
+        # to correct : only a subset of df1 should be kept
         df1.sort_values(by=["peakposition"],inplace=True)
 
         mtimes = sorted(set(df1["modification"]))
@@ -63,8 +64,8 @@ class CarryOver:
 
     @staticmethod
     def rulelastanalysed(_,second:pd.Series)->bool:
-        "It can be an observed carry over iff the latest experiment is kept"
-        return second["kept"]
+        "It can be an observed carry over iff the latest experiment is keep"
+        return second["keep"]
 
     @staticmethod
     def rulenooverlap(first:pd.Series,second:pd.Series,minoverlap=None)->bool:
@@ -103,12 +104,13 @@ class DuplicateData:
     '''
     takes a dataframe, duplicates data to mimick the chronology of the experiment
     '''
-    def __init__(self,path,match,key:str="track")->None:
-        self.match                  = match
-        self._pattern               = re.compile(match) if isinstance(match,str) else match
-        self.path                   = path
+    def __init__(self,path,match,**kwa)->None:
+        self.match                    = match
+        self._pattern                 = re.compile(match) if isinstance(match,str) else match
+        self.path                     = path
         self.history:List[ChronoItem] = []
-        self.key                    = key
+        self.key : str                = kwa.get("key","track")
+        self.anafiles                 = kwa.get("anafiles",[])
 
     def __duplicate(self,data:pd.DataFrame)->pd.DataFrame:
         """
@@ -118,12 +120,12 @@ class DuplicateData:
         the modification date is modified to match the recorded experimental file
         """
         out = data.copy()
-        out.assign(kept=True)
+        out = out.assign(keep=False)
         for itm in self.history:
             tmp = data.loc[data[self.key]==itm.key].copy()
             tmp.loc[:,"modification"]= itm.time
-            out=out.append(tmp.assign(kept= False))
-        return out
+            out=out.append(tmp.assign(keep= True))
+        return out.query("keep==True") # keeps only modification corresponding to true dates
 
     def findhistory(self)->List[ChronoItem]:
         "finds chronological order of experiments using files mtime"
@@ -133,6 +135,17 @@ class DuplicateData:
         return self.history
 
     @staticmethod
+    def keepanaonly(anafiles:List[str],data:pd.DataFrame)->pd.DataFrame: # FIXME: unfinished function
+        """
+        extracts time information from anafiles
+        changes keep to False for every peak except from tracks with ana files
+        """
+        data["keep"] = False
+        # finish implementing this
+        # need a way to recover information on the track matched to anafile
+        return data
+
+    @staticmethod
     def totimestamp(ifile:str):
         "converts mtime to Timestamps"
         return pd.Timestamp(getmtime(ifile),unit="s")
@@ -140,4 +153,7 @@ class DuplicateData:
     def __call__(self,data:pd.DataFrame,history=None):
         "returns a chronological list of experiments conducted for sequencing"
         self.history = self.findhistory() if history is None else history
-        return self.__duplicate(data)
+        data = self.__duplicate(data)
+        if self.anafiles:
+            return DuplicateData.keepanaonly(self.anafiles,data)
+        return data
