@@ -4,17 +4,22 @@
 """
 defines rules of carry over
 """
+import logging
+import json
 import re
-from glob    import glob
-from os.path import getmtime
-from typing  import List, NamedTuple, Tuple
+from glob import glob
+from os.path import getmtime, split
+from typing import List, NamedTuple, Tuple
 
-import numpy  as np
+import numpy as np
 import pandas as pd
 from holoviews import Curve, Overlay
 
 from sequences import Translator, overlap
-from utils     import initdefaults
+from utils import initdefaults
+
+
+LOGGER = logging.Logger("CarryOver")
 
 REVERSE = Translator().reversecomplement
 
@@ -47,7 +52,7 @@ class CarryOver:
         """
         duplicates = ["track","eventcount","peakposition","modification"]
         df1 = data.copy()
-        df1["track"]=df1["track"].str.lower()
+        df1["track"]=df1["track"]
         df1 = df1.drop_duplicates(subset=duplicates).copy()
         # to correct : only a subset of df1 should be kept
         df1.sort_values(by=["peakposition"],inplace=True)
@@ -110,9 +115,8 @@ class DuplicateData:
         self.path                     = path
         self.history:List[ChronoItem] = []
         self.key : str                = kwa.get("key","track")
-        self.anafiles                 = kwa.get("anafiles",[])
 
-    def __duplicate(self,data:pd.DataFrame)->pd.DataFrame:
+    def duplicate(self,data:pd.DataFrame)->pd.DataFrame:
         """
         map an item of history (key) to values of in data.
         The history lists the chronological order of experiments
@@ -124,7 +128,7 @@ class DuplicateData:
         for itm in self.history:
             tmp = data.loc[data[self.key]==itm.key].copy()
             tmp.loc[:,"modification"]= itm.time
-            out=out.append(tmp.assign(keep= True))
+            out = out.append(tmp.assign(keep= True))
         return out.query("keep==True") # keeps only modification corresponding to true dates
 
     def findhistory(self)->List[ChronoItem]:
@@ -135,25 +139,39 @@ class DuplicateData:
         return self.history
 
     @staticmethod
-    def keepanaonly(anafiles:List[str],data:pd.DataFrame)->pd.DataFrame: # FIXME: unfinished function
+    def findtrackfromana(anafile:str)->str:
+        "returns the track which is the source of anafile"
+        # implementation might change
+        ana = json.load(open(anafile,"r"))
+        try :
+            name = next(i for i in ana[1]["tasks"][0] if "path" in i)["path"]["∈"]
+            name = name[0] if isinstance(name,list) else name
+            return name
+        except StopIteration:
+            LOGGER.info(f"could not extract track from {split(anafile)[1]}")
+        return None
+
+    @staticmethod
+    def keepanaonly(anafiles:List[str],data:pd.DataFrame)->pd.DataFrame:
         """
         extracts time information from anafiles
         changes keep to False for every peak except from tracks with ana files
         """
         data["keep"] = False
-        # finish implementing this
-        # need a way to recover information on the track matched to anafile
+        tracks = [DuplicateData.findtrackfromana(i) for i in anafiles]
+        tokeep = [DuplicateData.totimestamp(i) for i in tracks if i]
+        data.loc[data["modification"].isin(tokeep),"keep"]=True
         return data
 
     @staticmethod
     def totimestamp(ifile:str):
-        "converts mtime to Timestamps"
-        return pd.Timestamp(getmtime(ifile),unit="s")
+        "converts mtime to time format"
+        return np.datetime64(pd.Timestamp(np.floor(getmtime(ifile)),unit="s"))# type: ignore
 
-    def __call__(self,data:pd.DataFrame,history=None):
+    def __call__(self,data:pd.DataFrame,history=None,anafiles:List[str]=None):
         "returns a chronological list of experiments conducted for sequencing"
         self.history = self.findhistory() if history is None else history
-        data = self.__duplicate(data)
-        if self.anafiles:
-            return DuplicateData.keepanaonly(self.anafiles,data)
+        data = self.duplicate(data)
+        if anafiles:
+            return DuplicateData.keepanaonly(anafiles,data)
         return data
