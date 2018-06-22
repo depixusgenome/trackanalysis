@@ -136,7 +136,12 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
 
             elif cache is not None:
                 value, color = cache.get(name, None), hexes[name]
-                if value is not None:
+                if value is None:
+                    continue
+
+                if name == 'saturation':
+                    tmp[order[self._model.cleaning.saturatedcycles(cache)]] = color
+                else:
                     tmp[order[value.min]] = color
                     tmp[order[value.max]] = color
         return tmp.ravel()

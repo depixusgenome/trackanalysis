@@ -112,12 +112,13 @@ class CyclesListWidget:
         info  = {i: cache[i].values[order] for i in names}
 
         info['saturation'] = np.zeros(len(order), dtype = 'U1')
+        info['saturation'][self.__task.saturatedcycles(cache)] = '✗'
+
         info['discarded']  = np.zeros(len(order), dtype = 'U1')
         if len(cache['saturation'].max):
-            info['saturation'][cache['saturation'].max] = '✗'
-            info['discarded'][:]                        = '✗'
+            info['discarded'][:]    = '✗'
         else:
-            info['discarded'][:bad]                     = '✗'
+            info['discarded'][:bad] = '✗'
 
         info['cycle'] = order
         return info

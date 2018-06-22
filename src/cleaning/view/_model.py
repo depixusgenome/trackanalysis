@@ -24,6 +24,12 @@ class DataCleaningAccess(TaskAccess, tasktype = DataCleaningTask):
         cur = mem.get(self.bead, None)
         return None if cur is None else {i.name: i for i in cur[0]}
 
+    def saturatedcycles(self, cache):
+        "returns saturated cycles"
+        sat                = cache['saturation'].values
+        sat[np.isnan(sat)] = 0.
+        return np.nonzero(sat > self.task.maxdisttozero)
+
     def nbadcycles(self, cache = NoArgs) -> int:
         "returns the number of bad cycles"
         return len(self.badcycles(cache))

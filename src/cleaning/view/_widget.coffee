@@ -128,5 +128,5 @@ export class DpxCleaning extends Widget
         maxhfsigma: [p.Number, 1e-2],
         minextent: [p.Number, .25],
         maxextent: [p.Number, 2.0],
-        maxsaturation: [p.Number, 90],
+        maxsaturation: [p.Number, 20],
     }
