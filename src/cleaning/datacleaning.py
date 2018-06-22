@@ -104,8 +104,17 @@ class DataCleaningRule:
         test  = np.asarray(test, 'f4')
         vlow  = getattr(self, f'min{name}', None)
         vhigh = getattr(self, f'max{name}', None)
-        low   = np.nonzero(test <= vlow) [0] if vlow  is not None else _ZERO
-        high  = np.nonzero(test >= vhigh)[0] if vhigh is not None else _ZERO
+
+        bad = np.isnan(test)
+        if vlow is not None:
+            test[bad] = vlow + 1
+        low  = np.nonzero(test <= vlow) [0] if vlow  is not None else _ZERO
+
+        if vhigh is not None:
+            test[bad] = vhigh - 1
+        high = np.nonzero(test >= vhigh)[0] if vhigh is not None else _ZERO
+
+        test[bad] = np.NaN
         return Partial(name, low, high, test)
 
     @staticmethod
@@ -243,6 +252,7 @@ class PingPongRule(DataCleaningRule):
 
     def _compute(self, cycle, scheme):
         val = np.abs(np.convolve(cycle, scheme, 'valid'))
+        val[~np.isfinite(val)]        = 0.
         val[val < self.mindifference] = 0.
         return np.nansum(val)
 
@@ -268,7 +278,7 @@ class SaturationRule:
     * an oligo is blocking the loop.
     """
     maxdisttozero = .015
-    maxsaturation  = 90.
+    maxsaturation = 20.
     satwindow     = 10
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):

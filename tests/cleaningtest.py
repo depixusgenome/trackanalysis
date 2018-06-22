@@ -61,7 +61,7 @@ def test_cleaning_base():
     cycs[4,3:69:3] += 2.5
     cycs[5,:22]    += 5.7
 
-    tsk = DataCleaning()
+    tsk = DataCleaning(maxextent = 6)
     assert set(tsk.hfsigma(cycs).min) == set([1])
     assert set(tsk.hfsigma(cycs).max) == set([0, 4])
     assert set(tsk.extent(cycs).min) == set([1, 2])
@@ -249,8 +249,11 @@ def test_cleaning_localpop():
     DataCleaningTask().aberrant(arr)
     assert np.all(np.isnan(arr[401:624]))
 
-def test_subtract():
+def test_subtract(monkeypatch):
     "tests subtractions"
+    import cleaning.beadsubtraction as C
+    monkeypatch.setattr(C, '_cleaningcst', lambda *x: None)
+
     agg = SubtractAverageSignal.apply
     assert_allclose(agg([np.arange(5)]),             np.arange(5))
     assert_allclose(agg([np.arange(5)]*5),           np.arange(5))
@@ -286,10 +289,10 @@ def test_processor():
     # pylint: disable=expression-not-assigned
     cache = {} # type: ignore
     trk   = randtrack().beads
-    DataCleaningProcessor.apply(trk, cache = cache)[0]
+    DataCleaningProcessor.apply(trk, cache = cache, maxsaturation = 100)[0]
     assert list(cache) == [0]
     tmp = cache[0]
-    DataCleaningProcessor.apply(trk, cache = cache)[0]
+    DataCleaningProcessor.apply(trk, cache = cache, maxsaturation = 100)[0]
     assert tmp is cache[0]
 
 def test_processor2():
