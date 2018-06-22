@@ -276,15 +276,15 @@ class PeakListTheme:
     height     = 400
     colwidth   = 60
     refid      = '0.0000'
-    columns    = [['z',        'Z (µm)',        '0.0000'],
-                  ['bases',    u'Z (base)',     '0.0'],
-                  ['id',       u'Id',           '0'],
-                  ['orient',   u'Strand',       ''],
-                  ['distance', u'Distance',     '0.0'],
-                  ['count',    'css:xlabel',    '0.0'],
-                  ['duration', 'css:xtoplabel', '0.000'],
-                  ['sigma',    u'σ (µm)',       '0.0000'],
-                  ['skew',     u'skew',         '0.00']]
+    columns    = [['z',        'Z (µm)',                 '0.0000'],
+                  ['bases',    'Z (base)',               '0.0'],
+                  ['id',       'Id',                     '0'],
+                  ['orient',   'Strand',                 ''],
+                  ['distance', 'Distance',               '0.0'],
+                  ['count',    PeaksPlotTheme.xlabel,    '0.0'],
+                  ['duration', PeaksPlotTheme.xtoplabel, '0.000'],
+                  ['sigma',    'σ (µm)',                 '0.0000'],
+                  ['skew',     'skew',                   '0.00']]
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
