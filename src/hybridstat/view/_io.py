@@ -132,19 +132,17 @@ class ConfigXlsxIO(TaskIO):
         if ind is not None:
             model.insert(ind+1, ExceptionCatchingTask(exceptions = [DataCleaningException]))
 
-        if isinstance(model[-1], pksmdl.identification.tasktype):
-            return model
+        if not isinstance(model[-1], pksmdl.identification.tasktype):
+            missing: tuple = (pksmdl.eventdetection, pksmdl.peakselection)
+            if pksmdl.fittoreference.task is not None:
+                missing += (pksmdl.fittoreference,)
+            if pksmdl.identification.task is not None:
+                missing += (pksmdl.identification,)
 
-        missing: tuple = (pksmdl.eventdetection, pksmdl.peakselection)
-        if pksmdl.fittoreference.task is not None:
-            missing += (pksmdl.fittoreference,)
-        if pksmdl.identification.task is not None:
-            missing += (pksmdl.identification,)
-
-        while len(missing):
-            if not isinstance(model[-1], tuple(i.tasktype for i in missing)):
-                return model + [deepcopy(i.configtask) for i in missing]
-            missing = missing[1:]
+            while len(missing):
+                if not isinstance(model[-1], tuple(i.tasktype for i in missing)):
+                    return model + [deepcopy(i.configtask) for i in missing]
+                missing = missing[1:]
 
         ref = pksmdl.fittoreference.reference
         ind = next((i for i, j in enumerate(model) if isinstance(j, FitToReferenceTask)),

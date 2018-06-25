@@ -406,6 +406,11 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         return self.sequencemodel.display.hpins.get(self.sequencemodel.tasks.bead,
                                                     dflt)
 
+    @sequencekey.setter
+    def sequencekey(self, value):
+        "sets the new sequence key"
+        self.sequencemodel.setnewkey(self._ctrl, value)
+
     @property
     def constraintspath(self):
         "return the path to constraints"
