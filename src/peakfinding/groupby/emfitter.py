@@ -21,7 +21,7 @@ class MaxCov(BaseEM):
     finds peaks and groups events using Expectation Maximization
     peaks are subdivided until none have a covariance above uppercov
     '''
-    uppercov   = 0.005**2 # in microns**2
+    uppercov   = None # in microns**2 # could be used, need simple model
     withtime   = True
 
     @initdefaults(frozenset(locals()))
@@ -70,7 +70,8 @@ class MaxCov(BaseEM):
     def _splitwidth(self,*args):
         'splits the peaks with great Z variance'
         rates, params = self.fit(self.data,*args) # pylint: disable =no-value-for-parameter
-
+        if self.uppercov is None:
+            return rates, params
         while any(params[:,1]>self.uppercov):
             idx = np.argmax(params[:,1])
             # split the one with highest covariance
@@ -201,7 +202,7 @@ class FullEm(BicSplit):
     def splitter(self,*args):
         return self._splitwithbic(*self._splitwidth(*args))
 
-class EmHybridization(FullEm):
+class EmHybridization(FullEm): # test # not ground breaking
     """
     likelihood penality on hybridization rates
     """
@@ -213,13 +214,10 @@ class EmHybridization(FullEm):
         poisson = scipy.stats.poisson(mu=np.mean(nevents))
         return super().llikelihood(score,rates)+np.sum(poisson.logpmf(nevents))
 
-# rewrite if it provides better results
-class Weighted(FullEm):
+class Weighted(FullEm): # test # not ground breaking
     """
     Spatial and duration dimensions are weighted differently
     """
-    # where is the  weight
-    # to debug reuse same weights
     @staticmethod
     def _spatialpdf(datum,param):
         loc,var=param[:2]
@@ -228,7 +226,7 @@ class Weighted(FullEm):
     @staticmethod
     def _durationpdf(datum,param):
         loc,scale=param[-2:]
-        return exppdf(loc,scale/2,datum[1]) # changed scale factor
+        return exppdf(loc,scale/10,datum[1]) # changed scale factor
 
     @staticmethod
     def _weightedpdf(datum,param):
