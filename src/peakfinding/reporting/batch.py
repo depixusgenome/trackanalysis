@@ -50,7 +50,7 @@ class PeakFindingBatchProcessor(BatchProcessor[PeakFindingBatchTask]):
     def model(cls, paths: PathIO, modl: PeakFindingBatchTemplate) -> Sequence[Task]:
         "creates a specific model for each path"
         modl = deepcopy(list(iter(modl))) # type: ignore
-        modl.insert(0, TrackReaderTask(path = checkpath(paths.track).path, beadsonly = True))
+        modl.insert(0, TrackReaderTask(path = checkpath(paths.track).path))
         if paths.reporting not in (None, ''):
             modl.append(cls.tasktype.reporttype()(path = paths.reporting, model = modl))
         return modl

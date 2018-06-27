@@ -104,14 +104,14 @@ class Beads(TrackView, ITrackView):
         "returns whether the key is one for a bead"
         return isint(key)
 
-    def _keys(self, sel:Optional[Sequence], beadsonly: bool) -> Iterator[BEADKEY]:
+    def _keys(self, sel:Optional[Sequence]) -> Iterator[BEADKEY]:
         if isinstance(self.data, Beads):
             if sel is None:
-                yield from self.data.keys(None, beadsonly)
+                yield from self.data.keys(None)
             else:
-                yield from (i for i in self.data.keys(None, beadsonly) if i in sel)
+                yield from (i for i in self.data.keys(None) if i in sel)
         else:
-            yield from super()._keys(sel, beadsonly)
+            yield from super()._keys(sel)
 
     def _iter(self, sel = None) -> Iterator[Tuple[BEADKEY, np.ndarray]]:
         if isinstance(self.data, Beads) and self.cycles is None:
@@ -156,9 +156,8 @@ class Beads(TrackView, ITrackView):
 
     if TYPE_CHECKING:
         def keys(self,
-                 sel      :Optional[Sequence] = None,
-                 beadsonly:Optional[bool]     = None) -> Iterator[BEADKEY]:
-            yield from super().keys(sel, beadsonly)
+                 sel      :Optional[Sequence] = None) -> Iterator[BEADKEY]:
+            yield from super().keys(sel)
 
         def __iter__(self) -> Iterator[Tuple[BEADKEY, np.ndarray]]:
             yield from super().__iter__()

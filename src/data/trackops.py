@@ -31,12 +31,13 @@ def dropbeads(trk:TRACKS, *beads:BEADKEY) -> TRACKS:
     if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
         beads = tuple(beads[0])
     cpy           = shallowcopy(trk)
-    good          = (frozenset(trk.data.keys()) - frozenset(beads)) | {'t', 'zmag'}
+    good          = frozenset(trk.data.keys()) - frozenset(beads)
     cpy.data      = {i: trk.data[i] for i in good}
 
     cpy.fov       = shallowcopy(trk.fov)
     good          = good & frozenset(trk.fov.beads)
     cpy.fov.beads = {i: trk.fov.beads[i] for i in good}
+    setattr(cpy, '_secondaries', dict(getattr(trk, '_secondaries')))
     return cpy
 
 def renamebeads(trk:TRACKS, *beads:Tuple[BEADKEY, BEADKEY]) -> TRACKS:
@@ -60,7 +61,7 @@ def selectbeads(trk:TRACKS, *beads:BEADKEY) -> TRACKS:
 
     if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
         beads = tuple(beads[0])
-    return dropbeads(trk, *(set(trk.beadsonly.keys()) - set(beads)))
+    return dropbeads(trk, *(set(trk.beads.keys()) - set(beads)))
 
 def selectcycles(trk:TRACKS, indexes:Union[slice, range, List[int]])-> TRACKS:
     """
@@ -70,9 +71,18 @@ def selectcycles(trk:TRACKS, indexes:Union[slice, range, List[int]])-> TRACKS:
         return _applytodict(selectcycles, trk, indexes, {})
 
     inds, phases = trk.phase.cut(indexes)
+    vals         = np.zeros(trk.nframes, dtype = 'bool')
+    vals[inds]   = True
+
     track        = trk.__getstate__()
-    track.update(data   = {i: j[inds] for i, j in trk.beads},
+    track.update(data   = {i: j[vals] for i, j in trk.beads},
                  phases = phases)
+
+    track['secondaries'] = secs = {i: trk.secondaries.data[i][inds] for i in ('t', 'zmag')}
+    for i, j in trk.secondaries.data.items():
+        if i not in secs:
+            inds = np.clip(np.int32(j['index']-trk.phases[0,0]), 0, len(vals)-1)
+            secs[i] = j[vals[inds]]
 
     trk = Track(**track)
     trk._lazydata_ = False # type: ignore # pylint: disable=protected-access
@@ -88,24 +98,36 @@ def concatenatetracks(trk:TRACKS, *tracks:TRACKS)-> TRACKS:
     This can be used to resume the recording an interrupted experiment
     """
     def _concatenate(trk1, trk2):
-        shift  = trk1.data["t"][-1] - trk2.data["t"][0] +1
+        shift  = trk1.secondaries.seconds[-1]-trk2.secondaries.seconds[0]+1
         phases = np.vstack([trk1.phases,trk2.phases+shift])
-        time   = np.hstack([trk1.data["t"],trk2.data['t']+shift])
+        time   = np.hstack([trk1.secondaries.seconds,trk2.secondaries.seconds+shift])
         beads  = set(trk1.data.keys()) | set(trk2.data.keys())
 
         values = np.zeros((len(beads),time.size))*np.nan
 
+        sz1    = trk1.secondaries.seconds.size
         for idx,val in enumerate(beads):
             if val in trk1.data.keys():
-                values[idx,:trk1.data["t"].size]=trk1.data[val]
+                values[idx,:sz1]=trk1.data[val]
             if val in trk2.data.keys():
-                values[idx,trk1.data["t"].size:]=trk2.data[val]
+                values[idx, sz1:]=trk2.data[val]
 
         data      = {j:values[i] for i,j in enumerate(beads)}
-        data['t'] = time
         track     = trk1.__getstate__()
         track["data"]   = data
         track["phases"] = phases
+        track["secondaries"] = {}
+
+        for i, j in trk1.secondaries.data.items():
+            if i == "t":
+                track['secondaries']['t'] = time
+            elif i == "zmag":
+                track['secondaries']['zmag'] = np.hstack([j, trk2.secondaries.zmag])
+            else:
+                cpy                      = np.copy(trk2.secondaries.data[i])
+                cpy['index']            += shift
+                track["secondaries"][i]  = np.hstack([j, cpy])
+
         return  Track(**track)
 
     for other in tracks:

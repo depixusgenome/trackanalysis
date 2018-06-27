@@ -244,7 +244,7 @@ def resume_bead_quality(tracks, dfmsg, dfstatus, ordertracks=None):
     if is_dict:
         all_beads = tracks.availablebeads()
     else:
-        all_beads = list(tracks.beadsonly.keys())
+        all_beads = list(tracks.beads.keys())
 
     #Create a dataframe with rows = key and columns = possible errors. 
     #The cells contain the nb of cycles in track that present 

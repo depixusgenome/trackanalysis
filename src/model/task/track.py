@@ -32,19 +32,17 @@ class TrackReaderTask(RootTask):
     # Attributes
 
     * `path`: is the path to a track file and its optional secondary files
-    * `beadsonly`: beads only should be iterated over, not 't' or 'zmag'.
     * `copy`: only a copy of the data should be iterated over.
     * `key`: a name by which to call the track. Defaults to the filename.
     * `axis`: which axis to load, It can be "X" "Y" or "Z"
     """
     path:      PATHTYPE = None
-    beadsonly: bool     = False
     copy:      bool     = False
     key:       str      = None
     axis:      str      = 'Z'
     def __init__(self, path = None, **kwa) -> None:
         super().__init__(**kwa)
-        lst = 'path', 'beadsonly', 'key', 'axis'
+        lst = 'path', 'key', 'axis'
         if hasattr(path, 'axis'):
             # Conversion for Track object
             kwa, tmp = {i: getattr(path, i) for i in lst}, kwa
@@ -97,7 +95,6 @@ class DataSelectionTask(Task):
 
     Some attributes are only relevant to `Beads` or to `Cycles` as indicated.
 
-    * `beadsonly`: iterate over beads only, not 't' or 'zmag'.
     * `samples`: a slice indicating which frames to select.
     * `phases`: interval of phases to select (`Cycles`).
     * `selected`: the beads (`Beads`) or beads and cycles (`Cycles`) to be selected.
@@ -106,7 +103,6 @@ class DataSelectionTask(Task):
     * `cycles`: the cycles to select (`Beads`).
     """
     level                                  = Level.none
-    beadsonly: bool                        = None
     samples:   Union[Sequence[int], slice] = None
     phases:    Union[Tuple[int,...], int]  = None
     selected:  List                        = None

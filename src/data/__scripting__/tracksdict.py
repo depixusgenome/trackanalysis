@@ -25,10 +25,10 @@ from   ..tracksdict                 import TracksDict as _TracksDict
 from   ..views                      import isellipsis
 
 @addto(Handler)
-def __call__(self, track = None, beadsonly = False, __old__ = Handler.__call__) -> Track:
+def __call__(self, track = None, __old__ = Handler.__call__) -> Track:
     if track is None:
         track = Track()
-    return __old__(self, track, beadsonly)
+    return __old__(self, track)
 
 class FrozenTrack(Track):
     "Track where the data is also part of the state"
@@ -207,7 +207,7 @@ class TracksDict(_TracksDict):
         "Returns a table with some data on the track files"
         if loadall:
             self.load()
-        beads   = [sum(1 for i in j.beadsonly.keys()) if j.isloaded else np.NaN
+        beads   = [sum(1 for i in j.beads.keys()) if j.isloaded else np.NaN
                    for j in self.values()]
         cleaned = [i.cleaned if i.isloaded else np.NaN for i in self.values()]
 

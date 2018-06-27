@@ -50,7 +50,7 @@ class TaskView(TrackView, Generic[Config, Key]):
     def _get_data_keys(self):
         return self.data.keys()
 
-    def _keys(self, sel:Optional[Sequence[Key]], beadsonly: bool) -> Iterable[Key]:
+    def _keys(self, sel:Optional[Sequence[Key]]) -> Iterable[Key]:
         if self.__keys is None:
             self.__keys = frozenset(self._get_data_keys())
 

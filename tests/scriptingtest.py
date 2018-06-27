@@ -55,7 +55,7 @@ def test_track():
             == [Tasks.subtraction, Tasks.cleaning, Tasks.alignment])
 
     assert track.op[:,:5].ncycles == 5
-    assert set(track.op[[1,2]].beadsonly.keys()) == {1,2}
+    assert set(track.op[[1,2]].beads.keys()) == {1,2}
 
 if __name__ == '__main__':
     test_track()

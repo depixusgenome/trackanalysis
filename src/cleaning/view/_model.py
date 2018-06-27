@@ -81,7 +81,7 @@ class BeadSubtractionAccess(TaskAccess, tasktype = BeadSubtractionTask):
         if task is None:
             return []
 
-        mine  = set(track.beadsonly.keys())
+        mine  = set(track.beads.keys())
         beads = [i for i in cast(BeadSubtractionTask, task).beads if i in mine]
         return beads
 

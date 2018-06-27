@@ -81,7 +81,7 @@ class RampDisplay(BasicDisplay, ramp = Track):
         return _show
 
     def getredim(self):
-        beads = self._items.beadsonly.keys() if self._beads is None else self._beads
+        beads = self._items.beads.keys() if self._beads is None else self._beads
         return (('beads', list(beads)),)
 
 __all__ = [] # type: list

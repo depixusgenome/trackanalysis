@@ -134,7 +134,9 @@ class Secondaries:
     * `track.secondaries.tservo` is the servo temperature
     * `track.secondaries.tsample` is the sample temperature
     * `track.secondaries.tsink` is the heat sink temperature
-    * `track.secondaries.vcap` is a measure of magnet altitude
+    * `track.secondaries.vcap` is a measure of magnet altitude using voltages
+    * `track.secondaries.zmag` is a measure of magnet altitude provided by its motor
+    * `track.secondaries.seconds` is the time axis
     """
     def __init__(self, track):
         self.__track = track
@@ -142,13 +144,17 @@ class Secondaries:
     data    = property(lambda self: self.__track._secondaries,
                        doc = "returns all the data")
     tservo  = cast(np.ndarray, property(lambda self: self.__value("Tservo"),
-                                        doc = "returns the servo temperature"))
+                                        doc = "the servo temperature"))
     tsample = cast(np.ndarray, property(lambda self: self.__value("Tsample"),
-                                        doc = "returns the sample temperature"))
+                                        doc = "the sample temperature"))
     tsink   = cast(np.ndarray, property(lambda self: self.__value("Tsink"),
-                                        doc = "returns the sink temperature"))
+                                        doc = "the sink temperature"))
     vcap    = cast(np.ndarray, property(lambda self: self.data.get("vcap"),
-                                        doc = "returns the magnet position: vcap"))
+                                        doc = "the magnet position: vcap"))
+    seconds = cast(np.ndarray, property(lambda self: self.__track._secondaries["t"],
+                                        doc = "the time axis"))
+    zmag    = cast(np.ndarray, property(lambda self: self.__track._secondaries["zmag"],
+                                        doc = "the magnet altitude sampled at frame rate"))
     def __value(self, name):
         val = self.__track._secondaries # pylint: disable=protected-access
         if val is None or name not in val:
@@ -211,7 +217,7 @@ class ViewDescriptor:
 
     def __set_name__(self, _, name):
         self.tpe  = Cycles if name.startswith('cycles') else Beads
-        self.args = dict(copy = False, beadsonly = 'only' in name)
+        self.args = dict(copy = False)
         setattr(self, '__doc__', getattr(self.tpe, '__doc__', None))
 
 def _lazies():
@@ -369,13 +375,11 @@ class Track:
     def __init__(self, **_):
         self._rawprecisions: _PRECISIONS = {}
 
-    ncycles    = cast(int,                 property(lambda self: len(self.phases)))
-    nphases    = cast(int,                 property(lambda self: self.phases.shape[1]))
-    beads      = cast(Beads,               ViewDescriptor())
-    beadsonly  = cast(Beads,               ViewDescriptor())
-    cycles     = cast(Cycles,              ViewDescriptor())
-    cyclesonly = cast(Cycles,              ViewDescriptor())
-    phase      = property(PhaseManipulator, doc = PhaseManipulator.__doc__)
+    ncycles = cast(int,                 property(lambda self: len(self.phases)))
+    nphases = cast(int,                 property(lambda self: self.phases.shape[1]))
+    beads   = cast(Beads,               ViewDescriptor())
+    cycles  = cast(Cycles,              ViewDescriptor())
+    phase   = property(PhaseManipulator, doc = PhaseManipulator.__doc__)
 
     def getdata(self) -> DATA:
         "returns the dataframe with all bead info"
@@ -408,11 +412,6 @@ class Track:
         "Unloads the data"
         for name in _lazies():
             setattr(self, name, deepcopy(getattr(type(self), name)))
-
-    @staticmethod
-    def isbeadname(key) -> bool:
-        "returns whether a column name is a bead's"
-        return isinstance(key, int)
 
     def view(self, tpe:Union[Type[TrackView], str], **kwa):
         "Creates a view of the suggested type"
@@ -499,12 +498,8 @@ class Track:
                 cache[ibead] = val = max(PrecisionAlg.MINPRECISION,
                                          nanhfsigma(beads[ibead], zip(first, last)))
             else:
-                if ibead is None or ibead is Ellipsis:
-                    beads = self.beadsonly
-                    ibead = set(beads.keys())
-                else:
-                    beads = self.beads
-                    ibead = set(ibead)
+                beads = self.beads
+                ibead = set(beads.keys()) if ibead is None or ibead is Ellipsis else set(ibead)
 
                 if len(ibead-set(cache)) > 0:
                     cache.update((i, max(PrecisionAlg.MINPRECISION,

@@ -51,7 +51,7 @@ class PeakCorrelationAlignmentProcessor(Processor[PeakCorrelationAlignmentTask])
             return partial(cls.apply, **cnf)
         cache = dict() # type: Dict[BEADKEY, np.ndarray]
         tsk   = PeakCorrelationAlignment(**cnf)
-        return toframe.new().withaction(partial(cls._action, tsk, cache), beadsonly = True)
+        return toframe.new().withaction(partial(cls._action, tsk, cache))
 
     def run(self, args):
         "updates frames"
@@ -93,7 +93,7 @@ class MinBiasPeakAlignmentProcessor(Processor[MinBiasPeakAlignmentTask]):
         if toframe is None:
             return partial(cls.apply, **cnf)
         tsk = MinBiasPeakAlignment(**cnf)
-        return toframe.new().withaction(partial(cls._action, tsk), beadsonly = True)
+        return toframe.new().withaction(partial(cls._action, tsk))
 
     def run(self, args):
         "updates frames"

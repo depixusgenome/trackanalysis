@@ -20,7 +20,7 @@ def isellipsis(vals):
     "checks whether the argument can be understood as an ellipsis"
     return (not isinstance(vals, np.ndarray)) and vals in _m_ALL
 
-BEADKEY  = Union[str,int]
+BEADKEY  = int
 CYCLEKEY = Tuple[BEADKEY,int]
 ISelf    = TypeVar('ISelf', bound = 'ITrackView')
 
@@ -37,10 +37,9 @@ class ITrackView(Iterable):
         "can return one item or a copy of self with only the selected keys"
 
     @abstractmethod
-    def keys(self, _1 = None, _2 = None) -> Iterator:
+    def keys(self, _1 = None) -> Iterator:
         "iterates over keys"
         assert _1 is None # should not be necessary: dicts can't do that
-        assert _2 is None # should not be necessary: dicts can't do that
         return iter(tuple())
 
 class TransformedTrackView:
@@ -66,9 +65,9 @@ class TransformedTrackView:
         self.__run()
         return self._parent.data[val]
 
-    def keys(self, _1 = None, _2 = None) -> Iterator:
+    def keys(self, _1 = None) -> Iterator:
         "iterates over keys"
-        assert _1 is None and _2 is None
+        assert _1 is None
         yield from self._data.keys()
 
     def __run(self):

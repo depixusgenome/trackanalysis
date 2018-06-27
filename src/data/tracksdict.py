@@ -326,7 +326,7 @@ class TracksDict(dict):
         if len(keys) == 0:
             keys = tuple(self.keys())
 
-        fcn   = lambda key: set(cast(Track, self[key]).beadsonly.keys())
+        fcn   = lambda key: set(cast(Track, self[key]).beads.keys())
         beads = None # type: Optional[Set[BEADKEY]]
         with ThreadPoolExecutor(self._NTHREADS) as pool:
             for cur in pool.map(fcn, keys):
@@ -339,7 +339,7 @@ class TracksDict(dict):
         if len(keys) == 0:
             keys = tuple(self.keys())
 
-        fcn   = lambda key: set(cast(Track, self[key]).beadsonly.keys())
+        fcn   = lambda key: set(cast(Track, self[key]).beads.keys())
         beads = set() # type: Set[BEADKEY]
         with ThreadPoolExecutor(self._NTHREADS) as pool:
             for cur in pool.map(fcn, keys):
@@ -352,7 +352,7 @@ class TracksDict(dict):
             return sorted(super().keys())
 
         beads = set(abeads)
-        fcn   = lambda key: (key, len(beads - set(cast(Track, self[key]).beadsonly.keys())))
+        fcn   = lambda key: (key, len(beads - set(cast(Track, self[key]).beads.keys())))
         keys  = [] # type: list
         with ThreadPoolExecutor(self._NTHREADS) as pool:
             for key, cur in pool.map(fcn, tuple(super().keys())):

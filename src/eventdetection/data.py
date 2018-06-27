@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Finds peak positions on a bead"
-from typing           import (Iterator, Tuple, Union, Sequence,
-                              Optional, cast, TYPE_CHECKING)
+from typing           import Iterator, Tuple, Union, Sequence, cast, TYPE_CHECKING
 from copy             import deepcopy
 from functools        import wraps
 import numpy          as     np
@@ -87,8 +86,8 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
 
     if TYPE_CHECKING:
         # pylint: disable=useless-super-delegation
-        def keys(self, sel = None, beadsonly:Optional[bool] = None) -> Iterator[CYCLEKEY]:
-            yield from super().keys(sel, beadsonly)
+        def keys(self, sel = None) -> Iterator[CYCLEKEY]:
+            yield from super().keys(sel)
 
         def __getitem__(self, keys) -> Union['Events', Sequence[EVENTS_TYPE]]:
             return cast(Union['Events', Sequence[EVENTS_TYPE]], super().__getitem__(keys))

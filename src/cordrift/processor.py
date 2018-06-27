@@ -107,7 +107,7 @@ class _BeadDriftAction:
 
     def onCycles(self, frame):
         "Applies the cordrift subtraction to parallel cycles"
-        beads  = frame.new(data = dict(frame[...].withbeadsonly()))
+        beads  = frame.new(data = dict(frame[...]))
         for icyc in frame.cyclerange():
             cyc = beads[...,icyc].withphases(self.task.phases)
             self.run(frame.parents+(icyc,), cyc)
@@ -116,7 +116,7 @@ class _BeadDriftAction:
 
     def poolOnCycles(self, pool, pickled, frame): # pylint: disable=too-many-locals
         "Applies the cordrift subtraction to parallel cycles"
-        rawprecision(frame.track, frame[...].withbeadsonly().keys()) # compute & freeze precisions
+        rawprecision(frame.track, frame[...].keys()) # compute & freeze precisions
         if getattr(frame.cycles, 'start', None) is not None:
             raise NotImplementedError("*you* do it!")
 
@@ -124,7 +124,7 @@ class _BeadDriftAction:
                            cycles = frame.cycles)
 
         rng    = list(orig.cyclerange())
-        beads  = orig[...].withbeadsonly().withcycles(...)
+        beads  = orig[...].withcycles(...)
         cycles = []
         for iproc in range(pool.nworkers):
             chk = poolchunk(rng, pool.nworkers, iproc)
@@ -152,7 +152,7 @@ class DriftProcessor(Processor[DriftTask]):
     @classmethod
     def _onbeads(cls, cache, kwa, frame):
         action = cls._ACTION(kwa, cache = cache)
-        return frame.new().withaction(action.onBead, beadsonly = True)
+        return frame.new().withaction(action.onBead)
 
     @classmethod
     def _oncycles_no_pool(cls, cache, kwa, frame):

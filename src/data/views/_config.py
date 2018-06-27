@@ -65,7 +65,6 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
     data:      TRACK_VIEW             = None
     selected:  List                   = None
     discarded: List                   = None
-    beadsonly                         = False
     actions:   List                   = []
     parents:   Union[Tuple, Hashable] = tuple()
     _COPY:     bool                   = None
@@ -75,7 +74,6 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
         self.data      = get('data')
         self.parents   = get('parents')
         self.actions   = get('actions')
-        self.beadsonly = get('beadsonly')
 
         self.__selection('selected',  get('selected'),  False)
         self.__selection('discarded', get('discarded'), False)
@@ -105,11 +103,6 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
                  and isint(key[0])
                 ) or isint(key))
 
-    def withbeadsonly(self:CSelf, beadsonly = True) -> CSelf:
-        "discards all but beads"
-        self.beadsonly = beadsonly
-        return self
-
     @staticmethod
     def _f_samples(samples, _, info):
         return info[0], info[1][samples]
@@ -135,15 +128,7 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
     def _f_all(_, fcn, items):
         return items[0], fcn(items[1])
 
-    @staticmethod
-    def _f_beads(fcn, frame, items):
-        return items[0], (fcn(items[1]) if frame.isbead(items[0]) else items[1])
-
-    @staticmethod
-    def _a_beads(fcn, frame, items):
-        return fcn(frame, items) if frame.isbead(items[0]) else items
-
-    def withfunction(self:CSelf, fcn = None, clear = False, beadsonly = False) -> CSelf:
+    def withfunction(self:CSelf, fcn = None, clear = False) -> CSelf:
         "Adds an action with fcn taking a value as single argument"
         if clear:
             self.actions = []
@@ -157,13 +142,10 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
             msg = f'Function {fcn} should have a single positional argument'
             raise TypeError(msg) from exc
 
-        if beadsonly:
-            self.actions.append(partial(self._f_all, fcn))
-        else:
-            self.actions.append(partial(self._f_beads, fcn))
+        self.actions.append(partial(self._f_all, fcn))
         return self
 
-    def withaction(self:CSelf, fcn = None, clear = False, beadsonly = False) -> CSelf:
+    def withaction(self:CSelf, fcn = None, clear = False) -> CSelf:
         "Adds an action with fcn taking a (key, value) pair as single argument"
         if clear:
             self.actions = []
@@ -178,7 +160,7 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
                    ' positional arguments: TrackView, Tuple[key, value]')
             raise TypeError(msg) from exc
 
-        self.actions.append(fcn if beadsonly else partial(self._a_beads, fcn))
+        self.actions.append(fcn)
         return self
 
     def withdata(self:CSelf, dat, fcn = None) -> CSelf:

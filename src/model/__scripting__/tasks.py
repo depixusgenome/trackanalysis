@@ -238,11 +238,11 @@ class Tasks(Enum):
         return type(self.default())
 
     @classmethod
-    def create(cls, *args, beadsonly = True, **kwa):
+    def create(cls, *args, **kwa):
         "returns the task associated to the argument"
         if len(args) == 1:
-            return cls.__create(args[0], kwa, beadsonly)
-        return [cls.__create(i, kwa, beadsonly) for i in args]
+            return cls.__create(args[0], kwa)
+        return [cls.__create(i, kwa) for i in args]
 
     @classmethod
     def defaulttaskorder(cls, order = None) -> Tuple[Type[Task],...]:
@@ -321,9 +321,9 @@ class Tasks(Enum):
 
     @classmethod
     @_DOCHelper.add(header = "These can be:")
-    def processors(cls, *args, copy = True, beadsonly = True) -> ProcessorController:
+    def processors(cls, *args, copy = True) -> ProcessorController:
         "Return a `ProcessorController` containing selected tasks."
-        procs      = _create(*cls.tasklist(*args, beadsonly = beadsonly))
+        procs      = _create(*cls.tasklist(*args))
         procs.copy = copy
         return procs
 
@@ -367,9 +367,9 @@ class Tasks(Enum):
 
     @classmethod
     @_DOCHelper.add(header = "These can be:")
-    def _apply_cls(cls, *args, copy = True, beadsonly = True, pool = None) -> TrackView:
+    def _apply_cls(cls, *args, copy = True, pool = None) -> TrackView:
         "Return an iterator over the result of selected tasks."
-        procs = cls.processors(*args, beadsonly = beadsonly)
+        procs = cls.processors(*args)
         ret   = isinstance(pool, bool)
         if ret:
             pool = ProcessPoolExecutor()
@@ -489,7 +489,7 @@ class Tasks(Enum):
 
 
     @classmethod
-    def __create(cls, arg, kwa, beadsonly): # pylint: disable=too-many-return-statements
+    def __create(cls, arg, kwa): # pylint: disable=too-many-return-statements
         if isinstance(arg, cls):
             return arg(**kwa)
 
@@ -513,7 +513,6 @@ class Tasks(Enum):
                     and isinstance(i, (Path, str)) for i in arg)):
             info = dict(kwa)
             info.setdefault('path', arg)
-            info.setdefault('beadsonly', beadsonly)
             return TrackReaderTask(**info)
 
         if isinstance(arg, (tuple, list)) and len(arg) == 2:

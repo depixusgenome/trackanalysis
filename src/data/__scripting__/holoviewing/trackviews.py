@@ -193,7 +193,7 @@ class BeadDisplay(Display, display = Beads):
 
     def _perall(self):
         if self._area:
-            keys = self._keys if self._keys else self._items.beadsonly.keys()
+            keys = self._keys if self._keys else self._items.beads.keys()
             return hv.Overlay([self._perbead(i) for i in keys])
         return self._run(self._items)
 

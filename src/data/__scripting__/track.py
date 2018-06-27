@@ -152,18 +152,18 @@ class _TrackMixin:
     __doc__  = ('    * `op` a'+TrackOperations.__doc__[6:]
                 +'\n    * `pathinfo` p'+PathInfo.__doc__[6:])
     cleaned = LazyProperty('cleaned')
-    def tasklist(self, *args, beadsonly = True):
+    def tasklist(self, *args):
         "creates a tasklist"
-        return Tasks.tasklist(self.path, *args, beadsonly = beadsonly)
+        return Tasks.tasklist(self.path, *args)
 
-    def processors(self, *args, copy = True, beadsonly = True):
+    def processors(self, *args, copy = True):
         "returns an iterator over the result of provided tasks"
-        procs = Tasks.processors(self.path, *args, beadsonly = beadsonly)
+        procs = Tasks.processors(self.path, *args)
         procs.data.setCacheDefault(0, self)
         procs.copy = copy
         return procs
 
-    def apply(self, *args, copy = True, beadsonly = True) -> TrackView:
+    def apply(self, *args, copy = True) -> TrackView:
         """
         Return an iterator over the result of provided tasks.
 
@@ -178,7 +178,7 @@ class _TrackMixin:
         If no Ellipsis is introduced, the list of tasks is completed using the reduced
         list in `Tasks.defaulttaskorder`. This list does not include any cleaning task.
         """
-        return next(iter(self.processors(*args, beadsonly = beadsonly).run(copy = copy)))
+        return next(iter(self.processors(*args).run(copy = copy)))
 
     @property
     def cleanbeads(self) -> Beads:
@@ -209,7 +209,7 @@ class _TrackMixin:
         if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
             beads = tuple(beads[0])
         if len(beads) == 0:
-            beads = tuple(self.beadsonly.keys()) # type: ignore
+            beads = tuple(self.beads.keys()) # type: ignore
         fcn = lambda i: renamebeads(selectbeads(cast(self, Task), i), (i, 0)) # type: ignore
         return TracksDict({i: fcn(i) for i in beads})
 
@@ -231,8 +231,6 @@ class _TrackMixin:
 
 addattributes(Track, protected = dict(cleaned = False))
 Track.cycles    .args['copy'] = True
-Track.cyclesonly.args['copy'] = True
 Track.beads     .args['copy'] = True
-Track.beadsonly .args['copy'] = True
 
 __all__ = ['Track']

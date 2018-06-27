@@ -106,7 +106,6 @@ class RootTask(Task):
 class DataFunctorTask(Task):
     "Adds it's task to the TrackItem using *withfunction*"
     copy      = False
-    beadsonly = True
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -121,6 +120,6 @@ class DataFunctorTask(Task):
 
         if self.copy:
             fcn = lambda val: cpy(np.copy(val)) # pylint: disable=not-callable
-            return lambda dat: dat.withfunction(fcn, beadsonly = self.beadsonly)
+            return lambda dat: dat.withfunction(fcn)
 
-        return lambda dat: dat.withfunction(cpy, beadsonly = self.beadsonly)
+        return lambda dat: dat.withfunction(cpy)

@@ -277,7 +277,7 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
         action = getattr(cls, '_apply_'+mode.name)
 
         def _apply(frame):
-            return frame.withaction(partial(action, kwa), beadsonly = True)
+            return frame.withaction(partial(action, kwa))
         return _apply if toframe is None else _apply(toframe)
 
     def run(self, args):

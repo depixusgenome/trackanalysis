@@ -348,7 +348,7 @@ class Handler:
         self.path    = path
         self.handler = handler
 
-    def __call__(self, track = None, beadsonly = False) -> "Track":
+    def __call__(self, track = None) -> "Track":
         path = self.path
         if (not isinstance(path, (str, Path))) and len(path) == 1:
             path = path[0]
@@ -362,7 +362,7 @@ class Handler:
                                    axis   = getattr(track, 'axis',   'Zaxis'))
         state  = track.__getstate__()
         self.__fov (state, kwargs)
-        self.__data(state, kwargs, beadsonly)
+        self.__data(state, kwargs)
 
         state.update(kwargs)
         state.update(path = path)
@@ -391,6 +391,7 @@ class Handler:
 
         sec = track.secondaries.data
         if sec:
+            data.update((i, sec.pop(i)) for i  in set(sec) & {'zmag', 't'})
             vcap = sec.pop('vcap', None)
             if vcap is not None:
                 data['vcap']  = vcap['index'], vcap['zmag'], vcap['vcap']
@@ -437,7 +438,7 @@ class Handler:
         return res
 
     @staticmethod
-    def __data(state, kwargs, beadsonly):
+    def __data(state, kwargs):
         if kwargs is None:
             data = {} # type: Dict[str, Union[float, np.ndarray, str]]
             sec  = {} # type: Dict[str, np.ndarray]
@@ -447,11 +448,10 @@ class Handler:
             sec  = {i: np.array(list(zip(*kwargs.pop(i))),
                                 dtype = dtpe if i[0] == 'T' else vtpe)
                     for i in ('vcap', 'Tservo', 'Tsink', 'Tsample') if i in kwargs}
+            sec.update({i: kwargs.pop(i) for i in set(kwargs) & {"t", "zmag"}})
 
             data = {i: kwargs.pop(i) for i in tuple(kwargs)
                     if isinstance(kwargs[i], np.ndarray) and len(kwargs[i].shape) == 1}
-            if beadsonly:
-                data = {i: j for i, j in data if Track.isbeadname(i)}
         state['data']        = data
         state['secondaries'] = sec
 
@@ -492,9 +492,9 @@ def checkpath(track, **opts) -> Handler:
     """
     return Handler.check(track, **opts)
 
-def opentrack(track, beadsonly = False):
+def opentrack(track):
     "Opens a track depending on its extension"
-    checkpath(track)(track, beadsonly)
+    checkpath(track)(track)
 
 N_SAVE_THREADS = 4
 def _savetrack(args):

@@ -298,7 +298,7 @@ def test_minmaxprocessor():
     track   = randtrack(driftargs = None, baselineargs = (.1, None, 'rand'))
     inipos  = [i.mean() for i in track.cycles.withphases(PHASE.initial).values()]
 
-    bead    = ExtremumAlignmentProcessor.apply(track.beadsonly,
+    bead    = ExtremumAlignmentProcessor.apply(track.beads,
                                                phase = AlignmentTactic.initial,
                                                edge  = None)
     corrpos = [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
@@ -310,7 +310,7 @@ def test_edgeminmaxprocessor():
     track   = randtrack(driftargs = None, baselineargs = (.1, None, 'rand'))
     inipos  = [i.mean() for i in track.cycles.withphases(PHASE.initial).values()]
 
-    bead    = ExtremumAlignmentProcessor.apply(track.beadsonly,
+    bead    = ExtremumAlignmentProcessor.apply(track.beads,
                                                phase = AlignmentTactic.onlyinitial,
                                                edge  = 'right')
     corrpos = [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
@@ -323,7 +323,7 @@ def test_initial_alignment():
         track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'))
         ini     = track.cycles.withphases(PHASE.initial)[0,0]
         ini    += (track.cycles.withphases(PHASE.pull)[0,0].mean()-ini.mean())*.5
-        bead    = ExtremumAlignmentProcessor.apply(track.beadsonly, phase = phase)
+        bead    = ExtremumAlignmentProcessor.apply(track.beads, phase = phase)
         return [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
 
     inipos  = _create(AlignmentTactic.onlyinitial)
@@ -410,7 +410,7 @@ def test_precision():
                        nbeads   = 1,
                        ncycles  = 100)
 
-    data  = track.beadsonly.new(Events)
+    data  = track.beads.new(Events)
     found = np.array([len(i) for _, i in data[0,...]], dtype = 'i4')
     sizes = getattr(track, 'simulator')[0]['sizes']
     sim   = np.sum(sizes >= data.events.select.minduration, 1)

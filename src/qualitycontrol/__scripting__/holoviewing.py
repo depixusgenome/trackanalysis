@@ -192,7 +192,7 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
         ovr = {}
         dim = hv.Dimension('extents', unit = 'µm')
         for key, track in self.tracks.items():
-            if bead in set(track.beadsonly.keys()):
+            if bead in set(track.beads.keys()):
                 mins          = extr(track, PHASE.initial)
                 maxs          = extr(track, PHASE.pull)
                 keys          = sorted(set(mins) & set(maxs))

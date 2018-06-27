@@ -122,7 +122,7 @@ class HybridstatBatchProcessor(BatchProcessor[HybridstatBatchTask]):
         "creates a specific model for each path"
         modl    = deepcopy(modl)
 
-        track   = TrackReaderTask(path = checkpath(paths.track).path, beadsonly = True)
+        track   = TrackReaderTask(path = checkpath(paths.track).path)
         oligos  = cls.__oligos(track, paths.oligos)
         cls.__identity(oligos, paths, modl)
 

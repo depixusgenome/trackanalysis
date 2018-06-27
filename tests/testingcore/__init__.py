@@ -14,10 +14,10 @@ warnings.filterwarnings('ignore', category = DeprecationWarning,
                         message  = '.*generator .* raised StopIteration.*')
 np.seterr(all='raise')
 
-def _trackreadertask(fpath, beadsonly = True):
+def _trackreadertask(fpath):
     from model.task     import TrackReaderTask
     from data.trackio   import checkpath
-    return TrackReaderTask(path = checkpath(fpath).path, beadsonly = beadsonly)
+    return TrackReaderTask(path = checkpath(fpath).path)
 
 def big_selected():
     "returns a TrackReaderTask on 2 GR files"

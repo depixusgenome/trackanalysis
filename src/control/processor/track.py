@@ -26,7 +26,7 @@ class InMemoryTrackProcessor(Processor[_tasks.InMemoryTrackTask]):
     @staticmethod
     def beads(cache, selected: Iterable[int]) -> Iterable[int]: # pylint: disable=unused-argument
         "Beads selected/discarded by the task"
-        return cache.beadsonly.keys()
+        return cache.beads.keys()
 
 class TrackReaderProcessor(Processor[_tasks.TrackReaderTask]):
     "Generates output from a _tasks.CycleCreatorTask"
@@ -39,7 +39,6 @@ class TrackReaderProcessor(Processor[_tasks.TrackReaderTask]):
         "updates frames"
         task  = cast(_tasks.TrackReaderTask, self.task)
         attr  = 'cycles' if task.levelou is Level.cycle else 'beads'
-        attr += 'only'   if task.beadsonly              else ''
         if isinstance(task.path, dict):
             trk = args.data.setCacheDefault(self, TracksDict())
             trk.update(task.path)
@@ -53,7 +52,7 @@ class TrackReaderProcessor(Processor[_tasks.TrackReaderTask]):
     @staticmethod
     def beads(cache, selected: Iterable[int]) -> Iterable[int]: # pylint: disable=unused-argument
         "Beads selected/discarded by the task"
-        return cache.beadsonly.keys()
+        return cache.beads.keys()
 
 class CycleCreatorProcessor(Processor[_tasks.CycleCreatorTask]):
     "Generates output from a _tasks.CycleCreatorTask"

@@ -34,21 +34,18 @@ class _MyItem(ITrackView):
     def __copy__(self):
         return _MyItem(self.vals)
 
-    def keys(self, sel = None, beadsonly = None):
+    def keys(self, sel = None):
         assert sel is None
-        assert beadsonly is None
         yield from self.vals.keys()
 
 def test_beaditerkeys():
     "tests wether keys are well listed"
-    track = data.Track(path = utpath("small_legacy"), beadsonly = False)
+    track = data.Track(path = utpath("small_legacy"))
     beads = lambda: data.Beads(track = track, data = _MyItem(track.data))
-    vals  = {i for i in range(92)} | {'zmag', 't'}
+    vals  = {i for i in range(92)}
 
     assert len(tuple(beads().keys()))                 == len(vals)
     assert len(tuple(i for i, _ in beads()))          == len(vals)
-    assert len(tuple(beads().selecting(['t', 0]).withbeadsonly().keys())) == len({0})
-    assert len(tuple(beads().withbeadsonly().keys())) == len((vals-{'zmag', 't'}))
     assert len(tuple(beads().selecting(all).keys()))  == len(vals)
     assert len(tuple(beads().selecting(None).keys())) == len(vals)
     assert len(tuple(beads()[:].keys())) == len(vals)
@@ -57,14 +54,11 @@ def test_beaditerkeys():
 
     assert set(beads().keys())                 == vals
     assert set(i for i, _ in beads())          == vals
-    assert set(beads().selecting(['t', 0]).withbeadsonly().keys()) == {0}
-    assert set(beads().withbeadsonly().keys()) == (vals-{'zmag', 't'})
     assert set(beads().selecting(all).keys())  == vals
     assert set(beads().selecting(None).keys()) == vals
     assert set(beads()[:].keys()) == vals
     assert set(beads()[:2].keys()) == {0, 1}
     assert set(beads()[:2][1:5].keys()) == {1} # pylint: disable=unsubscriptable-object
-    assert isinstance(beads()['t'], np.ndarray)
     assert isinstance(beads()[0],   np.ndarray)
 
     sel = track.beads
@@ -82,9 +76,9 @@ def test_beaditerkeys():
 
 def test_cycles_iterkeys():
     "tests wether keys are well listed"
-    track = data.Track(path = utpath("big_legacy"), beadsonly = False)
+    track = data.Track(path = utpath("big_legacy"))
     cycs  = lambda: data.Cycles(track = track, data = _MyItem(track.data))
-    cids  = lambda _: {(i,_) for i in range(39)} | {('zmag', _), ('t', _)}
+    cids  = lambda _: {(i,_) for i in range(39)}
     bids  = lambda _: {(_,i) for i in range(102)}
     assert len(tuple(cycs().selecting(0).keys()))  == len(bids(0))
     assert len(tuple(cycs()[:,0].keys()))          == len(cids(0))
@@ -94,7 +88,6 @@ def test_cycles_iterkeys():
     assert len(tuple(cycs()[0,...].keys()))        == len(bids(0))
     assert len(tuple(cycs()[0,:].keys()))          == len(bids(0))
     assert len(tuple(cycs()[0,2:5].keys()))        == len({i for i in bids(0) if 2<= i[1] < 5})
-    assert len(tuple(cycs()['zmag',...].keys()))   == len(bids('zmag'))
 
     assert set  (cycs().selecting(0).keys())     == bids(0)
     assert tuple(cycs().selecting((0,0)).keys()) == ((0,0),)
@@ -105,19 +98,14 @@ def test_cycles_iterkeys():
     assert set  (cycs()[0,...].keys())           == bids(0)
     assert set  (cycs()[0,:].keys())             == bids(0)
     assert set  (cycs()[0,2:5].keys())           == {i for i in bids(0) if 2<= i[1] < 5}
-    assert set  (cycs()['zmag',...].keys())      == bids('zmag')
     assert set(i[0] for i in (cycs()
-                              .selecting([('t',...), (0,...)])
-                              .withbeadsonly().keys())) == {0}
-    assert {"t", "zmag"} - set(i[0] for i in cycs().withbeadsonly().keys())  == {'t', 'zmag'}
+                              .selecting([(0,...)]).keys())) == {0}
 
     assert (tuple(cycs()
                   .selecting((0,all))
                   .discarding((0,i) for i in range(10, 200))
                   .keys())
             == tuple((0,i) for i in range(10)))
-
-    assert isinstance(cycs()[('zmag',0)], np.ndarray)
 
     truth = readtrack(utpath("big_legacy"))[0]
     for _, vals in cycs().selecting((0,1)):
@@ -128,7 +116,7 @@ def test_cycles_iterkeys():
 
 def test_cycles_iterkeys2():
     "tests wether keys are well listed"
-    track = data.Track(path = utpath("big_legacy"), beadsonly = False)
+    track = data.Track(path = utpath("big_legacy"))
     beads = track.beads.withcycles(range(5, 15))
     cycles = beads.new(data.Cycles)
     assert len(tuple(cycles[0, ...])) == 10
@@ -140,7 +128,7 @@ def test_cycles_iterkeys2():
 
 def test_cycles_mixellipsisnumbers():
     "mixing ellipis and lists of numbers in the indexes"
-    track = data.Track(path = utpath("big_legacy"), beadsonly = False)
+    track = data.Track(path = utpath("big_legacy"))
     beads = lambda: data.Beads(track = track, data = _MyItem(track.data))
     assert (tuple(beads()[..., np.arange(5)].selected)
             == tuple((..., i) for i in range(5)))
@@ -235,7 +223,7 @@ def test_loadgrdir():
         track = data.Track(path = paths)
         keys  = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
                  24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
-        assert set(track.beadsonly.keys()) == keys
+        assert set(track.beads.keys()) == keys
 
         keys  = {17, 23, 41, 14, 31, 45, 18, 37, 44,  7, 32,  6, 48, 22, 24, 47, 28,
                  19, 30, 25, 43, 42,  8, 26, 16, 12,  9, 33, 35, 27,  3, 10, 21, 15,
@@ -252,14 +240,14 @@ def test_findgrdir():
     track   = data.Track(path = paths)
     keys    = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
                24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
-    assert set(track.beadsonly.keys()) == keys
+    assert set(track.beads.keys()) == keys
 
     trkpath = str(Path(cast(str, utpath("big_legacy"))).parent/'*.trk')
     paths   = trkpath, utpath("big_grlegacy")
     track   = data.Track(path = paths)
     keys    = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
                24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
-    assert set(track.beadsonly.keys()) == keys
+    assert set(track.beads.keys()) == keys
 
 def test_scancgr():
     "tests LegacyGRFilesIO.scancgr"
@@ -373,7 +361,8 @@ def test_selectcycles():
     assert other.ncycles == 5
     assert set(other.beads.keys()) == set(trk.beads.keys())
     assert_allclose(other.phases, trk.phases[:5,:]-trk.phases[0,0])
-    assert_allclose(other.beads['t'], trk.beads['t'][:trk.phases[5,0]-trk.phases[0,0]])
+    assert_allclose(other.secondaries.seconds,
+                    trk.secondaries.seconds[:trk.phases[5,0]-trk.phases[0,0]])
 
     other = selectcycles(trk, [2, 4, 10])
     assert other.ncycles == 3
@@ -389,17 +378,17 @@ def test_concatenate():
     'test whether two Track stack properly'
     trk1 = Track(path = utpath("small_legacy"))
     trk2 = dropbeads(Track(path = utpath("small_legacy")),0)
-    size1, size2 = trk1.data["t"].size, trk2.data["t"].size
+    size1, size2 = [next(iter(x.data.values())).size for x  in (trk1, trk2)]
     trk  = concatenatetracks(trk1, trk2)
 
     assert set(trk.data.keys())==(set(trk1.data.keys())|set(trk2.data.keys()))
-    assert all((trk.data["t"][1:]-trk.data["t"][:-1])==1)
+    assert all((trk.secondaries.seconds[1:]-trk.secondaries.seconds[:-1])==1)
     assert all(np.isnan(trk.data[0][-size2:]))
     assert all(~np.isnan(trk.data[0][:size1]))
 
     assert_allclose(trk.phases[:len(trk1.phases)],trk1.phases)
     assert_allclose(trk.phases[len(trk1.phases):],
-                    trk2.phases+trk1.data["t"][-1]-trk2.data["t"][0]+1)
+                    trk2.phases+trk1.secondaries.seconds[-1]-trk2.secondaries.seconds[0]+1)
 
 def test_clone():
     'test whether two Track stack properly'

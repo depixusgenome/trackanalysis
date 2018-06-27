@@ -26,7 +26,7 @@ class BeadController:
     def allbeads(self) -> Iterator[int]:
         "returns all beads"
         track = self.track
-        return iter(()) if track is None else cast(Iterator[int], track.beadsonly.keys())
+        return iter(()) if track is None else cast(Iterator[int], track.beads.keys())
 
     @property
     def availablebeads(self) -> Iterable[int]:

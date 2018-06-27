@@ -80,8 +80,8 @@ class Cycles(TrackView, ITrackView):
         "whether the data keys are directly cycle keys"
         self._direct = i
 
-    def __keysfrombeads(self, sel, beadsonly):
-        beads     = tuple(self.track.beads.new(data = self.data).keys(None, beadsonly))
+    def __keysfrombeads(self, sel):
+        beads     = tuple(self.track.beads.new(data = self.data).keys(None))
         if hasattr(self.data, 'cyclerange'):
             allcycles = self.data.cyclerange()
         else:
@@ -90,7 +90,6 @@ class Cycles(TrackView, ITrackView):
             yield from ((col, cid) for col in beads for cid in allcycles)
             return
 
-        isbead = self.track.beads.isbead
         for thisid in sel: # pylint: disable=too-many-nested-blocks
             if isellipsis(thisid):
                 yield from ((col, cid) for col in beads for cid in allcycles)
@@ -104,18 +103,12 @@ class Cycles(TrackView, ITrackView):
                     yield from ((col, cid) for col in beads for cid in allcycles)
                 elif isellipsis(bid):
                     yield from ((bid, tmp) for bid in beads)
-                elif beadsonly and not isbead(bid):
-                    continue
                 elif isellipsis(tmp):
                     yield from ((bid, cid) for cid in allcycles)
                 else:
                     yield (bid, tmp)
 
-    def __keysdirect(self, sel, beadsonly):
-        if beadsonly:
-            isbead = self.isbead
-            yield from (i for i in self.__keysdirect(sel, False) if isbead(i))
-
+    def __keysdirect(self, sel):
         if sel is None:
             yield from self.data.keys()
             return
@@ -137,18 +130,18 @@ class Cycles(TrackView, ITrackView):
                 else:
                     yield (bid, tmp)
 
-    def _keys(self, sel, beadsonly) -> Iterable[CYCLEKEY]:
+    def _keys(self, sel) -> Iterable[CYCLEKEY]:
         if isinstance(self.data, Cycles):
             data = cast(Cycles, self.data)
             if sel is None:
-                yield from data.keys(None, beadsonly)
+                yield from data.keys(None)
             else:
-                yield from self.__keysdirect(sel, beadsonly)
+                yield from self.__keysdirect(sel)
 
         elif self.direct:
-            yield from self.__keysdirect(sel, beadsonly)
+            yield from self.__keysdirect(sel)
         else:
-            yield from self.__keysfrombeads(sel, beadsonly)
+            yield from self.__keysfrombeads(sel)
 
     def __iterfrombeads(self, sel = None):
         first   = 0                  if self.first is None else self.first
@@ -237,19 +230,13 @@ class Cycles(TrackView, ITrackView):
         last = self.track.phase.select(..., self.last+1)
         return np.max(last - first)
 
-    @staticmethod
-    def isbead(key:CYCLEKEY) -> bool:
-        "returns whether the key is one for a bead"
-        return isint(key[0])
-
     if TYPE_CHECKING:
         # pylint: disable=useless-super-delegation
         def __getitem__(self, keys) -> Union['Cycles',np.ndarray]:
             return super().__getitem__(keys)
 
         def keys(self,
-                 sel      :Optional[Sequence] = None,
-                 beadsonly:Optional[bool]     = None) -> Iterator[CYCLEKEY]:
+                 sel      :Optional[Sequence] = None) -> Iterator[CYCLEKEY]:
             yield from super().keys(sel)
 
         def __iter__(self) -> Iterator[Tuple[CYCLEKEY, np.ndarray]]:

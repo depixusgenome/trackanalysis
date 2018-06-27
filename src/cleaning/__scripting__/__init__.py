@@ -81,7 +81,7 @@ class TrackCleaningScript:
         "returns a dictionnary of cleaning results"
         get  = lambda x: x if x is None else x.args[0]
 
-        itms = self.track.beadsonly
+        itms = self.track.beads
         sub  = self.track.tasks.subtraction # type: ignore
         if sub is not None:
             cache: dict = {}
@@ -129,7 +129,7 @@ class TrackCleaningScript:
 
         if forceclean or self.track.cleaned is False: # type: ignore
             if beads:
-                good = set(self.track.beadsonly.keys())
+                good = set(self.track.beads.keys())
                 cur  = [i for i in beads if i in good]
             else:
                 cur  = None
@@ -143,7 +143,7 @@ class TrackCleaningScript:
                 msgs .extend([i[2] for i in itms])
                 ids.extend((cast(int, i),)*(len(msgs)-len(ids)))
 
-        miss = list(set(beads)-set(self.track.beadsonly.keys())) if beads else []
+        miss = list(set(beads)-set(self.track.beads.keys())) if beads else []
         cycs .extend([self.track.ncycles]*len(miss))
         types.extend(['missing']*len(miss))
         msgs .extend([''] *len(miss))
@@ -161,7 +161,7 @@ class TrackCleaningScript:
         return a dataframe with all test values
         """
         if beads:
-            good = set(self.track.beadsonly.keys())
+            good = set(self.track.beads.keys())
             cur  = [i for i in beads if i in good]
         else:
             cur  = None
@@ -266,7 +266,7 @@ class TracksDictCleaningScript:
         bad : Set[BEADKEY] = (set(self.tracks.availablebeads()) - good)
         cur:  Set[BEADKEY] = (bad | good) if beads is None else set(beads)
         for track in self.tracks.values():
-            tmp = (set(track.beadsonly.keys())-bad) & cur
+            tmp = (set(track.beads.keys())-bad) & cur
             if tmp:
                 bad.update(track.cleaning.bad(tmp,**kwa))
         return bad & cur, (good-bad) & cur

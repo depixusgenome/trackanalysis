@@ -112,7 +112,7 @@ class TaskPlotModelAccess(PlotModelAccess):
         if bead is None:
             track = self.track
             if track is not None:
-                return next(iter(track.beadsonly.keys()))
+                return next(iter(track.beads.keys()))
         return bead
 
     def impacts(self, root:RootTask, task:Task) -> bool:

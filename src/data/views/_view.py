@@ -22,12 +22,12 @@ class TrackView(TrackViewConfigMixin, ITrackView):
     def __init__(self, **kw) -> None:
         super().__init__(**kw)
 
-    def _keys(self, sel:Optional[Sequence], beadsonly: bool) -> Iterable:
+    def _keys(self, sel:Optional[Sequence]) -> Iterable:
         itr    = iter(self.data.keys())
         if sel is not None:
             keys = frozenset(itr)
             itr  = (i for i in sel if i in keys)
-        yield from ((i for i in itr if self.isbead(i)) if beadsonly else itr)
+        yield from itr
 
     def _iter(self, sel = None) -> Iterator[Tuple[Any,Any]]:
         if sel is None:
@@ -85,21 +85,16 @@ class TrackView(TrackViewConfigMixin, ITrackView):
         kwa.setdefault('parents',   self.parents)
         return (type(self) if tpe is None else tpe)(**kwa)
 
-    def keys(self,
-             sel      :Optional[Sequence] = None,
-             beadsonly:Optional[bool]     = None) -> Iterator:
+    def keys(self, sel :Optional[Sequence] = None) -> Iterator:
         "returns accepted keys"
         self.__unlazyfy()
         if sel is None:
             sel = self.selected
-        if beadsonly is None:
-            beadsonly = self.beadsonly
-
         if self.discarded is None:
-            yield from self._keys(sel, beadsonly)
+            yield from self._keys(sel)
         else:
-            disc = frozenset(self._keys(self.discarded, None))
-            yield from (key for key in self._keys(sel, beadsonly) if key not in disc)
+            disc = frozenset(self._keys(self.discarded))
+            yield from (key for key in self._keys(sel) if key not in disc)
 
     def values(self) -> Iterator[np.ndarray]:
         "returns the values only"
