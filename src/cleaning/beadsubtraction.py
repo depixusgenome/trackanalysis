@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Task & Processor for subtracting beads from other beads"
-from   typing                       import List, Iterable, Union, cast
+from   typing                       import List, Iterable, Tuple, Union, cast
 from   functools                    import partial
 from   itertools                    import repeat
 import warnings
 
 import numpy                        as     np
+import pandas                       as     pd
 
 from   control.processor            import Processor
-from   data.views                   import Cycles, Beads
+from   data.views                   import Cycles, Beads, BEADKEY
 from   model                        import Task, Level, PHASE
 from   signalfilter.noisereduction  import Filter
 from   utils                        import initdefaults
+from   .datacleaning                import AberrantValuesRule
 from   ._core                       import constant as _cleaningcst # pylint: disable=import-error
 
 class SubtractAverageSignal:
@@ -20,7 +22,7 @@ class SubtractAverageSignal:
     Subtracts the average signal
     """
     @staticmethod
-    def apply(signals):
+    def apply(signals, *_):
         "Aggregates signals"
         if len(signals) == 0:
             return 0.
@@ -172,3 +174,110 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
             raise NotImplementedError()
 
         return task.filter(sub) if task.filter else sub
+
+class FixedBeadDetection:
+    """
+    Finds and sorts fixed beads
+    """
+    abberrant    = AberrantValuesRule()
+    percentiles  = 5., 95.
+    threshold    = 95.
+    maxdiff      = .01
+    diffphases   = PHASE.initial, PHASE.measure
+    maxextent    = .03
+    extentphases = PHASE.initial, PHASE.pull
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        pass
+
+    def extents(self, cycles: Cycles) -> np.ndarray:
+        """
+        computes the bead extension
+        """
+        return (np.array([np.nanmedian(i) for _, i in cycles.withphases(self.extentphases[1])])
+                -[np.nanmedian(i) for _, i in cycles.withphases(self.extentphases[0])])
+
+    def __cycles(self, beads, data):
+        data = np.copy(data)
+        self.abberrant.aberrant(data)
+        return beads.track.cycles.withdata({0: data})
+
+    def cyclesock(self, cycles: Cycles) -> np.ndarray:
+        """
+        computes the cycle sock: percentiles of frame variability over all cycles
+        """
+        items = list(cycles.withphases(*self.diffphases).values())
+        vals  = np.full((len(items), max(len(i) for i in items)), np.NaN, dtype = 'f4')
+        for i, j in zip(vals, items):
+            i[:len(j)]  = j
+            i[:len(j)] -= np.nanmedian(j)
+
+        return np.nanpercentile(vals, self.percentiles, axis=0)
+
+    def dataframe(self, beads: Beads) -> pd.DataFrame:
+        """
+        Creates a dataframe for all beads in  a track.
+        """
+        extmean = []
+        extstd  = []
+        extperc = []
+        varmean = []
+        varstd  = []
+        varperc = []
+        isgood  = []
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore',
+                                    category = RuntimeWarning,
+                                    message  = '.*All-NaN slice encountered.*')
+            warnings.filterwarnings('ignore',
+                                    category = RuntimeWarning,
+                                    message  = '.*Mean of empty slice.*')
+            for _, data in beads:
+                cycs = self.__cycles(beads, data)
+
+                ext  = self.extents(cycs)
+                extmean.append(np.nanmean(ext))
+                extstd .append(np.nanstd (ext))
+                extperc.append(np.nanpercentile(ext, self.threshold))
+
+                ext  = np.diff(self.cyclesock(cycs), axis = 0).ravel()
+                varmean.append(np.nanmean(ext))
+                varstd .append(np.nanstd (ext))
+                varperc.append(np.nanpercentile(ext, self.threshold))
+                isgood.append(extperc[-1] < self.maxextent and varperc[-1] < self.maxdiff)
+
+        return pd.DataFrame(dict(bead    = list(beads.keys()),
+                                 extstd  = extstd,
+                                 extperc = extperc,
+                                 varmean = varmean,
+                                 varstd  = varstd,
+                                 varperc = varperc,
+                                 good    = isgood))
+
+    def __call__(self, beads: Beads) -> List[Tuple[float, float, BEADKEY]]:
+        """
+        Creates a dataframe for all beads in  a track.
+        """
+        items: List[Tuple[float, float, BEADKEY]] = []
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore',
+                                    category = RuntimeWarning,
+                                    message  = '.*All-NaN slice encountered.*')
+            for beadid, data in beads:
+                cycs   = self.__cycles(beads, data)
+                ext    = self.extents(cycs)
+
+                height = np.nanpercentile(ext, self.threshold)
+                if height > self.maxextent:
+                    continue
+
+                delta = np.diff(np.nanpercentile(ext, self.percentiles).ravel(),
+                                axis = 0)[0]
+                if delta < self.maxdiff:
+                    delta = np.nanpercentile(np.diff(self.cyclesock(cycs),
+                                                     axis = 0).ravel(),
+                                             self.threshold)
+                    if delta < self.maxdiff:
+                        items.append((delta, height, beadid))
+        return sorted(items)

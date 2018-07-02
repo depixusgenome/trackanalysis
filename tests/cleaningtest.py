@@ -12,7 +12,7 @@ from cleaning.processor         import (DataCleaningTask, DataCleaningException,
 from cleaning.datacleaning      import (DataCleaning, LocalNaNPopulation,
                                         DerivateIslands)
 from cleaning.beadsubtraction   import (SubtractAverageSignal, SubtractMedianSignal,
-                                        BeadSubtractionProcessor)
+                                        BeadSubtractionProcessor, FixedBeadDetection)
 import cleaning._core           as     cleaningcore # pylint:disable=no-name-in-module
 from simulator                  import randtrack, setseed
 from model.task.track           import TrackReaderTask
@@ -331,5 +331,15 @@ def test_view(bokehaction):
         server.change('Cleaning:Filter', 'subtracted', "11,30")
         server.wait()
 
+def test_fixedbeadsorting():
+    "test fixed bead detection"
+    beads  = next(iter(create(TrackReaderTask(path = utpath("fixedbeads.pk"))).run()))
+    lst    = FixedBeadDetection()(beads)
+    assert len(lst) == 1
+    assert lst[0][-1] == 4
+    frames = FixedBeadDetection().dataframe(beads)
+    assert frames.shape == (4, 7)
+    assert list(frames[frames.good].bead.values) == [0]
+
 if __name__ == '__main__':
-    test_view(bokehaction(None))
+    test_fixedbeadsorting()
