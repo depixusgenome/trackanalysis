@@ -9,7 +9,9 @@ import pandas               as     pd
 import numpy                as     np
 
 from   utils.holoviewing    import hv, addproperty, displayhook, ItemsDisplay
-from   .                    import TrackCleaningScript, TracksDictCleaningScript
+from   .                    import (TrackCleaningScript, TracksDictCleaningScript,
+                                    TrackCleaningScriptData as _TrackCleaningScriptData,
+                                    FixedBeadDetection)
 
 @addproperty(TrackCleaningScript)
 class TrackCleaningDisplay(ItemsDisplay):
@@ -24,6 +26,31 @@ TrackCleaningScript.__doc__ += (
     """
     In **jupyter**, this object automatically displays the list messages.
     """)
+
+@addproperty(TrackCleaningScript, 'data')
+class TrackCleaningScriptData(_TrackCleaningScriptData):
+    """
+    Provides access to certain classes of beads:
+
+    * `track.cleaning.data.fixed`: `Beads` for fixed beads only
+    * `track.cleaning.data.subtraction`: `Beads` for subtraction beads only. The
+    resulting subtracted bead is displayed with id -1.
+    * `track.cleaning.data.bad`: `Beads` for bad beads only
+    * `track.cleaning.data.good`: `Beads` for good beads only
+    """
+    # pylint: disable=arguments-differ
+    def fixed(self, display = True, zrange = (-.02, .04), **kwa):
+        "displays aligned cycles for fixed beads only"
+        data = super().fixed(**kwa)
+        if display:
+            alg    = FixedBeadDetection(**kwa)
+            hmap   = getattr(data.withphases(*alg.diffphases), 'display').display()
+            spread = lambda x: hv.Curve(np.diff(self.fixedspread(x, **kwa),
+                                                axis = 0).ravel(),
+                                        label = "spread").redim(y= "z", x = "frames")
+            hmap   = hmap * hv.DynamicMap(spread, kdims = ['bead'])
+            return hmap.redim.range(z=zrange) if zrange else hmap
+        return data
 
 @addproperty(TracksDictCleaningScript)    # type: ignore
 @displayhook

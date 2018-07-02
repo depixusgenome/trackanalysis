@@ -338,7 +338,7 @@ def test_fixedbeadsorting():
     assert len(lst) == 1
     assert lst[0][-1] == 4
     frames = FixedBeadDetection().dataframe(beads)
-    assert frames.shape == (4, 7)
+    assert frames.shape == (4, 11)
     assert list(frames[frames.good].bead.values) == [0]
 
 if __name__ == '__main__':

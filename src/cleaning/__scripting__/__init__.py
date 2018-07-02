@@ -6,22 +6,24 @@ Monkey patches the Track class.
 
 Adds a method for discarding beads with Cleaning warnings
 """
-from   typing                       import (Dict, Optional, Iterator, List, Any,
-                                            Set, Union, Tuple, Sequence, cast)
+from   copy                             import deepcopy
+from   typing                           import (Dict, Optional, Iterator, List, Any,
+                                                Set, Union, Tuple, Sequence, cast)
 import numpy                            as     np
 import pandas                           as     pd
 from   utils.decoration                 import addproperty, addto
 from   control.processor.dataframe      import DataFrameFactory
 from   model.__scripting__              import Tasks
 from   model.__scripting__.track        import LocalTasks
-from   data.views                       import BEADKEY, Beads
+from   data.views                       import BEADKEY, Beads, Cycles
 from   data.trackops                    import dropbeads
 from   data.__scripting__.track         import Track
 from   data.__scripting__.tracksdict    import TracksDict
 from   ..processor                      import (DataCleaningProcessor,
                                                 DataCleaningErrorMessage)
 from   ..beadsubtraction                import (BeadSubtractionTask,
-                                                BeadSubtractionProcessor)
+                                                BeadSubtractionProcessor,
+                                                FixedBeadDetection)
 
 @addto(BeadSubtractionTask, staticmethod)
 def __scripting_save__() -> bool:
@@ -107,15 +109,14 @@ class TrackCleaningScript:
 
     def fixed(self,
               beads: Sequence[BEADKEY] = None,
-              forceclean               = False,
-              extent                   = 0.2,
+              output  = 'beads',
               **kwa) -> List[int]:
         "a list of potential fixed beads"
-        data = self.messages(beads, forceclean, minextent = extent,
-                             maxextent = 100., **kwa)
-        data = data[data.types  == 'extent']
-        data = data[data.cycles >= self.track.ncycles]
-        return sorted(data.reset_index().bead.unique())
+        alg  = FixedBeadDetection(**kwa)
+        data = self.track.beads[list(beads)] if beads else self.track.beads
+        return (alg.dataframe(data) if output == 'dataframe' else
+                alg(data)           if output == "values"    else
+                [i[-1] for i in alg(data)])
 
     def messages(self,  # pylint: disable = too-many-locals
                  beads: Sequence[BEADKEY] = None,
@@ -201,29 +202,45 @@ class TrackCleaningScriptData:
     def __init__(self, itm):
         self.track = itm.track
 
-    def fixed(self, **kwa) -> Beads:
+    def fixedspread(self, bead, **kwa) -> np.ndarray:
+        """
+        return the spread of the fixed bead
+        """
+        return FixedBeadDetection(**kwa).cyclesock((self.track.beads, bead))
+
+    def fixed(self, **kwa) -> Cycles:
         "displays aligned cycles for fixed beads only"
         beads = self.track.cleaning.fixed(**kwa)
         return self.track.apply(Tasks.alignment)[beads,...]
 
-    def bad(self, **kwa) -> Beads:
+    def bad(self, **kwa) -> Cycles:
         "displays aligned cycles for bad beads only"
         beads = self.track.cleaning.bad(**kwa)
         return self.track.apply(Tasks.alignment)[beads,...]
 
-    def good(self, **kwa) -> Beads:
+    def good(self, **kwa) -> Cycles:
         "displays aligned cycles for good beads only"
         beads = self.track.cleaning.good(**kwa)
         return self.track.apply(Tasks.alignment)[beads,...]
 
-    def subtraction(self) -> Optional[Beads]:
+    def subtraction(self, beads = None, **kwa) -> Optional[Beads]:
         "displays aligned cycles for subtracted beads only"
-        task  = self.track.tasks.subtraction
-        beads = getattr(task, 'beads', None)
-        if not beads:
-            return None
+        task = self.track.tasks.subtraction
+        if beads is None:
+            beads = getattr(task, 'beads', None)
+            if not beads:
+                return None
+            cnf = task.config()
 
-        proc     = Tasks.subtraction.processor(**task.config())
+        elif task is None:
+            cnf = Tasks.beadsubtraction(bead = beads) # type: ignore
+
+        else:
+            cnf          = task.config()
+            cnf['beads'] = beads
+        cnf.update(**kwa)
+
+        proc     = Tasks.subtraction.processor(**cnf)
         data     = {i: self.track.data[i] for i in beads}
         data[-1] = proc.signal(self.track.beads) # type: ignore
         return self.track.apply(Tasks.alignment).withdata(data)
