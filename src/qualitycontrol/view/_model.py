@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing all messages concerning discarded beads"
-from   typing               import List, Dict, Set
-import numpy                as     np
+from   typing                   import List, Dict, Set
 
-from   data                 import BEADKEY
-from   control.modelaccess  import TaskPlotModelAccess, TaskAccess
-from   cleaning.processor   import (DataCleaningTask, # pylint: disable=unused-import
-                                    DataCleaningProcessor)
-from   model.level          import PHASE
-from   model.plots          import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
-from   utils                import initdefaults
+from   data                     import BEADKEY
+from   control.modelaccess      import TaskPlotModelAccess, TaskAccess
+from   cleaning.view            import FixedBeadDetectionModel, FIXED_LIST
+from   cleaning.processor       import (DataCleaningTask, # pylint: disable=unused-import
+                                        DataCleaningProcessor)
+from   model.level              import PHASE
+from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
+from   utils                    import initdefaults
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
@@ -33,52 +33,23 @@ class QualityControlDisplay:
     def __init__(self, **_):
         pass
 
-class QualityControlConfig:
-    "QualityControlDisplay"
-    name            = "qc"
-    fixedbeadextent = .2
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
-
-
-    def fixedbeads(self, ctrl, root) -> Set[BEADKEY]:
-        "returns bead ids with extent == all cycles"
-        lst   = ctrl.tasklist(root)
-        if not lst:
-            return set()
-
-        clean = next((t for t in lst if isinstance(t, DataCleaningTask)), None)
-        if not clean:
-            return set()
-
-        cache = ctrl.cache(root, clean)()
-        if cache is None:
-            return set()
-
-        minext = self.fixedbeadextent
-        def _compute(itm):
-            arr   = next((i.values for i in itm if i.name == 'extent'), None)
-            if arr is None:
-                return False
-
-            valid = np.isfinite(arr)
-            return np.sum(arr[valid] < minext) == np.sum(valid)
-
-        return set(i for i, (j, _) in cache.items() if _compute(j))
-
 class QualityControlModelAccess(TaskPlotModelAccess):
     "access to data cleaning"
     def __init__(self, ctrl) -> None:
         super().__init__(ctrl)
         self.cleaning  = DataCleaningTaskAccess(self)
-        self.__config  = ctrl.theme.add(QualityControlConfig(),    False)
+        self.__config  = ctrl.theme.add(FixedBeadDetectionModel(ctrl),    False)
         self.__display = ctrl.display.add(QualityControlDisplay(), False)
+
+    def addto(self, ctrl, name = "tasks", noerase = False):
+        "set _tasksmodel to same as main"
+        super().addto(ctrl, name, noerase)
+        self.__config.addto(ctrl, noerase)
 
     def buildmessages(self):
         "creates beads and warnings where applicable"
-        default = dict.fromkeys(('type', 'message', 'bead', 'cycles'), []) # type: Dict[str, List]
-        tsk     = self.cleaning.task
+        default: Dict[str, List] = dict.fromkeys(('type', 'message', 'bead', 'cycles'), [])
+        tsk = self.cleaning.task
         if tsk is not None:
             ctx = self.runcontext(GuiDataCleaningProcessor)
             with ctx as view:
@@ -100,9 +71,9 @@ class QualityControlModelAccess(TaskPlotModelAccess):
             return set()
         return set(self.messages()['bead'])
 
-    def fixedbeads(self) -> Set[BEADKEY]:
+    def availablefixedbeads(self) -> FIXED_LIST:
         "returns bead ids with extent == all cycles"
-        return self.__config.fixedbeads(self._ctrl.tasks, self.roottask)
+        return self.__config.current(self._ctrl, self.roottask)
 
     def messages(self) -> Dict[str, List]:
         "returns beads and warnings where applicable"

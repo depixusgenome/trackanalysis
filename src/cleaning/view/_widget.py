@@ -35,7 +35,7 @@ class BeadSubtractionModalDescriptor:
         if ref is not None:
             return f'ref = {ref}'
 
-        pot = model.subtracted.possiblefixedbeads()
+        pot = [i[-1] for i in model.availablefixedbeads]
         return f'{pot} ?' if pot else ''
 
     def line(self) -> Tuple[str, str]:
@@ -168,6 +168,7 @@ class DpxCleaning(Widget):
     frozen             = props.Bool(True)
     framerate          = props.Float(30.)
     figure             = props.Instance(Figure)
+    fixedbeads         = props.String("")
     subtracted         = props.String("")
     subtractcurrent    = props.Int(0)
     maxabsvalue        = props.Float(DataCleaningTask.maxabsvalue)
@@ -220,6 +221,7 @@ class CleaningFilterWidget:
 
         info['framerate'] = getattr(self.__model.track, 'framerate', 1./30.)
         info['subtracted']= ', '.join(str(i) for i in sorted(self.__model.subtracted.beads))
+        info['fixedbeads']= ', '.join(f"{i[-1]}" for i in self.__model.availablefixedbeads)
 
         (self.__widget if resets is None else resets[self.__widget]).update(**info)
 

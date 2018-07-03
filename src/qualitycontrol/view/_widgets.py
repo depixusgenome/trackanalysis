@@ -62,7 +62,7 @@ class SummaryWidget:
         track  = self.__tasks.track
         nbeads = 0  if track is None else sum(1 for i in track.beads.keys())
         bad    = sorted(self.__tasks.badbeads())
-        fixed  = sorted(self.__tasks.fixedbeads())
+        fixed  = [i[-1] for i in self.__tasks.availablefixedbeads()]
         return self.__model.text.format(ncycles   = 0 if track is None else track.ncycles,
                                         nbeads    = nbeads,
                                         ngood     = nbeads - len(bad),

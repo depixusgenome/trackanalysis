@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "access to the model"
-from typing                     import Optional, List, Set, cast
+from typing                     import Optional, List, Dict, cast
 import numpy as np
 
 from utils                      import NoArgs, initdefaults
+from model.task                 import RootTask
 from model.plots                import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 # pylint: disable=unused-import
 from control.modelaccess        import TaskPlotModelAccess, TaskAccess
 from eventdetection.processor   import ExtremumAlignmentTask
-from ..beadsubtraction          import BeadSubtractionTask
+from ..beadsubtraction          import BeadSubtractionTask, FixedBeadDetection, FIXED_LIST
 from ..processor                import DataCleaningTask
 
 class DataCleaningAccess(TaskAccess, tasktype = DataCleaningTask):
@@ -93,13 +94,63 @@ class BeadSubtractionAccess(TaskAccess, tasktype = BeadSubtractionTask):
     def _configattributes(kwa):
         return {}
 
-    def possiblefixedbeads(self) -> Set[int]:
-        "returns bead ids with extent == all cycles"
-        mdl = self._ctrl.theme.model("qc") if "qc" in self._ctrl.theme else None
-        return mdl.fixedbeads(self._ctrl.tasks, self.roottask) if mdl else set()
-
 class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
     "access to bead subtraction"
+
+class FixedBeadDetectionConfig(FixedBeadDetection):
+    """
+    Fixed bead detection configuration.
+
+    Warning: the class name must end with Config in order for the config file to be
+    good.
+    """
+    name = "fixedbeads"
+
+class FixedBeadDetectionData:
+    "For saving in the right place"
+    name                             = "fixedbeads"
+    data: Dict[RootTask, FIXED_LIST] = {}
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+class FixedBeadDetectionModel:
+    """
+    Fixed bead detection
+    """
+    config: FixedBeadDetectionConfig
+    data:   FixedBeadDetectionData
+    def __init__(self, ctrl):
+        self.config = ctrl.theme  .add(FixedBeadDetectionConfig(), False)
+        self.data   = ctrl.display.add(FixedBeadDetectionData(), False)
+
+    def addto(self, ctrl, noerase = False):
+        "add to the controller"
+        self.config = ctrl.theme  .add(self.config, noerase)
+        self.data   = ctrl.display.add(self.data,   noerase)
+
+        @ctrl.tasks.observe
+        def _onclosetrack(task = None, **_):
+            if task in self.data.data:
+                info = dict(self.data.data)
+                info.pop(task)
+                ctrl.display.update(self.data, data = info)
+
+    def current(self, ctrl, root:RootTask) -> FIXED_LIST:
+        "returns bead ids for potential fixed beads"
+        if root is None:
+            return []
+
+        beads = self.data.data.get(root, None)
+        if beads is None:
+            track = ctrl.tasks.track(root)
+            if track is None:
+                return []
+
+            info  = dict(self.data.data)
+            beads = info[root] = self.config(track.beads)
+            ctrl.display.update(self.data, data = info)
+        return beads
 
 class DataCleaningModelAccess(TaskPlotModelAccess):
     "Model for Cycles View"
@@ -108,12 +159,23 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
         self.alignment  = ExtremumAlignmentTaskAccess(self)
         self.cleaning   = DataCleaningAccess(self)
         self.subtracted = BeadSubtractionAccess(self)
+        self.fixedbeads = FixedBeadDetectionModel(ctrl)
+
+    def addto(self, ctrl, name = "tasks", noerase = False):
+        "set _tasksmodel to same as main"
+        super().addto(ctrl, name, noerase)
+        self.fixedbeads.addto(ctrl, noerase)
+
+    @property
+    def availablefixedbeads(self) -> FIXED_LIST:
+        "return the availablefixed beads for the current track"
+        return self.fixedbeads.current(self._ctrl, self.roottask)
 
 class CleaningPlotTheme(PlotTheme):
     """
     cleaning plot theme
     """
-    name             = "cleaning"
+    name             = "cleaning.theme"
     points           = PlotAttrs('color',  'circle', 1, alpha   = .5)
     figsize          = 500, 800, 'fixed'
     widgetwidth      = 470

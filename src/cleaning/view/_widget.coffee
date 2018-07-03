@@ -5,6 +5,9 @@ import {WidgetView, Widget} from "models/widgets/widget"
 export class DpxCleaningView extends WidgetView
     tagName: "div"
 
+    on_change_fixebeads: () ->
+        $(@el).find('#dpx-cl-fixed').html(@model.fixedbeads)
+
     on_change_frozen: () ->
         $(@el).find('.dpx-cl-freeze').prop('disabled', @model.frozen)
 
@@ -22,6 +25,7 @@ export class DpxCleaningView extends WidgetView
             @connect(@model.properties[evt].change,
                      do (event = evt, me = @) -> (val) -> me.on_change_input(event))
         @connect(@model.properties.frozen.change, () => @on_change_frozen())
+        @connect(@model.properties.fixedbeads.change, () => @on_change_fixebeads())
 
     render: () ->
         super()
@@ -39,6 +43,9 @@ export class DpxCleaningView extends WidgetView
 
         empty = "<br style='margin-top: 16px;'/>"
         html = "<div><div class='dpx-span'>"+
+                   "<p>Fixed beads:</p><p id='dpx-cl-fixedbeads'>#{@model.fixedbeads}</p>"+
+               "</div></div>"+
+                "<div><div class='dpx-span'>"+
                    "<label #{ttips[0]}>Subtracted</label>"+
                    "#{@mk_txt("subtracted")}"+
                    "#{@mk_btn("add", "╋", ttips[1])}"+
@@ -86,11 +93,12 @@ export class DpxCleaningView extends WidgetView
                     " type='number' min=0 max=#{maxv} step=#{dv} "+
                     " value=#{@model[name]}#{disabled}>"
 
-    mk_txt: (name) ->
+    mk_txt: (name, placeholder = '') ->
         disabled = if @model.frozen then ' disabled=true' else ''
         return  "<input id='dpx-cl-#{name}'"+
                     " type='text' class='dpx-cl-freeze bk-widget-form-input'"+
-                    " value='#{@model[name]}'#{disabled}>"
+                    " value='#{@model[name]}'#{disabled}"+
+                    " placeholder='#{placeholder}'>"
 
     mk_btn: (name, label, ttip) ->
         str = "<button type='button' id='dpx-cl-#{name}' #{ttip} "+
@@ -119,6 +127,7 @@ export class DpxCleaning extends Widget
         frozen: [p.Bool, true],
         framerate: [p.Number, 30],
         figure: [p.Instance],
+        fixedbeads: [p.String, ""],
         subtracted: [p.String, ""],
         subtractcurrent: [p.Number, 0],
         maxabsvalue: [p.Number, 5],

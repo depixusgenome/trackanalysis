@@ -219,7 +219,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
         hexes = tohex(self._theme.colors)
         clrs  = hexes['good'], hexes['fixed'], hexes['bad'], hexes['discarded']
         disc  = set(DataSelectionBeadController(self._ctrl).discarded)
-        fixed = self._model.fixedbeads() - disc
+        fixed = self._model.availablefixedbeads() - disc
         bad   = self._model.badbeads() - disc - fixed
         ttips = self.__tooltips()
 
