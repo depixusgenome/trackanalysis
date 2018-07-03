@@ -207,6 +207,8 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
 
         return task.filter(sub) if task.filter else sub
 
+FIXED_DATA = Tuple[float, float, float, BEADKEY]
+FIXED_LIST = List[FIXED_DATA]
 class FixedBeadDetection:
     """
     Finds and sorts fixed beads
@@ -286,11 +288,11 @@ class FixedBeadDetection:
                                  **_vals('var', var),
                                  **_vals('sig', sig)))
 
-    def __call__(self, beads: Beads) -> List[Tuple[float, float, float, BEADKEY]]:
+    def __call__(self, beads: Beads) -> FIXED_LIST:
         """
         Creates a dataframe for all beads in  a track.
         """
-        items: List[Tuple[float, float, float, BEADKEY]] = []
+        items: FIXED_LIST = []
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore',
                                     category = RuntimeWarning,
