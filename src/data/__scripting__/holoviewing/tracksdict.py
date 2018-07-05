@@ -8,7 +8,8 @@ from   typing             import List, Union
 from   functools          import partial, wraps
 from   concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
-from   utils.holoviewing  import addto, displayhook, addproperty, hv, BasicDisplay
+from   utils.holoviewing  import (addto, displayhook, addproperty, hv,
+                                  BasicDisplay, dropdown as _dropdown)
 from   ...views           import isellipsis, BEADKEY
 from   ...tracksdict      import TracksDict
 
@@ -294,4 +295,22 @@ class TracksDictSecondariesDisplayProperty(TracksDictDisplayProperty):
         return self.tracks[key].secondaries.display.vcap()
     vcap.__doc__ = __doc__.replace('temperatures or', 'zmag versus')
 
+
+@addto(TracksDict)
+def dropdown(self, fcn = None, **kwa):
+    """
+    creates a dropdown with all files as values and executes the
+    provided method with that value:
+
+    ```python
+    # displays events for a selected file
+
+    @TRACKS.dropdown
+    def showevents(tracks: TracksDict, dropdown: ipywidgets.Dropdown):
+        return tracks[dropdown.value].events
+    ```
+    """
+    if fcn is None:
+        return partial(self.dropdown, **kwa)
+    return _dropdown(list(self), lambda x: fcn(self[x]), index = 0, **kwa)
 __all__: List[str] = []
