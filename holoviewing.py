@@ -22,7 +22,8 @@ def _display_hook(item):
     "displays an item"
     disp  = item.display()
     if isinstance(disp, pd.DataFrame):
-        return _display(disp)
+        _display(disp)
+        return None
 
     if type(disp).__module__.startswith('holoviews'):
         return hv.ipython.display(disp)
@@ -158,5 +159,36 @@ class BasicDisplay(ItemsDisplay):
     @abstractmethod
     def getredim(self):
         "Returns the keys used by the dynamic map"
+
+def dropdown(options, fcn = None, layout = None, clear_output = True, **kwa):
+    """
+    creates a dropdown with all files as values and executes the
+    provided method with that value:
+
+    ```python
+    # displays events for a selected file
+
+    @dropdown
+    def showevents(dropdown: ipywidgets.Dropdown):
+        return TRACKS[dropdown.value].events
+    ```
+    """
+    if fcn is None:
+        return lambda x: dropdown(options, fcn = x, layout = layout, **kwa)
+
+    import ipywidgets as widgets
+    ddown = widgets.Dropdown(options = options, **kwa)
+    out   = widgets.Output(layout = layout if layout else {})
+    def _wrapped(value):
+        if clear_output:
+            out.clear_output()
+        with out:
+            cur = fcn(value)
+            if cur is not None:
+                _display(cur)
+
+    ddown.observe(lambda ch: _wrapped(ch['new']), 'value')
+    ddown.on_displayed(lambda x: _wrapped(x.value))
+    return widgets.VBox([ddown, out])
 
 __all__ = ['addto', 'displayhook', 'addproperty']

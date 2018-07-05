@@ -74,7 +74,7 @@ def _configure_hv(hvmod, locs):
             bcolor= opts.get("box_color", "lightblue")
             for i in opts.get("elements", ('Curve', 'Scatter', 'Distribution',
                                            'Spikes', 'Points', 'BoxWhisker',
-                                           'Histogram')):
+                                           'Histogram', 'RGB', 'HeatMap', 'Image')):
                 string = f"{i} [width={width}] {{+framewise}}"
                 if i == 'BoxWhisker':
                     string = string.replace("]",  f"] (box_color='{bcolor}') ")
@@ -113,6 +113,7 @@ def importjupyter(locs, *names):
         try:
             import holoviews as hv
             import holoviews.operation  as hvops
+            from .holoviewing import dropdown
         except ImportError:
             return
 
@@ -120,6 +121,7 @@ def importjupyter(locs, *names):
         ISJUP         = True
         locs['hv']    = hv
         locs['hvops'] = hvops
+        locs['dropdown'] = dropdown
 
         _configure_hv(hv, locs)
         _configure_jupyter()
