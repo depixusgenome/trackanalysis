@@ -4,6 +4,7 @@ u"Tests the simulator"
 from    itertools       import product
 import  numpy as np
 from    numpy.testing   import assert_allclose
+from    signalfilter    import hfsigma
 from    simulator       import (TrackSimulator, randpeaks, randbead, randevents,
                                 randbypeakevents)
 import simulator.bindings as _bind
@@ -126,6 +127,8 @@ def test_bindings():
     trks = exp.track(nbeads = 2, seed = 0)
     assert set(trks) == {'framerate', 'key', 'data', 'truth', 'phases'}
     assert set(trks['data']) == {0, 1}
+
+    assert_allclose([hfsigma(_bind.Baseline()(3000))], [_bind.Baseline().sigma], atol = 1e-4)
 
 if __name__ == '__main__':
     test_bindings()

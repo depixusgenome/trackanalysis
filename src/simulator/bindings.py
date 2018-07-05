@@ -5,7 +5,6 @@ from copy   import copy
 from enum   import Enum
 from typing import (Dict, Any, FrozenSet, Optional, List, Union, Iterable,
                     Sequence, NamedTuple, Tuple, cast)
-
 import numpy  as np
 
 RAND_STATE = Union[int, None, np.random.RandomState]
@@ -156,7 +155,7 @@ class ThermalDrift:
             bead[:].reshape((-1, drift.size))[:] += drift
         return drift
 
-class Baseline:
+class KneedBaseline:
     """
     Add baseline to bead
     """
@@ -183,6 +182,41 @@ class Baseline:
         out                   = fft.irfft(signal)
         assert len(out) >= size
         return out[:size-1]
+
+class Baseline:
+    """
+    Add baseline to bead
+    """
+    sigma     = 3e-3
+    framerate = 30.
+    params    = [1.089, 2.444]
+    covar     = [[.01, .005], [.005,.04]]
+
+    def shape(self, params, size) -> np.ndarray:
+        "return the shape in the frequency domain: the spectral power density"
+        shape    = np.linspace(1., self.framerate/2.+1., size)
+        shape    = np.exp(params[0]-params[1]*np.log(shape))
+        shape    = np.exp(shape-shape[0])
+        shape[0] = 0
+        return shape
+
+    def randparams(self, rand) -> np.ndarray:
+        "return the random parameters"
+        return (rand.multivariate_normal(self.params, self.covar) if self.covar else
+                self.params)
+
+    def __call__(self, cnf: Union[int,'Experiment'], seed = None) -> np.ndarray:
+        size    = (cnf if isinstance(cnf, int ) else cnf.ncycles * np.sum(cnf.phases))+1
+        rand    = randstate(seed)
+
+        signal  = np.fft.rfft(rand.normal(0., 1., size))
+        signal *= self.shape(self.randparams(rand), signal.size)
+        signal  = np.fft.irfft(signal)[:size-1]
+
+        diff    = np.diff(signal)
+        signal *= self.sigma/np.median(np.abs(diff-np.median(diff)))
+
+        return signal
 
 class StrandClosingTruth(NamedTuple): # pylint: disable=missing-docstring
     duration: np.ndarray
