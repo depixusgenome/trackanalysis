@@ -5,7 +5,9 @@ u"all view aspects here"
 import numpy as np
 from numpy.testing import assert_allclose
 
-from signalfilter  import ForwardBackwardFilter, NonLinearFilter, hfsigma, nanhfsigma
+from signalfilter  import (ForwardBackwardFilter, NonLinearFilter, hfsigma, nanhfsigma,
+                           nancount, nanthreshold)
+
 
 def test_nl_bf_filters():
     u"Tests ForwardBackwardFilter, NonLinearFilter"
@@ -48,5 +50,38 @@ def test_hfsigma():
     arr = np.insert(arr, range(0, 20, 2), np.nan)
     assert nanhfsigma(arr) == np.median(np.diff(arr[np.isfinite(arr)]))
 
+def test_nancount():
+    u"Tests ForwardBackwardFilter, NonLinearFilter"
+    arr = np.arange(10)*1.
+    assert_allclose(nancount(arr, 1), np.zeros(10, dtype = 'i4'))
+    assert_allclose(nancount(arr, 2), np.zeros(10, dtype = 'i4'))
+    assert_allclose(nancount(arr, 3), np.zeros(10, dtype = 'i4'))
+
+    assert_allclose(nanthreshold(arr, 1, 1), np.zeros(10, dtype = 'bool'))
+    assert_allclose(nanthreshold(arr, 2, 1), np.zeros(10, dtype = 'bool'))
+    assert_allclose(nanthreshold(arr, 3, 1), np.zeros(10, dtype = 'bool'))
+
+
+    arr[5] = np.NaN
+    vals   = ([0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+              [0, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+              [0, 0, 0, 1, 1, 1, 0, 0, 1, 2])
+    assert_allclose(nancount(arr, 1), np.array(vals[0], dtype = 'i4'))
+    assert_allclose(nancount(arr, 2), np.array(vals[1], dtype = 'i4'))
+    assert_allclose(nancount(arr, 3), np.array(vals[2], dtype = 'i4'))
+    assert_allclose(nanthreshold(arr, 1, 1), np.array(vals[0], dtype = 'bool'))
+    assert_allclose(nanthreshold(arr, 2, 1), np.array(vals[1], dtype = 'bool'))
+    assert_allclose(nanthreshold(arr, 3, 1), np.array(vals[2], dtype = 'bool'))
+
+    arr[6] = np.NaN
+    vals   = ([0, 0, 0, 0, 0, 1, 1, 0, 0, 0],
+              [0, 0, 0, 0, 1, 2, 1, 0, 0, 1],
+              [0, 0, 0, 1, 2, 2, 1, 0, 1, 2])
+    assert_allclose(nancount(arr, 1), np.array(vals[0], dtype = 'i4'))
+    assert_allclose(nancount(arr, 2), np.array(vals[1], dtype = 'i4'))
+    assert_allclose(nancount(arr, 3), np.array(vals[2], dtype = 'i4'))
+    assert_allclose(nanthreshold(arr, 1, 1), np.array(vals[0], dtype = 'bool'))
+    assert_allclose(nanthreshold(arr, 2, 1), np.array(vals[1], dtype = 'bool'))
+    assert_allclose(nanthreshold(arr, 3, 1), np.array(vals[2], dtype = 'bool'))
 if __name__ == '__main__':
     test_hfsigma()

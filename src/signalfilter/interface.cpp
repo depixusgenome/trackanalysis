@@ -4,7 +4,6 @@
 #include "signalfilter/signalfilter.h"
 #include "signalfilter/stattests.h"
 #include "signalfilter/accumulators.hpp"
-
 namespace
 {
     struct Check
@@ -362,33 +361,18 @@ namespace samples { namespace normal {
 
 namespace signalfilter { namespace stats {
     template <typename T>
-    pybind11::object _nanfcn1(std::pair<T, bool> (*fcn)(size_t, T const *),
-                              pybind11::array_t<T> & inp)
-    { 
-        auto x =  (*fcn)(inp.size(), inp.data()); 
-        if(x.second)
-            return pybind11::float_(x.first);
-        return pybind11::none();
-    }
-
-    template <typename T>
-    pybind11::object _nanfcn2(std::pair<T, bool> (*fcn)(size_t, T const *),
-                              pybind11::array_t<T> & inp,
-                              pybind11::object & rng)
+    T _nanfcn2(T (*fcn) (size_t, T const *),
+               pybind11::array_t<T> & inp,
+               pybind11::object & rng)
     {
         if(rng.is_none())
-        {
-            auto x =  (*fcn)(inp.size(), inp.data()); 
-            if(x.second)
-                return pybind11::float_(x.first);
-            return pybind11::none();
-        }
+            return (*fcn)(inp.size(), inp.data());
 
         auto data = inp.data();
         int  size = inp.size();
 
         pybind11::int_ ii(0), jj(1);
-        std::vector<double> meds;
+        std::vector<T> meds;
         for(auto i = rng.begin(), e = rng.end(); i != e; ++i)
         {
             int i1 = pybind11::cast<int>((*i)[ii]);
@@ -398,12 +382,10 @@ namespace signalfilter { namespace stats {
             if(i2 <= i1 || i1 >= size)
                 continue;
             auto x = fcn(i2-i1+1, data+i1);
-            if(x.second)
-                meds.push_back(x.first);
+            if(std::isfinite(x))
+                meds.push_back(x);
         }
-        if(meds.size())
-            return pybind11::float_(median(meds));
-        return pybind11::none();
+        return median(meds);
     }
 
     template <typename T>
@@ -414,10 +396,24 @@ pointwise derivate of the signal. The median
 itself is estimated using the P² quantile estimator
 algorithm.)_";
 
+        mod.def("nancount", [](pybind11::array_t<T> & inp, size_t width)
+                    { 
+                        pybind11::array_t<int>  arr(inp.size());
+                        nancount(width, inp.size(), inp.data(), arr.mutable_data());
+                        return arr;
+                    }, doc);
+
+        mod.def("nanthreshold", [](pybind11::array_t<T> & inp, size_t width, int threshold)
+                    { 
+                        pybind11::array_t<int>  arr(inp.size());
+                        nanthreshold(width, threshold, inp.size(), inp.data(), arr.mutable_data());
+                        return arr;
+                    }, doc);
+
         mod.def("hfsigma", [](pybind11::array_t<T> & inp)
                     { return hfsigma(inp.size(), inp.data()); }, doc);
         mod.def("nanhfsigma", [](pybind11::array_t<T> & inp)
-                    { return _nanfcn1(&nanhfsigma<T>, inp); }, doc);
+                    { return nanhfsigma(inp.size(), inp.data()); }, doc);
         mod.def("nanhfsigma", [](pybind11::array_t<T> & inp, pybind11::object rng)
                     { return _nanfcn2(&nanhfsigma<T>, inp, rng); }, doc);
 #       ifdef _MSC_VER
@@ -429,7 +425,7 @@ distance to the median for each point.)_";
         mod.def("mediandeviation", [](pybind11::array_t<T> & inp)
                     { return mediandeviation(inp.size(), inp.data()); }, doc2);
         mod.def("nanmediandeviation", [](pybind11::array_t<T> & inp)
-                    { return _nanfcn1(&nanmediandeviation<T>, inp); }, doc);
+                    { return nanmediandeviation(inp.size(), inp.data()); }, doc2);
         mod.def("nanmediandeviation", [](pybind11::array_t<T> & inp, pybind11::object rng)
                     { return _nanfcn2(&nanmediandeviation<T>, inp, rng); }, doc);
 #       ifdef _MSC_VER

@@ -15,6 +15,7 @@
 #include <boost/accumulators/framework/parameters/sample.hpp>
 #include <valarray>
 #include <list>
+#include <limits>
 
 #include "signalfilter/accumulators.h"
 namespace signalfilter { namespace stats
@@ -25,7 +26,7 @@ namespace signalfilter { namespace stats
         auto nth = items.size()/2;
         switch(items.size())
         {
-            case 0: return 0;
+            case 0: return std::numeric_limits<typename T::value_type>::quiet_NaN();
             case 1: return items[0];
             case 2: return (typename T::value_type)(.5)*(items[0]+items[1]);
             default:
@@ -454,24 +455,24 @@ namespace signalfilter { namespace stats
     }
 
     template <typename T>
-    inline std::pair<T,bool> nanhfsigma(size_t sz, T const * dt)
+    inline T nanhfsigma(size_t sz, T const * dt)
     {
         if(sz == 0)
-            return {T(0), false};
+            return std::numeric_limits<T>::quiet_NaN();
 
         size_t i = size_t(0);
         while(i < sz && !std::isfinite(dt[i]))
             ++i;
 
         if(i >= sz-1)
-            return {T(0), false};
+            return std::numeric_limits<T>::quiet_NaN();
 
         T last = dt[i++];
         while(i < sz && !std::isfinite(dt[i]))
             ++i;
 
         if(i == sz)
-            return {T(0), false};
+            return std::numeric_limits<T>::quiet_NaN();
 
         acc_t<bat::median> quant;
         quant((double) std::abs(last-dt[i]));
@@ -483,7 +484,71 @@ namespace signalfilter { namespace stats
                 quant((double) std::abs(cur-last));
                 last  = cur;
             }
-        return {(T) compute(quant), true};
+        return (T) compute(quant);
+    }
+
+    template <typename T, typename K>
+    inline void nancount(size_t width, size_t sz, T const * dt, K * out)
+    {
+        if(sz == 0)
+            return;
+
+        K last = K(width);
+        for(size_t i = size_t(0); i < sz &&  i < width; ++i)
+            if(std::isfinite(dt[i]))
+                --last;
+
+        out[0] = last;
+        for(size_t i = width+1, e = width > sz ? width : sz; i < e; ++i)
+        {
+            if(!std::isfinite(dt[i]))
+            {
+                if(std::isfinite(dt[i-width-1]))
+                    ++last;
+            } else if(!std::isfinite(dt[i-width-1]))
+                --last;
+            out[i-width] = last;
+        }
+
+        if(sz > width)
+            for(size_t i = sz-width; i < sz; ++i)
+            {
+                if(std::isfinite(dt[i-1]))
+                    ++last;
+                out[i] = last;
+            }
+    }
+
+    template <typename T, typename K>
+    inline void nanthreshold(size_t width, int threshold, size_t sz, T const * dt, K * out)
+    {
+        if(sz == 0)
+            return;
+
+        int last = int(width);
+        for(size_t i = size_t(0); i < sz &&  i < width; ++i)
+            if(std::isfinite(dt[i]))
+                --last;
+
+        out[0] = last >= threshold;
+        for(size_t i = width+1, e = width > sz ? width : sz; i < e; ++i)
+        {
+            if(!std::isfinite(dt[i]))
+            {
+                if(std::isfinite(dt[i-width-1]))
+                    ++last;
+            } else if(!std::isfinite(dt[i-width-1]))
+                --last;
+            out[i-width] = last >= threshold;
+        }
+
+        if(sz > width)
+            for(size_t i = sz-width; i < sz; ++i)
+            {
+                if(std::isfinite(dt[i-1]))
+                    ++last;
+                out[i] = last >= threshold;
+            }
     }
 
     template <typename T>
@@ -503,24 +568,24 @@ namespace signalfilter { namespace stats
     }
 
     template <typename T>
-    inline std::pair<T,bool> nanmediandeviation(size_t sz, T const * dt)
+    inline T nanmediandeviation(size_t sz, T const * dt)
     {
         if(sz == 0)
-            return {T(0), false};
+            return std::numeric_limits<T>::quiet_NaN();
 
         size_t i = size_t(0);
         while(i < sz && !std::isfinite(dt[i]))
             ++i;
 
         if(i >= sz)
-            return {T(0), false};
+            return std::numeric_limits<T>::quiet_NaN();
 
         acc_t<bat::mediandeviation> quant;
         quant((double) dt[i]);
         for(++i; i < sz; ++i)
             if(std::isfinite(dt[i]))
                 quant((double) dt[i]);
-        return {(T) compute(quant), true};
+        return (T) compute(quant);
     }
 }}
 #endif
