@@ -91,11 +91,14 @@ class TrackCleaningScript:
         itms = itms[list(beads)] if beads else itms
 
         dfltask = self.track.tasks.cleaning  # type: ignore
-        if dfltask:
-            # use the default settings for this track
-            dflt = dfltask.config()
-            dflt.update(kwa)
-            kwa  = dflt
+        if dfltask is None:
+            dfltask = Tasks.cleaning()
+
+        # use the default settings for this track
+        dflt = dfltask.config()
+        dflt.update(kwa)
+        kwa  = dflt
+
         return {info[0]: get(DataCleaningProcessor.compute(itms, info, **kwa))
                 for info in cast(Iterator, itms)}
 
