@@ -361,32 +361,79 @@ namespace samples { namespace normal {
 }}
 
 namespace signalfilter { namespace stats {
-    void pymodule(pybind11::module & mod)
+    template <typename T>
+    pybind11::object _nanfcn1(std::pair<T, bool> (*fcn)(size_t, T const *),
+                              pybind11::array_t<T> & inp)
+    { 
+        auto x =  (*fcn)(inp.size(), inp.data()); 
+        if(x.second)
+            return pybind11::float_(x.first);
+        return pybind11::none();
+    }
+
+    template <typename T>
+    pybind11::object _nanfcn2(std::pair<T, bool> (*fcn)(size_t, T const *),
+                              pybind11::array_t<T> & inp,
+                              pybind11::object & rng)
     {
-        auto smod       = mod.def_submodule("stats");
+        auto data = inp.data();
+        int  size = inp.size();
+
+        pybind11::int_ ii(0), jj(1);
+        std::vector<double> meds;
+        for(auto i = rng.begin(), e = rng.end(); i != e; ++i)
+        {
+            int i1 = pybind11::cast<int>((*i)[ii]);
+            int i2 = pybind11::cast<int>((*i)[jj]);
+            i1     = i1 <= -size ? 0 : i1 < 0 ? i1+size : i1;
+            i2     = i2 <= -size ? 0 : i2 < 0 ? i2+size : i2;
+            if(i2 <= i1 || i1 >= size)
+                continue;
+            auto x = fcn(i2-i1+1, data+i1);
+            if(x.second)
+                meds.push_back(x.first);
+        }
+        if(meds.size())
+            return pybind11::float_(median(meds));
+        return pybind11::none();
+    }
+
+    template <typename T>
+    void _defhfsigma(pybind11::module & mod)
+    {
         auto doc = R"_(Return the median of the absolute value of the
 pointwise derivate of the signal. The median
 itself is estimated using the P² quantile estimator
 algorithm.)_";
 
-        smod.def("hfsigma", [](pybind11::array_t<float> & inp)
-                            { return hfsigma(inp.size(), inp.data()); }, doc);
-        smod.def("hfsigma", [](pybind11::array_t<double> & inp)
-                            { return hfsigma(inp.size(), inp.data()); });
+        mod.def("hfsigma", [](pybind11::array_t<T> & inp)
+                    { return hfsigma(inp.size(), inp.data()); }, doc);
+        mod.def("nanhfsigma", [](pybind11::array_t<T> & inp)
+                    { return _nanfcn1(&nanhfsigma<T>, inp); }, doc);
+        mod.def("nanhfsigma", [](pybind11::array_t<T> & inp, pybind11::object rng)
+                    { return _nanfcn2(&nanhfsigma<T>, inp, rng); }, doc);
 #       ifdef _MSC_VER
 #           pragma warning ( push )
 #           pragma warning ( disable : 4244 )
 #       endif
         auto doc2 = R"_(Return the median of the absolute value of the
 distance to the median for each point.)_";
-        smod.def("mediandeviation", [](pybind11::array_t<float> & inp)
-                            { return mediandeviation(inp.size(), inp.data()); },
-                            doc2);
-        smod.def("mediandeviation", [](pybind11::array_t<double> & inp)
-                            { return mediandeviation(inp.size(), inp.data()); });
+        mod.def("mediandeviation", [](pybind11::array_t<T> & inp)
+                    { return mediandeviation(inp.size(), inp.data()); }, doc2);
+        mod.def("nanmediandeviation", [](pybind11::array_t<T> & inp)
+                    { return _nanfcn1(&nanmediandeviation<T>, inp); }, doc);
+        mod.def("nanmediandeviation", [](pybind11::array_t<T> & inp, pybind11::object rng)
+                    { return _nanfcn2(&nanmediandeviation<T>, inp, rng); }, doc);
 #       ifdef _MSC_VER
 #           pragma warning ( pop )
 #       endif
+    }
+
+    void pymodule(pybind11::module & mod)
+    {
+        auto smod       = mod.def_submodule("stats");
+        _defhfsigma<float>(smod);
+        _defhfsigma<double>(smod);
     }
 }}
 

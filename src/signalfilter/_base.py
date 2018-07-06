@@ -9,35 +9,32 @@ from abc            import ABC
 import numpy as np
 
 from utils          import initdefaults
-from ._core.stats   import hfsigma, mediandeviation # pylint: disable=import-error
+# pylint: disable=import-error
+from ._core.stats   import (hfsigma, mediandeviation, nanhfsigma as _nanhfsigma,
+                            nanmediandeviation as _nanmediandeviation)
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
     from data.track import Track
     from data.views import TrackView
 
-def _nanfcn(arr:np.ndarray, ranges, fcn):
-    arr = np.asarray(arr).ravel()
-    if len(arr) == 0:
-        return None
-
-    if not np.isscalar(arr[0]):
-        arr = np.float32(arr) # type: ignore
-
-    fin = np.isfinite(arr)
-    if ranges is None:
-        return fcn(arr[fin])
-    return np.nanmedian([fcn(arr[i:j][fin[i:j]]) for i, j in ranges])
-
 def nanhfsigma(arr: np.ndarray, ranges = None):
     "hfsigma which takes care of nans."
-    return _nanfcn(arr, ranges, hfsigma)
+    arr = np.asarray(arr).ravel()
+    if len(arr) and not np.isscalar(arr[0]):
+        arr = np.float32(arr) # type: ignore
+    return _nanhfsigma(arr, ranges)
+
 if getattr(nanhfsigma, '__doc__', None):
     nanhfsigma.__doc__ += "\n\n"+hfsigma.__doc__ # pylint: disable=no-member
 
 def nanmediandeviation(arr: np.ndarray, ranges = None):
     "mediandeviation which takes care of nans."
-    return _nanfcn(arr, ranges, mediandeviation)
+    arr = np.asarray(arr).ravel()
+    if len(arr) and not np.isscalar(arr[0]):
+        arr = np.float32(arr) # type: ignore
+    return _nanmediandeviation(arr, ranges)
+
 if getattr(nanmediandeviation, '__doc__', None):
     nanmediandeviation.__doc__ += "\n\n"+mediandeviation.__doc__ # pylint:disable=no-member
 

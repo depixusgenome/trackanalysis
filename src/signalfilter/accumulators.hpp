@@ -454,6 +454,39 @@ namespace signalfilter { namespace stats
     }
 
     template <typename T>
+    inline std::pair<T,bool> nanhfsigma(size_t sz, T const * dt)
+    {
+        if(sz == 0)
+            return {T(0), false};
+
+        size_t i = size_t(0);
+        while(i < sz && !std::isfinite(dt[i]))
+            ++i;
+
+        if(i >= sz-1)
+            return {T(0), false};
+
+        T last = dt[i++];
+        while(i < sz && !std::isfinite(dt[i]))
+            ++i;
+
+        if(i == sz)
+            return {T(0), false};
+
+        acc_t<bat::median> quant;
+        quant((double) std::abs(last-dt[i]));
+        last = dt[i];
+        for(++i; i < sz; ++i)
+            if(std::isfinite(dt[i]))
+            {
+                T cur = dt[i];
+                quant((double) std::abs(cur-last));
+                last  = cur;
+            }
+        return {(T) compute(quant), true};
+    }
+
+    template <typename T>
     inline T mediandeviation(size_t sz, T const * dt)
     {
 #       ifdef _MSC_VER
@@ -467,6 +500,27 @@ namespace signalfilter { namespace stats
         for(size_t i = size_t(0); i < sz; ++i)
             quant((double) dt[i]);
         return (T) compute(quant);
+    }
+
+    template <typename T>
+    inline std::pair<T,bool> nanmediandeviation(size_t sz, T const * dt)
+    {
+        if(sz == 0)
+            return {T(0), false};
+
+        size_t i = size_t(0);
+        while(i < sz && !std::isfinite(dt[i]))
+            ++i;
+
+        if(i >= sz)
+            return {T(0), false};
+
+        acc_t<bat::mediandeviation> quant;
+        quant((double) dt[i]);
+        for(++i; i < sz; ++i)
+            if(std::isfinite(dt[i]))
+                quant((double) dt[i]);
+        return {(T) compute(quant), true};
     }
 }}
 #endif
