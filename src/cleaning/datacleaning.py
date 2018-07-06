@@ -8,7 +8,7 @@ import  numpy                   as     np
 from    numpy.lib.stride_tricks import as_strided
 
 from    utils                   import initdefaults
-from    signalfilter            import nanhfsigma
+from    signalfilter            import nanhfsigma, nanthreshold
 from    ._core                  import (constant as _cleaningcst, # pylint: disable=import-error
                                         clip     as _cleaningclip)
 
@@ -26,6 +26,7 @@ class NaNDensity(ABC):
         provide the first index of intervals of at least `cnt` NaN values in an
         interval `width` long.
         """
+        return nanthreshold(bead, width, int(cnt))[:-width+1]
         tmp = np.asarray(np.isnan(bead), dtype = 'i1')
         if width > 1:
             tmp = np.sum(as_strided(tmp,
