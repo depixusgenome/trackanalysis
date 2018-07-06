@@ -23,6 +23,8 @@ def nanhfsigma(arr: np.ndarray, ranges = None):
     arr = np.asarray(arr).ravel()
     if len(arr) and not np.isscalar(arr[0]):
         arr = np.float32(arr) # type: ignore
+    if ranges is None:
+        return _nanhfsigma(arr)
     return _nanhfsigma(arr, ranges)
 
 if getattr(nanhfsigma, '__doc__', None):
