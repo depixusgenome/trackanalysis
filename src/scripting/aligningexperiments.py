@@ -186,9 +186,10 @@ class PeaksAlignment:
 
         return data
 
-    def __call__(self, tracks, ref,
+    def __call__(self, tracks, ref, # pylint: disable=too-many-arguments
                  discarded = None,
-                 masks     = None):
+                 masks     = None,
+                 pivot     = 'max'):
         if not isinstance(tracks, pd.DataFrame):
             tracks = self.peaks(tracks)
 
@@ -196,7 +197,7 @@ class PeaksAlignment:
                           discarded = discarded,
                           attribute = 'bead' if isinstance(ref, int) else 'track')
         data = self.maskpeaks(data, masks)
-        data = self.setpivot(data)
+        data = self.setpivot(data, pivot)
         data = self.correct(data, ref)
 
         out  = pd.concat([i for _, i in data]).sort_values(['bead', 'modification',
@@ -211,13 +212,14 @@ class PeaksAlignment:
                 discarded = None,
                 masks     = None,
                 align     = True,
+                pivot     = 'max',
                 **seqs):
         "display the data"
         if not isinstance(data, pd.DataFrame):
             data = self.peaks(data)
 
         if align:
-            data = self(data, ref, discarded=discarded, masks=masks)
+            data = self(data, ref, discarded=discarded, masks=masks, pivot=pivot)
             ref  = None
 
         data = data.sort_values(['bead', 'modification', 'peakposition', 'avg'])
