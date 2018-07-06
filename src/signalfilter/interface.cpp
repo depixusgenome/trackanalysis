@@ -376,6 +376,14 @@ namespace signalfilter { namespace stats {
                               pybind11::array_t<T> & inp,
                               pybind11::object & rng)
     {
+        if(rng.is_none())
+        {
+            auto x =  (*fcn)(inp.size(), inp.data()); 
+            if(x.second)
+                return pybind11::float_(x.first);
+            return pybind11::none();
+        }
+
         auto data = inp.data();
         int  size = inp.size();
 
