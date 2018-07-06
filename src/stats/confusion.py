@@ -30,6 +30,7 @@ class ConfusionMatrix:
         self.rule = 'theoretical_interval'
         self.brother = 3
         self.detection = list()#pd.DataFrame()
+        self.confusion = pd.DataFrame()
 
 
     def compute(self):
@@ -66,8 +67,8 @@ class ConfusionMatrix:
             elif elem[1].strand.unique()[0]=='minus':
                 confusion_state = 'TN' if not any(elem[1].detection) else 'FP'
                 if confusion_state == 'FP':
-                    confusion_state = 'TN' if sum(elem[1]['detection',
-                                                          'brother'].isin[2]>0) else 'FP'
+                    confusion_state = 'TN' if sum(elem[1][['detection',
+                                                       'brother']].sum(axis=1).isin([2]))>0 else 'FP'
                 estimators = len(elem[1].detection)
                 good_estimators = sum(~elem[1].detection)
                 isref = True if elem[0][0] in ref_pos else False
@@ -93,8 +94,25 @@ class ConfusionMatrix:
                                                                       'nb_true_est',
                                                                       'total_est',
                                                                       'reference'])   
-
-
+        self.confusion = pd.crosstab(index = self.confusion_detail['confusion_state'],
+                                     columns = ['count'])
+        self.confusion = self.confusion.reset_index()
+        try:
+            self.FN = self.confusion[self.confusion.confusion_state=='FN']['count'].values[0]
+        except (IndexError, AttributeError):
+            self.FN = 0
+        try:
+            self.FP = self.confusion[self.confusion.confusion_state=='FP']['count'].values[0]
+        except (IndexError, AttributeError):
+            self.FP = 0
+        try:
+            self.TN = self.confusion[self.confusion.confusion_state=='TN']['count'].values[0]
+        except (IndexError, AttributeError):
+            self.TN = 0
+        try:
+            self.TP = self.confusion[self.confusion.confusion_state=='TP']['count'].values[0]
+        except (IndexError, AttributeError):
+            self.TP = 0
 
     def _get_peak_position_df(self, trk, strand = 'plus', metil = True):
         """
@@ -129,14 +147,13 @@ class ConfusionMatrix:
                                  (theo_peaks[idx], idx, len(theo_peaks)),
                                  dist,
                                  peak[1]))
-                return peak_position
             if strand=='minus':
                 brother = diffplusminus[idx] < self.brother 
                 peak_position.append((peak[0],
                                  (theo_peaks[idx], idx, brother, len(theo_peaks)),
                                  dist,
                                  peak[1]))
-                return peak_position
+        return peak_position
 
     def get_detection(self):
         for trk in self.tracknames:
