@@ -4,36 +4,50 @@
 import numpy            as np
 import pandas           as pd
 from scipy          import stats
+import utilitaries as util
+import sequences
+
 
 class ConfusionMatrix:
 
-    def __init__(self, data, oligos, seq_path,
-                 param_rule,
-                 param_brother,
-                 param_confidence,
+    def __init__(self, data, oligos, seq_path, 
                  param_ioc,
                  param_tolerance):
         self.data = data
         self.tracknames = self.data.track.unique()
-        seq = Seq()
-        seq.set_sequence()
+        seq = util.Seq()
+        seq.set_sequence(seq_path)
         self.seq = seq
         self.oligos = oligos
+        self.ioc = param_ioc
+        self.tolerance = param_tolerance
+        self.tolerance_minus = 0.01
         self.TP = 0
         self.FP = 0
         self.TN = 0
         self.FN = 0
         self.confusion_detail = pd.DataFrame()
-        self.rule = param_rule
-        self.brother = param_brother
-        self.confidence = param_confidence
-        self.ioc = param_ioc
-        self.tolerance = param_tolerance
-        self.detection = pd.DataFrame()
+        self.rule = 'theoretical_interval'
+        self.brother = 3
+        self.detection = list()#pd.DataFrame()
 
 
     def compute(self):
-        df_grouped = list(self.df_detection.groupby(['theopos', 'track']))
+        self.get_detection()
+        self.detection = pd.DataFrame(self.detection, columns = ['theopos',
+                                                                 'exppos',
+                                                                 'peaknb',
+                                                                 'totalpeaks',
+                                                                 'dist',
+                                                                 'track',
+                                                                 'oli',
+                                                                 'strand',
+                                                                 'brother',
+                                                                 'rule',
+                                                                 'detection',
+                                                                 'hybrate',
+                                                                 'hybtime'])
+        df_grouped = list(self.detection.groupby(['theopos', 'track']))
         #compute the positions of the reference
         ref_pos = util.oligopeaks(self.seq.ref_oligo,
                                   self.seq)
@@ -75,14 +89,116 @@ class ConfusionMatrix:
                                                                       'exppos',
                                                                       'oligo',
                                                                       'strand',
+                                                                      'confusion_state',
                                                                       'nb_true_est',
                                                                       'total_est',
                                                                       'reference'])   
 
 
 
-    def _get_peak_position_df():
+    def _get_peak_position_df(self, trk, strand = 'plus', metil = True):
         """
-        output: auxiliary pandas DataFrame to be used in compute_qualities ?"""
+        output: auxiliary array to be used in get_detection with
+                * experimental position of the peak
+                * (closest theoretical position, index closest theoretical position,
+                   brother (if strand=='minus'), nb of possible positions)
+                * distance between experimental position and closest theoretical
+                * data corresponding to experimental position
+        """
+
+        if metil: 
+            theo_peaks = util.oligopeaks(util.map_track_oligo(trk, self.oligos),
+                                    self.seq, hp = 'target')
+        else:
+            theo_peaks = util.oligopeaks(util.map_track_oligo(trk, self.oligos),
+                                    self.seq, hp = 'complete')
+
+        diffplusminus = [min(abs(theo_peaks[0] - minuspeak)) for minuspeak in theo_peaks[1]]
+        theo_peaks = theo_peaks[0] if strand=='plus' else theo_peaks[1]
+
+        databypeakposition = list(self.data[self.data.track==trk].groupby('peakposition'))
+
+        peak_position = list()
+        for peak in databypeakposition:
+            if (strand=='minus' and len(theo_peaks)==0):
+                continue
+            idx = np.argmin(abs(theo_peaks - peak[0]))
+            dist = -(theo_peaks - peak[0])[idx]
+            if strand=='plus':
+                peak_position.append((peak[0],
+                                 (theo_peaks[idx], idx, len(theo_peaks)),
+                                 dist,
+                                 peak[1]))
+                return peak_position
+            if strand=='minus':
+                brother = diffplusminus[idx] < self.brother 
+                peak_position.append((peak[0],
+                                 (theo_peaks[idx], idx, brother, len(theo_peaks)),
+                                 dist,
+                                 peak[1]))
+                return peak_position
+
+    def get_detection(self):
+        for trk in self.tracknames:
+            peakposition_plus = self._get_peak_position_df(trk, 'plus')
+            peakposition_minus = self._get_peak_position_df(trk, 'minus')
+            for peak in peakposition_plus:
+                self._get_detection_perpeak(peak, 'plus')
+            if peakposition_minus!=None:
+                for peak in peakposition_minus:
+                    self._get_detection_perpeak(peak, 'minus')
 
 
+    def _get_detection_perpeak(self, peak, strand):
+        """
+        peak is a row from the output of _get_pea_position_df
+        append to detection:
+            * theoretical position
+            * experimental position
+            * theoretical peak number
+            * total theoretical peaks for that strand
+            * distance betweent theoretical and experimental position
+            * track
+            * oligo
+            * strand
+            * brother
+            * rule
+            * detection
+            * hybridisation rate
+            * average duration
+        """
+        ioc_theoretical_lower = peak[1][0] - self.ioc
+        ioc_theoretical_upper = peak[1][0] + self.ioc
+        prob_until_lower = stats.percentileofscore(peak[3].avg,
+                                                   ioc_theoretical_lower)
+        prob_until_upper = stats.percentileofscore(peak[3].avg,
+                                                   ioc_theoretical_upper)
+        
+        if strand=='plus':
+            brother = False
+            if (prob_until_upper - prob_until_lower)/100 < self.tolerance:
+                detecting = False
+            else:
+                detecting = True
+
+        if strand == 'minus':
+            brother = peak[1][2]
+            if (prob_until_upper - prob_until_lower)/100 < self.tolerance_minus:
+                detecting = False
+            else:
+                detecting = True
+        
+        self.detection.append((peak[1][0],
+                               peak[0],
+                               peak[1][1],
+                               peak[1][2],
+                               peak[2],
+                               peak[3].track.unique()[0],
+                               util.map_track_oligo(peak[3].track.unique()[0],
+                                                  self.oligos),
+                               strand,
+                               brother,
+                               self.rule,
+                               detecting,
+                               peak[3].hybridisationrate.unique()[0],
+                               peak[3].averageduration.unique()[0]))

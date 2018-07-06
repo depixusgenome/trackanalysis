@@ -5,7 +5,7 @@ import numpy        as np
 import pandas       as pd
 import warnings 
 from scipy          import stats
-
+import sequences
 
 class Seq:
     """The theoretical sequence: full, target, references"""
@@ -68,7 +68,7 @@ def set_dict_trackname_oligo(names, oligos):
     return output
 
 def map_track_oligo(name, oligos):
-    lst = [name.upper().find(oli)>0 for oli in oligos]
+    lst = [name.upper().find(oli)>=0 for oli in oligos]
     if sum(lst)==0:
         warnings.warn(f"""Can not find the oligo corresponding to track {name} \
 in the set of oligos {oligos}""")
@@ -80,3 +80,41 @@ in the set of oligos {oligos}""")
     if len(lst)>1:
         output = output[output != 'OR3']
         return output.dropna().values[0][0]
+
+def oligopeaks(oligo,
+               seq,
+               withref = True,
+               hp = 'complete'):
+    """
+    compute the list of theoretical peaks for oligo
+    input: oligo is a string
+    seq is a theoretical object
+    'full': string with the full sequence
+    'target': string with the target sequence
+    'oligo': string with the reference oligo
+    withref is True if we output the peaks of the reference oligo
+    False if not
+    """
+    #obtain the limits of the target sequence
+    tgt   = seq.target #[seq['full'].index(seq['target']), seq['full'].index(seq['target'])+len(seq['target'])]
+    #reverse complement of oligo
+    oli   = sequences.Translator.reversecomplement(oligo)
+    #find the positions and orientations of oli in the full sequence
+    oli   = sequences.peaks(seq.full, oli)#sequences.peaks(seq['full'], oli)
+    #keep the positions in target
+    if hp == 'target':
+        start2ome = sequences.peaks(seq.full,tgt)['position'][0]-len(tgt)-30
+        end2ome = sequences.peaks(seq.full,tgt)['position'][0]+41
+        oli   = oli[oli['position'] >= start2ome]
+        oli   = oli[oli['position'] <= end2ome]
+    #oly keep the positions oriented True (like our target)
+    olicopy = oli
+    oli   = oli['position'][oli['orientation']]
+    oli_os = olicopy['position'][~olicopy['orientation']]
+    #if withref then return array of all peaks of the reference and the peaks of oligo
+    if withref:
+        ref = sequences.peaks(seq.full, seq.ref_oligo)['position']
+        #ref = sequences.peaks(seq['full'], seq['oligo'])['position']
+        return (np.sort(np.concatenate([ref, oli])), oli_os)
+    #if withref then return array of all the peaks of oligo
+    return (oli, oli_os)
