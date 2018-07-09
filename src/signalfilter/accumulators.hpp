@@ -499,15 +499,15 @@ namespace signalfilter { namespace stats
                 --last;
 
         out[0] = last;
-        for(size_t i = width+1, e = width > sz ? width : sz; i < e; ++i)
+        for(size_t i = 1, e = width > sz ? 0 : sz-width; i < e; ++i)
         {
-            if(!std::isfinite(dt[i]))
+            if(!std::isfinite(dt[i+width-1]))
             {
-                if(std::isfinite(dt[i-width-1]))
+                if(std::isfinite(dt[i-1]))
                     ++last;
-            } else if(!std::isfinite(dt[i-width-1]))
+            } else if(!std::isfinite(dt[i-1]))
                 --last;
-            out[i-width] = last;
+            out[i] = last;
         }
 
         if(sz > width)
@@ -531,15 +531,15 @@ namespace signalfilter { namespace stats
                 --last;
 
         out[0] = last >= threshold;
-        for(size_t i = width+1, e = width > sz ? width : sz; i < e; ++i)
+        for(size_t i = 1, e = width > sz ? 0 : sz-width; i < e; ++i)
         {
-            if(!std::isfinite(dt[i]))
+            if(!std::isfinite(dt[i+width-1]))
             {
-                if(std::isfinite(dt[i-width-1]))
+                if(std::isfinite(dt[i-1]))
                     ++last;
-            } else if(!std::isfinite(dt[i-width-1]))
+            } else if(!std::isfinite(dt[i-1]))
                 --last;
-            out[i-width] = last >= threshold;
+            out[i] = last >= threshold;
         }
 
         if(sz > width)

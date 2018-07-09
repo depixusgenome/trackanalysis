@@ -152,5 +152,17 @@ namespace signalfilter { namespace stats
     T hfsigma(size_t sz, T const * dt);
 
     template <typename T>
+    T nanhfsigma(size_t sz, T const * dt);
+
+    template <typename T, typename K>
+    void nancount(size_t width, size_t sz, T const * dt, K * out);
+
+    template <typename T, typename K>
+    void nanthreshold(size_t width, int threshold, size_t sz, T const * dt, K * out);
+
+    template <typename T>
+    T nanmediandeviation(size_t sz, T const * dt);
+
+    template <typename T>
     inline T mediandeviation(size_t sz, T const * dt);
 }}

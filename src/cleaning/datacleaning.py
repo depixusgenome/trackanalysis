@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Removing aberrant points and cycles"
-from    typing                  import NamedTuple, List, Union
-from    abc                     import ABC, abstractmethod
+from    typing                  import NamedTuple, List
 
 import  numpy                   as     np
-from    numpy.lib.stride_tricks import as_strided
 
 from    utils                   import initdefaults
 from    signalfilter            import nanhfsigma, nanthreshold
+# pylint: disable=import-error,unused-import
 from    ._core                  import (constant as _cleaningcst, # pylint: disable=import-error
-                                        clip     as _cleaningclip)
+                                        clip     as _cleaningclip,
+                                        LocalNaNPopulation as LocalNaNPopulation,
+                                        NaNDerivateIslands as DerivateIslands,
+                                        AberrantValuesRule as CAberrantValuesRule)
 
 Partial = NamedTuple('Partial',
                      [('name', str),
@@ -18,42 +20,21 @@ Partial = NamedTuple('Partial',
                       ('max', np.ndarray),
                       ('values', np.ndarray)])
 
-class NaNDensity(ABC):
-    "removes frames affected by NaN value in their neighborhood"
-    @staticmethod
-    def _countnans(bead: np.ndarray, width: int, cnt: Union[float, int]) -> np.ndarray:
-        """
-        provide the first index of intervals of at least `cnt` NaN values in an
-        interval `width` long.
-        """
-        return nanthreshold(bead, width, int(cnt))[:-width+1]
-        tmp = np.asarray(np.isnan(bead), dtype = 'i1')
-        if width > 1:
-            tmp = np.sum(as_strided(tmp,
-                                    strides = (tmp.strides[0], tmp.strides[0]),
-                                    shape   = (tmp.size-width+1, width)),
-                         axis = 1) >= cnt
-        return tmp
-
-    @abstractmethod
-    def apply(self, bead:np.ndarray) -> None:
-        "removes bad frames"
-
-class LocalNaNPopulation(NaNDensity):
+class PyLocalNaNPopulation:
     "Removes frames which have NaN values to their right and their left"
     window = 5
     ratio  = 20
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
-        super().__init__()
+        pass
 
     def apply(self, bead: np.ndarray):
         "Removes frames which have NaN values to their right and their left"
-        tmp = self._countnans(bead, self.window, self.ratio/100.*self.window)
+        tmp = nanthreshold(bead, self.window, int(self.ratio/100.*self.window))[:-self.window+1]
         tmp = np.logical_and(tmp[:-self.window-1], tmp[self.window+1:])
         bead[self.window:-self.window][tmp] = np.NaN
 
-class DerivateIslands(NaNDensity):
+class PyDerivateIslands:
     """
     Removes frame intervals with the following characteristics:
 
@@ -67,11 +48,12 @@ class DerivateIslands(NaNDensity):
     maxderivate = .1
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
-        super().__init__()
+        pass
 
     def apply(self, bead: np.ndarray):
         "Removes frames which have NaN values to their right and their left"
-        tmp = np.nonzero(self._countnans(bead, self.riverwidth, self.riverwidth))[0]
+        width = self.riverwidth
+        tmp   = np.nonzero(nanthreshold(bead, width, width)[:-width+1])[0]
         if len(tmp) == 0:
             return
 
@@ -141,12 +123,12 @@ class AberrantValuesRule:
     * #{z[I-nanwindow//2:I+nanwindow//2] is nan} < nanratio*nanwindow
 
     """
-    mindeltavalue                = 1e-6
-    mindeltarange                = 3
-    nandensity: List[NaNDensity] = [LocalNaNPopulation(window = 16, ratio = 50),
-                                    DerivateIslands()]
-    maxabsvalue                  = 5.
-    maxderivate                  = .6
+    mindeltavalue    = 1e-6
+    mindeltarange    = 3
+    nandensity: List = [PyLocalNaNPopulation(window = 16, ratio = 50),
+                        PyDerivateIslands()]
+    maxabsvalue      = 5.
+    maxderivate      = .6
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -304,7 +286,7 @@ class SaturationRule:
             return Partial('saturation', _ZERO, np.nonzero(low)[0], deltas)
         return Partial('saturation', _ZERO, _ZERO, deltas)
 
-class DataCleaning(AberrantValuesRule, # pylint: disable=too-many-ancestors
+class DataCleaning(CAberrantValuesRule, # pylint: disable=too-many-ancestors
                    HFSigmaRule,
                    PopulationRule,
                    ExtentRule,
@@ -367,6 +349,15 @@ class DataCleaning(AberrantValuesRule, # pylint: disable=too-many-ancestors
         for base in DataCleaning.__bases__:
             base.__init__(self, **_) # type: ignore
 
+    def __getstate__(self):
+        state = dict(self.__dict__)
+        state.update(CAberrantValuesRule.__getstate__(self))
+        return state
+
+    def __setstate__(self, vals):
+        self.__dict__.update({i: j for i, j in vals.items() if i in self.__dict__})
+        CAberrantValuesRule.configure(self, vals)
+
     @staticmethod
     def badcycles(stats) -> np.ndarray:
         "returns all bad cycles"
@@ -379,6 +370,7 @@ class DataCleaning(AberrantValuesRule, # pylint: disable=too-many-ancestors
         return bad
 
     def aberrant(self, bead:np.ndarray, clip = False) -> bool:
+        "remove abberant values"
         super().aberrant(bead, clip)
         return np.isfinite(bead).sum() <= len(bead) * self.minpopulation * 1e-2
 
