@@ -19,7 +19,7 @@ def _min_extension():
         from utils.logconfig import getLogger
         getLogger(__name__).warning("Could not obtain min extension from the cleaning module")
         return .25
-    return ExtentRule.minextent
+    return ExtentRule().minextent
 
 class AlignmentTactic(Enum):
     "possible alignments"

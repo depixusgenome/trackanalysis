@@ -21,6 +21,32 @@
 namespace signalfilter { namespace stats
 {
     template <typename T>
+    T percentile(T * first, T * last, float val)
+    {
+        int  sz    = int(last-first);
+        if(sz == 0)
+            return std::numeric_limits<T>::quiet_NaN();
+        if(sz == 1)
+            return *first;
+
+        auto nth   = int(sz*0.01f*val);
+        bool exact = std::abs(sz*0.01f*val-nth) > 1e-4;
+            
+        if(nth == 0)
+            return *std::min_element(first, last);
+        if(nth == sz)
+            return *std::max_element(first, last);
+
+        std::nth_element(first, first+nth,   last);
+        if(exact)
+            return first[nth];
+
+        std::nth_element(first, first+nth-1, first+nth);
+        float rho = sz*0.01f*val-nth;
+        return (1.0f-rho)*first[nth-1]-1+rho*first[nth];
+    }
+
+    template <typename T>
     typename T::value_type median(T & items)
     {
         auto nth = items.size()/2;

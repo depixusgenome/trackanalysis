@@ -72,4 +72,61 @@ namespace cleaning {
 
         void apply(size_t, float *, bool = false) const;
     };
+
+    struct DataInfo
+    {
+        size_t              nframes;
+        float       const * data;
+
+        size_t              ncycles;
+        long long   const * start;
+        long long   const * stop;
+    };
+
+    struct DataOutput
+    {
+        DataOutput(size_t ncycles);
+        std::vector<float> values;
+        std::vector<int>   minv;
+        std::vector<int>   maxv;
+    };
+
+    struct HFSigmaRule
+    {
+        DataOutput apply(DataInfo info) const;
+        float minv = 1e-4f;
+        float maxv = 1e-2f;
+    };
+
+    struct PopulationRule
+    {
+        DataOutput apply(DataInfo info) const;
+        float minv = 80.0f;
+    };
+
+    struct ExtentRule
+    {
+        DataOutput apply(DataInfo info) const;
+        float minv          = .25f;
+        float maxv          = 2.0f;
+        float minpercentile = 5.0f;
+        float maxpercentile = 95.0f;
+    };
+
+    struct PingPongRule
+    {
+        DataOutput apply(DataInfo info) const;
+        float maxv          = 3.0f;
+        float mindifference = .01f;
+        float minpercentile = 5.;
+        float maxpercentile = 95.;
+    };
+
+    struct SaturationRule
+    {
+        DataOutput apply(DataInfo initial, DataInfo measures) const;
+        float  maxv          = 20.0f;
+        float  maxdisttozero = .015f;
+        size_t satwindow     = 10;
+    };
 }

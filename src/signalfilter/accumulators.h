@@ -22,6 +22,9 @@ namespace signalfilter { namespace stats
     typename T::value_type median(T & items);
 
     template <typename T>
+    T percentile(T * first, T * last, float val);
+
+    template <typename T>
     auto median(T begin, T end);
 
     template <typename ... T>

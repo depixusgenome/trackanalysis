@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Selecting beads"
-import  warnings
 from    typing                  import Optional, Dict, Any, List, Tuple, Type
 from    itertools               import repeat
 from    functools               import partial
@@ -96,28 +95,25 @@ class DataCleaningException(ProcessorException):
 
 class DataCleaningProcessor(Processor[DataCleaningTask]):
     "Processor for cleaning the data"
+    __DFLT = DataCleaningTask()
     @classmethod
     def __get(cls, name, cnf):
-        return cnf.get(name, getattr(cls.tasktype, name))
+        return cnf.get(name, getattr(cls.__DFLT, name))
 
     @classmethod
-    def __test(cls, frame, cnf):
-        sel = cls.tasktype(**cnf)
-        pha = cycs = None
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category = RuntimeWarning,
-                                    message = '.*All-NaN slice encountered.*')
-            warnings.filterwarnings('ignore', category = RuntimeWarning,
-                                    message = '.*invalid value encountered in [gl][re].*')
-            for name in sel.CYCLES:
-                cur = cls.__get(name+'phases', cnf)
-                if cycs is None or pha != cur:
-                    pha, cycs = cur, tuple(frame.withphases(*cur).values())
-                yield getattr(sel, name)(cycs)
+    def __test(cls, frame, bead, cnf):
+        phases = frame.track.phase.select
+        sel    = cls.tasktype(**cnf)
+        pha    = cycs = None
+        for name in sel.CYCLES:
+            cur = cls.__get(name+'phases', cnf)
+            if cycs is None or pha != cur:
+                pha, cycs = cur, (phases(..., cur[0]), phases(..., cur[1]+1))
+            yield getattr(sel, name)(bead, *cycs)
 
-            init = list(frame.withphases(cls.__get('saturationphases', cnf)[0]).values())
-            meas = list(frame.withphases(cls.__get('saturationphases', cnf)[1]).values())
-            yield sel.saturation(init, meas)
+        cur = cls.__get('saturationphases', cnf)
+        tmp = (phases(..., i) for i in (cur[0], cur[0]+1, cur[1], cur[1]+1))
+        yield sel.saturation(bead, *tmp)
 
     @classmethod
     def _compute(cls, cnf, frame, info): # pylint: disable=inconsistent-return-statements
@@ -126,13 +122,6 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
         if res is None:
             return info
         raise res
-
-    @classmethod
-    def saturation(cls, cycs, **cnf):
-        "return the saturation count"
-        initials = list(cycs.withphases(PHASE.initial).values())
-        measures = list(cycs.withphases(PHASE.measure).values())
-        return cls.tasktype(**cnf).saturation(initials, measures)
 
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf) -> Optional[DataCleaningException]:
@@ -146,8 +135,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
 
         discard = DataCleaning(**cnf).aberrant(info[1])
         if not tested:
-            cycs = frame.track.view("cycles", data = {info[0]: info[1]})
-            val  = tuple(cls.__test(cycs, cnf))
+            val  = tuple(cls.__test(frame, info[1], cnf))
 
         if not discard:
             bad = cls.tasktype.badcycles(val) # type: ignore

@@ -174,4 +174,144 @@ namespace cleaning
         localnans.apply(sz, data);
         islands.apply(sz, data);
     }
+
+    DataOutput::DataOutput(size_t ncycles)
+        : values(ncycles, std::numeric_limits<float>::quiet_NaN()),
+          minv  (),
+          maxv  ()
+    {}
+
+    namespace
+    {
+        template <typename T>
+        bool _has(T);
+
+        template <typename T>
+        decltype(_has(&T::minv)) _testmin(T const & self, float val) { return val < self.minv; }
+
+        template <typename T>
+        constexpr bool _testmin(T const &, ...) { return false; }
+
+        template <typename T>
+        decltype(_has(&T::maxv)) _testmax(T const & self, float val) { return val > self.maxv; }
+
+        template <typename T>
+        constexpr bool _testmax(T const &, ...) { return false; }
+
+        float _test(HFSigmaRule const &, size_t sz, float const *data)
+        { return signalfilter::stats::nanhfsigma(sz, data); }
+
+        float _test(PopulationRule const &, size_t sz, float const *data)
+        {
+            float cnt = 0.f;
+            for(size_t i = 0; i < sz; ++i)
+                if(std::isfinite(data[i]))
+                    ++cnt;
+            return sz == 0 ? 0. : cnt/sz*100.0f;
+        }
+
+        template <typename T>
+        float _test_extent(T const & self, size_t sz, float const *data)
+        {
+            auto imax = int(self.maxpercentile*.01f*sz);
+            auto imin = int(self.minpercentile*.01f*sz);
+            if(imax == 100 && imin == 0)
+            {
+                auto maxv = std::max_element(data, data+sz);
+                auto minv = std::min_element(data, data+sz);
+                return maxv-minv;
+            }
+
+            std::vector<float> cpy(data, data+sz);
+            auto dt = cpy.data();
+            auto maxv = signalfilter::stats::percentile(dt, dt+sz, self.maxpercentile);
+            auto minv = signalfilter::stats::percentile(dt, dt+sz, self.minpercentile);
+            return maxv-minv;
+        }
+        float _test(ExtentRule const & self, size_t sz, float const *data)
+        {   return _test_extent(self, sz, data); }
+
+        float _test(PingPongRule const & self, size_t sz, float const *data)
+        {
+            auto ext = _test_extent(self, sz, data);
+            if(!std::isfinite(ext) || ext == 0.0f)
+                return std::numeric_limits<float>::quiet_NaN();
+
+            auto invext = 1.0f/ext;
+            auto conv   = 0.0f;
+            for(size_t i = 4; i < sz; ++i)
+            {
+                auto val = std::abs((data[i]-data[i-4])*(1.0f/12.0f)
+                                     +(data[i-3]-data[i-1])*(2.0f/3.0f));
+                if(std::isfinite(val) && val > self.mindifference)
+                    conv += val*invext;
+            }
+            return conv;
+        }
+
+        template <typename T>
+        DataOutput _apply(T const & self, DataInfo const & info)
+        {
+            DataOutput out(info.ncycles);
+            for(size_t icyc = 0; icyc < info.ncycles; ++icyc)
+            {
+                auto value = _test(self,
+                                   info.stop[icyc]-info.start[icyc],
+                                   info.data+info.start[icyc]);
+                out.values[icyc] = value;
+                if(_testmin(self, value))
+                    out.minv.push_back(icyc);
+                if(_testmax(self, value))
+                    out.maxv.push_back(icyc);
+            }
+            return out;
+        }
+    }
+    
+    DataOutput HFSigmaRule::apply(DataInfo info) const
+    { return _apply(*this, info); }
+
+    DataOutput PopulationRule::apply(DataInfo info) const
+    { return _apply(*this, info); }
+
+    DataOutput ExtentRule::apply(DataInfo info) const
+    {  return _apply(*this, info); }
+
+    DataOutput PingPongRule::apply(DataInfo info) const
+    {  return _apply(*this, info); }
+
+    DataOutput SaturationRule::apply(DataInfo initial, DataInfo measures) const
+    {
+        DataOutput out(initial.ncycles);
+        auto zeros = size_t(0);
+        auto good  = size_t(0);
+        for(auto icyc = size_t(0); icyc < initial.ncycles; ++icyc)
+        {
+            std::vector<float> tmp(measures.data+measures.stop[icyc]-satwindow,
+                                   measures.data+measures.stop[icyc]);
+            auto diffmed = signalfilter::stats::median(tmp);
+            if(!std::isfinite(diffmed))
+                continue;
+
+            tmp.assign(initial.data+initial.start[icyc],
+                       initial.data+initial.stop[icyc]);
+            diffmed -= signalfilter::stats::median(tmp);
+            
+            out.values[icyc] = diffmed;
+            if(std::isfinite(diffmed))
+            {
+                ++good;
+                if(diffmed > maxdisttozero)
+                    ++zeros;
+            }
+
+        }
+        if(zeros*100 > good*maxv)
+        {
+            out.maxv.resize(initial.ncycles);
+            for(auto i = size_t(0); i < initial.ncycles; ++i)
+                out.maxv.at(i) = i;
+        }
+        return out;
+    }
 }

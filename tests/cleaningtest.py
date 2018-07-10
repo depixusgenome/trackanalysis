@@ -9,15 +9,80 @@ from testingcore                import path as utpath
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 from cleaning.processor         import (DataCleaningTask, DataCleaningException,
                                         DataCleaningProcessor)
+import cleaning.datacleaning    as     _datacleaning
 from cleaning.datacleaning      import (DataCleaning, LocalNaNPopulation,
                                         DerivateIslands)
 from cleaning.beadsubtraction   import (SubtractAverageSignal, SubtractMedianSignal,
                                         BeadSubtractionProcessor, FixedBeadDetection)
-import cleaning._core           as     cleaningcore # pylint:disable=no-name-in-module
+import cleaning._core  as     cleaningcore # pylint:disable=no-name-in-module,import-error
 from simulator                  import randtrack, setseed
 from model.task.track           import TrackReaderTask
 from control.taskcontrol        import create
 from data                       import Beads
+
+def test_datacleaning():
+    "test data cleaning"
+    bead = np.concatenate([np.random.normal(.1, 3e-3, 200),
+                           np.random.normal(.1, 3e-5, 200),
+                           np.random.normal(.1, 3e-2, 200)]).astype('f4')
+    out = _datacleaning.HFSigmaRule().hfsigma(bead, [0,200, 400], [200, 400, 600])
+    assert out.name == "hfsigma"
+    assert list(out.min) == [1]
+    assert list(out.max) == [2]
+
+    bead = np.concatenate([np.random.normal(.1, 3e-3,  100), np.random.normal(1.1, 3e-3, 100),
+                           np.random.normal(.5, 3e-3,  100), np.random.normal(.6, 3e-3,  100),
+                           np.random.normal(-2., 3e-3, 100), np.random.normal(.6, 3e-3,  100)]
+                         ).astype('f4')
+    out = _datacleaning.ExtentRule().extent(bead, [0,200, 400], [200, 400, 600])
+    assert out.name == "extent"
+    assert list(out.min) == [1]
+    assert list(out.max) == [2]
+
+    bead = np.ones(600, dtype = 'f4')
+    bead[200:400:2] = np.NaN
+    bead[400:600:6] = np.NaN
+    out = _datacleaning.PopulationRule().population(bead, [0,200, 400], [200, 400, 600])
+    assert out.name == "population"
+    assert list(out.min) == [1]
+    assert list(out.max) == []
+
+    bead = np.random.normal(.1, 3e-3,  600).astype('f4')
+    bead[50:100]  += 1
+    bead[250:300] += 1
+    bead[330:340] += 1
+    bead[350:360] += 1
+    bead[370:380] += 1
+    bead[450:500] += 1
+    bead[570:580] += .1
+    out = _datacleaning.PingPongRule().pingpong(bead, [0,200, 400], [200, 400, 600])
+    assert out.name == "pingpong"
+    assert list(out.min) == []
+    assert list(out.max) == [1]
+
+
+    bead = np.random.normal(.1, 3e-3, 1000).astype('f4')
+    for i in range(70,1000,100):
+        bead[i:i+10] += .02
+    out = _datacleaning.SaturationRule().saturation(bead,
+                                                    list(range(0,1000,100)),
+                                                    list(range(30,1000,100)),
+                                                    list(range(50,1000,100)),
+                                                    list(range(90,1000,100)))
+    assert out.name == "saturation"
+    assert list(out.min) == []
+    assert list(out.max) == []
+
+    for i in range(80,800,100):
+        bead[i:i+10] += .02
+    out = _datacleaning.SaturationRule().saturation(bead,
+                                                    list(range(0,1000,100)),
+                                                    list(range(30,1000,100)),
+                                                    list(range(50,1000,100)),
+                                                    list(range(90,1000,100)))
+    assert out.name == "saturation"
+    assert list(out.min) == []
+    assert list(out.max) == list(range(10))
 
 def test_constantvalues():
     "test constant values"
@@ -48,28 +113,6 @@ def test_constantvalues():
     fin[:] = False
     fin[21:30] = True
     assert_equal(np.isnan(bead), fin)
-
-def test_cleaning_base():
-    "test cleaning"
-    setseed(0)
-    cycs = np.asarray(np.random.normal(.1, 3e-3, 1000).reshape(10,-1), dtype = 'f4')
-    cycs[0,:]      = np.random.normal(1., 4e-2, 100)
-    cycs[:,50:]   += .51
-    cycs[1,:]      = np.random.normal(.5, 1e-5, 100)
-    cycs[2,:]      = np.random.normal(.0, 3e-3, 100)
-    cycs[3,:22]    = np.NaN
-    cycs[4,3:69:3] += 2.5
-    cycs[5,:22]    += 5.7
-
-    tsk = DataCleaning(maxextent = 6)
-    assert set(tsk.hfsigma(cycs).min) == set([1])
-    assert set(tsk.hfsigma(cycs).max) == set([0, 4])
-    assert set(tsk.extent(cycs).min) == set([1, 2])
-    assert set(tsk.extent(cycs).max) == set([])
-    assert set(tsk.population(cycs).min) == set([3])
-    tsk.aberrant(cycs.ravel())
-    assert set(tsk.population(cycs).min) == set([3,4,5])
-    assert set(tsk.population(cycs).max) == set([])
 
 def test_cleaning_localpop():
     "test cleaning"
@@ -340,7 +383,7 @@ def test_fixedbeadsorting():
     assert lst[0][-1] == 4
     frames = FixedBeadDetection().dataframe(beads)
     assert frames.shape == (4, 11)
-    assert list(frames[frames.good].bead.values) == [0]
+    assert list(frames[frames.good].bead.values) == [4]
 
 if __name__ == '__main__':
-    test_cleaning_localpop()
+    test_processor()
