@@ -5,10 +5,12 @@
 "Tests interval detection"
 import sys
 sys.modules['ACCEPT_SCRIPTING'] = True
+import pickle
 from scripting             import Track, Tasks, localcontext #pylint: disable=no-name-in-module
 from data                  import Cycles
 from eventdetection.data   import Events
 from peakfinding.processor import PeaksDict
+from scripting.confusion   import ConfusionMatrix, LNAHairpin
 from testingcore           import path as utpath
 
 def test_track():
@@ -57,5 +59,16 @@ def test_track():
     assert track.op[:,:5].ncycles == 5
     assert set(track.op[[1,2]].beads.keys()) == {1,2}
 
+def test_confusion():
+    "test the confusion matrix"
+    peaks = pickle.load(open(utpath("hp6jan2018.peaks"), "rb"))
+    peaks = peaks[peaks.track != 'ref']
+    cnf   = ConfusionMatrix(oligos  = peaks.track.unique(),
+                            seq     = LNAHairpin(path = utpath("hp6.fasta")))
+    det   = cnf.detection(peaks)
+    conf  = cnf.confusion(det)
+    return det, conf
+
+
 if __name__ == '__main__':
-    test_track()
+    test_confusion()

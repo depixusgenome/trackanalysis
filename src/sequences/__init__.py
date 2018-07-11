@@ -280,8 +280,11 @@ class LNAHairpin:
     full:       str       = ""
     target:     str       = ""
     references: List[str] = []
-    path                  = property(None, lambda self, val: self.setfrompath(val))
-    @initdefaults(frozenset(locals()))
+    @initdefaults(frozenset(locals()),
+                  path = lambda self, val: self.setfrompath(val))
+    def __init__(self, **_):
+        pass
+
     def setfrompath(self, file_sequence: Union[str, Path],
                     full:   str = 'full',
                     target: str = 'target',
@@ -311,3 +314,7 @@ class Strand(Enum):
     """
     positive = True
     negative = False
+
+    @classmethod
+    def _missing_(cls, value):
+        return getattr(cls, value)

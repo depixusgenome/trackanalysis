@@ -55,8 +55,8 @@ def oligopeaks(oligo: Union[str, Iterable[str]], seq: LNAHairpin,
 
     #if withref then return array of all peaks of the reference and the peaks of oligo
     if withref:
-        ref = _peaks(seq.full, seq.references)['position']
-        oli = np.sort(np.append(oli, ref))
+        ref = _peaks(seq.full, seq.references)
+        oli = np.sort(np.append(oli, ref[ref['orientation']]))
 
     return (oli['position'][oli['orientation']], oli['position'][~oli['orientation']])
 
@@ -86,18 +86,15 @@ class DataFrameCreator(ConfusionMatrix):
     "Creates dataframes"
     theo: np.ndarray
     def __init__(self, config):
-        super().__init__(**config.__dict__())
-
-    def theoposcolumn(self, idtheo: int, *_) -> int:
-        "the theoretical positions in bases"
-        return self.theo[idtheo]
+        super().__init__(**config.__dict__)
 
     @classmethod
     def dataframe(cls, config: ConfusionMatrix, data: pd.DataFrame, **kwa) -> pd.DataFrame:
         "returns a dataframe for all tracks"
         size = -len('column')
-        out  = np.ndarray([tuple(i) for i in cls.iterate(config, data, **kwa)])
-        data = {j[:size]: out[:,i] for i, (j,_) in enumerate(cls._columns(cls))}
+        out  = tuple(tuple(i) for i in cls.iterate(config, data, **kwa))
+        data = {j[:size]: [k[i] for k in out]
+                for i, (j,_) in enumerate(cls._columns(cls))}
         return pd.DataFrame(data)
 
     @staticmethod
@@ -130,7 +127,7 @@ class DetectionFrameCreator(DataFrameCreator):
     def __init__(self, config, trackname:str, strand: Strand, hptarget: str) -> None:
         super().__init__(config)
         self.trackname  = trackname
-        self.oligoname  = next(i for i in self.oligos if i in i.upper() in trackname.upper())
+        self.oligoname  = next(i for i in self.oligos if i.upper() in trackname.upper())
         self.strand     = Strand(strand)
         theo            = oligopeaks(trackoligo(trackname, self.oligos),
                                      self.seq, hptarget)
@@ -150,8 +147,8 @@ class DetectionFrameCreator(DataFrameCreator):
         data   = data.reset_index().set_index('track')
         for trk in tracks:
             grp = data.loc[trk].groupby('peakposition')
-            yield from cls(config, trk, grp.positive, hptarget).groupbyiterate(grp)
-            yield from cls(config, trk, grp.negative, hptarget).groupbyiterate(grp)
+            yield from cls(config, trk, Strand.positive, hptarget).groupbyiterate(grp)
+            yield from cls(config, trk, Strand.negative, hptarget).groupbyiterate(grp)
 
     def lineargs(self, info:Tuple[float, pd.DataFrame]) -> Tuple[int, float, pd.DataFrame]:
         """
@@ -172,6 +169,10 @@ class DetectionFrameCreator(DataFrameCreator):
     def oligocolumn(self, *_) -> str:
         "the oligo name"
         return self.oligoname
+
+    def theoposcolumn(self, idtheo: int, *_) -> int:
+        "the theoretical positions in bases"
+        return self.theo[idtheo]
 
     def strandcolumn(self, *_) -> str:
         "the strand name"
@@ -210,12 +211,12 @@ class DetectionFrameCreator(DataFrameCreator):
     @staticmethod
     def hybratecolumn(_, __, group:pd.DataFrame) -> float:
         "whether there could be a binding on both strands at the same time"
-        return group.hybridisationrate.first()
+        return group.hybridisationrate.values[0]
 
     @staticmethod
     def hybtimecolumn(_, __, group:pd.DataFrame) -> float:
         "whether there could be a binding on both strands at the same time"
-        return group.averageduration.first()
+        return group.averageduration.values[0]
 
 class LNAHairpinDataFrameResults(NamedTuple): # pylint: disable=missing-docstring
     data      : pd.DataFrame
@@ -242,9 +243,7 @@ class LNAHairpinDataFrameCreator(DataFrameCreator):
         """
         iterates over all lines
         """
-        self = cls(config, **kwa)
-        for info in data.groupby(['theopos', 'track']):
-            yield from self.groupbyiterate(info)
+        yield from cls(config, **kwa).groupbyiterate(data.groupby(['theopos', 'track']))
 
     @classmethod
     def results(cls, config: ConfusionMatrix, data: pd.DataFrame,
@@ -254,13 +253,13 @@ class LNAHairpinDataFrameCreator(DataFrameCreator):
         """
         creates and returns all results
         """
-        data      = cls.dataframe(config, **kwa)
+        data      = cls.dataframe(config, data, **kwa)
         confusion = pd.crosstab(index   = data[confusionindex],
                                 columns = list(confusioncolumns))
         def _count(name):
             try:
-                return confusion.loc[name]['count'].first()
-            except (IndexError, AttributeError):
+                return confusion.loc[name]['count']
+            except KeyError:
                 return 0
         counts = (_count(i) for i in ('FN', 'FP', 'TN', 'TP'))
         return LNAHairpinDataFrameResults(data, confusion, *counts)
@@ -278,6 +277,11 @@ class LNAHairpinDataFrameCreator(DataFrameCreator):
         return track
 
     @staticmethod
+    def theoposcolumn(theopos: int, *_) -> int:
+        "the theoretical positions in bases"
+        return theopos
+
+    @staticmethod
     def expposcolumn(_, __, grp: pd.DataFrame) -> float:
         "the experimental positions in µm"
         try:
@@ -288,18 +292,18 @@ class LNAHairpinDataFrameCreator(DataFrameCreator):
     @staticmethod
     def oligocolumn(_, __, grp: pd.DataFrame) -> str:
         "the oligo name"
-        return grp.oligo.first()
+        return grp.oligo.values[0]
 
     @staticmethod
     def strandcolumn(_, __, grp: pd.DataFrame) -> str:
         "the strand name"
-        return grp.strand.first()
+        return grp.strand.values[0]
 
     @staticmethod
     def confusionstatecolumn(_, __, grp: pd.DataFrame) -> str:
         "returns the state of the peak : false/true positive/negative"
         state = np.any(grp.detection)
-        if Strand(grp.strand.first()).value:
+        if Strand(grp.strand.values[0]).value:
             return 'TP' if state else 'FN'
 
         if state:
@@ -311,7 +315,7 @@ class LNAHairpinDataFrameCreator(DataFrameCreator):
     def goodestimatorscolumn(_, __, grp: pd.DataFrame) -> int:
         "returns the number of good estimators"
         cnt = grp.detection.sum()
-        return cnt if Strand(grp.strand.first()).value else len(grp) - cnt
+        return cnt if Strand(grp.strand.values[0]).value else len(grp) - cnt
 
     @staticmethod
     def estimatorscolumn(_, __, grp: pd.DataFrame) -> int:
