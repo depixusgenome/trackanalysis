@@ -196,28 +196,38 @@ def displaytrackstatus(beadqc:pd.DataFrame,
         disc = disc.loc[ordertracks]
     disc.reset_index(inplace = True)
     disc = (disc
-            .melt(id_vars = ['track'], variable = list(set(disc.columns) - {'track'}))
-            .rename(columns = {'variable': 'error', 'value': value})
-            .assign(ok    = lambda x: np.where(x.error == 'ok', 'ok',    np.NaN))
-            .assign(error = lambda x: np.where(x.error != 'ok', x.error, np.NaN)))
+            .melt(id_vars = ['track'])
+            .rename(columns = {'mostcommonerror': 'error', 'value': value}))
 
     disc.set_index('track', inplace = True)
     disc = disc.join(pd.Series(frame.groupby('track').bead.count()).rename('beads'))
     disc.reset_index(inplace = True)
+    disc[value] *= np.where(disc.error == 'ok', 1, -1)
+    disc['error'] = disc['error'].astype('category')
+    disc.set_index("error", inplace = True)
+    order  = ['ok', 'fixed', 'missing']
+    order += sorted(set(disc.index).difference(order))
+    disc = disc.loc[order,:]
+    disc.reset_index(inplace = True)
 
     nbeads = len(frame.bead.unique())
     def _labels(xaxis, color):
-        hmap = (hv.HeatMap(disc, kdims = [xaxis, 'track'], vdims = [value, 'beads'])
-                .redim.range(**{xaxis: (0, 100 if normalize else nbeads)})
-                .redim.label(**{xaxis: ""})
-                .options(dict(tools     = ['hover'],
-                              cmap      = color,
+        hmap = (hv.HeatMap(disc[~disc[xaxis].isna()],
+                           kdims = [xaxis, 'track'],
+                           vdims = [value, 'beads'])
+                .redim.range(**{value: (-100, 100) if normalize else (-nbeads, nbeads)})
+                .redim.label(**{xaxis: " "})
+                (plot  = dict(tools     = ['hover'],
                               xrotation = 40,
-                              color_bar = True)))
+                              colorbar  = True),
+                 style = dict(cmap      = color)))
 
-        fmt   = {value: ((lambda x: '.01f' % x) if normalize else (lambda x: '.1f' % x))}
-        return hmap*hv.Labels(hmap).redim.value_format(**fmt)
-    return _labels('ok', 'Blues')+_labels('error', 'Reds')
+        if normalize:
+            fmt = lambda x: f'{abs(x):.01f}'
+        else:
+            fmt = lambda x: f'{abs(x):.1f}'
+        return hmap*hv.Labels(hmap).redim.value_format(**{value: fmt})
+    return _labels('error', 'RdYlGn')
 
 def displaybeadandtrackstatus(beadqc: pd.DataFrame,
                               ordertracks = None,
