@@ -157,23 +157,25 @@ def mostcommonerror(beadqc: pd.DataFrame,
 
     return frame.idxmax(axis = 1).rename('mostcommonerror')
 
-def displaystatusevolution(trackqc: Union[pd.DataFrame, TrackQC],
-                           tracks:  TracksDict)->hv.Overlay:
+def displaystatusevolution(tracks:  TracksDict,
+                           trackqc: Union[pd.DataFrame, TrackQC])->hv.Overlay:
     "Scatter plot showing the evolution of the nb of missing, fixed and no-errors beads."
-    frame    = (trackqc.table if isinstance(trackqc, TrackQC) else trackqc).T
-    trkdates = ['d{0}-{1}h{2}m'.format(d.day,d.hour,d.minute)
-                for d in pd.DatetimeIndex(modificationdate(tracks).values)]
+    stats          = modificationdate(tracks).reset_index().set_index('track')
+    stats['date']  = ['d{0}-{1}h{2}m'.format(d.day,d.hour,d.minute)
+                      for d in pd.DatetimeIndex(stats.modification.values)]
 
+    frame = (trackqc.table if isinstance(trackqc, TrackQC) else trackqc).copy()
+    frame = frame.join(stats)
+
+    total = len(tracks.availablebeads())
     lst   = 'fixed', 'missing', 'ok'
-    total = sum(next(iter(frame.loc[i])) for i in lst)
-    get   = lambda x: (x, np.array(list(frame.loc[x]))/total)
-    frame = pd.DataFrame({"date": trkdates, **dict(get(i) for i in lst)})
-    pts   = [hv.Points(frame, 'date', i, label = i) for i in lst]
-    crvs  = [hv.Curve (frame, 'date', i, group = i) for i in lst]
-    crvs[-1] = crvs[-1].clone(vdims = ['nb']).opts(plot = dict(xrotation = 45))
-    return (hv.Overlay(pts + crvs)
+    for i in lst:
+        frame[i] *= 100/total
+    crvs  = [hv.Curve (frame, kdims = ['date', i], label = i) for i in lst]
+    return (hv.Overlay(crvs)
             .redim.range(y = (0,100))
-            .redim.label(x ='date', y = f'% beads (total {int(total*100)})'))
+            .redim.label(x ='date', fixed = f'% beads (total {int(total)})')
+            .options(xrotation = 45, show_grid = True))
 
 def displaytrackstatus(beadqc:pd.DataFrame,
                        ordertracks = None,
@@ -239,7 +241,7 @@ def displaybeadandtrackstatus(beadqc: pd.DataFrame,
                           color_bar = True))
             *hv.Labels(frame, kdims = ['bead', 'track'], vdims = ['mostcommonerror']))
 
-def flowBeads(beadqc: pd.DataFrame, tracks):
+def displaybeadflow(beadqc: pd.DataFrame, tracks):
     """
     outputs a flow diagram between two tracks showing the proportion
     of the beads classified by their status (their mostCommonError)
