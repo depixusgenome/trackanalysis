@@ -4,6 +4,7 @@
 Adds a dictionnaries to access tracks, experiments, ...
 """
 import re
+import sys
 from   typing                       import List, FrozenSet, TypeVar, cast
 from   functools                    import partial
 import pandas                       as     pd
@@ -406,4 +407,6 @@ class TracksDictOperator:
             raise KeyError("Could not slice the operator")
         return self
 
+# replace the class so as to have correct import later
+sys.modules['data.tracksdict'].TracksDict = TracksDict
 __all__ = ['TracksDict']
