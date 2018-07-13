@@ -11,9 +11,11 @@ import holoviews as hv
 import pandas    as pd
 import numpy     as np
 
+from   utils.holoviewing             import displayhook
 from   data.__scripting__.track      import Track
 from   data.__scripting__.tracksdict import TracksDict
 
+@displayhook(lambda x: hv.Table(x[0])+hv.Table(x[1]))
 class TrackQC(NamedTuple): # pylint: disable=missing-docstring
     table:  pd.DataFrame
     status: pd.DataFrame
@@ -25,7 +27,7 @@ def chronologicalorder(tracks: TracksDict):
 def modificationdate(tracks: TracksDict):
     "return tracks in chronological order"
     frame = tracks.dataframe().rename(columns = dict(key = 'track'))
-    frame.set_index('key', inplace = True)
+    frame.set_index('track', inplace = True)
     return frame.modification
 
 def trackqualitysummary(tracks: TracksDict, dfmsg: pd.DataFrame = None) -> TrackQC:
@@ -37,15 +39,14 @@ def trackqualitysummary(tracks: TracksDict, dfmsg: pd.DataFrame = None) -> Track
     * table:    dataframe with a resume of fixed, missing and not fixed/missing
     """
     if dfmsg is None:
-        dfmsg = getattr(tracks, 'cleaning').messages()
+        dfmsg = getattr(tracks, 'cleaning').dataframe()
         dfmsg.reset_index(inplace = True)
-    elif not isinstance(dfmsg, pd.RangeIndex):
+    elif not isinstance(dfmsg.index, pd.RangeIndex):
         dfmsg = dfmsg.reset_index()
 
     order = list(chronologicalorder(tracks))
-    print(order)
     dfmsg = dfmsg.assign(trackorder = [order.index(key) for key in dfmsg['key']],
-                         pc_cycles  = dfmsg.cycles*100/[cast(Track, tracks[i]).ncycles 
+                         pc_cycles  = dfmsg.cycles*100/[cast(Track, tracks[i]).ncycles
                                                         for i in dfmsg.key])
 
     dfstatus = pd.DataFrame(columns = pd.Series(order), index = tracks.availablebeads())
@@ -72,57 +73,60 @@ def trackqualitysummary(tracks: TracksDict, dfmsg: pd.DataFrame = None) -> Track
     return TrackQC(dfstatus.fillna('ok').apply(pd.value_counts).T, dfstatus)
 
 def beadqualitysummary(tracks:TracksDict,
-                       messages: pd.DataFrame,
-                       status:   pd.DataFrame) -> pd.DataFrame:
+                       messages: pd.DataFrame = None,
+                       status:   pd.DataFrame = None) -> pd.DataFrame:
     """
     a dataframe of frequence of errors per bead per track.  The line bd/trk has
     as many columns as the nb of types of errors that can be detected for a
     bead.  If the bead is missing/fixed all errors are set to NaN
     """
-    frame = (messages
-             .reset_index()
-             .rename(columns = {'key': 'track'})
-             .assign(keys = lambda x: x.types+x.messages)
-             .assign(keys = lambda x: x.keys.apply(lambda y: y.replace(' ', ''))))
+    if messages is None:
+        messages = getattr(tracks, 'cleaning').dataframe()
+        messages.reset_index(inplace = True)
+    elif not isinstance(messages.index, pd.RangeIndex):
+        messages = messages.reset_index()
 
-    items = set(product(tracks.availablebeads(), tracks))
-    ind   = (pd.MultiIndex.from_tuples(items - set(messages[['bead', 'key']].values))
-             .set_names(['track', 'bead']))
+    if status is None:
+        status = trackqualitysummary(tracks, messages).status
 
-    good  = frame.groupby(['bead', 'track', 'keys']).cycles.first()
-    good.reset_index(inplace = True)
-    good  = good.pivot_table(index   = ['track', 'bead'],
-                             columns = ['keys'],
-                             values  = ['cycles'],
-                             aggfunc = np.mean)
-    good.reset_index(inplace = True)
-    good  = pd.concat([good, pd.DataFrame(columns = frame.keys.values, index = ind)])
+    frame = messages.rename(columns     = {'key': 'track'})
+    frame['longmessage'] = (frame.types+frame.message).apply(lambda x: x.replace(" ", ""))
+    cols   = frame.longmessage.unique()
 
-    good.set_index(['track', 'bead'], inplace = True)
-    good  = (good.join(modificationdate(tracks))
-             .assign(status = [status[i][j] for i, j in iter(good.index)])
-             .assign(status = status.apply(lambda x: x if x in ('missing', 'fixed') else '')))
+    frame = frame.pivot_table(index   = ['bead', 'track'],
+                              columns = 'longmessage',
+                              values  = 'cycles')
 
-    # remove errors corresponding to missing beads
-    good.reset_index(inplace = True)
-    good.set_index(['bead', 'track', 'status'], inplace = True)
-    good.loc[(slice(None), slice(None), 'missing'), :] = np.NaN
+    frame['status'] = [status[j][i] for i, j in iter(frame.index)]
+    frame['status'] = frame.status.apply(lambda x: x if x in ('missing', 'fixed') else np.NaN)
 
     # remove errors corresponding to fixed beads
-    extent = next(i for i in good.columns if 'extent' in i and '<' in i)
-    good.loc[(slice(None), slice(None), 'fixed'), extent] = np.NaN
+    extent = next(i for i in cols if 'extent' in i and '<' in i)
+    frame.loc[frame.status == 'fixed', extent] = np.NaN
 
-    good.reset_index(inplace = True)
-    return good
+    # remove errors corresponding to missing beads
+    frame.loc[frame.status == 'fixed', list(set(frame.columns) - {'status'})] = np.NaN
+
+    ind   = pd.MultiIndex.from_tuples(set(product(tracks.availablebeads(), tracks))
+                                      .difference(frame.index))
+    frame = pd.concat([frame, pd.DataFrame(columns = frame.columns, index = ind)])
+
+    stats = modificationdate(tracks).reset_index().set_index('track')
+    stats['cyclecount'] = [tracks[i].ncycles for i in stats.index]
+    frame = frame.join(stats)
+    for i in cols:
+        frame[i] *= 1e2/frame.cyclecount
+
+    frame.reset_index(inplace = True)
+    return frame
 
 def bestbeadorder(beadqc: pd.DataFrame) -> pd.Series:
     """
     Outputs the list of beads sorted by best to worst
     in terms of the errors the bead presents
     """
-    ncycs = beadqc.max().max()
     frame = beadqc.copy()
-    frame = frame.assign(status = frame.status.apply(lambda x: ncycs if len(x) else 0))
+    frame = frame.assign(status = frame.status.apply(lambda x: 100. if len(x) else 0))
     frame.set_index(['bead', 'track', 'modification'], inplace = True)
 
     frame = frame.sum(axis = 1)
