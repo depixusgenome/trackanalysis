@@ -134,36 +134,28 @@ def bestbeadorder(beadqc: pd.DataFrame) -> pd.Series:
     frame.reset_index(inplace = True)
     return frame.bead
 
-def _addstatuscols(beadqc: pd.DataFrame,
-                   fixedassingleerror = True,
-                   states             = ('missing', 'fixed', '')) -> pd.DataFrame:
-    "add a column per status"
-    if states == 'bad':
-        states = ('missing', 'fixed')
-
-    if fixedassingleerror:
-        beadqc = beadqc.copy().set_index(['bead', 'track', 'status'])
-        beadqc.loc[(slice(None), slice(None), 'fixed'), :] = np.NaN
-        beadqc.reset_index(inplace = True)
-
-    ncycs = beadqc.max().max()
-    def _get(label):
-        return beadqc.status.apply(lambda x: (ncycs if x == label else 0))
-    frame = beadqc.copy().assign(**{i if i else 'noerror': _get(i) for i in states})
-    del frame['status']
-    return frame
-
 def mostcommonerror(beadqc: pd.DataFrame,
-                    fixedassingleerror = True,
-                    states             = ('missing', 'fixed', '')) -> pd.DataFrame:
+                    fixedassingleerror = True) -> pd.DataFrame:
     """
     outputs a dataframe columns are the tracks rows the beads,
     each cell contains the status of the bead: noError, extent>0.5,...
     """
-    return (_addstatuscols(beadqc, states = states, fixedassingleerror = fixedassingleerror)
-            .set_index(['bead','track', 'modification'])
-            .idxmax(axis = 1)
-            .rename('mostcommonerror'))
+    frame = beadqc.assign(status = beadqc.status.fillna("noerror"))
+    if fixedassingleerror:
+        cols   = [i for i in frame.columns if '>' in i or '<' in i]
+        frame.loc[frame.status == 'fixed', cols] = np.NaN
+
+    newcols = frame.pivot_table(index   = ["bead", 'track'],
+                                 columns = "status",
+                                 values  = 'cyclecount')
+    frame.set_index(['bead', 'track'], inplace = True)
+    frame  = frame.join(newcols)
+
+    frame.set_index(['modification'], inplace = True, append = True)
+    for i in ('status', 'cyclecount', 'noerror'):
+        del frame[i]
+
+    return frame.idxmax(axis = 1).rename('mostcommonerror')
 
 def displaystatusevolution(trackqc: Union[pd.DataFrame, TrackQC],
                            tracks:  TracksDict)->hv.Overlay:
