@@ -181,9 +181,9 @@ def displaytrackstatus(beadqc:pd.DataFrame,
                        ordertracks = None,
                        normalize   = True) -> hv.Layout:
     """
-    Outputs 2 heatmaps side to side. Columns are types of Error and rows are
-    tracks. Each cell presents the percentage of appearance of the specific
-    error at the specific track.
+    Outputs a heatmap. Columns are types of Error and rows are tracks. Each
+    cell presents the percentage of appearance of the specific error at the
+    specific track.
     """
     value  = 'percentage' if normalize else 'count'
     frame  = mostcommonerror(beadqc).fillna("ok").reset_index()
@@ -231,25 +231,25 @@ def displaytrackstatus(beadqc:pd.DataFrame,
 
 def displaybeadandtrackstatus(beadqc: pd.DataFrame,
                               ordertracks = None,
-                              orderbeads  = None) -> hv.Overlay:
+                              orderbeads  = None) -> hv.HeatMap:
     "Outputs heatmap with the status of the beads per track"
     if orderbeads is None:
         orderbeads = sorted(beadqc.bead.unique())
     if ordertracks is None:
         ordertracks = sorted(beadqc.track.unique())
 
-    frame   = mostcommonerror(beadqc).fillna("").sort_values(['bead', 'track'])
+    frame   = mostcommonerror(beadqc).fillna("").reset_index()
     errlist = sorted(frame.mostcommonerror.unique())
     errlist.remove("")
-    errint  = {"":-1., **{j: i/len(errlist) for i, j in enumerate(errlist)}}
+    errint  = {"":1., **{j: -i/len(errlist) for i, j in enumerate(errlist)}}
     frame   = frame.assign(errorid = frame.mostcommonerror.apply(errint.__getitem__))
     return (hv.HeatMap(frame,
                        kdims = ['bead', 'track'],
                        vdims = ['errorid', 'mostcommonerror'])
-            .options(dict(tools     = ['hover'],
-                          yrotation = 40,
-                          color_bar = True))
-            *hv.Labels(frame, kdims = ['bead', 'track'], vdims = ['mostcommonerror']))
+            (plot  = dict(tools     = ['hover'],
+                          xrotation = 40,
+                          colorbar  = True),
+             style = dict(cmap      = 'RdYlGn')))
 
 def displaybeadflow(beadqc: pd.DataFrame, tracks):
     """
