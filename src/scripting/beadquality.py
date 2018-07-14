@@ -146,8 +146,8 @@ def mostcommonerror(beadqc: pd.DataFrame,
         frame.loc[frame.status == 'fixed', cols] = np.NaN
 
     newcols = frame.pivot_table(index   = ["bead", 'track'],
-                                 columns = "status",
-                                 values  = 'cyclecount')
+                                columns = "status",
+                                values  = 'cyclecount')
     frame.set_index(['bead', 'track'], inplace = True)
     frame  = frame.join(newcols)
 
@@ -251,39 +251,44 @@ def displaybeadandtrackstatus(beadqc: pd.DataFrame,
                           colorbar  = True),
              style = dict(cmap      = 'RdYlGn')))
 
-def displaybeadflow(beadqc: pd.DataFrame, tracks):
+def displaybeadflow(beadqc: pd.DataFrame, tracks = None):
     """
     outputs a flow diagram between two tracks showing the proportion
     of the beads classified by their status (their mostCommonError)
     """
-    col = (mostcommonerror(beadqc)
-           .replace(list(set(col.unique()) - {'fixed', 'missing', 'ok'}), 'error')
-           .reset_index())
-    col.sort_values('modification', inplace = True)
+    col   = mostcommonerror(beadqc)
+    frame = (col.replace(list(set(col.unique()) - {'fixed', 'missing', np.NaN}), 'error')
+             .reset_index()
+             .fillna("ok"))
+    frame.sort_values('modification', inplace = True)
 
     if tracks is None:
-        tracks = col.track.values[[0,-1]]
+        tracks = frame.track.values[[0,-1]]
 
-    errors = col.pivot(index = 'bead', columns = 'track', value = 'mostcommonerror')
+    errors = frame.pivot(index = 'bead', columns = 'track', values = 'mostcommonerror')
     errors.reset_index(inplace = True)
-    errors = errors.rename(columns = {'index': 'nodenumber'})
 
-    nodes  = col.groupby(['track', 'modification', 'mostcommonerror']).bead.count()
+    nodes  = (frame.groupby(['track', 'modification', 'mostcommonerror']).bead.count()
+              .reset_index(["modification", "mostcommonerror"])
+              .loc[list(tracks), :])
     nodes.reset_index(inplace = True)
     nodes.sort_values(['modification', 'mostcommonerror'], inplace = True)
     nodes.reset_index(inplace = True) # add an 'index' column
+    nodes = nodes.rename(columns = {'index': 'nodenumber'})
     nodes.set_index(['track', 'mostcommonerror'], inplace = True)
 
     edges  = pd.DataFrame(columns = ['From', 'To', 'bead'])
     for i in range(len(tracks)-1):
-        tmp = errors.groupby(list(tracks[i:i+1])).bead.count()
-        tmp.reset_index(inplace = True)
-        tmp = tmp.rename(columns = {tracks[i]: 'From', tracks[i+1]: 'To'})
-        for j, k in zip(('From', 'To'), tracks[i:i+1]):
-            tmp[j] = [nodes.loc[k, l].nodenumber.values[0] for l in tmp[j]]
+        tmp = (errors.groupby(list(tracks[i:i+2])).bead.count()
+               .reset_index())
+        for j, k in zip(('From', 'To'), tracks[i:i+2]):
+            tmp[j] = [nodes.loc[k, l].nodenumber for l in tmp[k]]
+        tmp = tmp.rename(columns = {tracks[i]: 'Left', tracks[i+1]: 'Right'})
+        edges = pd.concat([edges, tmp])
 
-        edges = pd.concatenate([edges, tmp])
-
-    hvnodes = hv.Dataset(nodes, vdims = list(set(nodes.columns) - {'nodenumber'}))
-    return (hv.Sankey((edges, hvnodes), ['From', 'To'], ['bead'])
-            .options(label_index = 'mostcommonerror', edge_color_index = 'From'))
+    nodes.reset_index(inplace = True)
+    hvnodes = hv.Dataset(nodes, "nodenumber")
+    return (hv.Sankey((edges, hvnodes), ['From', 'To'], ['bead', 'Left'])
+            .options(label_index = 'mostcommonerror',
+                     edge_color_index = 'Left',
+                     color_index = 'mostcommonerror'))
