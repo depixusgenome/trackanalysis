@@ -20,7 +20,12 @@ from   utils.attrdefaults   import setdefault
 
 def _display_hook(item):
     "displays an item"
-    disp  = item.display()
+    if (type(item).__module__.startswith('holoviews')
+            or isinstance(item, pd.DataFrame)):
+        disp = item
+    else:
+        disp = item.display()
+
     if isinstance(disp, pd.DataFrame):
         _display(disp)
         return None
@@ -30,20 +35,28 @@ def _display_hook(item):
 
     shell = get_ipython()
     if shell is not None:
-        fmt   = shell.display_formatter.formatters['text/html']
-        fcn   = fmt.lookup_by_type(type(disp))
+        fmt = shell.display_formatter.formatters['text/html']
+        fcn = fmt.lookup_by_type(type(disp))
         return fcn(disp)
     return disp
 
 def displayhook(cls, *args):
     "Adds the class as a hook"
     shell = get_ipython()
-    if shell is not None:
-        fmt = shell.display_formatter.formatters['text/html']
+    if shell is None:
+        return cls
+
+    fmt = shell.display_formatter.formatters['text/html']
+    if isinstance(cls, type):
         fmt.for_type(cls, _display_hook)
         for i in args:
             fmt.for_type(i, _display_hook)
-    return cls
+        return cls
+
+    def _wrapper(itm):
+        fmt.for_type(itm, lambda x: _display_hook(cls(x)))
+        return itm
+    return _wrapper
 
 def addto(*types, addhook = 'auto'):
     "adds the item as a display hook"
