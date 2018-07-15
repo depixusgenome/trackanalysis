@@ -7,6 +7,7 @@ Monkey patches the Track class.
 Adds a method for discarding beads with Cleaning warnings
 """
 from   copy                             import deepcopy
+from   concurrent.futures               import ProcessPoolExecutor
 from   typing                           import (Dict, Optional, Iterator, List, Any,
                                                 Set, Union, Tuple, Sequence, cast)
 import numpy                            as     np
@@ -153,12 +154,14 @@ class TrackCleaningScript:
         msgs .extend([''] *len(miss))
         ids.extend(cast(List[int], miss))
 
-        name = DataFrameFactory.trackname(self.track)
-        return pd.DataFrame(dict(key     = np.full(len(ids), name),
-                                 bead    = np.array(ids, dtype = 'i4'),
-                                 types   = types,
-                                 cycles  = np.array(cycs, dtype = 'i4'),
-                                 message = msgs)).set_index(['bead', 'key'])
+        name = np.full(len(ids), DataFrameFactory.trackname(self.track))
+        date = np.full(len(ids), getattr(self.track, 'pathinfo').modification)
+        return pd.DataFrame({'key':          name,
+                             'modification': date,
+                             'bead':         np.array(ids, dtype = 'i4'),
+                             'types':        types,
+                             'cycles':       np.array(cycs, dtype = 'i4'),
+                             'message':      msgs}).set_index(['bead', 'key'])
 
     def dataframe(self, beads: Sequence[BEADKEY] = None, **kwa) -> Optional[pd.DataFrame]:
         """
@@ -185,7 +188,9 @@ class TrackCleaningScript:
             for stat in vals:
                 info[stat.name].append(stat.values)
 
-        return pd.DataFrame({i: np.concatenate(j) for i, j in info.items()})
+        frame  =  pd.DataFrame({i: np.concatenate(j) for i, j in info.items()})
+        frame['modification'] = getattr(self.track, 'pathinfo').modification
+        return frame
 
     def dropbad(self, **kwa) -> Track:
         "removes bad beads *forever*"
@@ -263,7 +268,7 @@ Track.__doc__ += (
     +'\n'.join(TrackCleaningScript.__doc__.split('\n')[3:]).replace('\n', '\n    ')
     )
 
-@addproperty(TracksDict.__base__, 'cleaning')
+@addproperty(getattr(TracksDict, '__base__'), 'cleaning')
 class TracksDictCleaningScript:
     """
     Adds means for finding beads with cleaning warnings and possibly discarding
@@ -291,24 +296,34 @@ class TracksDictCleaningScript:
                 bad.update(track.cleaning.bad(tmp,**kwa))
         return bad & cur, (good-bad) & cur
 
+    @staticmethod
+    def _compute(args) -> pd.DataFrame:
+        "return messages"
+        itm = TrackCleaningScript(Track(path = args[0]))
+        return getattr(itm, args[1])(*args[2:-1], **args[-1])
+
+    def __compute(self, name, beads, *args) -> pd.DataFrame:
+        "returns beads and warnings where applicable"
+        if beads is None:
+            beads = self.tracks.availablebeads()
+
+        itr  = ((i.path, name, beads)+args for i in self.tracks.values())
+        with ProcessPoolExecutor() as pool:
+            items = list(pool.map(self._compute, itr))
+        return pd.concat(items)
+
     def messages(self,
                  beads: Sequence[BEADKEY] = None,
                  forceclean               = False,
                  **kwa) -> pd.DataFrame:
         "returns beads and warnings where applicable"
-        if beads is None:
-            beads = self.tracks.availablebeads()
-        return pd.concat([TrackCleaningScript(i).messages(beads, forceclean, **kwa)
-                          for i in self.tracks.values()])
+        return self.__compute('messages', beads, forceclean, kwa)
 
     def dataframe(self, beads: Sequence[BEADKEY] = None, **kwa) -> Optional[pd.DataFrame]:
         """
         return a dataframe with all test values
         """
-        if beads is None:
-            beads = self.tracks.availablebeads()
-        return pd.concat([TrackCleaningScript(i).dataframe(beads, **kwa)
-                          for i in self.tracks.values()])
+        return self.__compute('dataframe', beads, kwa)
 
     def good(self, **kwa) -> List[BEADKEY]:
         "returns beads without warnings"
