@@ -16,17 +16,11 @@ from   utils.holoviewing             import displayhook as _displayhook
 from   data.__scripting__.track      import Track
 from   data.__scripting__.tracksdict import TracksDict
 
-@_displayhook(lambda x: hv.Table(x[0])+hv.Table(x[1]))
-class TrackQC(NamedTuple): # pylint: disable=missing-docstring
+@_displayhook(lambda x: hv.Table(x[0])+hv.Table(x[1])) # pylint: disable=missing-docstring
+class TrackQC(NamedTuple):
     table:    pd.DataFrame
     status:   pd.DataFrame
     messages: pd.DataFrame
-
-def modificationdate(tracks: TracksDict):
-    "return tracks in chronological order"
-    frame = tracks.dataframe().rename(columns = dict(key = 'track'))
-    frame.set_index('track', inplace = True)
-    return frame.modification
 
 def trackqualitysummary(tracks: TracksDict, dfmsg: pd.DataFrame = None) -> TrackQC:
     """
@@ -108,20 +102,6 @@ def beadqualitysummary(trackqc: TrackQC) -> pd.DataFrame:
 
     frame.reset_index(inplace = True)
     return frame
-
-def bestbeadorder(beadqc: pd.DataFrame) -> pd.Series:
-    """
-    Outputs the list of beads sorted by best to worst
-    in terms of the errors the bead presents
-    """
-    frame = beadqc.copy()
-    frame = frame.assign(status = frame.status.apply(lambda x: 100. if len(x) else 0))
-    frame.set_index(['bead', 'track', 'modification'], inplace = True)
-
-    frame = frame.sum(axis = 1)
-    frame.sort_values(inplace = True)
-    frame.reset_index(inplace = True)
-    return frame.bead
 
 def mostcommonerror(beadqc: pd.DataFrame,
                     fixedassingleerror = True) -> pd.DataFrame:
@@ -258,8 +238,7 @@ def displaybeadflow(trackqc: TrackQC, tracks = None):
     outputs a flow diagram between two tracks showing the proportion
     of the beads classified by their status (their mostCommonError)
     """
-    beadqc = beadqualitysummary(trackqc)
-    col    = mostcommonerror(beadqc)
+    col    = mostcommonerror(beadqualitysummary(trackqc))
     frame  = (col.replace(list(set(col.unique()) - {'fixed', 'missing', np.NaN}), 'error')
               .reset_index()
               .fillna("ok"))
