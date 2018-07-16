@@ -149,14 +149,14 @@ def displaystatusevolution(trackqc: Union[pd.DataFrame, TrackQC])->hv.Overlay:
                 plot  = dict(tools=[hover], show_grid=True)))
               for i, j in zip(lst, colors)]
 
-    def apply_formatter(plot, element):
+    def _newaxis(plot, _):
         plot.state.extra_x_ranges = {"track": FactorRange(*frame.track.values)}
         plot.state.add_layout(CategoricalAxis(x_range_name="track"), 'above')
 
     return (hv.Overlay(crvs)
             .redim.range(y = (0,100))
             .redim.label(x ='date', ok = f'% beads (total {int(total)})')
-            .options(xrotation = 45, finalize_hooks=[apply_formatter])
+            .options(xrotation = 45, finalize_hooks=[_newaxis])
             .clone(label="Evolution of the bead status as function of time")
            )
 
