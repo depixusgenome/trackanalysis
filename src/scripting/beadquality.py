@@ -10,19 +10,17 @@ from   typing    import NamedTuple, Union, cast
 import holoviews as hv
 import pandas    as pd
 import numpy     as np
+from   bokeh.models                  import HoverTool, FactorRange, CategoricalAxis
 
-from   utils.holoviewing             import displayhook
+from   utils.holoviewing             import displayhook as _displayhook
 from   data.__scripting__.track      import Track
 from   data.__scripting__.tracksdict import TracksDict
 
-@displayhook(lambda x: hv.Table(x[0])+hv.Table(x[1]))
+@_displayhook(lambda x: hv.Table(x[0])+hv.Table(x[1]))
 class TrackQC(NamedTuple): # pylint: disable=missing-docstring
-    table:  pd.DataFrame
-    status: pd.DataFrame
-
-def chronologicalorder(tracks: TracksDict):
-    "return tracks in chronological order"
-    return tracks.dataframe().key.values
+    table:    pd.DataFrame
+    status:   pd.DataFrame
+    messages: pd.DataFrame
 
 def modificationdate(tracks: TracksDict):
     "return tracks in chronological order"
@@ -40,23 +38,21 @@ def trackqualitysummary(tracks: TracksDict, dfmsg: pd.DataFrame = None) -> Track
     """
     if dfmsg is None:
         dfmsg = getattr(tracks, 'cleaning').dataframe()
-        dfmsg.reset_index(inplace = True)
-    elif not isinstance(dfmsg.index, pd.RangeIndex):
+    if not isinstance(dfmsg.index, pd.RangeIndex):
         dfmsg = dfmsg.reset_index()
+    dfmsg              = dfmsg.rename(columns = {'key': 'track'})
+    dfmsg['pc_cycles'] = dfmsg.cycles*100/[cast(Track, tracks[i]).ncycles for i in dfmsg.track]
 
-    order = list(chronologicalorder(tracks))
-    dfmsg = dfmsg.assign(trackorder = [order.index(key) for key in dfmsg['key']],
-                         pc_cycles  = dfmsg.cycles*100/[cast(Track, tracks[i]).ncycles
-                                                        for i in dfmsg.key])
+    dfstatus = pd.DataFrame(columns = pd.Series(tracks.dataframe().key.values),
+                            index   = pd.Int64Index(tracks.availablebeads(), name = 'bead'))
 
-    dfstatus = pd.DataFrame(columns = pd.Series(order), index = tracks.availablebeads())
-
+    order = dict(dfmsg[['modification', 'track']].values)
     def _fill(label, tpe, cycs, msg = None):
-        tmp = dfmsg[dfmsg['types']==tpe][lambda x: x.pc_cycles > cycs]
+        tmp   = dfmsg[dfmsg['types']==tpe][lambda x: x.pc_cycles > cycs]
         if msg:
             tmp = tmp[tmp['message'].str.find(msg)!=-1]
-        for pair in tmp.groupby(['bead', 'trackorder']).count().index:
-            dfstatus.iloc[pair] = label
+        for bead, trk in tmp.groupby(['bead', 'modification']).count().index:
+            dfstatus.loc[bead, order[trk]] = label
 
     _fill('missing', 'hfsigma',  99)  # hfsigma too low
     _fill('missing', 'pingpong', 10) # ping pong appears
@@ -70,26 +66,22 @@ def trackqualitysummary(tracks: TracksDict, dfmsg: pd.DataFrame = None) -> Track
 
     #if extent is too small, the bead is fixed, not missing
     _fill('fixed', 'extent', 99, '<')
-    return TrackQC(dfstatus.fillna('ok').apply(pd.value_counts).T, dfstatus)
 
-def beadqualitysummary(tracks:TracksDict,
-                       messages: pd.DataFrame = None,
-                       status:   pd.DataFrame = None) -> pd.DataFrame:
+    dfsumm = (dfstatus
+              .fillna('ok').apply(pd.value_counts).T
+              .join(dfmsg[['track', 'modification']]
+                    .groupby("track").modification.first()))
+    dfsumm.index.set_names("track", inplace = True)
+    dfsumm['cyclecount'] = [tracks[i].ncycles for i in dfsumm.index]
+    return TrackQC(dfsumm, dfstatus, dfmsg)
+
+def beadqualitysummary(trackqc: TrackQC) -> pd.DataFrame:
     """
     a dataframe of frequence of errors per bead per track.  The line bd/trk has
     as many columns as the nb of types of errors that can be detected for a
     bead.  If the bead is missing/fixed all errors are set to NaN
     """
-    if messages is None:
-        messages = getattr(tracks, 'cleaning').dataframe()
-        messages.reset_index(inplace = True)
-    elif not isinstance(messages.index, pd.RangeIndex):
-        messages = messages.reset_index()
-
-    if status is None:
-        status = trackqualitysummary(tracks, messages).status
-
-    frame = messages.rename(columns     = {'key': 'track'})
+    frame = trackqc.messages.copy()
     frame['longmessage'] = (frame.types+frame.message).apply(lambda x: x.replace(" ", ""))
     cols   = frame.longmessage.unique()
 
@@ -97,7 +89,7 @@ def beadqualitysummary(tracks:TracksDict,
                               columns = 'longmessage',
                               values  = 'cycles')
 
-    frame['status'] = [status[j][i] for i, j in iter(frame.index)]
+    frame['status'] = [trackqc.status[j][i] for i, j in iter(frame.index)]
     frame['status'] = frame.status.apply(lambda x: x if x in ('missing', 'fixed') else np.NaN)
 
     # remove errors corresponding to fixed beads
@@ -107,13 +99,10 @@ def beadqualitysummary(tracks:TracksDict,
     # remove errors corresponding to missing beads
     frame.loc[frame.status == 'fixed', list(set(frame.columns) - {'status'})] = np.NaN
 
-    ind   = pd.MultiIndex.from_tuples(set(product(tracks.availablebeads(), tracks))
+    ind   = pd.MultiIndex.from_tuples(set(product(trackqc.status.index, trackqc.status.columns))
                                       .difference(frame.index))
-    frame = pd.concat([frame, pd.DataFrame(columns = frame.columns, index = ind)])
-
-    stats = modificationdate(tracks).reset_index().set_index('track')
-    stats['cyclecount'] = [tracks[i].ncycles for i in stats.index]
-    frame = frame.join(stats)
+    frame = (pd.concat([frame, pd.DataFrame(columns = frame.columns, index = ind)])
+             .join(trackqc.table[['modification', 'cyclecount']]))
     for i in cols:
         frame[i] *= 1e2/frame.cyclecount
 
@@ -157,27 +146,41 @@ def mostcommonerror(beadqc: pd.DataFrame,
 
     return frame.idxmax(axis = 1).rename('mostcommonerror')
 
-def displaystatusevolution(tracks:  TracksDict,
-                           trackqc: Union[pd.DataFrame, TrackQC])->hv.Overlay:
+def displaystatusevolution(trackqc: Union[pd.DataFrame, TrackQC])->hv.Overlay:
     "Scatter plot showing the evolution of the nb of missing, fixed and no-errors beads."
-    stats          = modificationdate(tracks).reset_index().set_index('track')
-    stats['date']  = ['d{0}-{1}h{2}m'.format(d.day,d.hour,d.minute)
-                      for d in pd.DatetimeIndex(stats.modification.values)]
+    frame         = trackqc.table.reset_index()
+    frame['date'] = frame.modification.apply(lambda d: f'd{d.day}-{d.hour}h{d.minute}m')
 
-    frame = (trackqc.table if isinstance(trackqc, TrackQC) else trackqc).copy()
-    frame = frame.join(stats)
 
-    total = len(tracks.availablebeads())
-    lst   = 'fixed', 'missing', 'ok'
+    total = len(trackqc.status.index)
+    lst    = 'ok', 'fixed', 'missing'
+    colors = 'blue', 'orange', 'red'
     for i in lst:
         frame[i] *= 100/total
-    crvs  = [hv.Curve (frame, kdims = ['date', i], label = i) for i in lst]
+    hover = HoverTool(tooltips=[("(date, track)", "(@date, @track)"),
+                                *((f"# {i}", f"@{i}") for i in lst),
+                                ("# cycles", "@cyclecount")])
+    crvs   = [(hv.Points(frame, kdims = ['date', i], label = i)
+               (style = dict(color = j, marker = 'o', size = 5),
+                plot  = dict(tools=[hover], show_grid=True)))
+              for i, j in zip(lst, colors)]
+    crvs  += [(hv.Curve (frame, kdims = ['date', i], label = i)
+               (style = dict(color = j),
+                plot  = dict(tools=[hover], show_grid=True)))
+              for i, j in zip(lst, colors)]
+
+    def apply_formatter(plot, element):
+        plot.state.extra_x_ranges = {"track": FactorRange(*frame.track.values)}
+        plot.state.add_layout(CategoricalAxis(x_range_name="track"), 'above')
+
     return (hv.Overlay(crvs)
             .redim.range(y = (0,100))
-            .redim.label(x ='date', fixed = f'% beads (total {int(total)})')
-            .options(xrotation = 45, show_grid = True))
+            .redim.label(x ='date', ok = f'% beads (total {int(total)})')
+            .options(xrotation = 45, finalize_hooks=[apply_formatter])
+            .clone(label="Evolution of the bead status as function of time")
+           )
 
-def displaytrackstatus(beadqc:pd.DataFrame,
+def displaytrackstatus(data: Union[TrackQC, pd.DataFrame],
                        ordertracks = None,
                        normalize   = True) -> hv.Layout:
     """
@@ -185,6 +188,7 @@ def displaytrackstatus(beadqc:pd.DataFrame,
     cell presents the percentage of appearance of the specific error at the
     specific track.
     """
+    beadqc = data if isinstance(data, pd.DataFrame) else beadqualitysummary(data)
     value  = 'percentage' if normalize else 'count'
     frame  = mostcommonerror(beadqc).fillna("ok").reset_index()
 
@@ -211,28 +215,25 @@ def displaytrackstatus(beadqc:pd.DataFrame,
     disc.reset_index(inplace = True)
 
     nbeads = len(frame.bead.unique())
-    def _labels(xaxis, color):
-        hmap = (hv.HeatMap(disc[~disc[xaxis].isna()],
-                           kdims = [xaxis, 'track'],
-                           vdims = [value, 'beads'])
-                .redim.range(**{value: (-100, 100) if normalize else (-nbeads, nbeads)})
-                .redim.label(**{xaxis: " "})
-                (plot  = dict(tools     = ['hover'],
-                              xrotation = 40,
-                              colorbar  = True),
-                 style = dict(cmap      = color)))
+    hmap   = (hv.HeatMap(disc[~disc['error'].isna()],
+                         kdims = ['error', 'track'],
+                         vdims = [value, 'beads'])
+              .redim.range(**{value: (-100, 100) if normalize else (-nbeads, nbeads)})
+              .redim.label(**{'error': " "})
+              (plot  = dict(tools     = ['hover'],
+                            xrotation = 40,
+                            colorbar  = True),
+               style = dict(cmap      = 'RdYlGn')))
 
-        if normalize:
-            fmt = lambda x: f'{abs(x):.01f}'
-        else:
-            fmt = lambda x: f'{abs(x):.1f}'
-        return hmap*hv.Labels(hmap).redim.value_format(**{value: fmt})
-    return _labels('error', 'RdYlGn')
+    fmt = (lambda x: f'{abs(x):.01f}') if normalize else (lambda x: f'{abs(x):.1f}')
+    return ((hmap*hv.Labels(hmap).redim.value_format(**{value: fmt}))
+            .clone(label = 'By track, the percentage of beads per status & error'))
 
-def displaybeadandtrackstatus(beadqc: pd.DataFrame,
+def displaybeadandtrackstatus(data: Union[TrackQC, pd.DataFrame],
                               ordertracks = None,
                               orderbeads  = None) -> hv.HeatMap:
     "Outputs heatmap with the status of the beads per track"
+    beadqc = data if isinstance(data, pd.DataFrame) else beadqualitysummary(data)
     if orderbeads is None:
         orderbeads = sorted(beadqc.bead.unique())
     if ordertracks is None:
@@ -249,21 +250,25 @@ def displaybeadandtrackstatus(beadqc: pd.DataFrame,
             (plot  = dict(tools     = ['hover'],
                           xrotation = 40,
                           colorbar  = True),
-             style = dict(cmap      = 'RdYlGn')))
+             style = dict(cmap      = 'RdYlGn'))
+            .clone(label = "Most common error per track and bead"))
 
-def displaybeadflow(beadqc: pd.DataFrame, tracks = None):
+def displaybeadflow(trackqc: TrackQC, tracks = None):
     """
     outputs a flow diagram between two tracks showing the proportion
     of the beads classified by their status (their mostCommonError)
     """
-    col   = mostcommonerror(beadqc)
-    frame = (col.replace(list(set(col.unique()) - {'fixed', 'missing', np.NaN}), 'error')
-             .reset_index()
-             .fillna("ok"))
+    beadqc = beadqualitysummary(trackqc)
+    col    = mostcommonerror(beadqc)
+    frame  = (col.replace(list(set(col.unique()) - {'fixed', 'missing', np.NaN}), 'error')
+              .reset_index()
+              .fillna("ok"))
     frame.sort_values('modification', inplace = True)
 
     if tracks is None:
-        tracks = frame.track.values[[0,-1]]
+        tracks = trackqc.status.columns[0], trackqc.status.columns[-1]
+    elif tracks is all or tracks is Ellipsis:
+        tracks = trackqc.status.columns
 
     errors = frame.pivot(index = 'bead', columns = 'track', values = 'mostcommonerror')
     errors.reset_index(inplace = True)
@@ -283,7 +288,7 @@ def displaybeadflow(beadqc: pd.DataFrame, tracks = None):
                .reset_index())
         for j, k in zip(('From', 'To'), tracks[i:i+2]):
             tmp[j] = [nodes.loc[k, l].nodenumber for l in tmp[k]]
-        tmp = tmp.rename(columns = {tracks[i]: 'Left', tracks[i+1]: 'Right'})
+        tmp   = tmp.rename(columns = {tracks[i]: 'Left', tracks[i+1]: 'Right'})
         edges = pd.concat([edges, tmp])
 
     nodes.reset_index(inplace = True)
