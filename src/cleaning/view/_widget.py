@@ -11,13 +11,13 @@ from    bokeh.models    import (ColumnDataSource, DataTable, TableColumn,
 
 import  numpy       as     np
 
-from    utils               import initdefaults
-from    utils.gui           import parseints
-from    view.base           import enableOnTrack
-from    view.static         import ROUTE
-from    view.plots          import DpxNumberFormatter, CACHE_TYPE
-from    eventdetection.view import AlignmentWidget
-from    ._model             import DataCleaningModelAccess, DataCleaningTask
+from    utils                   import initdefaults
+from    utils.gui               import parseints
+from    control.beadscontrol    import TaskWidgetEnabler
+from    view.static             import ROUTE
+from    view.plots              import DpxNumberFormatter, CACHE_TYPE
+from    eventdetection.view     import AlignmentWidget
+from    ._model                 import DataCleaningModelAccess, DataCleaningTask
 
 class BeadSubtractionModalDescriptor:
     "for use with modal dialogs"
@@ -233,6 +233,7 @@ class CleaningFilterWidget:
 
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
+    __objects = TaskWidgetEnabler
     def __init__(self, ctrl, model):
         self.__widgets = dict(table    = CyclesListWidget(ctrl, model.cleaning),
                               align    = AlignmentWidget(ctrl, model.alignment),
@@ -252,9 +253,10 @@ class WidgetMixin(ABC):
     def _createwidget(self, ctrl, fig):
         widgets = {i: j.addtodoc(self, ctrl) for i, j in self.__widgets.items()}
         self.__widgets['cleaning'].setfigure(fig)
-        enableOnTrack(self, widgets)
+        self.__objects = TaskWidgetEnabler(widgets)
         return widgets
 
-    def _resetwidget(self, cache: CACHE_TYPE):
+    def _resetwidget(self, cache: CACHE_TYPE, disable: bool):
         for ite in self.__widgets.values():
             getattr(ite, 'reset')(cache)
+        self.__objects.disable(cache, disable)

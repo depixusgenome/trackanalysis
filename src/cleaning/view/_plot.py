@@ -92,15 +92,16 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         return self._keyedlayout(ctrl, fig, left = left)
 
     def _reset(self, cache: CACHE_TYPE):
-        items, nans     = None, None
+        items, nans, disable = None, None, True
         try:
             items, nans = GuiDataCleaningProcessor.runbead(self._model)
+            disable     = False
         finally:
             data        = self.__data(items, nans)
             self.setbounds(cache, self.__fig.x_range, 'x', data['t'])
             self.setbounds(cache, self.__fig.y_range, 'y', data['z'])
             cache[self.__source]['data'] = data
-            self._resetwidget(cache)
+            self._resetwidget(cache, disable)
 
     def __data(self, items, nans) -> Dict[str, np.ndarray]:
         if items is None or len(items) == 0 or not any(len(i) for _, i in items):

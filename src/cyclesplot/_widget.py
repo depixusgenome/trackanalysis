@@ -10,16 +10,17 @@ from    bokeh.models        import (ColumnDataSource, Slider, CustomJS, Paragrap
                                     DataTable, TableColumn, IntEditor, NumberEditor,
                                     CheckboxButtonGroup, Widget)
 
-from    utils               import initdefaults
-from    model.task          import RootTask
-from    model.task.application import TasksDisplay
-from    sequences.view      import OligoListWidget, SequencePathWidget
-from    view.plots          import DpxNumberFormatter, CACHE_TYPE
-from    view.base           import enableOnTrack
-from    modaldialog.view    import AdvancedWidgetMixin
+from    utils                   import initdefaults
+from    control.beadscontrol    import TaskWidgetEnabler
+from    model.task              import RootTask
+from    model.task.application  import TasksDisplay
+from    sequences.view          import OligoListWidget, SequencePathWidget
+from    view.plots              import DpxNumberFormatter, CACHE_TYPE
+from    modaldialog.view        import AdvancedWidgetMixin
 
-from    eventdetection.view import AlignmentWidget, EventDetectionWidget
-from    ._model             import CyclesModelAccess, CyclesPlotTheme, CyclesModelConfig
+from    eventdetection.view     import AlignmentWidget, EventDetectionWidget
+from    ._model                 import (CyclesModelAccess, CyclesPlotTheme,
+                                        CyclesModelConfig)
 
 class PeaksTableTheme:
     "peaks table theme"
@@ -298,6 +299,7 @@ class AdvancedWidget(AdvancedWidgetMixin):
 
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
+    __objects: TaskWidgetEnabler
     def __init__(self, ctrl, model):
         self.__widgets = dict(table    = PeaksTableWidget(ctrl, model),
                               sliders  = ConversionSlidersWidget(ctrl, model),
@@ -325,8 +327,7 @@ class WidgetMixin(ABC):
         self.__widgets['sliders'].addinfo(self._histsource)
 
         widgets = {i: j.addtodoc(self, ctrl) for i, j in self.__widgets.items()}
-
-        enableOnTrack(self, self._hist, self._raw, widgets)
+        self.__objects = TaskWidgetEnabler(self._hist, self._raw, widgets)
 
         self.__widgets['seq']     .callbacks(self._hover, self._ticker)
         self.__widgets['sliders'] .callbacks(self._hover)
@@ -342,9 +343,10 @@ class WidgetMixin(ABC):
                                 for i in ('align', 'drift', 'events')],
                                [layouts.widgetbox(widgets['advanced'], **mds)]], **mds)
 
-    def _resetwidget(self, cache: CACHE_TYPE):
+    def _resetwidget(self, cache: CACHE_TYPE, disable: bool):
         for ite in self.__widgets.values():
             ite.reset(cache) # type: ignore
+        self.__objects.disable(cache, disable)
 
     def __slave_to_hover(self, widgets):
         jsc = CustomJS(code = "hvr.on_change_hover(table, stretch, bias, fig, ttip)",

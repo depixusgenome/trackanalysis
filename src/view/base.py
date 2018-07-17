@@ -3,7 +3,6 @@
 "basic view module"
 from abc                        import ABC
 from asyncio                    import wrap_future
-from functools                  import partial
 from concurrent.futures         import ThreadPoolExecutor
 
 from bokeh.document             import Document
@@ -29,31 +28,6 @@ class View(ABC):
 
     def close(self):
         "closes the application"
-
-def enableOnTrack(ctrl, *aitms):
-    "Enables/disables view elements depending on the track status"
-    def _get(obj, litms):
-        if isinstance(obj, (tuple, list)):
-            for i in obj:
-                _get(i, litms)
-        elif isinstance(obj, dict):
-            for i in obj.values():
-                _get(i, litms)
-        else:
-            litms.append((obj, 'frozen' if hasattr(obj, 'frozen') else 'disabled'))
-        return litms
-
-    itms = tuple(_get(aitms, []))
-    for ite, attr in itms:
-        setattr(ite, attr, True)
-
-    def _ontasks(lst, old = None, model = None, **_):
-        if 'roottask' in old:
-            val = model.roottask is None
-            for ite, attr in lst:
-                setattr(ite, attr, val)
-
-    getattr(ctrl, '_ctrl', ctrl).display.observe(partial(_ontasks, itms))
 
 POOL = ThreadPoolExecutor(1)
 async def threadmethod(fcn, *args, pool = None, **kwa):
@@ -92,10 +66,6 @@ class BokehView(View):
         "closes the application"
         super().close()
         self._doc  = None
-
-    def enableOnTrack(self, *itms):
-        "Enables/disables view elements depending on the track status"
-        enableOnTrack(self._ctrl, *itms)
 
     def addtodoc(self, _, doc):
         "Adds one's self to doc"

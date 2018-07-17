@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 "Deals with bead selection"
 from typing                     import Optional, Iterator, Iterable, cast
+
+from data.track                 import Track
 from model.task                 import RootTask, DataSelectionTask
 from model.task.application     import TasksDisplay
-from data.track                 import Track
 
 class BeadController:
     "Deals with bead selection"
@@ -121,3 +122,52 @@ class DataSelectionBeadController(BeadController):
             self._ctrl.tasks.removetask(root, tsk)
         else:
             self._ctrl.tasks.updatetask(root, tsk, discarded = list(vals))
+
+class TaskWidgetEnabler:
+    "suger for enabling a list of widgets"
+    def __init__(self, *args, track = True, bead = False):
+        self.items: list = []
+        self.track       = track
+        self.bead        = bead
+        self.extend(*args)
+
+    def extend(self, *aitms):
+        "extends the list of items"
+        def _get(obj, litms):
+            if isinstance(obj, (tuple, list)):
+                for i in obj:
+                    _get(i, litms)
+            elif isinstance(obj, dict):
+                for i in obj.values():
+                    _get(i, litms)
+            else:
+                litms.append((obj, 'frozen' if hasattr(obj, 'frozen') else 'disabled'))
+            return litms
+
+        itms = tuple(_get(aitms, []))
+        for ite, attr in itms:
+            setattr(ite, attr, True)
+        self.items.extend(itms)
+
+    def observe(self, ctrl):
+        "observe a list of items"
+        ctrl.display.observe(self._ontasks)
+
+    def disable(self, cache, val):
+        "disables items"
+        for ite, attr in self.items:
+            cache[ite].update({attr: val})
+
+    def _ontasks(self, old = None, model = None, **_):
+        if (self.track and 'roottask' in old) or (self.bead and 'bead' in old):
+            val = model.roottask is None
+            for ite, attr in self.items:
+                setattr(ite, attr, val)
+
+def enablewidgets(ctrl, *aitems, track = True, bead = False) -> TaskWidgetEnabler:
+    "enables/disables items as a function of tasks & tracks"
+    out = TaskWidgetEnabler(track = track, bead = bead)
+    out.extend(*aitems)
+    if ctrl:
+        out.observe(ctrl)
+    return out

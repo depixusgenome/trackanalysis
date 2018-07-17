@@ -45,13 +45,13 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # t
         return [widgets, parent]
 
     def _reset(self, cache: CACHE_TYPE):
-        shape = self._DEFAULT_DATA[1]
+        shape, disable = self._DEFAULT_DATA[1], True
         try:
-            shape = self._resetraw(cache)
+            shape, disable = self._resetraw(cache), False
         finally:
             data  = cache[self._rawsource]['data']
             self._resethist(cache, data, shape)
-            self._resetwidget(cache)
+            self._resetwidget(cache, disable)
 
     def ismain(self, ctrl):
         WidgetMixin.ismain(self, ctrl)

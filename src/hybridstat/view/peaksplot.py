@@ -11,7 +11,7 @@ from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
 
 import numpy                    as     np
 
-from view.base                  import enableOnTrack
+from control.beadscontrol       import TaskWidgetEnabler
 from view.colors                import tohex
 from view.plots                 import PlotView, CACHE_TYPE
 from view.plots.tasks           import TaskPlotCreator
@@ -83,6 +83,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     _rends: List[Tuple]
     _fig:   Figure
     _theme: PeaksPlotTheme
+    __enabler: TaskWidgetEnabler
     def __init__(self, ctrl):
         super().__init__(ctrl, noerase = False)
         self._src: Dict[str, ColumnDataSource] = {}
@@ -181,6 +182,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         try:
             dicos = self.__data()
         finally:
+            self.__enabler.disable(cache, dicos is None)
             if dicos is None:
                 dicos = self.__defaults()
 
@@ -263,7 +265,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     def __setup_widgets(self, ctrl, doc):
         widgets = self._widgets
         wdg     = {i: j.addtodoc(self, ctrl, self._src['peaks']) for i, j in widgets.items()}
-        enableOnTrack(self, self._fig, wdg)
+        self.__enabler = TaskWidgetEnabler(self._fig, wdg)
         widgets['cstrpath'].callbacks(ctrl, doc)
         widgets['seq'].callbacks(self._hover, self._ticker, wdg['stats'][-1], wdg['peaks'][-1])
         widgets['advanced'].callbacks(doc)
