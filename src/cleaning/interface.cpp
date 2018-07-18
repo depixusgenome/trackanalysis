@@ -55,9 +55,93 @@ namespace cleaning { // generic meta functions
 
     template <typename T, typename K>
     using issame = std::enable_if<std::is_same<typename std::remove_const<T>::type, K>::value>;
+
+    template <typename T, typename K>
+    using issameb = std::enable_if<std::is_same<typename std::remove_const<T>::type, K>::value, bool>;
 }
 
 namespace cleaning { // fromkwa specializations
+    template <typename T>
+    typename issameb<T, SaturationRule>::type
+    _equals(T const & a, T const & b)
+    {
+        return a.maxv          == b.maxv
+            && a.maxdisttozero == b.maxdisttozero
+            && a.satwindow     == b.satwindow;
+    }
+
+    template <typename T>
+    typename issameb<T, PingPongRule>::type
+    _equals(T const & a, T const & b)
+    {
+        return a.maxv == b.maxv
+            && a.mindifference == b.mindifference
+            && a.minpercentile == b.minpercentile
+            && a.maxpercentile == b.maxpercentile;
+    }
+
+    template <typename T>
+    typename issameb<T, PopulationRule>::type
+    _equals(T const & a, T const & b) { return a.minv == b.minv; }
+
+    template <typename T>
+    typename issameb<T, HFSigmaRule>::type
+    _equals(T const & a, T const & b)
+    { return a.minv == b.minv && a.maxv == b.maxv; }
+
+
+    template <typename T>
+    typename issameb<T, ExtentRule>::type
+    _equals(T const & a, T const & b)
+    {
+        return a.maxv == b.maxv
+            && a.minv == b.minv
+            && a.minpercentile == b.minpercentile
+            && a.maxpercentile == b.maxpercentile;
+    }
+
+    template <typename T>
+    typename issameb<T, NaNDerivateIslands>::type
+    _equals(T const & a, T const & b)
+    {
+        return a.riverwidth  == b.riverwidth
+            && a.islandwidth == b.islandwidth
+            && a.ratio       == b.ratio
+            && a.maxderivate == b.maxderivate;
+    }
+
+    template <typename T>
+    typename issameb<T, LocalNaNPopulation>::type
+    _equals(T const & a, T const & b)
+    { return a.window == b.window && a.ratio == b.ratio; }
+
+    template <typename T>
+    typename issameb<T, DerivateSuppressor<float>>::type
+    _equals(T const & a, T const & b)
+    {
+        return a.maxderivate == b.maxderivate
+            && a.maxabsvalue == b.maxabsvalue;
+    }
+
+    template <typename T>
+    typename issameb<T, ConstantValuesSuppressor<float>>::type
+    _equals(T const & a, T const & b)
+    {
+        return a.mindeltarange == b.mindeltarange
+            && a.mindeltavalue == b.mindeltavalue;
+    }
+
+
+    template <typename T>
+    typename issameb<T, AberrantValuesRule>::type
+    _equals(T const & a, T const & b)
+    {
+        return _equals(a.constants, b.constants)
+            && _equals(a.derivative, b.derivative)
+            && _equals(a.localnans,  b.localnans)
+            && _equals(a.islands,    b.islands);
+    }
+
     template <typename T>
     typename issame<T, SaturationRule>::type
     _fromkwa(T inst, pybind11::dict kwa)
@@ -187,6 +271,7 @@ namespace cleaning { // the module
     {
         cls.def(pybind11::init([](pybind11::kwargs kwa) { return _toptr<T>(kwa); }))
            .def("configure",  &_fromkwa<T>)
+           .def("__eq__", &_equals<T>)
            .def(pybind11::pickle([](T const & self)
                                  { pybind11::dict d; _fromkwa(self, d); return d; },
                                  &_toptr<T>)
