@@ -1,6 +1,6 @@
 #include <boost/math/distributions/students_t.hpp>
 #include <boost/math/distributions/normal.hpp>
-#include "signalfilter/stattests.h"
+#include "eventdetection/stattests.h"
 
 namespace bm = boost::math;
 
@@ -104,6 +104,9 @@ namespace samples
 
             float  tothresholdvalue(Input const & left, Input const & right)
             {
+                if(right.count == 1 || left.count == 1)
+                    return 1.;
+
                 float val = _level(value(left, right));
                 return val < .5f ? 1.0f-val : val;
             }

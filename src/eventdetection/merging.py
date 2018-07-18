@@ -9,7 +9,17 @@ import  numpy                   as     np
 from    numpy.lib.stride_tricks import as_strided
 
 from    utils                   import initdefaults
-from    signalfilter            import samples as _samples, PrecisionAlg
+from    signalfilter            import PrecisionAlg
+# pylint: disable=no-name-in-module,import-error
+from    ._core                  import samples as _samples
+# pylint: disable=unused-import
+from    ._core                  import (HeteroscedasticEventMerger,
+                                        PopulationMerger,
+                                        ZRangeMerger,
+                                        MultiMerger)
+
+# pybind11 bug
+MultiMerger.__base__.__setstate__ = lambda self, vals: self.configure(vals)
 
 class EventMerger(ABC):
     "merges neighbouring stretches of data."
@@ -158,7 +168,7 @@ class KnownSigmaEventMerger(StatsEventMerger, PrecisionAlg):
         return np.array([(cnt.sum(), np.average(sel['m'], weights = cnt))],
                         dtype = stats.dtype)
 
-class HeteroscedasticEventMerger(StatsEventMerger):
+class PyHeteroscedasticEventMerger(StatsEventMerger):
     """
     Merges neighbouring stretches of data.
 
@@ -197,7 +207,7 @@ class HeteroscedasticEventMerger(StatsEventMerger):
                           np.average(sel['s'], weights = cnt))],
                         dtype = stats.dtype)
 
-class PopulationMerger(EventMerger):
+class PyPopulationMerger(EventMerger):
     """
     Merges neighbouring stretches of data if enough of their population have a
     common range.
@@ -259,7 +269,7 @@ class PopulationMerger(EventMerger):
             else:
                 ileft, left = iright, right
 
-class ZRangeMerger(EventMerger):
+class PyZRangeMerger(EventMerger):
     """
     Merges neighbouring stretches of data if enough of their population have a
     common range.
@@ -310,11 +320,11 @@ class ZRangeMerger(EventMerger):
             else:
                 ileft, left = iright, right
 
-class MultiMerger(EventMerger):
+class PyMultiMerger(EventMerger):
     "Multiple merge tools applied in a row"
-    merges: List[EventMerger] = [HeteroscedasticEventMerger(),
-                                 PopulationMerger(percentile = 66),
-                                 ZRangeMerger(percentile = 80)]
+    merges: List[EventMerger] = [PyHeteroscedasticEventMerger(),
+                                 PyPopulationMerger(percentile = 66),
+                                 PyZRangeMerger(percentile = 80)]
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()

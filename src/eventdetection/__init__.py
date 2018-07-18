@@ -4,6 +4,7 @@ u"Deals with event detection"
 from utils          import initdefaults
 from signalfilter   import Filter, PrecisionAlg
 from .detection     import EventDetector
+from ._core         import samples # pylint: disable=import-error
 
 class EventDetectionConfig(PrecisionAlg):
     """

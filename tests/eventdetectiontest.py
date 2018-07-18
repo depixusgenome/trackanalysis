@@ -12,7 +12,7 @@ from model.task.dataframe     import DataFrameTask
 from eventdetection.merging   import (KnownSigmaEventMerger,
                                       HeteroscedasticEventMerger,
                                       PopulationMerger, ZRangeMerger,
-                                      EventSelector)
+                                      EventSelector, PyHeteroscedasticEventMerger)
 from eventdetection.splitting import (MinMaxSplitDetector, DerivateSplitDetector,
                                       GradedSplitDetector, MultiGradeSplitDetector,
                                       ChiSquareSplitDetector)
@@ -23,9 +23,9 @@ from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
 from eventdetection.processor import (ExtremumAlignmentProcessor, AlignmentTactic,
                                       EventDetectionTask)
 from eventdetection.data      import Events
+from eventdetection           import samples
 from control.taskcontrol      import create
 from simulator                import randtrack
-from signalfilter             import samples
 from testingcore              import path as utfilepath
 
 def test_detectsplits():
@@ -198,8 +198,8 @@ def test_merge():
     def _merges(inst):
         "Tests flat stretches merging"
         np.random.seed(0)
-        det   = lambda  i, j: tuple(tuple(_) for _ in inst(i, np.array(j)))
-        items = np.random.normal(0., 1e-3, (30,))
+        det   = lambda  i, j: tuple(tuple(_) for _ in inst(i, np.array(j, dtype ='i4')))
+        items = np.random.normal(0., 1e-3, (30,)).astype('f4')
 
         assert det([], ((0,30),)) == tuple()
         assert det([1], tuple())  == tuple()
@@ -224,8 +224,9 @@ def test_merge():
 
     _merges(KnownSigmaEventMerger(precision = 1e-3, confidence = 0.1, isequal = True,
                                   oneperrange = True))
-    _merges(HeteroscedasticEventMerger(confidence = 0.1, oneperrange = False))
-    _merges(HeteroscedasticEventMerger(confidence = 0.1, oneperrange = True))
+    _merges(PyHeteroscedasticEventMerger(confidence = 0.1, oneperrange = False))
+    _merges(PyHeteroscedasticEventMerger(confidence = 0.1, oneperrange = True))
+    _merges(HeteroscedasticEventMerger(confidence = 0.1))
 
     left  = np.zeros(100, dtype = 'f4')
     right = np.zeros(100, dtype = 'f4')
@@ -243,21 +244,21 @@ def test_merge():
 
 def test_population_merge():
     "tests population merge"
-    data  = np.arange(100)
-    intervals = np.array([(0,10), (5,17), (8, 20), (30, 40), (37,41)])
+    data      = np.arange(100, dtype = 'f4')
+    intervals = np.array([(0,10), (5,17), (8, 20), (30, 40), (37,41)], dtype = 'i4')
     merged    = PopulationMerger(percentile = 75.)(data, intervals)
     assert tuple(tuple(i) for i in merged) == ((0,10), (5,20), (30,41))
 
-    data  = pickle.load(open(cast(str, utfilepath("eventsdata.pk")), 'rb'))
+    data      = pickle.load(open(cast(str, utfilepath("eventsdata.pk")), 'rb'))
     intervals = np.array([[  1,  11], [ 12,  15], [ 16,  25], [ 26,  52],
-                          [ 55, 121], [125, 136], [138, 453]])
+                          [ 55, 121], [125, 136], [138, 453]], dtype = 'i4')
     merged    = PopulationMerger()(data, intervals)
     assert tuple(tuple(i) for i in merged) == ((1, 52), (55, 121), (125, 136), (138, 453))
 
 def test_range_merge():
     "tests population merge"
-    data  = np.arange(100)
-    intervals = np.array([(0,10), (5,17), (8, 23), (30, 40), (35,41)])
+    data      = np.arange(100, dtype = 'f4')
+    intervals = np.array([(0,10), (5,17), (8, 23), (30, 40), (35,41)], dtype = 'i4')
     merged    = ZRangeMerger(percentile = 70.)(data, intervals)
     assert tuple(tuple(i) for i in merged) == ((0,10), (5,23), (30,41))
 
@@ -429,4 +430,5 @@ def test_dataframe():
     assert 'avg'   in data
 
 if __name__ == '__main__':
-    test_splittererosion()
+    test_population_merge()
+    test_range_merge()

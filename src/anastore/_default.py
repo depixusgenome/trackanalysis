@@ -3,7 +3,8 @@
 """
 Default patches for tasks and configs
 """
-from ._patches  import Patches, modifyclasses, RESET, DELETE
+from  itertools import product
+from ._patches  import Patches, modifyclasses, RESET, DELETE, TPE
 
 def _v0task(data:dict) -> dict:
     modifyclasses(data,
@@ -40,10 +41,21 @@ def _v4tasks(data:dict) -> dict:
             data.setdefault("sequence", {})[i] = cnf[j]
     return data
 
-__TASKS__   = Patches(_v0task, _v1, _v2, _v3, _v4tasks)
+def _v5(data:dict) -> dict:
+    mdl  = 'eventdetection.merging.'
+    args = zip(('HeteroscedasticEventMerger', 'PopulationMerger', 'RangeMerger'),
+               ('stats', 'pop', 'range'))
+    def _multi(itm):
+        itm.update({k: i for i, (j, k) in product(itm.pop('merges', ()), args)
+                    if i[TPE] == mdl+j})
+
+    modifyclasses(data, mdl+"MultiMerger", dict(__call__ = _multi))
+    return data
+
+__TASKS__   = Patches(_v0task, _v1, _v2, _v3, _v4tasks, _v5)
 
 def _v0cnf(data:dict) -> dict:
     data = _v0task(data)
     data.get('config', {}).pop('precision.max', None)
     return data
-__CONFIGS__ = Patches(_v0cnf, _v1, _v2, _v3)
+__CONFIGS__ = Patches(_v0cnf, _v1, _v2, _v3, _v5)

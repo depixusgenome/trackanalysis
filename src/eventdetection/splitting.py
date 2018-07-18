@@ -13,11 +13,13 @@ from    scipy.ndimage.filters       import correlate1d
 from    scipy.stats.distributions   import chi2
 
 from    utils                       import initdefaults
-from    signalfilter                import samples as _samples, PrecisionAlg
+from    signalfilter                import PrecisionAlg
 
 from    .threshold                  import Threshold, MedianThreshold
 from    .intervalextension          import (IntervalExtension,
                                             IntervalExtensionAroundRange)
+# pylint: disable=no-name-in-module,import-error
+from    ._core                      import samples as _samples
 norm = _samples.normal.knownsigma # pylint: disable=invalid-name
 
 class SplitDetector(PrecisionAlg):
