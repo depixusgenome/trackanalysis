@@ -161,5 +161,8 @@ def grfiles(self):
 
 # pylint: disable=no-member,invalid-name
 scriptapp = default.application(ScriptingView).open(None).topview.views[0] # type: ignore
+def localcontext(**kwa):
+    "allows changing the context locally. This is **not** thread safe."
+    return scriptapp.control.theme.localcontext(**kwa)
 
-__all__ = ['scriptapp', 'Tasks']
+__all__ = ['scriptapp', 'Tasks', 'localcontext']

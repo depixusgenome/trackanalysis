@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "All sequences-related stuff"
-from    typing      import (Sequence, Union,  # pylint: disable=unused-import
-                            Iterator, Tuple, TextIO, Dict, Iterable, cast)
-import  pathlib
+from    enum        import Enum
+from    pathlib     import Path
+from    typing      import (Sequence, Union, Iterator, Tuple, TextIO, Dict,
+                            List, Iterable, cast)
 import  re
 import  numpy       as np
 from    utils       import fromstream, initdefaults, updatecopy
@@ -36,11 +37,11 @@ def _read(stream:TextIO) -> Iterator[Tuple[str,str]]:
 
     if len(seq):
         if first and title is None and getattr(stream, 'name', None) is not None:
-            yield (pathlib.Path(str(stream.name)).stem, seq)
+            yield (Path(str(stream.name)).stem, seq)
         else:
             yield ("hairpin %d" % (ind+1) if title is None else title, seq)
 
-def read(stream:Union[pathlib.Path, str, Dict[str,str], TextIO]) -> Iterator[Tuple[str,str]]:
+def read(stream:Union[Path, str, Dict[str,str], TextIO]) -> Iterator[Tuple[str,str]]:
     "reads a path and yields pairs (name, sequence)"
     if isinstance(stream, dict):
         return cast(Iterator[Tuple[str, str]], stream.items())
@@ -50,7 +51,7 @@ def read(stream:Union[pathlib.Path, str, Dict[str,str], TextIO]) -> Iterator[Tup
 
     if isinstance(stream, str) and '/' not in stream and '.' not in stream:
         try:
-            if not pathlib.Path(stream).exists():
+            if not Path(stream).exists():
                 return iter((('hairpin 1', stream),))
         except OSError:
             return iter((('hairpin 1', stream),))
@@ -91,7 +92,7 @@ class Translator:
         return cls.__TRAFIND.sub(cls.__trarep, olig)
 
     @classmethod
-    def reversecomplement(cls, oligo:str) -> str:
+    def reversecomplement(cls, oligo: str) -> str:
         "returns the reverse complement for that oligo"
         return ''.join(cls.__COMPLE.get(i, i) for i in oligo[::-1])
 
@@ -114,7 +115,7 @@ class Translator:
                     val = reg.search(seq, val.start()+1)
 
     @classmethod
-    def peaks(cls, seq:Union[str, pathlib.Path], oligs:Union[Sequence[str], str],
+    def peaks(cls, seq:Union[str, Path], oligs:Union[Sequence[str], str],
               flags = re.IGNORECASE) -> np.ndarray:
         """
         Returns the peak positions and orientation associated to a sequence.
@@ -144,14 +145,14 @@ class Translator:
             >>> assert len(res) == 4
         """
         ispath = False
-        if isinstance(oligs, (dict, pathlib.Path)):
+        if isinstance(oligs, (dict, Path)):
             seq, oligs = oligs, seq
 
         if isinstance(seq, dict):
             return ((i, cls.peaks(j, oligs)) for i, j in seq.items())
 
         try:
-            ispath = isinstance(seq, pathlib.Path) or pathlib.Path(seq).exists()
+            ispath = isinstance(seq, Path) or Path(seq).exists()
         except OSError:
             pass
 
@@ -273,3 +274,47 @@ class NonLinearities(Translator):
         single = np.arange(len(size), dtype = 'f4') * self.singlestrand
         double = size+single
         return double - np.polyval(np.polyfit(single, double, 1), single)
+
+class LNAHairpin:
+    """The theoretical sequence: full, target, references"""
+    full:       str       = ""
+    target:     str       = ""
+    references: List[str] = []
+    @initdefaults(frozenset(locals()),
+                  path = lambda self, val: self.setfrompath(val))
+    def __init__(self, **_):
+        pass
+
+    def setfrompath(self, file_sequence: Union[str, Path],
+                    full:   str = 'full',
+                    target: str = 'target',
+                    references: Union[Iterable[str], str] = None):
+        """file_sequence is the path of the fasta file
+         format of the file:
+            > full
+            (...)cccatATTCGTATcGTcccat(...)
+            > oligo
+            cccat,tgtca
+            > target
+            TCGTAT
+        """
+        text = dict(read(file_sequence))
+
+        self.full       = text.pop(full)
+        self.target     = self.full if target is None else text.pop(target)
+
+        if isinstance(references, str):
+            references = [i.strip() for i in references.split(',')]
+        itr = (text.values() if not references else (text[i] for i in references))
+        self.references = sum((i.split(',') for i in itr), [])
+
+class Strand(Enum):
+    """
+    Which strand we sit on
+    """
+    positive = True
+    negative = False
+
+    @classmethod
+    def _missing_(cls, value):
+        return getattr(cls, value)
