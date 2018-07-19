@@ -38,7 +38,7 @@ class QualityControlModelAccess(TaskPlotModelAccess):
     def __init__(self, ctrl) -> None:
         super().__init__(ctrl)
         self.cleaning  = DataCleaningTaskAccess(self)
-        self.__config  = ctrl.theme.add(FixedBeadDetectionModel(ctrl),    False)
+        self.__config  = FixedBeadDetectionModel(ctrl)
         self.__display = ctrl.display.add(QualityControlDisplay(), False)
 
     def addto(self, ctrl, name = "tasks", noerase = False):
