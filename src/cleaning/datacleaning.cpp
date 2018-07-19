@@ -31,7 +31,7 @@ namespace cleaning
     template struct ConstantValuesSuppressor<double>;
 
     template <typename T>
-    void DerivateSuppressor<T>::apply(size_t sz, T * data, bool doclip, float azero) const
+    void DerivateSuppressor<T>::apply(size_t sz, T * data, bool doclip, double azero) const
     {
         int     e    = int(sz);
         T       zero = T(azero);
@@ -214,8 +214,8 @@ namespace cleaning
         template <typename T>
         float _test_extent(T const & self, size_t sz, float const *data)
         {
-            auto imax = int(self.maxpercentile*.01f*sz);
-            auto imin = int(self.minpercentile*.01f*sz);
+            auto imax = int(self.maxpercentile*.01*sz);
+            auto imin = int(self.minpercentile*.01*sz);
             if(imax == 100 && imin == 0)
             {
                 auto maxv = std::max_element(data, data+sz);

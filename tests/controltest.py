@@ -357,7 +357,7 @@ def test_task_expandandcollapse():
     frames = tuple(ctrl.run(read,read))
     assert frozenset(type(fra) for fra in frames) == frozenset((Beads,))
     keys  = set(key for frame in frames for key, _ in frame)
-    beads = {i for i in range(74)} | {'t', 'zmag'}
+    beads = {i for i in range(74)}
     assert keys == beads
 
     frames = tuple(ctrl.run(read,tc))

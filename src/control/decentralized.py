@@ -14,15 +14,16 @@ LOGS   = getLogger(__name__)
 DELETE = type('DELETE', (), {})
 
 def _isdiff(left, right):
-    if left == right:
-        return False
+    if type(left) is not type(right):
+        return True
+
+    if hasattr(left, '__getstate__'):
+        left, right = left.__getstate__(), right.__getstate__()
+
     if isinstance(left, dict):
-        if set(left) != set(right):
-            return True
-        return any(_isdiff(right[i], j) for i, j in left.items())
-    if hasattr(left, '__dict__') and left.__dict__ == right.__dict__:
-        return False
-    return pickle.dumps(left) != pickle.dumps(right)
+        return set(left) != set(right) or any(_isdiff(right[i], j) for i, j in left.items())
+
+    return left != right and pickle.dumps(left) != pickle.dumps(right)
 
 def _good(model, i, j):
     if not hasattr(model, i):
@@ -42,12 +43,24 @@ def updatemodel(self, model, kwa, force = False, deflt = None):
     if len(kwa) == 0 and not force:
         return None
 
-    old = {i: getattr(model, i) for i in kwa}
-    rem = {i: getattr(model, i) for i,j in kwa.items() if j is DELETE}
-    for i, j in kwa.items():
-        if j is DELETE:
-            j = getattr(model.__class__, i) if deflt is None else getattr(deflt, i)
-        setattr(model, i, j)
+
+    if callable(getattr(model, 'configure', None)):
+        dmdl = model.__getstate__()
+
+        old  = {i: dmdl[i] for i in kwa}
+        rem  = {i: dmdl[i] for i,j in kwa.items() if j is DELETE}
+        if rem:
+            ddef = (model.__class__() if deflt is None else deflt).__getstate__()
+            kwa.update({i: ddef[i] for i, j in kwa.items() if j is DELETE})
+        model.configure(kwa)
+    else:
+        old = {i: getattr(model, i) for i in kwa}
+        rem = {i: getattr(model, i) for i,j in kwa.items() if j is DELETE}
+        if rem:
+            deflt = model.__class__() if deflt is None else deflt
+            kwa.update({i: getattr(deflt, i) for i, j in kwa.items() if j is DELETE})
+        for i, j in kwa.items():
+            setattr(model, i, j)
 
     return dict(control = self, model = model,  old = old, deleted = rem)
 

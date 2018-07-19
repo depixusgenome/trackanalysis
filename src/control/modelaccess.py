@@ -10,7 +10,7 @@ from model.task.application import DEFAULT_TASKS, TasksModel
 from data.track             import Track
 from data.views             import TrackView
 from data.views             import BEADKEY
-from utils                  import NoArgs, updatedeepcopy
+from utils                  import NoArgs
 from utils.inspection       import diffobj
 from .processor             import Processor
 from .processor.cache       import CacheReplacement
@@ -168,6 +168,14 @@ class TaskAccess(TaskPlotModelAccess):
         assert name not in DEFAULT_TASKS or inst == DEFAULT_TASKS[name]
         DEFAULT_TASKS[name] = inst
 
+    @staticmethod
+    def __deepcopy(task, kwa):
+        cnf = task.__getstate__() if hasattr(task, '__getstate__') else dict(task.__dict__)
+        cnf.update(kwa)
+
+        out = type(task)(**cnf)
+        return out
+
     @property
     def defaultconfigtask(self) -> Task:
         "returns the config task"
@@ -188,7 +196,7 @@ class TaskAccess(TaskPlotModelAccess):
             return
 
         tasks = dict(self._ctrl.theme.get("tasks", "tasks", {}))
-        tasks[self.configname] = updatedeepcopy(task, **kwa)
+        tasks[self.configname] = self.__deepcopy(tasks[self.configname], kwa)
         self._ctrl.theme.update("tasks", tasks = tasks)
 
     @property
@@ -230,7 +238,7 @@ class TaskAccess(TaskPlotModelAccess):
 
         elif task is None:
             kwa['disabled'] = False
-            item = updatedeepcopy(self.configtask, **kwa)
+            item = self.__deepcopy(self.configtask, **kwa)
             self._ctrl.tasks.addtask(root, item, index = self.index)
         else:
             kwa['disabled'] = False

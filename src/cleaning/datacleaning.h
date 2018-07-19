@@ -18,7 +18,7 @@ namespace cleaning {
         T maxabsvalue = T(5.);
         T maxderivate = T(.6);
 
-        void apply(size_t, T *, bool, float) const;
+        void apply(size_t, T *, bool, double) const;
     };
 
     extern template struct DerivateSuppressor<float>;
@@ -45,7 +45,7 @@ namespace cleaning {
         size_t riverwidth  = 2;
         size_t islandwidth = 10;
         size_t ratio       = 80;
-        float  maxderivate = .02;
+        double  maxderivate = .02;
 
         void apply(size_t, float *) const;
     };
@@ -94,39 +94,39 @@ namespace cleaning {
     struct HFSigmaRule
     {
         DataOutput apply(DataInfo info) const;
-        float minv = 1e-4f;
-        float maxv = 1e-2f;
+        double minv = 1e-4;
+        double maxv = 1e-2;
     };
 
     struct PopulationRule
     {
         DataOutput apply(DataInfo info) const;
-        float minv = 80.0f;
+        double minv = 80.0;
     };
 
     struct ExtentRule
     {
         DataOutput apply(DataInfo info) const;
-        float minv          = .25f;
-        float maxv          = 2.0f;
-        float minpercentile = 5.0f;
-        float maxpercentile = 95.0f;
+        double minv          = .25;
+        double maxv          = 2.0;
+        double minpercentile = 5.0;
+        double maxpercentile = 95.0;
     };
 
     struct PingPongRule
     {
         DataOutput apply(DataInfo info) const;
-        float maxv          = 3.0f;
-        float mindifference = .01f;
-        float minpercentile = 5.;
-        float maxpercentile = 95.;
+        double maxv          = 3.0;
+        double mindifference = .01;
+        double minpercentile = 5.;
+        double maxpercentile = 95.;
     };
 
     struct SaturationRule
     {
         DataOutput apply(DataInfo initial, DataInfo measures) const;
-        float  maxv          = 20.0f;
-        float  maxdisttozero = .015f;
-        size_t satwindow     = 10;
+        double  maxv          = 20.0;
+        double  maxdisttozero = .015;
+        size_t  satwindow     = 10;
     };
 }
