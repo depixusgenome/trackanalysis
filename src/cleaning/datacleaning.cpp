@@ -169,7 +169,8 @@ namespace cleaning
         // remove values outside an absolute range and derivatives outside an absolute range
         derivative.apply(sz, data, clip, compute(med));
         // remove stretches of constant values
-        constants.apply(sz, data);
+        if(!clip)
+            constants.apply(sz, data);
         // remove NaN features
         localnans.apply(sz, data);
         islands.apply(sz, data);
@@ -223,9 +224,9 @@ namespace cleaning
             }
 
             std::vector<float> cpy(data, data+sz);
-            auto dt = cpy.data();
-            auto maxv = signalfilter::stats::percentile(dt, dt+sz, self.maxpercentile);
-            auto minv = signalfilter::stats::percentile(dt, dt+sz, self.minpercentile);
+            auto dt   = cpy.data();
+            auto maxv = signalfilter::stats::nanpercentile(dt, dt+sz, self.maxpercentile);
+            auto minv = signalfilter::stats::nanpercentile(dt, dt+sz, self.minpercentile);
             return maxv-minv;
         }
         float _test(ExtentRule const & self, size_t sz, float const *data)
@@ -289,13 +290,13 @@ namespace cleaning
         {
             std::vector<float> tmp(measures.data+measures.stop[icyc]-satwindow,
                                    measures.data+measures.stop[icyc]);
-            auto diffmed = signalfilter::stats::median(tmp);
+            auto diffmed = signalfilter::stats::nanmedian(tmp);
             if(!std::isfinite(diffmed))
                 continue;
 
             tmp.assign(initial.data+initial.start[icyc],
                        initial.data+initial.stop[icyc]);
-            diffmed -= signalfilter::stats::median(tmp);
+            diffmed -= signalfilter::stats::nanmedian(tmp);
             
             out.values[icyc] = diffmed;
             if(std::isfinite(diffmed))

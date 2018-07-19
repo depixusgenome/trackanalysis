@@ -22,10 +22,19 @@ namespace signalfilter { namespace stats
     typename T::value_type median(T & items);
 
     template <typename T>
+    typename T::value_type nanmedian(T & items);
+
+    template <typename T>
     T percentile(T * first, T * last, float val);
 
     template <typename T>
+    T nanpercentile(T * first, T * last, float val);
+
+    template <typename T>
     auto median(T begin, T end);
+
+    template <typename T>
+    auto nanmedian(T begin, T end);
 
     template <typename ... T>
     struct acc_t: public ba::accumulator_set<double, ba::stats<T...>>

@@ -171,14 +171,17 @@ class DpxCleaning(Widget):
     fixedbeads         = props.String("")
     subtracted         = props.String("")
     subtractcurrent    = props.Int(0)
-    maxabsvalue        = props.Float(DataCleaningTask().derivative.maxabsvalue)
-    maxderivate        = props.Float(DataCleaningTask().derivative.maxderivate)
-    minpopulation      = props.Float(DataCleaningTask.minpopulation)
-    minhfsigma         = props.Float(DataCleaningTask.minhfsigma)
-    maxhfsigma         = props.Float(DataCleaningTask.maxhfsigma)
-    minextent          = props.Float(DataCleaningTask.minextent)
-    maxextent          = props.Float(DataCleaningTask.maxextent)
-    maxsaturation      = props.Float(DataCleaningTask.maxsaturation)
+
+    __DFLT             = DataCleaningTask()
+    maxabsvalue        = props.Float(__DFLT.derivative.maxabsvalue)
+    maxderivate        = props.Float(__DFLT.derivative.maxderivate)
+    minpopulation      = props.Float(__DFLT.minpopulation)
+    minhfsigma         = props.Float(__DFLT.minhfsigma)
+    maxhfsigma         = props.Float(__DFLT.maxhfsigma)
+    minextent          = props.Float(__DFLT.minextent)
+    maxextent          = props.Float(__DFLT.maxextent)
+    maxsaturation      = props.Float(__DFLT.maxsaturation)
+    del __DFLT
 
 class CleaningFilterWidget:
     "All inputs for cleaning"

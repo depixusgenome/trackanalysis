@@ -27,6 +27,11 @@ class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
         super().__init__(**kwa)
         Task.__init__(self, **kwa)
 
+    def __getstate__(self):
+        state = super().__getstate__()
+        state.update(self.__dict__)
+        return state
+
 class DataCleaningErrorMessage:
     "creates the error message upon request"
     def __init__(self, stats, cnf:Dict[str,Any], # pylint: disable=too-many-arguments
@@ -44,13 +49,14 @@ class DataCleaningErrorMessage:
 
     def data(self) -> List[Tuple[Optional[int], str, str]]:
         "returns a message if the test is invalid"
+        dflt = self.tasktype()
         if self.stats is None:
-            pop = self.config.get('minpopulation', self.tasktype.minpopulation)
+            pop = self.config.get('minpopulation', dflt.minpopulation)
             return [(None, 'population', '< %d' % pop)]
 
         stats = {i.name: i  for i in self.stats}
         get1  = lambda i, j: len(getattr(stats[i], j))
-        get2  = lambda i, j: self.config.get(j+i, getattr(self.tasktype, j+i))
+        get2  = lambda i, j: self.config.get(j+i, getattr(dflt, j+i))
         msg   = (('saturation', '> %.0f%%', 'max'),
                  ('population', '< %.0f%%', 'min'),
                  ('hfsigma',    '< %.4f',   'min'),
@@ -65,13 +71,14 @@ class DataCleaningErrorMessage:
     @classmethod
     def message(cls, tasktype, stats, **cnf) -> str:
         "returns a message if the test is invalid"
+        dflt = tasktype()
         if stats is None:
-            pop = cnf.get('minpopulation', tasktype.minpopulation)
+            pop = cnf.get('minpopulation', dflt.minpopulation)
             return 'has less than %d %% valid points' % pop
 
         stats = {i.name: i  for i in stats}
         get   = lambda i, j: (len(getattr(stats[i], j)),
-                              cnf.get(j+i, getattr(tasktype, j+i)))
+                              cnf.get(j+i, getattr(dflt, j+i)))
         msg   = ('%d cycles: non-closing > %.0f%%' % get('saturation', 'max'),
                  '%d cycles: %%good < %.0f%%'      % get('population', 'min'),
                  '%d cycles: σ[HF] < %.4f'         % get('hfsigma',    'min'),

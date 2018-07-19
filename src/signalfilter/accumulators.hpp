@@ -21,10 +21,10 @@
 namespace signalfilter { namespace stats
 {
     template <typename T>
-    T percentile(T * first, T * last, float val)
+    inline T percentile(T * first, T * last, float val)
     {
         int  sz    = int(last-first);
-        if(sz == 0)
+        if(sz <= 0)
             return std::numeric_limits<T>::quiet_NaN();
         if(sz == 1)
             return *first;
@@ -47,7 +47,26 @@ namespace signalfilter { namespace stats
     }
 
     template <typename T>
-    typename T::value_type median(T & items)
+    inline T nanpercentile(T * first, T * last, float val)
+    {
+        T * i = first, * e = last;
+        while(i != e && !std::isfinite(*i))
+            ++i;
+        while(i != e && !std::isfinite(*(e-1)))
+            --e;
+        for(auto j = i; j != e; ++j)
+            if(!std::isfinite(*j))
+            {
+                --e;
+                *j = *e;
+                while(j != e && !std::isfinite(*(e-1)))
+                    --e;
+            }
+        return percentile(i, e, val);
+    }
+
+    template <typename T>
+    inline typename T::value_type median(T & items)
     {
         auto nth = items.size()/2;
         switch(items.size())
@@ -70,14 +89,29 @@ namespace signalfilter { namespace stats
             return (typename T::value_type)(.5)*(items[nth]+items[nth-1]);
     }
 
+
     template <typename T>
-    auto median(T begin, T end)
+    inline auto median(T begin, T end)
     {
         using S = typename std::remove_cv<
                     typename std::remove_reference<decltype(*begin)>::type
                                          >::type;
         std::vector<S> x(begin, end);
         return median(x);
+    }
+
+    template <typename T>
+    inline typename T::value_type nanmedian(T & items)
+    { return nanpercentile(&items[0], &items[0]+items.size(), 50.0f); }
+
+    template <typename T>
+    inline auto nanmedian(T begin, T end)
+    {
+        using S = typename std::remove_cv<
+                    typename std::remove_reference<decltype(*begin)>::type
+                                         >::type;
+        std::vector<S> x(begin, end);
+        return nanmedian(x);
     }
 }}
 

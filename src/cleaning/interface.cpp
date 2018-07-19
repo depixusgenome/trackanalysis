@@ -1,5 +1,6 @@
 #include <cmath>
 #include <type_traits>
+#include <typeinfo>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "cleaning/datacleaning.h"
@@ -9,30 +10,32 @@ namespace cleaning { // generic meta functions
     using ndarray = pybind11::array_t<T, pybind11::array::c_style>;
 
     template <typename T>
-    inline T _get(char const * name, pybind11::dict & kwa, T deflt)
-    { return  kwa.contains(name) ? kwa[name].cast<T>() : deflt; }
-
-    template <typename T>
-    inline void _get(T & inst, char const * name, pybind11::dict & kwa)
+    inline void _get(std::false_type, T & inst, char const * name, pybind11::dict & kwa)
     {
         if(kwa.contains(name))
             inst = kwa[name].cast<T>();
     }
 
     template <typename T>
-    inline void _get(T const & inst, char const * name, pybind11::dict & kwa)
+    inline void _get(std::false_type, T & val1, T & val2, char const * name, pybind11::dict & kwa)
+    {
+        if(kwa.contains(name))
+        {
+            val1 = kwa[name][pybind11::int_(0)].cast<T>();
+            val2 = kwa[name][pybind11::int_(1)].cast<T>();
+        }
+    }
+
+    template <typename T>
+    inline void _get(std::true_type, T const & inst, char const * name, pybind11::dict & kwa)
     { kwa[name] = inst; }
+
+    template <typename T>
+    inline void _get(std::true_type, T const & val1, T const & val2, char const * name, pybind11::dict & kwa)
+    { kwa[name] = pybind11::make_tuple(val1, val2); }
 
     void _has(...) {}
 
-    template <typename T>
-    std::unique_ptr<T>
-    _toptr(pybind11::dict kwa)
-    {
-        std::unique_ptr<T> ptr(new T());
-        _fromkwa(*ptr, kwa);
-        return ptr;
-    }
 
     template <typename T, typename K1, typename K2>
     void _pairproperty(pybind11::class_<T> & cls, char const * name,
@@ -54,191 +57,122 @@ namespace cleaning { // generic meta functions
     }
 
     template <typename T, typename K>
-    using issame = std::enable_if<std::is_same<typename std::remove_const<T>::type, K>::value>;
-
-    template <typename T, typename K>
-    using issameb = std::enable_if<std::is_same<typename std::remove_const<T>::type, K>::value, bool>;
+    using issame = std::enable_if<
+                           std::is_same<T, K>::value
+                        || std::is_same<T, K const>::value>;
 }
 
 namespace cleaning { // fromkwa specializations
     template <typename T>
-    typename issameb<T, SaturationRule>::type
-    _equals(T const & a, T const & b)
-    {
-        return a.maxv          == b.maxv
-            && a.maxdisttozero == b.maxdisttozero
-            && a.satwindow     == b.satwindow;
-    }
-
-    template <typename T>
-    typename issameb<T, PingPongRule>::type
-    _equals(T const & a, T const & b)
-    {
-        return a.maxv == b.maxv
-            && a.mindifference == b.mindifference
-            && a.minpercentile == b.minpercentile
-            && a.maxpercentile == b.maxpercentile;
-    }
-
-    template <typename T>
-    typename issameb<T, PopulationRule>::type
-    _equals(T const & a, T const & b) { return a.minv == b.minv; }
-
-    template <typename T>
-    typename issameb<T, HFSigmaRule>::type
-    _equals(T const & a, T const & b)
-    { return a.minv == b.minv && a.maxv == b.maxv; }
-
-
-    template <typename T>
-    typename issameb<T, ExtentRule>::type
-    _equals(T const & a, T const & b)
-    {
-        return a.maxv == b.maxv
-            && a.minv == b.minv
-            && a.minpercentile == b.minpercentile
-            && a.maxpercentile == b.maxpercentile;
-    }
-
-    template <typename T>
-    typename issameb<T, NaNDerivateIslands>::type
-    _equals(T const & a, T const & b)
-    {
-        return a.riverwidth  == b.riverwidth
-            && a.islandwidth == b.islandwidth
-            && a.ratio       == b.ratio
-            && a.maxderivate == b.maxderivate;
-    }
-
-    template <typename T>
-    typename issameb<T, LocalNaNPopulation>::type
-    _equals(T const & a, T const & b)
-    { return a.window == b.window && a.ratio == b.ratio; }
-
-    template <typename T>
-    typename issameb<T, DerivateSuppressor<float>>::type
-    _equals(T const & a, T const & b)
-    {
-        return a.maxderivate == b.maxderivate
-            && a.maxabsvalue == b.maxabsvalue;
-    }
-
-    template <typename T>
-    typename issameb<T, ConstantValuesSuppressor<float>>::type
-    _equals(T const & a, T const & b)
-    {
-        return a.mindeltarange == b.mindeltarange
-            && a.mindeltavalue == b.mindeltavalue;
-    }
-
-
-    template <typename T>
-    typename issameb<T, AberrantValuesRule>::type
-    _equals(T const & a, T const & b)
-    {
-        return _equals(a.constants, b.constants)
-            && _equals(a.derivative, b.derivative)
-            && _equals(a.localnans,  b.localnans)
-            && _equals(a.islands,    b.islands);
-    }
-
-    template <typename T>
     typename issame<T, SaturationRule>::type
-    _fromkwa(T inst, pybind11::dict kwa)
+    _fromkwa(T & inst, pybind11::dict & kwa)
     {
-        _get(inst.maxv,          "maxsaturation", kwa);
-        _get(inst.maxdisttozero, "maxdisttozero", kwa);
-        _get(inst.satwindow,     "satwindow",     kwa);
+        _get(std::is_const<T>(), inst.maxv,          "maxsaturation", kwa);
+        _get(std::is_const<T>(), inst.maxdisttozero, "maxdisttozero", kwa);
+        _get(std::is_const<T>(), inst.satwindow,     "satwindow",     kwa);
     };
 
     template <typename T>
     typename issame<T, PingPongRule>::type
-    _fromkwa(T inst, pybind11::dict kwa)
+    _fromkwa(T & inst, pybind11::dict & kwa)
     {
-        _get(inst.maxv,          "maxpingpong",   kwa);
-        _get(inst.mindifference, "mindifference", kwa);
-        if(kwa.contains("percentiles"))
-        {
-            inst.minpercentile = kwa["percentiles"][pybind11::int_(0)].cast<float>();
-            inst.maxpercentile = kwa["percentiles"][pybind11::int_(1)].cast<float>();
-        }
+        _get(std::is_const<T>(), inst.maxv,          "maxpingpong",   kwa);
+        _get(std::is_const<T>(), inst.mindifference, "mindifference", kwa);
+        _get(std::is_const<T>(), inst.minpercentile, inst.maxpercentile, "percentiles", kwa);
     }
 
     template <typename T>
     typename issame<T, PopulationRule>::type
-    _fromkwa(T inst, pybind11::dict kwa)
-    {
-        _get(inst.minv,    "minhfsigma",  kwa);
-    }
+    _fromkwa(T & inst, pybind11::dict & kwa)
+    { _get(std::is_const<T>(), inst.minv,    "minhfsigma",  kwa); }
 
     template <typename T>
     typename issame<T, HFSigmaRule>::type
-    _fromkwa(T inst, pybind11::dict kwa)
+    _fromkwa(T & inst, pybind11::dict & kwa)
     {
-        _get(inst.minv,    "minhfsigma",  kwa);
-        _get(inst.maxv,    "maxhfsigma",  kwa);
+        _get(std::is_const<T>(), inst.minv,    "minhfsigma",  kwa);
+        _get(std::is_const<T>(), inst.maxv,    "maxhfsigma",  kwa);
     }
 
     template <typename T>
     typename issame<T, ExtentRule>::type
-    _fromkwa(T inst, pybind11::dict kwa)
+    _fromkwa(T & inst, pybind11::dict & kwa)
     {
-        _get(inst.minv,    "minextent",  kwa);
-        _get(inst.maxv,    "maxextent",  kwa);
-        if(kwa.contains("percentiles"))
-        {
-            inst.minpercentile = kwa["percentiles"][pybind11::int_(0)].cast<float>();
-            inst.maxpercentile = kwa["percentiles"][pybind11::int_(1)].cast<float>();
-        }
+        _get(std::is_const<T>(), inst.minv,    "minextent",  kwa);
+        _get(std::is_const<T>(), inst.maxv,    "maxextent",  kwa);
+        _get(std::is_const<T>(), inst.minpercentile, inst.maxpercentile, "percentiles", kwa);
     }
 
     template <typename T>
-    decltype(_has(&T::localnans))
-    _fromkwa(T & inst, pybind11::dict kwa)
+    typename issame<T, DerivateSuppressor<float>>::type
+    _fromkwa(T & inst, pybind11::dict & kwa)
     {
-        _get(inst.constants,    "constants",  kwa);
-        _get(inst.derivative,   "derivative", kwa);
-        _get(inst.localnans,    "localnans",  kwa);
-        _get(inst.islands,      "islands",    kwa);
+        _get(std::is_const<T>(), inst.maxderivate, "maxderivate", kwa);
+        _get(std::is_const<T>(), inst.maxabsvalue, "maxabsvalue", kwa);
+    }
+
+    template <typename T>
+    typename issame<T, ConstantValuesSuppressor<float>>::type
+    _fromkwa(T & inst, pybind11::dict & kwa)
+    {
+        _get(std::is_const<T>(), inst.mindeltarange, "mindeltarange", kwa);
+        _get(std::is_const<T>(), inst.mindeltavalue, "mindeltavalue", kwa);
+    }
+
+    template <typename T>
+    typename issame<T, NaNDerivateIslands>::type
+    _fromkwa(T & inst, pybind11::dict & kwa)
+    {
+        _get(std::is_const<T>(), inst.riverwidth,  "riverwidth",  kwa);
+        _get(std::is_const<T>(), inst.islandwidth, "islandwidth", kwa);
+        _get(std::is_const<T>(), inst.ratio,       "ratio",       kwa);
+        _get(std::is_const<T>(), inst.maxderivate, "maxderivate", kwa);
+    }
+
+    template <typename T>
+    typename issame<T, LocalNaNPopulation>::type
+    _fromkwa(T & inst, pybind11::dict & kwa)
+    {
+        _get(std::is_const<T>(), inst.window, "window", kwa);
+        _get(std::is_const<T>(), inst.ratio,  "ratio",  kwa);
+    }
+
+    template <typename T>
+    typename issame<T, AberrantValuesRule>::type
+    _fromkwa(T & inst, pybind11::dict & kwa)
+    {
+        _fromkwa(inst.constants,  kwa);
+        _fromkwa(inst.derivative, kwa);
         if(!std::is_const<T>::value)
         {
-            _fromkwa(inst.constants, kwa);
-            _fromkwa(inst.derivative, kwa);
+            _get(std::is_const<T>(), inst.islands,   "islands",   kwa);
+            _get(std::is_const<T>(), inst.localnans, "localnans", kwa);
         }
+
+        _get(std::is_const<T>(), inst.islands.riverwidth,  "cstriverwidth",  kwa);
+        _get(std::is_const<T>(), inst.islands.islandwidth, "cstislandwidth", kwa);
+        _get(std::is_const<T>(), inst.islands.ratio,       "cstratio",       kwa);
+        _get(std::is_const<T>(), inst.islands.maxderivate, "cstmaxderivate", kwa);
+        _get(std::is_const<T>(), inst.localnans.window, "nanwindow", kwa);
+        _get(std::is_const<T>(), inst.localnans.ratio,  "nanratio",  kwa);
     }
 
     template <typename T>
-    decltype(_has(&T::riverwidth))
-    _fromkwa(T & inst, pybind11::dict kwa)
+    std::unique_ptr<T>
+    _toptr(pybind11::dict kwa)
     {
-        _get(inst.riverwidth,  "riverwidth",  kwa);
-        _get(inst.islandwidth, "islandwidth", kwa);
-        _get(inst.ratio,       "ratio",       kwa);
-        _get(inst.maxderivate, "maxderivate", kwa);
+        std::unique_ptr<T> ptr(new T());
+        _fromkwa<T>(*ptr, kwa);
+        return ptr;
     }
 
-    template <typename T>
-    decltype(_has(&T::window, &T::ratio))
-    _fromkwa(T & inst, pybind11::dict kwa)
-    {
-        _get(inst.window, "window", kwa);
-        _get(inst.ratio,  "ratio",  kwa);
-    }
 
     template <typename T>
-    decltype(_has(&T::maxderivate, &T::maxabsvalue))
-    _fromkwa(T & inst, pybind11::dict kwa)
-    {
-        _get(inst.maxderivate, "maxderivate", kwa);
-        _get(inst.maxabsvalue, "maxabsvalue", kwa);
-    }
-
-    template <typename T>
-    decltype(_has(&T::mindeltavalue, &T::mindeltarange))
-    _fromkwa(T & inst, pybind11::dict kwa)
-    {
-        _get(inst.mindeltarange, "mindeltarange", kwa);
-        _get(inst.mindeltavalue, "mindeltavalue", kwa);
+    pybind11::dict _getkwa(T const & inst) 
+    { 
+        pybind11::dict d;
+        _fromkwa<T const>(inst, d);
+        return d; 
     }
 
     template <typename T>
@@ -270,12 +204,15 @@ namespace cleaning { // the module
     void _defaults(pybind11::class_<T> & cls)
     {
         cls.def(pybind11::init([](pybind11::kwargs kwa) { return _toptr<T>(kwa); }))
-           .def("configure",  &_fromkwa<T>)
-           .def("__eq__", &_equals<T>)
-           .def(pybind11::pickle([](T const & self)
-                                 { pybind11::dict d; _fromkwa(self, d); return d; },
-                                 &_toptr<T>)
-               );
+           .def("configure", [](T & i, pybind11::dict d){ _fromkwa<T>(i, d); })
+           .def("__eq__", 
+                [](pybind11::object & a, pybind11::object b) -> bool
+                { 
+                    if(!a.attr("__class__").is(b.attr("__class__")))
+                        return false;
+                    return std::memcmp(a.cast<T*>(), b.cast<T*>(), sizeof(T)) == 0;
+                })
+           .def(pybind11::pickle(&_getkwa<T>, &_toptr<T>));
     }
 
     pybind11::tuple _totuple(pybind11::object cls, const char * name, DataOutput const & out)
