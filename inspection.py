@@ -43,15 +43,18 @@ def diffobj(left, right):
         raise TypeError(f"{left} and {right} are different classes")
 
     if isinstance(left, dict):
-        dleft = left
+        dleft  = left
+        dright = right
     elif hasattr(left, '__getstate__'):
-        dleft = left.__getstate__()
+        dleft  = left.__getstate__()
+        dright = right.__getstate__()
         if not isinstance(dleft, dict):
             raise NotImplementedError()
     else:
-        dleft = left.__dict__
+        dleft  = left.__dict__
+        dright = right.__dict__
 
-    itr = ((i, j, getattr(right, i)) for i, j in dleft.items())
+    itr = ((i, j, dright[i]) for i, j in dleft.items())
     return {i: j for i, j, k in itr if j != k and dumps(j) != dumps(k)}
 
 def isfunction(fcn) -> bool:
