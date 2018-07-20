@@ -3,7 +3,6 @@
 u"Signal Analysis: filters, stats and interval detection"
 from ._base             import (mediandeviation, nanmediandeviation,
                                 nanhfsigma, hfsigma, PrecisionAlg, PRECISION)
-from ._core             import samples # pylint: disable=no-name-in-module,import-error
 from ._core.stats       import (nancount, # pylint: disable=no-name-in-module,import-error
                                 nanthreshold)
 from .noisereduction    import (RollingFilter, NonLinearFilter,
