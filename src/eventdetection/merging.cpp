@@ -43,9 +43,9 @@ namespace statsmerging
         auto r3    = 1.0f - r1 - r2;
         auto mean  = r1*first.mean+r2*sec.mean+r3*third.mean;
 
-        r1 = (first.count-1)/float(cnt-1);
-        r2 = (sec  .count-1)/float(cnt-1);
-        r3 = (third.count-1)/float(cnt-1);
+        r1 = first.count == 0 ? 0 : (first.count-1)/float(cnt-1);
+        r2 = sec  .count == 0 ? 0 : (sec  .count-1)/float(cnt-1);
+        r3 = third.count == 0 ? 0 : (third.count-1)/float(cnt-1);
         auto sigma = std::sqrt(r1*first.sigma*first.sigma
                               +r2*sec.sigma*sec.sigma
                               +r3*third.sigma*third.sigma);
