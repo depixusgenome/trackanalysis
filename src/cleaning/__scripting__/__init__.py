@@ -234,6 +234,9 @@ class TrackCleaningScriptData:
     def subtraction(self, beads = None, **kwa) -> Optional[Beads]:
         "displays aligned cycles for subtracted beads only"
         task = self.track.tasks.subtraction
+        if task is None and beads is None:
+            beads = self.track.cleaning.fixed(**kwa)
+
         if beads is None:
             beads = getattr(task, 'beads', None)
             if not beads:
@@ -241,8 +244,7 @@ class TrackCleaningScriptData:
             cnf = task.config()
 
         elif task is None:
-            cnf = Tasks.beadsubtraction(bead = beads) # type: ignore
-
+            cnf         = Tasks.subtraction(beads = beads).config()
         else:
             cnf          = task.config()
             cnf['beads'] = beads
