@@ -258,17 +258,19 @@ void MultiGradeSplitDetector::grade(float precision, grade_t & grade) const
             _chi2grade(wlen, rho, tmp);
             _apply( first+hlen, last-hlen,
                     [&grade](size_t i) { return grade[i] >= 1.0f; },
-                    [&grade, &tmp, first, hmin](size_t i1, size_t i2) 
+                    [&grade, &tmp, first, hmin, wmin](size_t i1, size_t i2) 
                     { 
-                        std::slice gs(i1+hmin,       i2-i1-2_s*hmin, 1_s);
-                        std::slice ts(i1-first+hmin, i2-i1-2_s*hmin, 1_s);
-                        grade[gs] = tmp[ts];
+                        if(i2-i1 >= wmin)
+                        {
+                            std::slice gs(i1+hmin,       i2-i1-2_s*hmin, 1_s);
+                            std::slice ts(i1-first+hmin, i2-i1-2_s*hmin, 1_s);
+                            grade[gs] = tmp[ts];
+                        }
                     });
         };
 
     bool found = false;
-    auto first = 0_s;
-    auto last  = 0_s;
+    auto first = 0_s, last = 0_s;
     _apply( 0_s, sz,
             [&grade](size_t i) { return grade[i] >= 1.0f; },
             [&first, &last, &found, &patch, sz, hlen, wmin](size_t i1, size_t i2)

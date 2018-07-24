@@ -23,7 +23,7 @@ namespace dpx { namespace pyinterface {
     inline ndarray<T> toarray2d(K shape, T const * ptr)
     {
         auto out = pybind11::array_t<T>(shape, {long(shape[1]*sizeof(T)), long(sizeof(T))});
-        std::copy(ptr, ptr+shape[1], out.mutable_data());
+        std::copy(ptr, ptr+shape[1]*shape[0], out.mutable_data());
         return out;
     }
 
@@ -32,7 +32,7 @@ namespace dpx { namespace pyinterface {
     {
         auto out = pybind11::array_t<T>(std::move(shape),
                                         {long(shape[1]*sizeof(T)), long(sizeof(T))});
-        std::copy(ptr, ptr+shape[1], out.mutable_data());
+        std::copy(ptr, ptr+shape[1]*shape[0], out.mutable_data());
         return out;
     }
 

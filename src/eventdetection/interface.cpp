@@ -1,3 +1,6 @@
+#include <boost/preprocessor/seq/for_each_product.hpp> 
+#include <boost/preprocessor/seq/to_tuple.hpp>
+#include <boost/preprocessor/tuple/elem.hpp> 
 #include "cleaning/pybind11.hpp"
 #include "eventdetection/stattests.h"
 #include "eventdetection/splitting.h"
@@ -374,11 +377,47 @@ different sigma.)_";
     }
 }}
 
+namespace 
+{
+    template <typename T1, typename T2>
+    ndarray<int> _events(T1 const & split, T2 const & merge,
+                         ndarray<float>       const & pydata,
+                         float                        precision)
+    {
+        if(pydata.size() == 0)
+            return _topyintervals();
+        
+        eventdetection::splitting::data_t data({pydata.data(), pydata.size()});
+        eventdetection::splitting::ints_t ints;
+        {
+            py::gil_scoped_release _;
+            ints = split.compute(precision, data);
+
+            if(ints.size() > 1)
+                merge.run(std::get<0>(data), ints);
+        }
+
+        return _topyintervals(ints);
+    }
+}
 namespace eventdetection {
     void pymodule(py::module & mod)
     {
         merging::pymodule(mod);
         splitting::pymodule(mod);
         samples::normal::pymodule(mod);
+#       define __DPX_EVTS_ALL(X,Y)                                          \
+            mod.def("events", &_events<splitting::X,merging::Y>,            \
+                    "splitter"_a, "merger"_a, "data"_a, "precision"_a);
+
+#       define _DPX_EVTS_ALL(X)                                             \
+            __DPX_EVTS_ALL(BOOST_PP_TUPLE_ELEM(2, 0, X), BOOST_PP_TUPLE_ELEM(2, 1, X))
+#       define DPX_EVTS_ALL(_, ITMS) _DPX_EVTS_ALL(BOOST_PP_SEQ_TO_TUPLE(ITMS))
+        using namespace py::literals;
+        BOOST_PP_SEQ_FOR_EACH_PRODUCT(DPX_EVTS_ALL,
+                                      ((DerivateSplitDetector)
+                                       (ChiSquareSplitDetector)(MultiGradeSplitDetector))
+                                      ((HeteroscedasticEventMerger)
+                                       (PopulationMerger)(ZRangeMerger)(MultiMerger)))
     }
 }
