@@ -5,8 +5,9 @@ import numpy as np
 
 from  utils        import initdefaults
 from  signalfilter import PrecisionAlg
-from .splitting    import SplitDetector, MultiGradeSplitDetector
+from .splitting    import SplitDetector, CppMultiGradeSplitDetector
 from .merging      import MultiMerger, EventMerger, EventSelector
+from ._core        import events as _cppevents # pylint: disable=import-error
 
 class EventDetector(PrecisionAlg):
     """
@@ -23,7 +24,7 @@ class EventDetector(PrecisionAlg):
 
     * `select`: possibly clips events and discards those too small.
     """
-    split: SplitDetector = MultiGradeSplitDetector()
+    split: SplitDetector = CppMultiGradeSplitDetector()
     merge: EventMerger   = MultiMerger()
     select               = EventSelector()
     @initdefaults(frozenset(locals()))
@@ -32,6 +33,8 @@ class EventDetector(PrecisionAlg):
 
     def __call__(self, data:np.ndarray, precision: float = None):
         precision = self.getprecision(precision, data)
+        if all('_core' in i.__class__.__module__ for i in (self.merge, self.split)):
+            return self.select(data, _cppevents(self.split, self.merge, data, precision))
         return self.select(data, self.merge(data, self.split(data, precision), precision))
 
     @classmethod
