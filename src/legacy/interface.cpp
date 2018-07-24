@@ -8,12 +8,24 @@ namespace legacy
     namespace
     {
         template <typename T, typename K>
-        pybind11::object _toimage(K & shape, void *ptr)
+        pybind11::object _toimage(K & shape, T const * ptr)
         {
-            std::vector<size_t> strides(2);
-            strides = { shape[1]*sizeof(T), sizeof(T) };
-            return pybind11::array(shape, strides, (T*) ptr);
+            auto out = pybind11::array_t<T>(shape, {long(shape[1]*sizeof(T)), long(sizeof(T))});
+            std::copy(ptr, ptr+shape[1], out.mutable_data());
+            return out;
         }
+
+        template <typename T>
+        pybind11::object _toarray(size_t sz, T const *ptr)
+        {
+            auto out = pybind11::array_t<T>(sz);
+            std::copy(ptr, ptr+sz, out.mutable_data());
+            return out;
+        }
+
+        template <typename T>
+        pybind11::object _toarray(std::vector<T> const && ptr)
+        { return _toarray(ptr.size(), ptr.data()); }
 
         void _open(legacy::GenRecord & rec, std::string name)
         {
@@ -42,9 +54,9 @@ namespace legacy
             std::vector<size_t> shape = {(size_t) ny, (size_t) nx};
 
             if(dt == 512)
-                res = _toimage<float>(shape, ptr);
+                res = _toimage<float>(shape, (float const *) ptr);
             else if(dt == 256)
-                res = _toimage<unsigned char>(shape, ptr);
+                res = _toimage<unsigned char>(shape, (unsigned char const *) ptr);
         } catch(...) {};
 
         rec.destroyfov(dt, ptr);
@@ -75,11 +87,11 @@ namespace legacy
         auto last    = notall ? cycles[cycles.size()-rec.nphases()] : rec.nrecs();
         auto sz      = last-first;
 
-        auto add = [&](auto key, auto val)
-            {
-                auto mem = val();
-                res[pybind11::cast(key)] = pybind11::array(sz, mem.data()+first);
-            };
+        auto add = [&](auto key, auto && val)
+                    { 
+                        auto mem = val();
+                        res[pybind11::cast(key)] = _toarray(sz, mem.data()+first);
+                    };
 
         int axis = tpe.size() == 0 || tpe[0] == 'Z' || tpe[0] == 'z' ? 0 :
                                       tpe[0] == 'X' || tpe[0] == 'x' ? 1 : 2;
@@ -100,7 +112,7 @@ namespace legacy
         res["framerate"] = pybind11::cast(rec.camerafrequency());
         res["fov"]       = _readrecfov(rec);
 
-        auto addpairs = [](std::vector<std::pair<int, float>> const & data)
+        auto addpairs = [](std::vector<std::pair<int, float>> const && data)
             {
                 std::vector<int>   ts(data.size());
                 std::vector<float> ys(data.size());
@@ -110,22 +122,23 @@ namespace legacy
                     ys[i] = data[i].second;
                 }
 
-                return pybind11::make_tuple(pybind11::array(ts.size(), ts.data()),
-                                            pybind11::array(ys.size(), ys.data()));
+                return pybind11::make_tuple(_toarray(std::move(ts)),
+                                            _toarray(std::move(ys)));
             };
         
         auto temp      = rec.temperatures();
-        res["Tservo"]  = addpairs(temp[0]);
-        res["Tsample"] = addpairs(temp[1]);
-        res["Tsink"]   = addpairs(temp[2]);
+        res["Tservo"]  = addpairs(std::move(temp[0]));
+        res["Tsample"] = addpairs(std::move(temp[1]));
+        res["Tsink"]   = addpairs(std::move(temp[2]));
         auto vcap      = rec.vcap();
-        res["vcap"]    = pybind11::make_tuple(pybind11::array(vcap[0].size(), vcap[0].data()),
-                                              pybind11::array(vcap[1].size(), vcap[1].data()),
-                                              pybind11::array(vcap[2].size(), vcap[2].data()));
+        res["vcap"]    = pybind11::make_tuple(_toarray(std::move(vcap[0])),
+                                              _toarray(std::move(vcap[1])),
+                                              _toarray(std::move(vcap[2])));
 
         pybind11::dict calib;
         pybind11::dict pos;
         char tmpname[L_tmpnam];
+
         std::string fname = std::tmpnam(tmpname);
         auto        sdi   = rec.sdi();
         for(auto const & val: calibpos)
@@ -151,10 +164,8 @@ namespace legacy
                                                                       std::get<3>(dim)));
 
         std::vector<size_t> shape   = {rec.ncycles()-(notall ? 4: 0), rec.nphases()};
-        std::vector<size_t> strides = {rec.nphases()*sizeof(decltype(cycles)::value_type),
-                                                     sizeof(decltype(cycles)::value_type)};
-        res["phases"]    = pybind11::array(shape, strides,
-                                           cycles.data()+(notall ? 3*rec.nphases() : 0));
+        res["phases"] = _toimage<typename decltype(cycles)::value_type>
+                            (shape, cycles.data()+(notall ? 3*rec.nphases() : 0));
         return res;
     }
 
@@ -169,7 +180,7 @@ namespace legacy
         auto first  = cycles[3*rec.nphases()];
         auto last   = cycles[cycles.size()-rec.nphases()];
         auto mem    = rec.rot();
-        return pybind11::array(last-first, mem.data()+first);
+        return _toarray(last-first, mem.data()+first);
     }
 
     pybind11::object _readgr(std::string name)
@@ -181,7 +192,7 @@ namespace legacy
         res["title"] = pybind11::bytes(gr.title());
 
         auto get = [&](bool isx, size_t i)
-                    { return pybind11::array(gr.size(isx, i), gr.data(isx, i)); };
+                    { return _toarray(gr.size(isx, i), gr.data(isx, i)); };
 
         for(size_t i = 0; i < gr.size(); ++i)
             res[pybind11::bytes(gr.title(i))] = pybind11::make_tuple(get(true, i),
@@ -200,24 +211,21 @@ namespace legacy
         auto dims = gr.dims();
 
         std::vector<size_t> shape   = {dims.second, dims.first };
-        std::vector<size_t> strides(2);
         if(gr.isfloat())
         {
-            strides = { dims.first*sizeof(float), sizeof(float) };
             std::vector<float> dt(dims.first*dims.second);
             gr.data((void*)dt.data());
             if(!all)
-                return pybind11::array(shape, strides, dt.data());
-            res["image"] = pybind11::array(shape, strides, dt.data());
+                return _toimage<float>(shape, dt.data());
+            res["image"] = _toimage<float>(shape, dt.data());
         }
         else if(gr.ischar())
         {
-            strides = { dims.first*sizeof(char), sizeof(char) };
             std::vector<unsigned char> dt(dims.first*dims.second);
             gr.data((void*)dt.data());
             if(!all)
-                return pybind11::array(shape, strides, dt.data());
-            res["image"] = pybind11::array(shape, strides, dt.data());
+                return _toimage<unsigned char>(shape, dt.data());
+            res["image"] = _toimage<unsigned char>(shape, dt.data());
         }
         if(!all)
             return pybind11::none();

@@ -6,7 +6,9 @@ from   typing                 import cast
 
 import pandas as pd
 import numpy  as np
-from   numpy.testing          import assert_allclose
+from   numpy.testing             import assert_allclose
+from   scipy.stats.distributions import chi2
+
 from model                    import PHASE
 from model.task.dataframe     import DataFrameTask
 from eventdetection.merging   import (KnownSigmaEventMerger,
@@ -15,7 +17,9 @@ from eventdetection.merging   import (KnownSigmaEventMerger,
                                       EventSelector, PyHeteroscedasticEventMerger)
 from eventdetection.splitting import (MinMaxSplitDetector, DerivateSplitDetector,
                                       GradedSplitDetector, MultiGradeSplitDetector,
-                                      ChiSquareSplitDetector)
+                                      ChiSquareSplitDetector, CppDerivateSplitDetector,
+                                      CppChiSquareSplitDetector,
+                                      CppMultiGradeSplitDetector)
 from eventdetection.intervalextension import (IntervalExtensionAroundMean,
                                               IntervalExtensionAroundRange)
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
@@ -27,6 +31,46 @@ from eventdetection           import samples
 from control.taskcontrol      import create
 from simulator                import randtrack
 from testingcore              import path as utfilepath
+
+def test_cpp_splits():
+    "test cpp splits"
+    np.random.seed(0)
+    data         = np.random.normal(0, 3e-3, 70).astype('f4')
+    data[:10]   += 20
+    data[10:20] += np.linspace(20,19,10)
+    data[20:40] += 19
+    data[40:45] += np.linspace(19,18,5)
+    data[45:48] += 18
+    data[48:53] += np.linspace(18,17,5)
+    data[53:]   += 17
+
+    der          = np.array([data[0]-np.mean(data[1:4])]
+                            +[np.mean(data[max(0,i-3):i])-np.mean(data[i+1:i+4])
+                              for i in range(1, data.size-1)]
+                            +[np.mean(data[-4:-1])-data[-1]], dtype = 'f4')
+    der /= np.percentile(der, 75.)+3e-3
+    out  = CppDerivateSplitDetector().grade(data, 3e-3)
+    assert  np.max(np.abs(out/0.9358587-der)) < 2e-5
+
+    gx2  = np.array([np.var(data[max(0,i-2):i+3]) for i in range(data.size)], dtype = 'f4')
+    gx2  = np.sqrt(gx2)
+    gx2 /= 3e-3 * chi2.ppf(.9, 4)/5
+    out2 = CppChiSquareSplitDetector().grade(data, 3e-3)
+    assert_allclose(out2, gx2, rtol = 1e-6, atol = 1e-5)
+
+    gmu        = np.copy(out)
+    gmu[14:16] = out2[14:16]
+    gmu[42]    = out2[42]
+    gmu[50]    = out2[50]
+    out3       = CppMultiGradeSplitDetector().grade(data, 3e-3)
+    assert_allclose(out3, gmu)
+
+    ints = CppMultiGradeSplitDetector()(data, 3e-3)
+    assert tuple(tuple(i) for i in ints) == ((0,12), (18, 40), (44,48), (52, 70))
+
+    data[1] = data[15] = data[50] = np.NaN
+    ints = CppMultiGradeSplitDetector()(data, 3e-3)
+    assert tuple(tuple(i) for i in ints) == ((0,12), (19, 40), (44,48), (52, 70))
 
 def test_detectsplits():
     "Tests flat stretches detection"
@@ -430,5 +474,4 @@ def test_dataframe():
     assert 'avg'   in data
 
 if __name__ == '__main__':
-    test_population_merge()
-    test_range_merge()
+    test_cpp_splits()

@@ -1,5 +1,22 @@
-#ifndef SIGNALFILTER_ACCUMULATORS_HPP
-#   define SIGNALFILTER_ACCUMULATORS_HPP
+#pragma once
+#ifndef __cpp_noexcept_function_type
+# define __cpp_noexcept_function_type 0
+#endif
+#ifndef __NVCC___WORKAROUND_GUARD
+# define __NVCC___WORKAROUND_GUARD 0
+#endif
+#ifndef __NVCC__
+# define __NVCC__ 0
+#endif
+#include <valarray>
+#include <list>
+#include <limits>
+#ifdef __GNUC__
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+# pragma GCC diagnostic ignored "-Wmisleading-indentation"
+# pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 #include <boost/accumulators/statistics/rolling_mean.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/min.hpp>
@@ -13,9 +30,9 @@
 #include <boost/accumulators/statistics/extended_p_square_quantile.hpp>
 #include <boost/accumulators/framework/accumulator_base.hpp>
 #include <boost/accumulators/framework/parameters/sample.hpp>
-#include <valarray>
-#include <list>
-#include <limits>
+#ifdef __GNUC__
+# pragma GCC diagnostic pop
+#endif
 
 #include "signalfilter/accumulators.h"
 namespace signalfilter { namespace stats
@@ -30,7 +47,7 @@ namespace signalfilter { namespace stats
             return *first;
 
         auto nth   = int(sz*0.01f*val);
-        bool exact = std::abs(sz*0.01f*val-nth) > 1e-4;
+        bool exact = std::abs(sz*0.01f*val-nth) < 1e-4;
             
         if(nth == 0)
             return *std::min_element(first, last);
@@ -41,9 +58,9 @@ namespace signalfilter { namespace stats
         if(exact)
             return first[nth];
 
-        std::nth_element(first, first+nth-1, first+nth);
+        float np1 = *std::min_element(first+nth+1, last);
         float rho = sz*0.01f*val-nth;
-        return (1.0f-rho)*first[nth-1]-1+rho*first[nth];
+        return (1.0f-rho)*first[nth]+rho*np1;
     }
 
     template <typename T>
@@ -648,4 +665,3 @@ namespace signalfilter { namespace stats
         return (T) compute(quant);
     }
 }}
-#endif

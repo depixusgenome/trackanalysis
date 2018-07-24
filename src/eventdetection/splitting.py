@@ -18,8 +18,12 @@ from    signalfilter                import PrecisionAlg
 from    .threshold                  import Threshold, MedianThreshold
 from    .intervalextension          import (IntervalExtension,
                                             IntervalExtensionAroundRange)
-# pylint: disable=no-name-in-module,import-error
-from    ._core                      import samples as _samples
+
+# pylint: disable=no-name-in-module,import-error,unused-import
+from    ._core  import (samples as _samples,
+                        DerivateSplitDetector   as CppDerivateSplitDetector,
+                        ChiSquareSplitDetector  as CppChiSquareSplitDetector,
+                        MultiGradeSplitDetector as CppMultiGradeSplitDetector)
 norm = _samples.normal.knownsigma # pylint: disable=invalid-name
 
 class SplitDetector(PrecisionAlg):

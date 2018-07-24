@@ -205,7 +205,7 @@ namespace cleaning { // the module
     {
         cls.def(pybind11::init([](pybind11::kwargs kwa) { return _toptr<T>(kwa); }))
            .def("configure", [](T & i, pybind11::dict d){ _fromkwa<T>(i, d); })
-           .def("__eq__", 
+           .def("__eq__",
                 [](pybind11::object & a, pybind11::object b) -> bool
                 { 
                     if(!a.attr("__class__").is(b.attr("__class__")))
