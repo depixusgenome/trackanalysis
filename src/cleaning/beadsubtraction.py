@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Task & Processor for subtracting beads from other beads"
-from   typing                       import List, Iterable, Tuple, Union, cast
+from   typing                       import List, Iterable, Tuple, Union, Callable, cast
 from   functools                    import partial
 from   itertools                    import repeat
 import warnings
@@ -218,8 +218,8 @@ class FixedBeadDetection:
     threshold    = 95.
     maxdiff      = .01
     diffphases   = PHASE.initial, PHASE.measure
-    maxhfsigma   = .06
-    maxextent    = .03
+    maxhfsigma   = .006
+    maxextent    = .035
     extentphases = PHASE.initial, PHASE.pull
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -231,11 +231,6 @@ class FixedBeadDetection:
         """
         return (np.array([np.nanmax(i) for _, i in cycles.withphases(self.extentphases[1])])
                 -[np.nanmin(i) for _, i in cycles.withphases(self.extentphases[0])])
-
-    def __cycles(self, beads, data):
-        data = np.copy(data)
-        self.abberrant.aberrant(data)
-        return beads[:, ...].withdata({0: data})
 
     def cyclesock(self, cycles: Cycles) -> np.ndarray:
         """
@@ -293,41 +288,65 @@ class FixedBeadDetection:
         Creates a dataframe for all beads in  a track.
         """
         items: FIXED_LIST = []
-        phases  = beads.track.phase.select
-        getsigs = HFSigmaRule(maxhfsigma=self.maxhfsigma).hfsigma
-        getext  = ExtentRule(maxextent   = self.maxextent,
-                             minextent   = 0.,
-                             percentiles = (0,100) ).extent
+        sigfcn           = self.__sigs(beads)
+        extfast, extslow = self.__exts(beads)
+
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore',
                                     category = RuntimeWarning,
                                     message  = '.*All-NaN slice encountered.*')
             for beadid, data in beads:
-                if beads.track.rawprecision(beadid) > self.maxhfsigma:
+                if extfast(data) or beads.track.rawprecision(beadid) > self.maxhfsigma:
                     continue
+
                 cycs   = self.__cycles(beads, data)
 
-                ext    = getext(cycs.data[0],
-                                phases(..., self.extentphases[0]),
-                                phases(..., self.extentphases[1]+1)).values
-
+                ext    = extslow(cycs)
                 height = np.nanpercentile(ext, self.threshold)
                 if height > self.maxextent:
                     continue
 
-                sigs   = getsigs(cycs.data[0],
-                                 phases(..., PHASE.initial),
-                                 phases(..., PHASE.measure+1)).values
-                sigv   = np.nanpercentile(sigs, self.threshold)
+                delta  = np.diff(np.nanpercentile(ext, self.percentiles).ravel(),
+                                 axis = 0)[0]
+                if delta > self.maxdiff:
+                    continue
+
+                sigv = np.nanpercentile(sigfcn(cycs), self.threshold)
                 if sigv > self.maxhfsigma:
                     continue
 
-                delta = np.diff(np.nanpercentile(ext, self.percentiles).ravel(),
-                                axis = 0)[0]
+                delta = np.nanpercentile(np.diff(self.cyclesock(cycs), axis = 0).ravel(),
+                                         self.threshold)
                 if delta < self.maxdiff:
-                    delta = np.nanpercentile(np.diff(self.cyclesock(cycs),
-                                                     axis = 0).ravel(),
-                                             self.threshold)
-                    if delta < self.maxdiff:
-                        items.append((delta, sigv, height, beadid))
+                    items.append((delta, sigv, height, beadid))
         return sorted(items)
+
+    def __cycles(self, beads, data):
+        data = np.copy(data)
+        self.abberrant.aberrant(data)
+        return beads[:, ...].withdata({0: data})
+
+    def __sigs(self, beads: Beads) -> Callable[[Cycles], np.ndarray]:
+        phases  = beads.track.phase.select
+        getsigs = HFSigmaRule(maxhfsigma=self.maxhfsigma).hfsigma
+        sigph   = tuple(phases(..., i).astype('i8') for i in (PHASE.initial, PHASE.measure+1))
+        return lambda x: getsigs(x.data[0], *sigph).values
+
+    def __exts(self, beads: Beads) -> Tuple[Callable[[Cycles], bool],
+                                            Callable[[Cycles], np.ndarray]]:
+        phases  = beads.track.phase.select
+        getext  = ExtentRule(maxextent   = self.maxextent,
+                             minextent   = 0.,
+                             percentiles = (50,50) ).extent
+        extph   = (phases(..., self.extentphases[0]+1),
+                   phases(..., self.extentphases[1]),
+                   phases(..., self.extentphases[0]).astype('i8'),
+                   phases(..., self.extentphases[1]+1).astype('i8'))
+
+        def _fast(data: np.ndarray):
+            height = np.nanpercentile(data[extph[1]]-data[extph[0]], self.threshold)
+            return height > self.maxextent
+
+        def _slow(cycs: Cycles):
+            return getext(cycs.data[0], extph[2], extph[3]).values
+        return _fast, _slow
