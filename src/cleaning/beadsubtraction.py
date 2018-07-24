@@ -15,7 +15,7 @@ from   model                        import Task, Level, PHASE
 from   signalfilter                 import nanhfsigma
 from   signalfilter.noisereduction  import Filter
 from   utils                        import initdefaults
-from   .datacleaning                import AberrantValuesRule
+from   .datacleaning                import AberrantValuesRule, HFSigmaRule, ExtentRule
 from   ._core                       import constant as _cleaningcst # pylint: disable=import-error
 
 class SubtractAverageSignal:
@@ -229,8 +229,8 @@ class FixedBeadDetection:
         """
         computes the bead extension
         """
-        return (np.array([np.nanmedian(i) for _, i in cycles.withphases(self.extentphases[1])])
-                -[np.nanmedian(i) for _, i in cycles.withphases(self.extentphases[0])])
+        return (np.array([np.nanmax(i) for _, i in cycles.withphases(self.extentphases[1])])
+                -[np.nanmin(i) for _, i in cycles.withphases(self.extentphases[0])])
 
     def __cycles(self, beads, data):
         data = np.copy(data)
@@ -293,21 +293,33 @@ class FixedBeadDetection:
         Creates a dataframe for all beads in  a track.
         """
         items: FIXED_LIST = []
+        phases  = beads.track.phase.select
+        getsigs = HFSigmaRule(maxhfsigma=self.maxhfsigma).hfsigma
+        getext  = ExtentRule(maxextent   = self.maxextent,
+                             minextent   = 0.,
+                             percentiles = (0,100) ).extent
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore',
                                     category = RuntimeWarning,
                                     message  = '.*All-NaN slice encountered.*')
             for beadid, data in beads:
-                cycs   = self.__cycles(beads, data)
-                sigs   = np.array([nanhfsigma(i) for i in cycs.values()], dtype = 'f4')
-                sigv   = np.nanpercentile(sigs, self.threshold)
-                if sigv > self.maxhfsigma:
+                if beads.track.rawprecision(beadid) > self.maxhfsigma:
                     continue
+                cycs   = self.__cycles(beads, data)
 
-                ext    = self.extents(cycs)
+                ext    = getext(cycs.data[0],
+                                phases(..., self.extentphases[0]),
+                                phases(..., self.extentphases[1]+1)).values
 
                 height = np.nanpercentile(ext, self.threshold)
                 if height > self.maxextent:
+                    continue
+
+                sigs   = getsigs(cycs.data[0],
+                                 phases(..., PHASE.initial),
+                                 phases(..., PHASE.measure+1)).values
+                sigv   = np.nanpercentile(sigs, self.threshold)
+                if sigv > self.maxhfsigma:
                     continue
 
                 delta = np.diff(np.nanpercentile(ext, self.percentiles).ravel(),
