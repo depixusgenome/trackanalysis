@@ -208,11 +208,12 @@ class PeaksAlignment:
 
     def display(self,   # pylint: disable=too-many-arguments
                 data,
-                ref       = None,
-                discarded = None,
-                masks     = None,
-                align     = True,
-                pivot     = 'max',
+                ref        = None,
+                discarded  = None,
+                masks      = None,
+                align      = True,
+                pivot      = 'max',
+                trackorder = 'modification',
                 **seqs):
         "display the data"
         if not isinstance(data, pd.DataFrame):
@@ -222,7 +223,7 @@ class PeaksAlignment:
             data = self(data, ref, discarded=discarded, masks=masks, pivot=pivot)
             ref  = None
 
-        data = data.sort_values(['bead', 'modification', 'peakposition', 'avg'])
+        data = data.sort_values(['bead', trackorder, 'peakposition', 'avg'])
         if ref is None:
             ref  = 'identity' if 'identity' in data.columns else 'track'
         cols = ['peakposition', 'resolution']
