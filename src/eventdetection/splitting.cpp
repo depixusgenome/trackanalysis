@@ -151,6 +151,8 @@ namespace
         auto   info = _removenans(nandata);
         auto & good = std::get<0>(info);
         auto & nans = std::get<1>(info);
+        if(good.size() == 0)
+            return {};
         if(prec <= 0.0f)
             prec = signalfilter::stats::hfsigma(good.size(), &good[0]);
 

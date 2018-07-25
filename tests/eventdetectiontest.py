@@ -15,11 +15,11 @@ from eventdetection.merging   import (KnownSigmaEventMerger,
                                       HeteroscedasticEventMerger,
                                       PopulationMerger, ZRangeMerger,
                                       EventSelector, PyHeteroscedasticEventMerger)
-from eventdetection.splitting import (MinMaxSplitDetector, DerivateSplitDetector,
-                                      GradedSplitDetector, MultiGradeSplitDetector,
-                                      ChiSquareSplitDetector, CppDerivateSplitDetector,
-                                      CppChiSquareSplitDetector,
-                                      CppMultiGradeSplitDetector)
+from eventdetection.splitting import (MinMaxSplitDetector, PyDerivateSplitDetector,
+                                      GradedSplitDetector, PyMultiGradeSplitDetector,
+                                      PyChiSquareSplitDetector, DerivateSplitDetector,
+                                      ChiSquareSplitDetector,
+                                      MultiGradeSplitDetector)
 from eventdetection.intervalextension import (IntervalExtensionAroundMean,
                                               IntervalExtensionAroundRange)
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
@@ -49,32 +49,32 @@ def test_cpp_splits():
                               for i in range(1, data.size-1)]
                             +[np.mean(data[-4:-1])-data[-1]], dtype = 'f4')
     der /= np.percentile(der, 75.)+3e-3
-    out  = CppDerivateSplitDetector().grade(data, 3e-3)
+    out  = DerivateSplitDetector().grade(data, 3e-3)
     assert  np.max(np.abs(out/0.9358587-der)) < 2e-5
 
     gx2  = np.array([np.var(data[max(0,i-2):i+3]) for i in range(data.size)], dtype = 'f4')
     gx2  = np.sqrt(gx2)
     gx2 /= 3e-3 * chi2.ppf(.9, 4)/5
-    out2 = CppChiSquareSplitDetector().grade(data, 3e-3)
+    out2 = ChiSquareSplitDetector().grade(data, 3e-3)
     assert_allclose(out2, gx2, rtol = 1e-6, atol = 1e-5)
 
     gmu        = np.copy(out)
     gmu[14:16] = out2[14:16]
     gmu[42]    = out2[42]
     gmu[50]    = out2[50]
-    out3       = CppMultiGradeSplitDetector().grade(data, 3e-3)
+    out3       = MultiGradeSplitDetector().grade(data, 3e-3)
     assert_allclose(out3, gmu)
 
-    ints = CppMultiGradeSplitDetector()(data, 3e-3)
+    ints = MultiGradeSplitDetector()(data, 3e-3)
     assert tuple(tuple(i) for i in ints) == ((0,12), (18, 40), (44,48), (52, 70))
 
     data[1] = data[15] = data[50] = np.NaN
-    ints = CppMultiGradeSplitDetector()(data, 3e-3)
+    ints = MultiGradeSplitDetector()(data, 3e-3)
     assert tuple(tuple(i) for i in ints) == ((0,12), (19, 40), (44,48), (52, 70))
 
 def test_detectsplits():
     "Tests flat stretches detection"
-    inst  = DerivateSplitDetector(precision = 1., confidence = 0.1, window = 1, erode = 0)
+    inst  = PyDerivateSplitDetector(precision = 1., confidence = 0.1, window = 1, erode = 0)
     det   = lambda  i: tuple(tuple(j) for j in inst(i))
     items = np.zeros((30,))
     thr   = 1.01*samples.normal.knownsigma.threshold(True, inst.confidence, inst.precision,
@@ -168,7 +168,7 @@ def test_splittererosion():
 
 def test_chi2split():
     "Tests flat stretches detection"
-    inst = ChiSquareSplitDetector(precision = 1., confidence = None, window = 3)
+    inst = PyChiSquareSplitDetector(precision = 1., confidence = None, window = 3)
     vals = np.zeros(30, dtype = 'f4')
     assert_allclose(inst.flatness(vals), vals)
 
@@ -282,7 +282,7 @@ def test_merge():
 
     right[40:43] = 1
 
-    agg = MultiGradeSplitDetector.AGG.patch
+    agg = PyMultiGradeSplitDetector.AGG.patch
     assert (list(np.nonzero(agg.apply(left, right))[0])
             == [10, 20, 21, 30, 32, 40, 41, 42])
 

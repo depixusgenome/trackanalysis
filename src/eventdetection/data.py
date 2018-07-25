@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Finds peak positions on a bead"
-from typing           import Iterator, Tuple, Union, Sequence, cast, TYPE_CHECKING
 from copy             import deepcopy
 from functools        import wraps
+from itertools        import chain
+from typing           import Iterator, Tuple, Union, Sequence, cast, TYPE_CHECKING
+
 import numpy          as     np
 
 from model            import PHASE, Level
@@ -39,9 +41,54 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
         super().__init__(**kw)
         EventDetectionConfig.__init__(self, **kw)
 
+    def _iter(self, sel = None) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
+        if isinstance(self.data, Events):
+            yield from ((i, cast(Sequence[EVENTS_TYPE], self.data[i]))
+                        for i in self.keys(self.selected if sel is None else sel))
+            return
+
+        tmp = super()._iter(sel)
+        for key, cycle in tmp:
+            test = cycle.dtype == EVENTS_DTYPE or cycle.dtype == 'O'
+            itrs = (key, cycle)
+            yield from (self.__testiter(itrs, tmp)     if test        else
+                        self.__filterediter(itrs, tmp) if self.filter else
+                        self.__simpleiter(itrs, tmp))
+            break
+
+    def __simpleiter(self, first, itrs) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
+        prec      = None if self.precision in (0., None) else self.precision
+        track     = self.track
+        evts      = deepcopy(self.events).compute
+
+        val, curb = self.getprecision(prec, track, first[0][0]), first[0][0]
+        ints      = evts(first[1], precision = val)
+        gen       = EventsArray([(i, first[1][i:j]) for i, j in ints],
+                                discarded = len(ints) == 0)
+        yield (first[0], gen)
+
+        for key, cycle in itrs:
+            if curb != key[0]:
+                val, curb = self.getprecision(prec, track, key[0]), key[0]
+            ints = evts(cycle, precision = val)
+            gen  = EventsArray([(i, cycle[i:j]) for i, j in ints],
+                               discarded = len(ints) == 0)
+            yield (key, gen)
+
+    @staticmethod
+    def __fitered_out(fcn, evts, key, cycle, val):
+        good = np.isfinite(cycle)
+        cnt  = good.sum()
+        if cnt == 0:
+            return key, EventsArray([], discarded = True)
+
+        fdt = fcn(cycle, None if cnt == len(cycle) else good, val)
+        gen = EventsArray([(i, cycle[i:j]) for i, j in evts(fdt, precision = val)])
+        return key, gen
+
     def __filterfcn(self):
         if self.filter is None:
-            return lambda x, *_: x
+            return None
 
         fcn = deepcopy(self.filter)
         @wraps(fcn)
@@ -54,35 +101,27 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
             return fdt
         return _fcn
 
-    def _iter(self, sel = None) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
-        if isinstance(self.data, Events):
-            yield from ((i, cast(Sequence[EVENTS_TYPE], self.data[i]))
-                        for i in self.keys(self.selected if sel is None else sel))
-            return
-
+    def __filterediter(self, first, itrs) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
         prec  = None if self.precision in (0., None) else self.precision
-        track = self.track
         fcn   = self.__filterfcn()
-        evts  = deepcopy(self.events)
-        test  = None
-        for key, cycle in super()._iter(sel):
-            if test is None:
-                test = cycle.dtype == EVENTS_DTYPE or cycle.dtype == 'O'
-            if test:
-                gen  = asview(cycle, EventsArray,
-                              discarded = getattr(cycle, 'discarded', False))
-            else:
-                val  = self.getprecision(prec, track, key[0])
-                good = np.isfinite(cycle)
-                cnt  = good.sum()
-                if cnt == 0:
-                    gen = EventsArray([], discarded = True)
-                else:
-                    fdt = fcn(cycle, None if cnt == len(cycle) else good, val)
-                    gen = EventsArray([(i, cycle[i:j])
-                                       for i, j in evts(fdt, precision = val)])
-            yield (key, gen)
+        evts  = deepcopy(self.events).compute
+        fout  = self.__fitered_out
 
+        key, cycle  = first
+        val, curb   = self.getprecision(prec, self.track, key[0]), key[0]
+        yield fout(fcn, evts, key, cycle, val)
+
+        for key, cycle in chain((first,), itrs):
+            if curb != key[0]:
+                val, curb = self.getprecision(prec, self.track, key[0]), key[0]
+            yield fout(fcn, evts, key, cycle, val)
+
+    @staticmethod
+    def __testiter(first, itrs) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
+        for key, cycle in chain((first,), itrs):
+            gen  = asview(cycle, EventsArray,
+                          discarded = getattr(cycle, 'discarded', False))
+            yield (key, gen)
 
     if TYPE_CHECKING:
         # pylint: disable=useless-super-delegation
