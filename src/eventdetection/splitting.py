@@ -21,9 +21,9 @@ from    .intervalextension          import (IntervalExtension,
 
 # pylint: disable=no-name-in-module,import-error,unused-import
 from    ._core  import (samples as _samples,
-                        DerivateSplitDetector   as CppDerivateSplitDetector,
-                        ChiSquareSplitDetector  as CppChiSquareSplitDetector,
-                        MultiGradeSplitDetector as CppMultiGradeSplitDetector)
+                        DerivateSplitDetector,
+                        ChiSquareSplitDetector,
+                        MultiGradeSplitDetector)
 norm = _samples.normal.knownsigma # pylint: disable=invalid-name
 
 class SplitDetector(PrecisionAlg):
@@ -172,7 +172,7 @@ class GradedSplitDetector(SplitDetector):
         pass
 
 CONFIDENCE_TYPE = Union[None, float, Threshold]
-class DerivateSplitDetector(GradedSplitDetector):
+class PyDerivateSplitDetector(GradedSplitDetector):
     """
     Detects flat stretches of value
 
@@ -227,7 +227,7 @@ class DerivateSplitDetector(GradedSplitDetector):
         return norm.threshold(True, self.confidence, precision,
                               self.window, self.window)
 
-class ChiSquareSplitDetector(GradedSplitDetector):
+class PyChiSquareSplitDetector(GradedSplitDetector):
     """
     Detects flat stretches of value.
 
@@ -341,7 +341,7 @@ class MultiGradeItem(NamedTuple): # pylint: disable=missing-docstring
     detector: GradedSplitDetector
     operator: MultiGradeAggregation
 
-class MultiGradeSplitDetector(SplitDetector):
+class PyMultiGradeSplitDetector(SplitDetector):
     """
     Detects flat stretches of value collating multiple *flatness* indicators.
 

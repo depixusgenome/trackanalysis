@@ -338,7 +338,7 @@ class PyMultiMerger(EventMerger):
             intervals = merge(data, intervals, precision)
         return intervals
 
-class EventSelector:
+class PyEventSelector:
     """
     Filters flat stretches:
 

@@ -118,3 +118,78 @@ class PrecisionAlg(ABC):
     def rawprecision(track, ibead, first = None, last = None):
         "Obtain the raw precision for a given bead"
         return getattr(track, 'track', track).rawprecision(ibead, first, last)
+
+class CppPrecisionAlg:
+    "Implements precision extraction from data: use only in case of Metaclass conflict"
+    precision    = PrecisionAlg.precision
+    rawfactor    = PrecisionAlg.rawfactor
+    MINPRECISION = PrecisionAlg.MINPRECISION
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def getprecision(self, # pylint: disable=too-many-branches
+                     precision:PRECISION = None,
+                     data     :DATATYPE  = tuple(),
+                     beadid   :BEADKEY   = None) -> float:
+        """
+        Returns the precision, possibly extracted from the data.  Raises
+        AttributeError if the precision was neither set nor could be extracted
+        """
+        if isinstance(precision, tuple):
+            data, beadid = precision
+            precision    = self.precision
+
+        elif precision is None:
+            precision = self.precision
+
+        prec = cast(float, precision)
+        if np.isscalar(prec) and prec > 0.:
+            return max(self.MINPRECISION, float(prec))
+
+        if beadid is not None:
+            return max(self.MINPRECISION,
+                       cast(float, self.rawprecision(data, beadid)) # type: ignore
+                      )*self.rawfactor
+
+        if isinstance(data, (float, int)):
+            return max(self.MINPRECISION, float(data))
+
+        if isinstance(data, (Sequence, np.ndarray)):
+            if len(data) == 0:
+                pass
+            elif isinstance(data[0], (Sequence, np.ndarray)):
+                if len(data) == 1:
+                    return self.getprecision(PrecisionAlg, data[0], beadid)
+
+                first = next((i for i in data if len(i)), None)
+                if first is not None:
+                    if isinstance(first, (Sequence, np.ndarray)):
+                        ret = np.median(tuple(nanhfsigma(np.concatenate(list(i)))
+                                              for i in data if len(i)))
+                    else:
+                        ret = np.median(tuple(nanhfsigma(i) for i in data if len(i)))
+                    return max(self.MINPRECISION, ret)*self.rawfactor
+            else:
+                return max(self.MINPRECISION, nanhfsigma(data))*self.rawfactor
+
+        raise AttributeError('Could not extract precision: no data or set value')
+
+    # pylint: disable=unused-argument,function-redefined
+    @overload
+    @staticmethod
+    def rawprecision(track:Union['TrackView', 'Track'], ibead: int) -> float:
+        "Obtain the raw precision for a given bead"
+        return 0.
+
+    @overload
+    @staticmethod
+    def rawprecision(track:Union['TrackView', 'Track'],
+                     ibead: Optional[Iterable[int]]
+                    ) -> Iterator[Tuple[int,float]]:
+        "Obtain the raw precision for a number of beads"
+
+    @staticmethod
+    def rawprecision(track, ibead, first = None, last = None):
+        "Obtain the raw precision for a given bead"
+        return getattr(track, 'track', track).rawprecision(ibead, first, last)

@@ -1,6 +1,3 @@
-#include <boost/preprocessor/seq/for_each_product.hpp> 
-#include <boost/preprocessor/seq/to_tuple.hpp>
-#include <boost/preprocessor/tuple/elem.hpp> 
 #include "cleaning/pybind11.hpp"
 #include "eventdetection/stattests.h"
 #include "eventdetection/splitting.h"
@@ -256,7 +253,7 @@ namespace eventdetection { namespace splitting {
     {
         using namespace py::literals;
         py::class_<T> cls(mod, name, doc);
-        cls.def("__call__",   &_call<T>,  "data"_a, "precision"_a)
+        cls.def("__cal__",    &_call<T>,  "data"_a, "precision"_a)
            .def("grade",      &_grade<T>, "data"_a, "precision"_a)
            .def("threshold",  &_threshold<T>::call)
            .def_static("run", [args...](ndarray<float> data, float prec, py::kwargs kwa)
@@ -374,50 +371,71 @@ different sigma.)_";
 * `ZRangeMerger`: both stretches share enough of a common range.)_";
             DPX_PY2C(MultiMerger, (stats)(pop)(range))
         }
+        {
+            auto doc = R"_(Filters flat stretches:
+
+* clips the edges
+* makes sure their length is enough.)_";
+            DPX_PY2C(EventSelector, (edgelength)(minlength))
+        }
     }
 }}
 
-namespace 
-{
-    template <typename T1, typename T2>
-    ndarray<int> _events(T1 const & split, T2 const & merge,
-                         ndarray<float>       const & pydata,
-                         float                        precision)
+namespace eventdetection  { namespace detector {
+    using namespace splitting;
+    using splitting::ints_t;
+    struct EventDetector
     {
-        if(pydata.size() == 0)
-            return _topyintervals();
-        
-        eventdetection::splitting::data_t data({pydata.data(), pydata.size()});
-        eventdetection::splitting::ints_t ints;
+        splitting::MultiGradeSplitDetector split;
+        merging::MultiMerger               merge;
+        merging::EventSelector             select;
+
+        ints_t compute(float precision, data_t const & data) const
         {
-            py::gil_scoped_release _;
-            ints = split.compute(precision, data);
-
+            auto ints = split.compute(precision, data);
             if(ints.size() > 1)
+            {
                 merge.run(std::get<0>(data), ints);
+                if(ints.size() != 0)
+                    select.run(std::get<0>(data), ints);
+            }
+            return ints;
         }
+    };
 
-        return _topyintervals(ints);
+    template <typename T, typename ...Args>
+    void _defaults(py::module & mod, char const * name, char const *doc, Args ...args)
+    {
+        using namespace py::literals;
+        py::class_<T> cls(mod, name, doc);
+        cls.def("compute", &_call<T>,  "data"_a, "precision"_a);
+        dpx::pyinterface::addapi<T>(cls, std::move(args)...);
     }
-}
+
+    void pymodule(py::module & mod)
+    {
+        auto doc = R"_(Detect, merge and select flat intervals in `PHASE.measure`.
+
+# Attributes
+
+* `split`: splits the data into too many intervals. This is based on a grade
+computed for each frame indicating the likelihood that an event is finished.
+See `eventdetection.splitting` for the available grades.
+
+* `merge`: merges the previous intervals when the difference between their
+population is not statistically relevant.
+
+* `select`: possibly clips events and discards those too small.)_";
+        detector::DPX_PY2C(EventDetector, (split)(merge)(select))
+    }
+}}
+
 namespace eventdetection {
     void pymodule(py::module & mod)
     {
+        samples::normal::pymodule(mod);
         merging::pymodule(mod);
         splitting::pymodule(mod);
-        samples::normal::pymodule(mod);
-#       define __DPX_EVTS_ALL(X,Y)                                          \
-            mod.def("events", &_events<splitting::X,merging::Y>,            \
-                    "splitter"_a, "merger"_a, "data"_a, "precision"_a);
-
-#       define _DPX_EVTS_ALL(X)                                             \
-            __DPX_EVTS_ALL(BOOST_PP_TUPLE_ELEM(2, 0, X), BOOST_PP_TUPLE_ELEM(2, 1, X))
-#       define DPX_EVTS_ALL(_, ITMS) _DPX_EVTS_ALL(BOOST_PP_SEQ_TO_TUPLE(ITMS))
-        using namespace py::literals;
-        BOOST_PP_SEQ_FOR_EACH_PRODUCT(DPX_EVTS_ALL,
-                                      ((DerivateSplitDetector)
-                                       (ChiSquareSplitDetector)(MultiGradeSplitDetector))
-                                      ((HeteroscedasticEventMerger)
-                                       (PopulationMerger)(ZRangeMerger)(MultiMerger)))
+        detector::pymodule(mod);
     }
 }

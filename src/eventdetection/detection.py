@@ -4,12 +4,12 @@
 import numpy as np
 
 from  utils        import initdefaults
-from  signalfilter import PrecisionAlg
-from .splitting    import SplitDetector, CppMultiGradeSplitDetector
-from .merging      import MultiMerger, EventMerger, EventSelector
-from ._core        import events as _cppevents # pylint: disable=import-error
+from  signalfilter import PrecisionAlg, CppPrecisionAlg
+from .splitting    import SplitDetector, PyMultiGradeSplitDetector
+from .merging      import PyMultiMerger, EventMerger, PyEventSelector
+from ._core        import EventDetector as _EventDetector # pylint: disable=import-error
 
-class EventDetector(PrecisionAlg):
+class PyEventDetector(PrecisionAlg):
     """
     Detect, merge and select flat intervals in `PHASE.measure`
 
@@ -24,18 +24,47 @@ class EventDetector(PrecisionAlg):
 
     * `select`: possibly clips events and discards those too small.
     """
-    split: SplitDetector = CppMultiGradeSplitDetector()
-    merge: EventMerger   = MultiMerger()
-    select               = EventSelector()
+    split: SplitDetector = PyMultiGradeSplitDetector()
+    merge: EventMerger   = PyMultiMerger()
+    select               = PyEventSelector()
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def __call__(self, data:np.ndarray, precision: float = None):
-        precision = self.getprecision(precision, data)
-        if all('_core' in i.__class__.__module__ for i in (self.merge, self.split)):
-            return self.select(data, _cppevents(self.split, self.merge, data, precision))
+    def compute(self, data:np.ndarray, precision: float) -> np.ndarray:
+        "computes the intervals"
         return self.select(data, self.merge(data, self.split(data, precision), precision))
+
+    def __call__(self, data:np.ndarray, precision: float = None)-> np.ndarray:
+        precision = self.getprecision(precision, data)
+        return self.select(data, self.merge(data, self.split(data, precision), precision))
+
+    @classmethod
+    def run(cls, *args, **kwa):
+        "instantiates and calls class"
+        return cls(**kwa)(*args)
+
+class EventDetector(CppPrecisionAlg, _EventDetector):
+    """
+    Detect, merge and select flat intervals in `PHASE.measure`
+
+    # Attributes
+
+    * `split`: splits the data into too many intervals. This is based on a grade
+    computed for each frame indicating the likelihood that an event is finished.
+    See `eventdetection.splitting` for the available grades.
+
+    * `merge`: merges the previous intervals when the difference between their
+    population is not statistically relevant.
+
+    * `select`: possibly clips events and discards those too small.
+    """
+    def __init__(self, **kwa):
+        CppPrecisionAlg.__init__(self, **kwa)
+        _EventDetector.__init__(self, **kwa)
+
+    def __call__(self, data:np.ndarray, precision: float = None):
+        return self.compute(data, self.getprecision(precision, data))
 
     @classmethod
     def run(cls, *args, **kwa):

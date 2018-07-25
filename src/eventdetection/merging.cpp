@@ -305,4 +305,28 @@ void  MultiMerger::run(float const *data,  ints_t & intervals) const
     pop.run(data, intervals);
     range.run(data, intervals);
 }
+
+void EventSelector::run(float const *data,  ints_t & intervals) const
+{
+    auto minl = 2*this->edgelength+this->minlength;
+    if(minl == 0u)
+        return;
+
+    auto   elen = this->edgelength;
+    size_t j    = 0u;
+    for(size_t i = 0u, e = intervals.size(); i < e; ++i)
+    {
+        size_t i1 = intervals[i].first;
+        size_t i2 = intervals[i].second;
+        while(i1+minl <= i2 && !std::isfinite(data[i1]))
+            ++i1;
+        while(i1+minl <= i2 && !std::isfinite(data[i2]))
+            --i2;
+        if(i2 < minl+i1)
+            continue;
+
+        intervals[j] = {intervals[i].first+elen, intervals[i].second-elen};
+        ++j;
+    }
+}
 }}

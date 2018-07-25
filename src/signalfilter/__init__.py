@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 u"Signal Analysis: filters, stats and interval detection"
 from ._base             import (mediandeviation, nanmediandeviation,
-                                nanhfsigma, hfsigma, PrecisionAlg, PRECISION)
+                                nanhfsigma, hfsigma, PrecisionAlg, CppPrecisionAlg,
+                                PRECISION)
 from ._core.stats       import (nancount, # pylint: disable=no-name-in-module,import-error
                                 nanthreshold)
 from .noisereduction    import (RollingFilter, NonLinearFilter,

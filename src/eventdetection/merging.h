@@ -32,4 +32,12 @@ namespace eventdetection { namespace merging {
 
         void  run(float const *,  ints_t &) const;
     };
+
+    struct EventSelector
+    {
+        size_t edgelength = 0;
+        size_t minlength  = 4;
+        void  run(float const *,  ints_t &) const;
+    };
+
 }}
