@@ -84,7 +84,7 @@ namespace cleaning { // fromkwa specializations
     template <typename T>
     typename issame<T, PopulationRule>::type
     _fromkwa(T & inst, pybind11::dict & kwa)
-    { _get(std::is_const<T>(), inst.minv,    "minhfsigma",  kwa); }
+    { _get(std::is_const<T>(), inst.minv,    "minpopulation",  kwa); }
 
     template <typename T>
     typename issame<T, HFSigmaRule>::type
