@@ -86,7 +86,8 @@ class Task:
 
     def config(self) -> Dict[str,Any]:
         "returns a deepcopy of its dict which can be safely used in generators"
-        return deepcopy(self.__dict__)
+        return deepcopy(self.__dict__ if not hasattr(self, '__getstate__') else
+                        getattr(self, '__getstate__')())
 
 class RootTask(Task):
     "Class indicating that a track file should be created/loaded to memory"
