@@ -87,6 +87,17 @@ class _NDArrayIO(_ItemIO):
             return {TPE: 'npo', CNT: vals}
         return {TPE: 'np'+str(val.dtype), CNT: val.tolist()}
 
+class _NDScalarIO(_ItemIO):
+    @staticmethod
+    def check(val):
+        "returns wether this class deals with val"
+        return np.isscalar(val)
+
+    @staticmethod
+    def run(val, runner):
+        "returns thishe dict to be dumped"
+        return val.tolist() if type(val).__module__ == 'numpy' else val
+
 class _NPFunction(_ItemIO):
     @staticmethod
     def check(val):
