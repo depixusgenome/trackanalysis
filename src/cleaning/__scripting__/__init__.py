@@ -6,7 +6,7 @@ Monkey patches the Track class.
 
 Adds a method for discarding beads with Cleaning warnings
 """
-from   copy                             import deepcopy
+from   copy                             import deepcopy, copy as shallowcopy
 from   concurrent.futures               import ProcessPoolExecutor
 from   typing                           import (Dict, Optional, Iterator, List, Any,
                                                 Set, Union, Tuple, Sequence, cast)
@@ -341,6 +341,23 @@ class TracksDictCleaningScript:
         for key, track in cpy.items():
             cpy[key] = TrackCleaningScript(track).dropbad(**kwa)
         return cpy
+
+    @staticmethod
+    def _subtractbeads(info):
+        return (info[0], info[1](info[2].beads))
+
+    def subtractbeads(self, **kwa) -> TracksDict:
+        "creates a new TracksDict with subtracted beads"
+        alg = FixedBeadDetection(**kwa)
+        itr = ((i, alg, j) for i, j in self.tracks.items())
+        with ProcessPoolExecutor() as pool:
+            info = dict(pool.map(self._subtractbeads, itr))
+
+        itms = cast(TracksDict, type(self.tracks)())
+        for i, beads in info.items():
+            itms[i] = shallowcopy(self.tracks[i])
+            itms[i].tasks.subtraction = [j[-1] for j in beads]
+        return itms
 
 TracksDict.__doc__ += (
     """
