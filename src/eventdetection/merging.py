@@ -16,6 +16,7 @@ from    ._core                  import samples as _samples
 from    ._core                  import (HeteroscedasticEventMerger,
                                         PopulationMerger,
                                         ZRangeMerger,
+                                        EventSelector,
                                         MultiMerger)
 
 # pybind11 bug
