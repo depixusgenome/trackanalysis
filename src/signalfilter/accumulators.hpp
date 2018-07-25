@@ -14,8 +14,10 @@
 #ifdef __GNUC__
 # pragma GCC diagnostic push
 # pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-# pragma GCC diagnostic ignored "-Wmisleading-indentation"
-# pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+# ifndef __clang__
+#  pragma GCC diagnostic ignored "-Wmisleading-indentation"
+#  pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+# endif
 #endif
 #include <boost/accumulators/statistics/rolling_mean.hpp>
 #include <boost/accumulators/statistics/mean.hpp>

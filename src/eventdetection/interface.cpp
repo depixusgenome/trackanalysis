@@ -328,7 +328,7 @@ namespace eventdetection { namespace merging {
     }
 
     template <typename T, typename ...Args>
-    void _defaults(py::module & mod, char const * name, char const *doc, Args ...args)
+    pybind11::class_<T> _defaults(py::module & mod, char const * name, char const *doc, Args ...args)
     {
         using namespace py::literals;
         py::class_<T> cls(mod, name, doc);
@@ -341,6 +341,7 @@ namespace eventdetection { namespace merging {
                             return _call(*self, data, rng, py::args());
                        }, "data"_a, "intervals"_a);
         dpx::pyinterface::addapi(cls, std::move(args)...);
+        return cls;
     }
 
     void pymodule(py::module & mod)
@@ -376,7 +377,10 @@ different sigma.)_";
 
 * clips the edges
 * makes sure their length is enough.)_";
-            DPX_PY2C(EventSelector, (edgelength)(minlength))
+            auto cls = DPX_PY2C(EventSelector, (edgelength)(minlength))
+            cls.def_property_readonly("minduration",
+                                      [](EventSelector const & self)
+                                      { return self.edgelength*2u+self.minlength; });
         }
     }
 }}

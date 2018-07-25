@@ -65,17 +65,22 @@ namespace
         auto sz  = std::get<1>(nandata);
         std::valarray<size_t> nans(sz);
         grade_t               data(sz);
-        auto itd = std::begin(data);
-        auto itn = std::begin(nans);
+        size_t cnt = 0_s;
+        auto   itd = std::begin(data);
+        auto   itn = std::begin(nans);
         _apply( 0_s, data.size(),
                 [ptr]      (size_t i)             { return std::isfinite(ptr[i]); },
-                [&itd, ptr](size_t i1, size_t i2)
-                { std::copy(ptr+i1, ptr+i2, itd); itd += i2-i1; },
-                [&itn]     (size_t i1, size_t i2)
-                { for(; i1 < i2; ++i1, ++itn) *itn = i1; });
+                [&itd, &itn, &cnt, ptr](size_t i1, size_t i2)
+                { 
+                    std::copy(ptr+i1, ptr+i2, itd); itd += i2-i1; 
+                    std::fill(itn, itn+i2-i1, cnt); itn += i2-i1;
+                },
+                [&cnt]     (size_t i1, size_t i2) { cnt += i2-i1; });
 
-        if(itn == std::begin(nans))
+        if(cnt == 0)
             return {data, {}};
+
+        *(itn++) = cnt;
         return { data[std::slice(0_s, itd - std::begin(data), 1_s)],
                  nans[std::slice(0_s, itn - std::begin(nans), 1_s)]};
     }
@@ -87,20 +92,12 @@ namespace
                 [&grade]     (size_t i)             { return grade[i] < 1.0f; },
                 [&intervals] (size_t i1, size_t i2) { intervals.push_back({i1, i2}); });
 
-        if(nans.size() == 0)
-            return intervals;
-
-        auto first = std::begin(nans), itr = std::begin(nans), last = std::end(nans);
-        for(auto & i: intervals)
-        {
-            if(itr != last)
-                itr       = std::upper_bound(itr, last, i.first);
-            i.first  += itr - first;
-
-            if(itr != last)
-                itr       = std::upper_bound(itr, last, i.second);
-            i.second += itr - first;
-        }
+        if(nans.size() > 0)
+            for(auto & i: intervals)
+            {
+                i.first  += nans[i.first];
+                i.second += nans[i.second];
+            }
         return intervals;
     }
 
