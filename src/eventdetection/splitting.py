@@ -361,8 +361,8 @@ class PyMultiGradeSplitDetector(SplitDetector):
     AGG                              = MultiGradeAggregation
     ITEM                             = MultiGradeItem
     erode                            = 1
-    _detectors: List[MultiGradeItem] = [ITEM(DerivateSplitDetector (), AGG.minimum),
-                                        ITEM(ChiSquareSplitDetector(), AGG.patch)]
+    _detectors: List[MultiGradeItem] = [ITEM(PyDerivateSplitDetector (), AGG.minimum),
+                                        ITEM(PyChiSquareSplitDetector(), AGG.patch)]
     @initdefaults('detectors')
     def __init__(self, **kwa):
         super().__init__(**kwa)

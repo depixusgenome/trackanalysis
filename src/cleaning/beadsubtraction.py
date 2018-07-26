@@ -172,7 +172,8 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
 
         next(iter(frame.keys())) # unlazyfy # type: ignore
         data = frame.data
-        itr  = task.beads if key is None else list(zip(task.beads, repeat(key)))
+        itr  = (cast(Iterable[int], task.beads) if key is None else
+                cast(Iterable[int], list(zip(task.beads, repeat(key)))))
         if len(task.beads) == 0:
             sub = 0.
 

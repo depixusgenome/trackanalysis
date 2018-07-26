@@ -19,7 +19,7 @@ struct DerivateSplitDetector: public IntervalExtensionAroundRange
 {
     size_t gradewindow     = 3;
     double percentile      = 75.;
-    double distance        = 1.;
+    double distance        = 2.;
 
     float  threshold(float, grade_t const &) const;
     void   grade    (float, grade_t &)       const;

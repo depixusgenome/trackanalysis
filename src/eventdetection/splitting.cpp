@@ -110,6 +110,8 @@ namespace
                                               ba::stats<bat::min, bat::max, bat::mean>>;
 
         auto const wlen = self.extensionwindow;
+        if(wlen == 0)
+            return intervals;
         auto const data = std::get<0>(info);
         auto const sz   = std::get<1>(info);
 
@@ -205,13 +207,23 @@ void DerivateSplitDetector::grade(float precision, grade_t & data) const
     auto tmp(_sum(wlen, data));
     auto sz   = data.size();
     auto tsz  = tmp.size();
-    auto sl   = [&sz](size_t i) { return std::slice(i, sz-1_s, 1_s); };
+    auto sl   = [](size_t i, size_t j) { return std::slice(i, j, 1_s); };
 
-    data[sl(1_s)]  = tmp[sl(0_s)];
-    data[0_s]      = tmp[0_s];
-    data[sl(0_s)] -= tmp[sl(wlen)];
-    data[sz-1_s]  -= tmp[tsz-1_s];
-    data          *= 1./this->threshold(precision, data);
+    data[sl(wlen, sz)] = tmp[sl(wlen-1_s, sz-1_s)];
+    data[0]            = tmp[0];
+    if(wlen > 1)
+    {
+        data[1]        = tmp[0];
+        for(size_t i = 2u; i < wlen; ++i)
+            data[i] = (tmp[0]*(wlen-i)+tmp[i-1]*i)/wlen;
+    }
+
+    data[sl(0_s,  sz-wlen)] -= tmp[sl(wlen-1_s, sz-1_s)];
+    for(size_t i = 0u; i < wlen; ++i)
+        data[sz-1_s-i] -= (tmp[tsz-1_s]*(wlen-i-1_s)+tmp[tsz-1_s-i]*(i+1_s))/wlen;
+
+    data  = std::abs(data);
+    data *= 1./this->threshold(precision, data);
 }
 
 ints_t DerivateSplitDetector::compute(float precision, data_t data) const

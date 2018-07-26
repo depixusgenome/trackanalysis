@@ -44,13 +44,16 @@ def test_cpp_splits():
     data[48:53] += np.linspace(18,17,5)
     data[53:]   += 17
 
-    der          = np.array([data[0]-np.mean(data[1:4])]
-                            +[np.mean(data[max(0,i-3):i])-np.mean(data[i+1:i+4])
-                              for i in range(1, data.size-1)]
-                            +[np.mean(data[-4:-1])-data[-1]], dtype = 'f4')
+    der          = np.array([data[0]-np.mean(data[0:3]),
+                             data[0]-np.mean(data[1:4]),
+                             (data[0]*2+data[1])/3.-np.mean(data[2:5])]
+                            +[np.mean(data[i-4:i-1])-np.mean(data[i:i+3])
+                              for i in range(3, data.size-3)]
+                            +[np.mean(data[-5:-2])-(data[-1]*2+data[-2])/3.,
+                              np.mean(data[-4:-1])-data[-1]], dtype = 'f4')
     der /= np.percentile(der, 75.)+3e-3
     out  = DerivateSplitDetector().grade(data, 3e-3)
-    assert  np.max(np.abs(out/0.9358587-der)) < 2e-5
+    assert  np.max(np.abs(out-der)) < 2e-5
 
     gx2  = np.array([np.var(data[max(0,i-2):i+3]) for i in range(data.size)], dtype = 'f4')
     gx2  = np.sqrt(gx2)
