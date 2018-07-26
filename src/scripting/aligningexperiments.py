@@ -7,7 +7,7 @@ from   typing                               import Dict
 import pandas                               as     pd
 import numpy                                as     np
 import holoviews                            as     hv # pylint: disable=import-error
-
+import sequences
 from   utils                               import initdefaults
 from   peakcalling.toreference             import (Range, # pylint: disable=unused-import
                                                    CorrectedHistogramFit, Pivot)
@@ -44,12 +44,15 @@ class PeaksAlignment:
     def __init__(self, **kwa):
         pass
 
-    def sethppeaks(self, peaks) -> 'PeaksAlignment':
+    def sethppeaks(self, peaks, oligo = None, hprefalign = False) -> 'PeaksAlignment':
         "sets hairpin peaks"
+        if not isinstance(peaks, np.ndarray):
+            peaks = sequences.peaks(peaks, oligo)['position']
+
         if self.hpalign:
             self.hpalign.peaks = peaks
 
-        if self.hprefalign.peaks:
+        if hprefalign:
             self.hprefalign.peaks = peaks
         return self
 
