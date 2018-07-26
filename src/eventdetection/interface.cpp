@@ -205,6 +205,36 @@ namespace eventdetection { namespace splitting {
     }
 
     template <typename T>
+    py::list _callall(T              const & self,
+                      ndarray<float> const & pydata,
+                      float                  prec,
+                      ndarray<int>   const & pyfirst,
+                      ndarray<int>   const & pylast
+                     )
+    {
+        if(pydata.size() == 0)
+            return py::list();
+        
+        float const * data  = pydata.data();
+        int   const * first = pyfirst.data();
+        int   const * last  = pylast.data();
+        size_t        sz    = pyfirst.size();
+
+        std::vector<ints_t> lst;
+        {
+            py::gil_scoped_release _;
+            lst.reserve(sz);
+            for(size_t i = 0u; i < sz; ++i)
+                lst.emplace_back(self.compute(prec, {data+first[i], last[i]-first[i]}));
+        }
+
+        py::list pylst;
+        for(auto const & i: lst)
+            pylst.append(_topyintervals(i));
+        return pylst;
+    }
+
+    template <typename T>
     ndarray<float> _grade(T              const & self,
                           ndarray<float> const & pydata,
                           float                  prec)
@@ -253,8 +283,9 @@ namespace eventdetection { namespace splitting {
     {
         using namespace py::literals;
         py::class_<T> cls(mod, name, doc);
-        cls.def("__cal__",    &_call<T>,  "data"_a, "precision"_a)
-           .def("grade",      &_grade<T>, "data"_a, "precision"_a)
+        cls.def("__call__",   &_call<T>,     "data"_a, "precision"_a)
+           .def("__call__",   &_callall<T>,  "data"_a, "precision"_a, "start"_a, "stop"_a)
+           .def("grade",      &_grade<T>,    "data"_a, "precision"_a)
            .def("threshold",  &_threshold<T>::call)
            .def_static("run", [args...](ndarray<float> data, float prec, py::kwargs kwa)
                        {

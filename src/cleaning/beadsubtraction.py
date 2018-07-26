@@ -16,7 +16,8 @@ from   signalfilter                 import nanhfsigma
 from   signalfilter.noisereduction  import Filter
 from   utils                        import initdefaults
 from   .datacleaning                import AberrantValuesRule, HFSigmaRule, ExtentRule
-from   ._core                       import constant as _cleaningcst # pylint: disable=import-error
+from   ._core                       import (reducesignals, # pylint: disable=import-error
+                                            constant as _cleaningcst)
 
 class SubtractAverageSignal:
     """
@@ -25,25 +26,13 @@ class SubtractAverageSignal:
     @staticmethod
     def apply(signals, *_):
         "Aggregates signals"
-        if len(signals) == 0:
-            return 0.
+        return 0. if len(signals) == 0 else reducesignals("mean", 0, 0, signals)
 
-        if len(signals) == 1:
-            res = np.copy(signals[0])
-        else:
-            res = np.empty(max(len(i) for i in signals), dtype = 'f4')
-            ini = 0
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore',
-                                        category = RuntimeWarning,
-                                        message  = '.*All-NaN slice encountered.*')
-                while len(signals):
-                    minv = min(len(i) for i in signals)
-                    np.nanmean([i[ini:minv] for i in signals],
-                               axis = 0, out = res[ini:minv])
-                    signals = [i for i in signals if len(i) > minv]
-                    ini     = minv
-        return res
+    @classmethod
+    def process(cls, beads, frame):
+        "Aggregates signals from a frame"
+        signals = [frame.data[i] for i in beads]
+        return 0. if len(signals) == 0 else reducesignals("mean", signals)
 
 class SubtractWeightedAverageSignal:
     """
@@ -76,6 +65,16 @@ class SubtractWeightedAverageSignal:
             res[~good]  = np.NaN
         return res
 
+    def process(self, beads, frame):
+        "Aggregates signals from a frame"
+        pha = frame.track.phase.select(..., (0, self.phase, self.phase+1))
+        pha = pha[:,1:]-pha[:,:1]
+        cyc = frame.new(Cycles).withdata({i: frame.data[i] for i in beads})
+        itr = [self.apply([cyc[i,j] for i in beads], pha[j,:])
+               for j in frame.cyclerange()]
+
+        return np.concatenate(itr)
+
 class SubtractMedianSignal:
     """
     Subtracts a median signal from beads.
@@ -92,28 +91,17 @@ class SubtractMedianSignal:
     def __init__(self, **_):
         pass
 
+    def process(self, beads, frame):
+        "Aggregates signals from a frame"
+        pha     = [frame.track.phase.select(..., i) for i in (0, self.phase, self.phase+1)]
+        signals = [frame.data[i] for i in beads]
+        return 0. if len(signals) == 0 else reducesignals("median", signals, pha)
+
     @staticmethod
     def apply(signals, meanrange):
         "Aggregates signals"
-        assert len(signals) > 1
-        rng     = slice(*meanrange)
-        offsets = np.array([np.nanmedian(i[rng]) for i in signals], dtype = 'f4')
-
-        if not np.any(np.isfinite(offsets)):
-            return np.full(max(len(i) for i in signals), np.NaN, dtype = 'f4')
-
-        tmp = np.full((len(signals), max(len(i) for i in signals)), np.NaN, dtype = 'f4')
-        for i, j, k in zip(tmp, signals, offsets):
-            i[:len(j)] = j-k
-
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore',
-                                    category = RuntimeWarning,
-                                    message  = '.*All-NaN slice encountered.*')
-            res = np.nanmedian(tmp, axis = 0)
-
-            res += np.nanmean(offsets)
-        return res
+        return (0. if len(signals) == 0 else
+                reducesignals("median", meanrange[0], meanrange[1], signals))
 
 AGG_TYPE = Union[SubtractAverageSignal, SubtractMedianSignal, SubtractWeightedAverageSignal]
 
@@ -184,26 +172,15 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
 
         next(iter(frame.keys())) # unlazyfy # type: ignore
         data = frame.data
+        itr  = task.beads if key is None else list(zip(task.beads, repeat(key)))
         if len(task.beads) == 0:
             sub = 0.
 
         elif len(task.beads) == 1:
             sub = np.copy(data[task.beads[0]])
 
-        elif isinstance(task.agg, SubtractAverageSignal):
-            itr  = task.beads if key is None else zip(task.beads, repeat(key))
-            sub  = task.agg.apply([data[i] for i in cast(Iterable, itr)])
-
-        elif isinstance(frame, Beads):
-            pha = frame.track.phase.select(..., (0, task.agg.phase, task.agg.phase+1))
-            pha = pha[:,1:]-pha[:,:1]
-            cyc = frame.new(Cycles).withdata({i: data[i] for i in task.beads})
-            itr = [task.agg.apply([cyc[i,j] for i in task.beads], pha[j,:])
-                   for j in frame.cyclerange()]
-
-            sub = np.concatenate(itr)
         else:
-            raise NotImplementedError()
+            sub = task.agg.process(itr, frame)
 
         return task.filter(sub) if task.filter else sub
 
@@ -329,7 +306,7 @@ class FixedBeadDetection:
     def __sigs(self, beads: Beads) -> Callable[[Cycles], np.ndarray]:
         phases  = beads.track.phase.select
         getsigs = HFSigmaRule(maxhfsigma=self.maxhfsigma).hfsigma
-        sigph   = tuple(phases(..., i).astype('i8') for i in (PHASE.initial, PHASE.measure+1))
+        sigph   = tuple(phases(..., i) for i in (PHASE.initial, PHASE.measure+1))
         return lambda x: getsigs(x.data[0], *sigph).values
 
     def __exts(self, beads: Beads) -> Tuple[Callable[[Cycles], bool],
@@ -340,8 +317,8 @@ class FixedBeadDetection:
                              percentiles = (50,50) ).extent
         extph   = (phases(..., self.extentphases[0]+1),
                    phases(..., self.extentphases[1]),
-                   phases(..., self.extentphases[0]).astype('i8'),
-                   phases(..., self.extentphases[1]+1).astype('i8'))
+                   phases(..., self.extentphases[0]),
+                   phases(..., self.extentphases[1]+1))
 
         def _fast(data: np.ndarray):
             height = np.nanpercentile(data[extph[1]]-data[extph[0]], self.threshold)

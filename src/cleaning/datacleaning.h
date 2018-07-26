@@ -75,12 +75,12 @@ namespace cleaning {
 
     struct DataInfo
     {
-        size_t              nframes;
-        float       const * data;
+        size_t         nframes;
+        float  const * data;
 
-        size_t              ncycles;
-        long long   const * start;
-        long long   const * stop;
+        size_t         ncycles;
+        int    const * start;
+        int    const * stop;
     };
 
     struct DataOutput

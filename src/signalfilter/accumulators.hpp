@@ -95,8 +95,8 @@ namespace signalfilter { namespace stats
             case 2: return (typename T::value_type)(.5)*(items[0]+items[1]);
             default:
             {
-                auto at  = [&](size_t k) { return items.begin()+k; };
-                std::nth_element(at(0), at(nth), items.end());
+                auto at  = [&](size_t k) { return std::begin(items)+k; };
+                std::nth_element(at(0), at(nth), std::end(items));
                 if(items.size() % 2 == 0)
                     std::nth_element(at(0), at(nth-1), at(nth));
             }
