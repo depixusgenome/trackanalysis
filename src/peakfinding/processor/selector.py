@@ -96,7 +96,8 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
     level  = Level.peak
     def compute(self, ibead, precision: float = None) -> PeakListArray:
         "Computes values for one bead"
-        vals = iter(i for _, i in self.data[ibead,...]) # type: ignore
+        vals = (self.data.bead(ibead) if hasattr(self.data, 'bead') else # type: ignore
+                self.data[ibead,...].values())                           # type: ignore
         return self.config(vals, self._precision(ibead, precision))
 
     @classmethod

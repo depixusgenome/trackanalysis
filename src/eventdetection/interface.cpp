@@ -445,6 +445,7 @@ namespace eventdetection  { namespace detector {
         using namespace py::literals;
         py::class_<T> cls(mod, name, doc);
         cls.def("compute", &_call<T>,  "data"_a, "precision"_a);
+        cls.def("computeall", &_callall<T>,  "data"_a, "precision"_a, "start"_a, "stop"_a);
         dpx::pyinterface::addapi<T>(cls, std::move(args)...);
     }
 

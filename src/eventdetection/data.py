@@ -9,7 +9,7 @@ from typing           import Iterator, Tuple, Union, Sequence, cast, TYPE_CHECKI
 import numpy          as     np
 
 from model            import PHASE, Level
-from data.views       import ITrackView, Cycles, CYCLEKEY
+from data.views       import ITrackView, Cycles, CYCLEKEY, Beads
 from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview, EventsArray
 from .                import EventDetectionConfig
 
@@ -55,6 +55,24 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
                         self.__filterediter(itrs, tmp) if self.filter else
                         self.__simpleiter(itrs, tmp))
             break
+
+    def bead(self, ibead):
+        "return the data for a full bead"
+        if (isinstance(self.data, Beads)
+                and not self.data.cycles
+                and hasattr(self.events, "computeall")):
+            prec   = None if self.precision in (0., None) else self.precision
+            data   = self.data[ibead]
+            meas   = self.track.phase.select(..., PHASE.measure)
+            ints   = self.events.computeall(data,
+                                            self.getprecision(prec, self.track, ibead),
+                                            meas,
+                                            self.track.phase.select(..., PHASE.measure+1)
+                                           )
+            return (EventsArray([(j, data[i+j:i+k]) for j, k in cyc],
+                                discarded = len(cyc) == 0)
+                    for i, cyc in zip(meas, ints))
+        return iter(self[ibead, ...].values())
 
     def __simpleiter(self, first, itrs) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
         prec      = None if self.precision in (0., None) else self.precision
