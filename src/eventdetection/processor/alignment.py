@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
-import warnings
-from   typing             import Optional, NamedTuple # pylint: disable=unused-import
-from   functools          import partial
 from   enum               import Enum
+from   functools          import partial
+from   typing             import Optional, NamedTuple # pylint: disable=unused-import
 
 import numpy              as     np
-from   utils              import initdefaults, updatecopy
+from   utils              import initdefaults
 from   model              import Task, Level, PHASE
 from   control.processor  import Processor
-from   ..alignment        import ExtremumAlignment, PhaseEdgeAlignment
+from   .._core            import (ExtremumAlignment, # pylint: disable=import-error
+                                  PhaseEdgeAlignment, ExtremumAlignmentMode,
+                                  translate, medianthreshold)
 
 def _min_extension():
     try:
@@ -98,36 +99,35 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
         "Aligns cycles to zero"
         def __init__(self, frame, info):
             "returns computed cycles for this bead"
-            self.cycles = frame.track.view('cycles', data = {info[0]: info[1]})
-            if frame.cycles is not None:
-                phases            = frame.track.phases[frame.cycles,:]
-                self.cycles.track = updatecopy(frame.track, phases = phases)
+            self.frame = frame
+            self.info  = info
+            self.bead  = self.info[1]
+            if self.frame.cycles and self.frame.cycles.stop < self.frame.track.ncycles:
+                self.bead = self.bead[:self.frame.track.select(self.frame.cycles.stop, 0)]
 
-        def values(self, phase):
-            "aligns a phase"
-            return self.cycles.withphases(phase).values()
+        def phase(self, phase):
+            "return the phases"
+            cyc = self.frame.cycles
+            out = self.frame.track.phase.select(cyc if cyc else ..., phase)
+            assert out.dtype == np.dtype("i4"), f'{out.dtype}'
+            return out
 
         def bias(self, phase, window, edge, percentile):
             "aligns a phase"
-            vals  = np.array(list(self.values(phase)), dtype = 'O')
             if edge is not None:
                 align = PhaseEdgeAlignment(window     = window,
                                            edge       = edge,
                                            percentile = percentile)
             else:
-                mode  = 'min'  if phase == PHASE.pull else 'max'
-                align = ExtremumAlignment(binsize = window, mode = mode).many
-            return align(vals, subtract = False)
+                mode  = (ExtremumAlignmentMode.min if phase == PHASE.pull else
+                         ExtremumAlignmentMode.max)
+                align = ExtremumAlignment(binsize = window, mode = mode)
+            return align.compute(self.bead, self.phase(phase), self.phase(phase+1))
 
         def translate(self, delete, bias):
             "translates data according to provided biases"
-            for val, delta in zip(self.values(...), bias):
-                if np.isfinite(delta):
-                    val += delta
-                elif delete:
-                    val[:] = np.NaN
-
-            return next(iter(self.cycles.data.items()))
+            translate(delete, bias, self.phase(0), self.bead)
+            return self.info
 
     _Args = NamedTuple('_Args',
                        [('cycles',  _Utils),
@@ -230,18 +230,11 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
     @classmethod
     def __filter_on_relax(cls, args, kwa, bias):
         minv =  cls._get(kwa, 'minrelax')
-        if minv is None:
-            return
-
-        vals = list(args.cycles.values(PHASE.relax))
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category = RuntimeWarning,
-                                    message = '.*All-NaN slice encountered.*')
-            relax = np.array([np.nanmedian(i) for i in vals], dtype = 'f4') + bias
-
-            warnings.filterwarnings('ignore', category = RuntimeWarning,
-                                    message = '.*invalid value encountered in less.*')
-            bias[relax < np.nanmedian(relax)-minv] = np.NaN
+        if minv is not None:
+            medianthreshold(minv, args.cycles.bead,
+                            args.cycles.phase(PHASE.relax),
+                            args.cycles.phase(PHASE.relax+1),
+                            bias)
 
     @classmethod
     def __less(cls, array, kwa, name):

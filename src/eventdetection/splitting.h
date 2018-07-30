@@ -28,7 +28,7 @@ struct DerivateSplitDetector: public IntervalExtensionAroundRange
 
 struct ChiSquareSplitDetector: public IntervalExtensionAroundRange
 {
-    size_t gradewindow     = 5;
+    size_t gradewindow     = 4;
     double confidence      = .1;
 
     float  threshold(float) const;

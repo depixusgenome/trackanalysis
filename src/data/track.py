@@ -310,7 +310,7 @@ class PhaseManipulator:
                 return (self._track.nframes if cid >= self._track.ncycles-1 else
                         phases[1+cast(int, cid),0]-phases[0,0])
 
-            tmp = np.append(phases[1:,0]-phases[0,0], self._track.nframes)
+            tmp = np.append(phases[1:,0]-phases[0,0], np.int32(self._track.nframes))
             return tmp[None if ells[0] else cid]
 
         return (phases        if all(ells) else

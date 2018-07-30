@@ -1,4 +1,5 @@
 #include <limits>
+#include <boost/accumulators/statistics/rolling_variance.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/min.hpp>
 #include <boost/accumulators/statistics/max.hpp>
@@ -134,13 +135,19 @@ namespace
                     break;
                 }
 
-            for(int j = int(std::min(i.second+wlen-1_s, sz)), e = int(i.second); j > e; --j)
+            for(int j = int(std::min(i.second+wlen-1_s, sz)), e = int(i.second); j >= e; --j)
                 if(std::isfinite(data[j]) && rmin <= data[j] && data[j] <= rmax)
                 {
-                    i.second = j;
+                    i.second = j+1;
                     break;
                 }
         }
+        for(auto i = 0_s, e = intervals.size()>0_s ? intervals.size()-1_s:0_s; i < e; ++i)
+            if(intervals[i].second > intervals[i+1].first)
+            {
+                intervals[i+1].first  = (intervals[i+1].first+intervals[i+1].second)/2;
+                intervals[i]  .second = intervals[i+1].first;
+            }
         return intervals;
     }
 
@@ -156,39 +163,36 @@ namespace
             prec = signalfilter::stats::hfsigma(good.size(), &good[0]);
 
         self.grade(prec, good);
-        return _extend(self, prec, nandata, _tointervals(nans, good));
+        auto ints = _tointervals(nans, good);
+        return ints.size() ? _extend(self, prec, nandata, std::move(ints)) : ints;
     }
 
     void _chi2grade(size_t wlen, float rho, grade_t & data)
     {
-        wlen            = (wlen/2_s)*2_s+1_s;
         auto const hlen = wlen/2_s;
         auto const sz   = data.size();
 
-        auto cpy        = data;
-        auto mean(_sum(wlen, cpy));
+        grade_t cpy(sz+hlen*2_s);
+        cpy[std::slice(0_s,     hlen, 1_s)] = data[0];
+        cpy[std::slice(hlen,    sz,   1_s)] = data;
+        cpy[std::slice(sz+hlen, hlen, 1_s)] = data[sz-1_s];
+
+        data = cpy[std::slice(0_s, sz, 1_s)];
+        for(size_t i = 1_s; i < wlen; ++i)
+            data += cpy[std::slice(i, sz, 1_s)];
+        data *= -1.0f/wlen;
 
         grade_t tmp(wlen);
-        auto    var     = [&cpy, &tmp](size_t i1, float m)
-                            {
-                                tmp  = -m;
-                                tmp += cpy[std::slice(i1, tmp.size(), 1_s)];
-                                tmp *= tmp;
-                                return tmp.sum()/tmp.size();
-                            };
-
-        for(auto i = hlen, e = sz-hlen; i < e; ++i)
-            data[i] = var(i-hlen, mean[i+hlen]);
-
-        for(auto i = 0_s; i < hlen; ++i)
+        for(auto i = 0_s; i < sz; ++i)
         {
-            tmp.resize(i+hlen+1_s);
-            data[i]        = var(0_s,           mean[i+hlen]);
-            data[sz-1_s-i] = var(sz-hlen-1_s-i, mean[sz+hlen-1_s-i]);
+            tmp     = data[i];
+            tmp    += cpy[std::slice(i, wlen, 1_s)];
+            tmp    *= tmp;
+            data[i] = tmp.sum();
         }
 
         data  = std::sqrt(data);
-        data *= 1.0f/rho;
+        data *= 1.0f/(rho*std::sqrt(wlen));
     }
 
 }
@@ -209,8 +213,8 @@ void DerivateSplitDetector::grade(float precision, grade_t & data) const
     auto tsz  = tmp.size();
     auto sl   = [](size_t i, size_t j) { return std::slice(i, j, 1_s); };
 
-    data[sl(wlen, sz)] = tmp[sl(wlen-1_s, sz-1_s)];
-    data[0]            = tmp[0];
+    data[sl(wlen, sz-wlen)] = tmp[sl(wlen-1_s, sz-wlen)];
+    data[0]                 = tmp[0];
     if(wlen > 1)
     {
         data[1]        = tmp[0];
@@ -218,7 +222,7 @@ void DerivateSplitDetector::grade(float precision, grade_t & data) const
             data[i] = (tmp[0]*(wlen-i)+tmp[i-1]*i)/wlen;
     }
 
-    data[sl(0_s,  sz-wlen)] -= tmp[sl(wlen-1_s, sz-1_s)];
+    data[sl(0_s,  sz-wlen)] -= tmp[sl(wlen-1_s, sz-wlen)];
     for(size_t i = 0u; i < wlen; ++i)
         data[sz-1_s-i] -= (tmp[tsz-1_s]*(wlen-i-1_s)+tmp[tsz-1_s-i]*(i+1_s))/wlen;
 
@@ -239,7 +243,7 @@ float ChiSquareSplitDetector::threshold(float prec) const
 
 void ChiSquareSplitDetector::grade(float precision, grade_t & data) const
 {
-    auto const wlen = (this->gradewindow/2)*2+1;
+    auto const wlen = this->gradewindow;
     auto const rho  = this->threshold(precision);
     _chi2grade(wlen, rho, data);
 }
@@ -255,7 +259,7 @@ void MultiGradeSplitDetector::grade(float precision, grade_t & grade) const
     auto const sz   = grade.size();
     auto const hmin = this->minpatchwindow/2_s;
     auto const wmin = (this->minpatchwindow/2_s)*2_s+1_s;
-    auto const wlen = (this->chisquare.gradewindow/2_s)*2_s+1_s;
+    auto const wlen = this->chisquare.gradewindow;
     auto const hlen = this->chisquare.gradewindow/2_s;
     auto const rho  = this->chisquare.threshold(precision);
 
@@ -304,5 +308,5 @@ ints_t MultiGradeSplitDetector::compute(float precision, data_t data) const
 ints_t IntervalExtensionAroundRange::compute(float     precision,
                                               data_t    data,
                                               ints_t && intervals) const
-{ return _extend(*this, precision, data, std::move(intervals)); }
+{  return _extend(*this, precision, data, std::move(intervals));  }
 }}

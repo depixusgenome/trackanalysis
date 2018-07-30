@@ -25,6 +25,9 @@ namespace signalfilter { namespace stats
     typename T::value_type nanmedian(T & items);
 
     template <typename T>
+    typename T::value_type nanmedian(T && items);
+
+    template <typename T>
     T percentile(T * first, T * last, float val);
 
     template <typename T>

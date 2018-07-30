@@ -2,6 +2,7 @@
 #include "eventdetection/stattests.h"
 #include "eventdetection/splitting.h"
 #include "eventdetection/merging.h"
+#include "eventdetection/alignment.h"
 
 using dpx::pyinterface::ndarray;
 namespace 
@@ -465,6 +466,119 @@ population is not statistically relevant.
     }
 }}
 
+namespace eventdetection  { namespace alignment {
+    template <typename T>
+    ndarray<float> _call(T              const & self,
+                         ndarray<float> const & data,
+                         ndarray<int>   const & phase1,
+                         ndarray<int>   const & phase2)
+    {
+        if(data.size() == 0 || phase1.size() == 0)
+            return ndarray<float>();
+
+        DataInfo info = { size_t(data.size()),   data.data(),
+                          size_t(phase1.size()), phase1.data(), phase2.data()};
+        info_t out;
+        {
+            py::gil_scoped_release _;
+            out = self.compute(std::move(info));
+        }
+
+        ndarray<float> pyout(out.size());
+        std::copy(std::begin(out), std::end(out), pyout.mutable_data());
+        return pyout;
+    }
+
+    void _translate(bool del,
+                    ndarray<float> const & delta,
+                    ndarray<int>   const & phase,
+                    ndarray<float>       & data)
+    {
+        if(data.size() == 0 || phase.size() == 0)
+            return;
+
+        DataInfo info = { size_t(data.size()),  delta.data(),
+                          size_t(phase.size()), phase.data(), nullptr};
+        auto ptrdata(data.mutable_data());
+        {
+            py::gil_scoped_release _;
+            translate(std::move(info), del, ptrdata);
+        }
+    }
+
+    void _medianthreshold(float minv,
+                          ndarray<float> const & data,
+                          ndarray<int>   const & phase1,
+                          ndarray<int>   const & phase2,
+                          ndarray<float>       & bias)
+    {
+        if(data.size() == 0 || phase1.size() == 0)
+            return;
+
+        DataInfo info = { size_t(data.size()),   data.data(),
+                          size_t(phase1.size()), phase1.data(), phase2.data()};
+        auto ptrdata(bias.mutable_data());
+        {
+            py::gil_scoped_release _;
+            medianthreshold(std::move(info), minv, ptrdata);
+        }
+    }
+
+    template <typename T, typename ...Args>
+    void _defaults(py::module & mod, char const * name, char const *doc, Args ...args)
+    {
+        using namespace pybind11::literals;
+        py::class_<T> cls(mod, name, doc);
+        cls.def("compute", &_call<T>, "data"_a, "phase1"_a, "phase2"_a);
+        dpx::pyinterface::addapi<T>(cls, std::move(args)...);
+    }
+
+    void pymodule(py::module & mod)
+    {
+#       define DPX_AL_ENUM(CLS, X, Y)               \
+            py::enum_<CLS::Mode>(mod, #CLS"Mode")   \
+                .value(#X, CLS::Mode::X)            \
+                .value(#Y, CLS::Mode::Y)            \
+                .export_values();
+        {
+            auto doc = R"_(Functor which an array of biases computed as the extremum
+of provided ranges.
+
+Biases are furthermore centered at zero around their median.
+
+Attributes:
+
+* *window*: the width on which to compute a median.
+* *edge*: the edge to use: left or right)_";
+
+            DPX_AL_ENUM(PhaseEdgeAlignment,left,right)
+            DPX_PY2C(PhaseEdgeAlignment, (window)(mode)(percentile))
+        }
+
+        {
+            auto doc = R"_(Functor which an array of biases computed as the
+extremum of provided ranges.
+
+Biases are furthermore centered at zero around their median
+
+Attributes:
+
+* *mode*: the extremum to use
+* *binsize*: if > 2, the extremum is computed over the median of values binned
+by *binsize*.)_";
+
+            DPX_AL_ENUM(ExtremumAlignment,min,max)
+            DPX_PY2C(ExtremumAlignment, (binsize)(mode))
+        }
+
+        using namespace pybind11::literals;
+        mod.def("translate", &_translate,
+                "deleteonnan"_a, "deltas"_a, "phase"_a, "data"_a);
+        mod.def("medianthreshold", &_medianthreshold,
+                "minv"_a, "data"_a, "phase1"_a, "phase2"_a, "bias"_a);
+    }
+}}
+
 namespace eventdetection {
     void pymodule(py::module & mod)
     {
@@ -472,5 +586,6 @@ namespace eventdetection {
         merging::pymodule(mod);
         splitting::pymodule(mod);
         detector::pymodule(mod);
+        alignment::pymodule(mod);
     }
 }

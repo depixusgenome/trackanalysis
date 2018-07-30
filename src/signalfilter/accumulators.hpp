@@ -11,6 +11,7 @@
 #include <valarray>
 #include <list>
 #include <limits>
+#include <type_traits>
 #ifdef __GNUC__
 # pragma GCC diagnostic push
 # pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -110,7 +111,7 @@ namespace signalfilter { namespace stats
 
 
     template <typename T>
-    inline auto median(T begin, T end)
+    inline auto median(T begin, T end) -> typename std::remove_cv<decltype(*begin)>::type
     {
         using S = typename std::remove_cv<
                     typename std::remove_reference<decltype(*begin)>::type
@@ -121,6 +122,10 @@ namespace signalfilter { namespace stats
 
     template <typename T>
     inline typename T::value_type nanmedian(T & items)
+    { return nanpercentile(&items[0], &items[0]+items.size(), 50.0f); }
+
+    template <typename T>
+    inline typename T::value_type nanmedian(T && items)
     { return nanpercentile(&items[0], &items[0]+items.size(), 50.0f); }
 
     template <typename T>
