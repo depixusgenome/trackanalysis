@@ -403,10 +403,11 @@ class Track:
         "returns whether the data was already acccessed"
         return self._data is not None
 
-    def load(self):
+    def load(self) -> 'Track':
         "Loads the data"
         if self._data is None and self._path is not None:
             opentrack(self)
+        return self
 
     def unload(self):
         "Unloads the data"

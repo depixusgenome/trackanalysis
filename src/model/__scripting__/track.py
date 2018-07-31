@@ -135,6 +135,7 @@ def localtasks(self: Track, *args, force = True, **kwa) -> Track:
     ```
     """
     cpy = shallowcopy(self)
+    cpy.load()
     for i in args:
         if force or (isinstance(i, Task) and i != Tasks(i)()):
             setattr(cpy.tasks, Tasks(i).name, i) # type: ignore
