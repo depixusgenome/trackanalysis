@@ -111,13 +111,14 @@ namespace
                                               ba::stats<bat::min, bat::max, bat::mean>>;
 
         auto const wlen = self.extensionwindow;
-        if(wlen == 0)
+        if(wlen == 0 || intervals.size() == 0)
             return intervals;
         auto const data = std::get<0>(info);
         auto const sz   = std::get<1>(info);
 
         precision      *= self.extensionratio;
-        for(auto & i: intervals)
+        auto newi(intervals);
+        for(auto & i: newi)
         {
             acc_t acc;
             for(auto j = i.first, e = i.second; j < e; ++j)
@@ -142,13 +143,24 @@ namespace
                     break;
                 }
         }
+
+        decltype(newi) out;
+        auto           last = intervals[0].first;
         for(auto i = 0_s, e = intervals.size()>0_s ? intervals.size()-1_s:0_s; i < e; ++i)
-            if(intervals[i].second > intervals[i+1].first)
+        {
+            if(newi[i].first > intervals[i+1].first)
+                out.back().second = newi[i+1].second;
+            else 
             {
-                intervals[i+1].first  = (intervals[i+1].first+intervals[i+1].second)/2;
-                intervals[i]  .second = intervals[i+1].first;
+                out.emplace_back(std::max(last, newi[i].first),
+                                 std::min(newi[i].second,
+                                          (newi[i].second+newi[i+1].first)/2));
+                if(out.back().first >= out.back().second)
+                    out.resize(out.size()-1_s);
             }
-        return intervals;
+            last = out.back().second;
+        }
+        return out;
     }
 
     template <typename T>
