@@ -454,6 +454,7 @@ class Handler:
                     if isinstance(kwargs[i], np.ndarray) and len(kwargs[i].shape) == 1}
         state['data']        = data
         state['secondaries'] = sec
+        state['phases']      = kwargs.pop('phases').astype('i4')
 
     @staticmethod
     def __fov(res, kwargs):

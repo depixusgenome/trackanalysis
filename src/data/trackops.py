@@ -76,7 +76,7 @@ def selectcycles(trk:TRACKS, indexes:Union[slice, range, List[int]])-> TRACKS:
 
     track        = trk.__getstate__()
     track.update(data   = {i: j[vals] for i, j in trk.beads},
-                 phases = phases)
+                 phases = phases.astype('i4'))
 
     track['secondaries'] = secs = {i: trk.secondaries.data[i][inds] for i in ('t', 'zmag')}
     for i, j in trk.secondaries.data.items():
