@@ -102,8 +102,12 @@ namespace
         return intervals;
     }
 
+    /* moves the edge of the intervals:
+     *  1. erodes edges when points are away from central values
+     *  2. pushes back edges when points are within central values
+     */
     template <typename T>
-    ints_t _extend(T const self, float precision, data_t const & info, ints_t && intervals)
+    ints_t _wanewax(T const self, float precision, data_t const & info, ints_t && intervals)
     {
         namespace ba    = boost::accumulators;
         namespace bat   = boost::accumulators::tag;
@@ -128,20 +132,22 @@ namespace
             auto mean = ba::extract_result<bat::mean>(acc);
             auto rmin = std::min(ba::extract_result<bat::min>(acc), mean-precision);
             auto rmax = std::max(ba::extract_result<bat::max>(acc), mean+precision);
+            auto test = [rmin, rmax, data](size_t j)
+                        { return (std::isfinite(data[j])
+                              && rmin <= data[j]
+                              && data[j] <= rmax); };
+
+            for(auto j = i.first, e = std::min(i.second, i.first+wlen); j < e; ++j)
+                if(test(j)) { i.first = j; break; }
 
             for(auto j = i.first > wlen ? i.first-wlen : 0_s, e = i.first; j < e; ++j)
-                if(std::isfinite(data[j]) && rmin <= data[j] && data[j] <= rmax)
-                {
-                    i.first = j;
-                    break;
-                }
+                if(test(j)) { i.first = j; break; }
+
+            for(int j  = i.second-1, e = std::max(i.first, i.second-wlen); j >= e; --j)
+                if(test(j)) { i.second = j+1; break; }
 
             for(int j = int(std::min(i.second+wlen-1_s, sz)), e = int(i.second); j >= e; --j)
-                if(std::isfinite(data[j]) && rmin <= data[j] && data[j] <= rmax)
-                {
-                    i.second = j+1;
-                    break;
-                }
+                if(test(j)) { i.second = j+1; break; }
         }
 
         decltype(newi) out;
@@ -176,7 +182,7 @@ namespace
 
         self.grade(prec, good);
         auto ints = _tointervals(nans, good);
-        return ints.size() ? _extend(self, prec, nandata, std::move(ints)) : ints;
+        return ints.size() ? _wanewax(self, prec, nandata, std::move(ints)) : ints;
     }
 
     void _chi2grade(size_t wlen, float rho, grade_t & data)
@@ -320,5 +326,5 @@ ints_t MultiGradeSplitDetector::compute(float precision, data_t data) const
 ints_t IntervalExtensionAroundRange::compute(float     precision,
                                               data_t    data,
                                               ints_t && intervals) const
-{  return _extend(*this, precision, data, std::move(intervals));  }
+{  return _wanewax(*this, precision, data, std::move(intervals));  }
 }}
