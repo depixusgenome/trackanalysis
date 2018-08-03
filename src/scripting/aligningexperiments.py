@@ -7,17 +7,16 @@ from   typing                               import Dict
 import pandas                               as     pd
 import numpy                                as     np
 import holoviews                            as     hv # pylint: disable=import-error
-import sequences
 from   utils                               import initdefaults
 from   peakcalling.toreference             import (Range, # pylint: disable=unused-import
                                                    CorrectedHistogramFit, Pivot)
-from   peakcalling.tohairpin               import ChiSquareFit, matchpeaks
+from   peakcalling.tohairpin               import ChiSquareFit, matchpeaks, HairpinFitter
 from   peakfinding.groupby.histogramfitter import PeakFlagger
 from   model.__scripting__.tasks           import Tasks
 
-def createpeaks(tracks):
+def createpeaks(tracks, **kwa):
     "create peaks for all tracks"
-    return PeaksAlignment().peaks(tracks)
+    return PeaksAlignment(**kwa).peaks(tracks)
 
 class PeaksAlignment:
     """
@@ -47,7 +46,7 @@ class PeaksAlignment:
     def sethppeaks(self, peaks, oligo = None, hprefalign = False) -> 'PeaksAlignment':
         "sets hairpin peaks"
         if not isinstance(peaks, np.ndarray):
-            peaks = sequences.peaks(peaks, oligo)['position']
+            peaks = HairpinFitter.topeaks(peaks, oligo)
 
         if self.hpalign:
             self.hpalign.peaks = peaks
@@ -232,18 +231,20 @@ class PeaksAlignment:
         cols = ['peakposition', 'resolution']
         out  = ((hv.Scatter(data, ref, 'avg', label = 'events')
                  (plot  = dict(jitter = .75),
-                  style = dict(alpha  = .2)))
+                  style = dict(alpha  = .2))
+                ).redim.label(avg = 'base pairs')
                 *(hv.Scatter(data, ref, cols, label = 'peaks')
                   (plot  = dict(size_index     = 'resolution',
                                 scaling_factor = 10000 ),
-                   style = dict(alpha = .01)))
+                   style = dict(alpha = .01))
+                 ).redim.label(**{cols[0]: 'base pairs'})
                )
 
         args = dict(style = dict(color = 'gray', alpha = .5, size = 5), group = 'ref')
         for i, j in seqs.items():
             out = self.hpindisplay(data, j, ref, label = i, **args)*out
 
-        return out.redim(avg = 'base pairs') if self.hpalign else out
+        return out if self.hpalign else out
 
     @staticmethod
     def hpindisplay(data, positions,
