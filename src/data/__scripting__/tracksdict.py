@@ -252,11 +252,11 @@ class TracksDict(_TracksDict):
             tasks = tasks[:-1]
 
         dframe  = Tasks.dataframe(merge = True, measures = kwa, transform = transform)
-        created = [Tasks.create(i) for i in tasks[1:]]
+        created = [Tasks.create(i) for i in tasks]
         procs   = register(SafeDataFrameProcessor, cache = register(), recursive = False)
         par     = Parallel()
         for j in self.values():
-            par.extend([j], *Tasks.defaulttasklist(j, tasks[0], j.cleaned),
+            par.extend([j], *Tasks.defaulttasklist(j, tasks[0], j.cleaned)[:-1],
                        *created, dframe, processors = procs)
         if process:
             out  = par.process(None, 'concat')
