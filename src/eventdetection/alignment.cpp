@@ -40,7 +40,11 @@ namespace {
 info_t ExtremumAlignment::compute(DataInfo const && data) const
 {
     info_t out;
-    if(binsize >= 2)
+    if(mode == ExtremumAlignment::median)
+        out = _ecompute(data,
+                        [](float const * a, float const *b)
+                        { return signalfilter::stats::nanmedian(a, b); });
+    else if(binsize >= 2)
     {
         if(mode == ExtremumAlignment::min)
             out = _ebincompute(binsize, data, [](float a, float b) { return a < b ? a : b; });

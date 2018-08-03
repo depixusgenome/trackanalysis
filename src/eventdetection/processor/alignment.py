@@ -119,8 +119,7 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
                                            edge       = edge,
                                            percentile = percentile)
             else:
-                mode  = (ExtremumAlignmentMode.min if phase == PHASE.pull else
-                         ExtremumAlignmentMode.max)
+                mode  = ExtremumAlignmentMode.median
                 align = ExtremumAlignment(binsize = window, mode = mode)
             return align.compute(self.bead, self.phase(phase), self.phase(phase+1))
 

@@ -1,3 +1,5 @@
+#include <boost/preprocessor/stringize.hpp>
+#include <boost/preprocessor/seq/for_each.hpp>
 #include "cleaning/pybind11.hpp"
 #include "eventdetection/stattests.h"
 #include "eventdetection/splitting.h"
@@ -536,10 +538,10 @@ namespace eventdetection  { namespace alignment {
 
     void pymodule(py::module & mod)
     {
-#       define DPX_AL_ENUM(CLS, X, Y)               \
-            py::enum_<CLS::Mode>(mod, #CLS"Mode")   \
-                .value(#X, CLS::Mode::X)            \
-                .value(#Y, CLS::Mode::Y)            \
+#       define _DPX_AL_ENUM(_,CLS,X)  .value(BOOST_PP_STRINGIZE(X), CLS::Mode::X)
+#       define DPX_AL_ENUM(CLS, SEQ)                        \
+            py::enum_<CLS::Mode>(mod, #CLS"Mode")           \
+                BOOST_PP_SEQ_FOR_EACH(_DPX_AL_ENUM,CLS,SEQ) \
                 .export_values();
         {
             auto doc = R"_(Functor which an array of biases computed as the extremum
@@ -552,7 +554,7 @@ Attributes:
 * *window*: the width on which to compute a median.
 * *edge*: the edge to use: left or right)_";
 
-            DPX_AL_ENUM(PhaseEdgeAlignment,left,right)
+            DPX_AL_ENUM(PhaseEdgeAlignment, (left)(right))
             DPX_PY2C(PhaseEdgeAlignment, (window)(mode)(percentile))
         }
 
@@ -568,7 +570,7 @@ Attributes:
 * *binsize*: if > 2, the extremum is computed over the median of values binned
 by *binsize*.)_";
 
-            DPX_AL_ENUM(ExtremumAlignment,min,max)
+            DPX_AL_ENUM(ExtremumAlignment, (min)(median)(max))
             DPX_PY2C(ExtremumAlignment, (binsize)(mode))
         }
 

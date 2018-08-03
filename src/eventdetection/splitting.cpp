@@ -166,6 +166,10 @@ namespace
             }
             last = out.back().second;
         }
+
+        out.emplace_back(std::max(last, newi.back().first), newi.back().second);
+        if(out.back().first >= out.back().second)
+            out.resize(out.size()-1_s);
         return out;
     }
 

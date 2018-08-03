@@ -14,7 +14,7 @@ namespace eventdetection { namespace alignment {
 
     struct ExtremumAlignment
     {
-        enum Mode { min, max };
+        enum Mode { min, median, max };
 
         size_t binsize = 15;
         Mode   mode    = min;
