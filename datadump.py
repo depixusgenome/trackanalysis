@@ -21,7 +21,8 @@ class LazyShelf(Dict):
     def __init__(self, path: str, *args, **kwa) -> None:
         super().__init__()
         self.path = path
-        self.info: Dict[Any, Callable[[], Any]] = dict(*args, **kwa)
+        self.info: Dict[Any, Callable[[], Any]] = {}
+        self.update(*args, **kwa)
 
     def get(self, key, default = None):
         "returns the value"
