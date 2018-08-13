@@ -21,16 +21,18 @@ def qcdataframe(items: Union[Track, TracksDict])-> pd.DataFrame:
         length = np.concatenate([np.full(j, i, dtype = 'i4') for i, j in enumerate(sizes)]
                                 +[np.full(1000, -1, dtype = 'i4')])
 
-        get    = lambda i, j: getattr(track.secondaries, i)[j]
+        get    = lambda i, j: track.secondaries[i][j]
         data   = lambda i: get(i, 'value')
         index  = lambda i: (get(i, 'index')-track.phases[0,0]).astype('i4')
         cycle  = lambda i: length[index(i)]
 
         dframe: pd.DataFrame = None
-        for i in ("tservo", "tsink", "tsample"):
-            tmp    = pd.DataFrame({i: data(i), 'index': index(i), 'cycle': cycle(i)})
-            tmp.set_index(['cycle', 'index'], inplace = True)
-            dframe = tmp if dframe is None else dframe.join(tmp, how = 'outer') # type: ignore
+        for i in track.secondaries.keys():
+            if i.startswith('T'):
+                i   = i.lower()
+                tmp = pd.DataFrame({i: data(i), 'index': index(i), 'cycle': cycle(i)})
+                tmp.set_index(['cycle', 'index'], inplace = True)
+                dframe = tmp if dframe is None else dframe.join(tmp, how = 'outer') # type: ignore
 
         vca    = track.secondaries.vcap
         if vca is None:

@@ -54,15 +54,28 @@ class TrackQualityControlDisplay(ItemsDisplay, qc = Track):
         """
         return _TQC(self._items).dataframe()
 
-    def temperatures(self):
+    def temperatures(self, *args, element = None):
         "displays the temperatures"
-        length = np.nanmean(np.diff(self._items.phases[:,0]))
-        get = lambda i, j: getattr(self._items.secondaries, i)[j]
-        fcn = lambda i, j: hv.Curve((get(i, 'index')/length, get(i, 'value')),
-                                    'cycle', '°C', label = j)
-        return (fcn('tservo', 'T° Servo')
-                *fcn('tsink', 'T° Sink')
-                *fcn('tsample', 'T° Sample'))
+        if element is None:
+            element = hv.Curve
+        if isinstance(element, str):
+            element = (hv.BoxWhisker if element.lower() == 'boxwhisker' else
+                       hv.Curve      if element.lower() == 'curve'      else
+                       getattr(hv, element))
+
+        if not args:
+            args = tuple(i for i in self._items.secondaries.keys() if i.startswith("T"))
+
+        frame = self.dataframe().reset_index()[lambda x: x.cycle >= 0]
+        out   = None
+        for item in args:
+            if element is hv.Curve:
+                tmp = element(frame[['cycle', item.lower()]].dropna(),
+                              'cycle', item.lower(), label = 'T° '+item[1:])
+            else:
+                tmp = element(frame, 'cycle', item.lower(), label = 'T° '+item[1:])
+            out = tmp if out is None else out*tmp
+        return out
 
     def vcap(self):
         "displays the bead calibration"
@@ -126,11 +139,8 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
         """
         Temperatures, especially the samples should be within .5°C of one another
         """
-        secs   = {i: j['value'] for i, j in self.secondaries(name).items()}
-        tolist = lambda i: list(chain.from_iterable(i))
-        frame  = pd.DataFrame({'track': tolist([i]*len(j) for i, j in secs.items()),
-                               name:    tolist(secs.values())}).dropna()
-        rng    = tuple(np.nanpercentile(frame[name], axisrange))
+        frame = self.dataframe()
+        rng   = tuple(np.nanpercentile(frame[name], axisrange))
         return (hv.BoxWhisker(frame, "track", name)
                 .redim.range(**{name: rng})
                 .redim(**{name: hv.Dimension(name, unit = "°C")}))

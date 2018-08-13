@@ -155,6 +155,17 @@ class Secondaries:
                                         doc = "the time axis"))
     zmag    = cast(np.ndarray, property(lambda self: self.__track._secondaries["zmag"],
                                         doc = "the magnet altitude sampled at frame rate"))
+    def keys(self):
+        "return the available secondaries"
+        return set(self.data.keys()) | {"tservo", "tsample", "tsink", "vcap", "seconds", "zmag"}
+
+    def __getitem__(self, name):
+        "returns a secondary value"
+        if hasattr(self, name):
+            return getattr(self, name)
+
+        return self.__value(name) if name.startswith("T") else self.data[name]
+
     def __value(self, name):
         val = self.__track._secondaries # pylint: disable=protected-access
         if val is None or name not in val:
