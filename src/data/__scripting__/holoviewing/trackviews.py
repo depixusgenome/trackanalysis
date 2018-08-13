@@ -40,6 +40,12 @@ class Display(BasicDisplay): # pylint: disable=abstract-method
         "returns the dimension names"
         return {'kdims': ['frames'], 'vdims': ['z']}
 
+    @staticmethod
+    def _error_finalize_hook(plot, elem):
+        if elem.data[2]:
+            plot.handles['x_range'].update(start = 0., end = 1.)
+            plot.handles['y_range'].update(start = 0., end = 1.5)
+
     def errormessage(self, exc):
         "displays error message"
         args = getattr(exc, 'args', tuple())
@@ -50,9 +56,9 @@ class Display(BasicDisplay): # pylint: disable=abstract-method
         opts.update(self._opts)
         cdims = {i: opts[i] for i in ('kdims', 'vdims') if i in opts}
         tdims = (cdims['kdims']+opts.get('vdims', []))[:2]
-        return hv.Overlay([hv.Text(0.5, .9, str(args[0]), kdims = tdims),
-                           self._tpe(([0., np.NaN, 1.],[0., np.NaN, 1.]),
-                                     **cdims)])
+        txt   = (hv.Text(0.5, .9, str(args[0]), kdims = tdims)
+                 (plot = dict(finalize_hooks=[self._error_finalize_hook])))
+        return hv.Overlay([txt, self._tpe(([0., np.NaN, 1.],[0., np.NaN, 1.]), **cdims)])
 
     def _create(self, opts, good):
         opts = deepcopy(opts)
