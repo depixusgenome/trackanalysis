@@ -180,6 +180,8 @@ class PeaksAlignment:
         """
         translate the data to a common zero
         """
+        if ref is None:
+            return data
         corr = self.toreference(data, ref)
         corr = self.tohairpin(data, ref, corr)
         data = [(i, j.assign(peakposition = (j.peakposition-corr[i][2])*corr[i][1],
