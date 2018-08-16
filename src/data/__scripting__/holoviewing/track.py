@@ -21,30 +21,37 @@ def display(self, colorbar = True):
 @addto(FoV)         # type: ignore
 def display(self,   # pylint: disable=too-many-arguments
             beads    = None,
-            calib    = True,
-            colorbar = True,
-            ptcolor  = 'lightblue',
-            txtcolor = 'blue'):
+            calib    = None,
+            cmap     = 'YlGn',
+            colorbar = True):
     """
     displays the FoV with bead positions as well as calibration images.
     """
+    if calib is None:
+        calib = any(x.image is not None and x.image.size != 0
+                    for x in self.beads.values())
     bnd   = self.bounds()
-    beads = list(self.beads.keys()) if beads is None else list(beads)
+    beads = list(self.beads.keys()) if beads is None or beads is Ellipsis else list(beads)
+    if len(beads) and np.isscalar(beads[0]):
+        beads = (beads,)
 
-    good  = {i: j.position[:2] for i, j in self.beads.items() if i in beads}
-    xvals = [i                 for i, _ in good.values()]
-    yvals = [i                 for _, i in good.values()]
-    txt   = [f'{i}'            for i    in good.keys()]
+    itms  = [hv.Image(self.image[::-1], bounds = bnd)
+             (plot  = dict(colorbar = colorbar),
+              style = dict(cmap = cmap))]
+    for grp in beads:
+        if grp is None or grp is Ellipsis:
+            grp = list(self.beads.keys())
+        good  = {i: j.position[:2] for i, j in self.beads.items() if i in grp}
+        xvals = [i                 for i, _ in good.values()]
+        yvals = [i                 for _, i in good.values()]
+        txt   = [f'{i}'            for i    in good.keys()]
+        itms.append(hv.Points((xvals, yvals))(style = dict(size=10, alpha=.6)))
+        itms.extend(hv.Text(*i) for i in zip(xvals, yvals, txt))
 
-    top   = (hv.Overlay([hv.Image(self.image[::-1], bounds = bnd)
-                         (plot = dict(colorbar = colorbar)),
-                         hv.Points((xvals, yvals))
-                         (style = dict(color = ptcolor))]
-                        +[hv.Text(*i)(style = dict(color = txtcolor))
-                          for i in zip(xvals, yvals, txt)])
-             .redim(x = 'x (μm)', y = 'y (μm)'))
+    top = hv.Overlay(itms).redim(x = 'x (μm)', y = 'y (μm)')
     if not calib:
         return top
+
     bottom = hv.DynamicMap(lambda bead: self.beads[bead].display(colorbar = colorbar),
                            kdims = ['bead']).redim.values(bead = beads)
     return (top+bottom).cols(1)
