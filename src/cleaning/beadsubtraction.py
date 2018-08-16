@@ -86,7 +86,8 @@ class SubtractMedianSignal:
     2. For each frame, the median of unbiased signals is selected.
     3. The average bias is added to the result
     """
-    phase = PHASE.measure
+    phase   = PHASE.measure
+    average = False
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -95,7 +96,22 @@ class SubtractMedianSignal:
         "Aggregates signals from a frame"
         pha     = [frame.track.phase.select(..., i) for i in (0, self.phase, self.phase+1)]
         signals = [frame.data[i] for i in beads]
-        return 0. if len(signals) == 0 else reducesignals("median", signals, pha)
+        if len(signals) == 0:
+            return 0.
+
+        out = reducesignals("median", signals, pha)
+        if not self.average:
+            return out
+
+        mdl = reducesignals("median", [out[j:k] for j, k in zip(pha[1], pha[2])])
+        for i, j, k in zip(*pha):
+            out[i:j] = mdl[j-k]
+            out[j:k] = mdl[j-k:]
+
+        for i, j in zip(pha[2], pha[0][1:]):
+            out[i:j] =  mdl[-1]
+        out[pha[2][-1]:] = mdl[-1]
+        return out
 
     @staticmethod
     def apply(signals, meanrange):
