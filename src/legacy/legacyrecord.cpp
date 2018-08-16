@@ -4999,11 +4999,47 @@ namespace legacy
         return res;
     }
 
+    void   GenRecord::xbeaderr  (size_t ibead, float *dt) const
+    {
+        if(_ptr == nullptr || ibead >= size_t(_ptr->n_bead))
+            return;
+        _get(_ptr->b_r[ibead]->x_er, 1.0f, 0.0f, dt);
+    }
+
+    void   GenRecord::ybeaderr  (size_t ibead, float *dt) const
+    {
+        if(_ptr == nullptr || ibead >= size_t(_ptr->n_bead))
+            return;
+        _get(_ptr->b_r[ibead]->y_er, 1.0f, 0.0f, dt);
+    }
+
+    void   GenRecord::zbeaderr  (size_t ibead, float *dt) const
+    {
+        if(_ptr == nullptr || ibead >= size_t(_ptr->n_bead))
+            return;
+        _get(_ptr->b_r[ibead]->z_er, 1.0f, 0.0f, dt);
+    }
+
     void   GenRecord::bead  (size_t ibead, float *dt) const
     {
         if(_ptr == nullptr || ibead >= size_t(_ptr->n_bead))
             return;
         _get(_ptr->b_r[ibead]->z, _ptr->z_cor, 0.0f, dt);
+    }
+
+    std::vector<float>  GenRecord::bead  (size_t i, int tpe) const
+    {
+        std::vector<float> x(nrecs());
+        switch (tpe)
+        {
+            case 0: bead(i, x.data()); break;
+            case 1: xbead(i, x.data()); break;
+            case 2: ybead(i, x.data()); break;
+            case 3: xbeaderr(i, x.data()); break;
+            case 4: ybeaderr(i, x.data()); break;
+            case 5: zbeaderr(i, x.data()); break;
+        }
+        return x;
     }
 
     void   GenRecord::xbead  (size_t ibead, float *dt) const
@@ -5081,4 +5117,5 @@ namespace legacy
         _ptr  = load(tmp);
         _name = x;
     }
+
 }

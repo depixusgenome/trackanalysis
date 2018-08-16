@@ -43,6 +43,9 @@ namespace legacy
         void   bead  (size_t, float *)  const;
         void   xbead (size_t, float *)  const;
         void   ybead (size_t, float *)  const;
+        void   xbeaderr (size_t, float *)  const;
+        void   ybeaderr (size_t, float *)  const;
+        void   zbeaderr (size_t, float *)  const;
         void   cycles(std::vector<int>    & x) const { x.resize(nphases()*ncycles()); cycles(x.data()); }
         void   t     (std::vector<int>    & x) const { x.resize(nrecs());   t     (x.data()); }
         void   status(std::vector<int>    & x) const { x.resize(nrecs());   status(x.data()); }
@@ -71,12 +74,7 @@ namespace legacy
         std::vector<float>  bead  (size_t i) const { decltype(bead(0))  x; bead(i, x);  return x; }
         std::vector<float>  xbead (size_t i) const { decltype(bead(0))  x; xbead(i, x); return x; }
         std::vector<float>  ybead (size_t i) const { decltype(bead(0))  x; ybead(i, x); return x; }
-        std::vector<float>  bead  (size_t i, int tpe) const
-        {
-          decltype(bead(0))  x;
-          tpe == 0 ?  bead(i, x): tpe == 1 ? xbead(i, x): ybead(i, x);
-          return x;
-        }
+        std::vector<float>  bead  (size_t i, int tpe) const;
         std::vector<int>    cycles()         const { decltype(cycles()) x; cycles(x);   return x; }
 
         float  camerafrequency() const;

@@ -94,7 +94,10 @@ namespace legacy
                     };
 
         int axis = tpe.size() == 0 || tpe[0] == 'Z' || tpe[0] == 'z' ? 0 :
-                                      tpe[0] == 'X' || tpe[0] == 'x' ? 1 : 2;
+                                      tpe[0] == 'X' || tpe[0] == 'x' ? 1 :
+                                      tpe[0] == 'Y' || tpe[0] == 'y' ? 2 : 3;
+        if(axis == 3 && tpe.size() >= 1)
+            axis = tpe[1] == '1' ? 3 : tpe[1] == '2' ? 4 : 5;
 
         auto calibpos = rec.pos();
         for(size_t ibead = size_t(0), ebead = rec.nbeads(); ibead < ebead; ++ibead)
