@@ -69,6 +69,7 @@ class Translator:
     __TRANS  = {'k': '[gt]', 'm': '[ac]', 'r': '[ag]', 'y': '[ct]', 's': '[cg]',
                 'w': '[at]', 'b': '[^a]', 'v': '[^t]', 'h': '[^g]', 'd': '[^c]',
                 'n': '.',    'x': '.', 'u': 't'}
+    __TRANS.update({i.upper(): j for i, j in __TRANS.items()})
 
     __TRAFIND = re.compile('['+''.join(__TRANS)+']')
     __ALPHABET= 'atgc'+''.join(__TRANS)+__SYMBOL
