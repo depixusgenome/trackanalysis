@@ -151,8 +151,11 @@ class Secondaries:
                                         doc = "the sink temperature"))
     vcap    = cast(np.ndarray, property(lambda self: self.data.get("vcap"),
                                         doc = "the magnet position: vcap"))
-    seconds = cast(np.ndarray, property(lambda self: self.__track._secondaries["t"],
-                                        doc = "the time axis"))
+    frames  = cast(np.ndarray, property(lambda self: self.__track._secondaries["t"],
+                                        doc = "the time axis (frame count)"))
+    seconds = cast(np.ndarray, property(lambda self: (self.__track._secondaries["t"]
+                                                      /self.__track.framerate),
+                                        doc = "the time axis (s)"))
     zmag    = cast(np.ndarray, property(lambda self: self.__track._secondaries["zmag"],
                                         doc = "the magnet altitude sampled at frame rate"))
     def keys(self):
