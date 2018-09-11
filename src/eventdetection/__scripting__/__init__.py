@@ -99,6 +99,10 @@ class Comparator:
         return frozenset(tuple(i for i, j in self.__vals()
                                if cond(other[0] < k < other[1] for k in j)))
 
+    def count(self):
+        self.__func = len
+        return self
+
     def __lt__(self, other) -> _RETURN_TYPE:
         cond = self.__cond
         return frozenset(tuple(i for i, j in self.__vals() if cond(k < other for k in j)))
