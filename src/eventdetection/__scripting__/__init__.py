@@ -100,6 +100,7 @@ class Comparator:
                                if cond(other[0] < k < other[1] for k in j)))
 
     def count(self):
+        "for filtering on the number of events in a cycle"
         self.__func = len
         return self
 
