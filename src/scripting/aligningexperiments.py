@@ -190,6 +190,22 @@ class PeaksAlignment:
 
         return data
 
+    def correctionfactors(self, tracks, ref, # pylint: disable=too-many-arguments
+                          discarded = None,
+                          masks     = None,
+                          pivot     = 'max'):
+        "return the correction factors for the different beads or tracks"
+        if not isinstance(tracks, pd.DataFrame):
+            tracks = self.peaks(tracks)
+
+        data = self.split(tracks,
+                          discarded = discarded,
+                          attribute = 'bead' if isinstance(ref, int) else 'track')
+        data = self.maskpeaks(data, masks)
+        data = self.setpivot(data, pivot)
+        corr = self.toreference(data, ref)
+        return self.tohairpin(data, ref, corr)
+
     def __call__(self, tracks, ref, # pylint: disable=too-many-arguments
                  discarded = None,
                  masks     = None,
