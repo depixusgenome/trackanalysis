@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycle alignment: define an absolute zero common to all cycles"
-from   typing                  import Union, Optional, Iterable, List
+from   typing                  import Union, Optional, Iterable, List, Tuple, cast
 
-import numpy  as     np
+import numpy                   as     np
 from   numpy.lib.stride_tricks import as_strided
+from   numpy.linalg            import lstsq
 
 from   utils                   import (initdefaults, updatecopy, kwargsdefaults,
                                        asobjarray, EVENTS_DTYPE)
@@ -200,7 +201,7 @@ class PeakCorrelationAlignment:
         elif precision is None:
             precision = self.projector.precision
 
-        wtab = PeakCorrelationAlignmentWorkTable(self, precision, data, **kwa) # type: ignore
+        wtab = PeakCorrelationAlignmentWorkTable(self, precision, data, **kwa)
         bias = None
         for action in self.actions:
             bias = action(wtab, bias)
@@ -210,6 +211,52 @@ class PeakCorrelationAlignment:
     def run(cls, data: Iterable[np.ndarray], **kwa):
         "runs the algorithm"
         return cls(**kwa)(data)
+
+class PeakAlignment:
+    """
+    contains means for getting event stats
+    """
+    norm  = 'ones_like' # could be sqrt
+    @initdefaults({"norm"})
+    def __init__(self, **kwa):
+        pass
+
+    DTYPE = np.dtype([('weight', 'f4'), ('mean', 'f4')])
+    def tostats(self, peaks) -> np.ndarray:
+        "changes a list of peaks to stats"
+        stats = np.array([[self.__compute(i) for i in j] for j in peaks['events']],
+                         dtype = self.DTYPE)
+        if self.norm:
+            stats['weight'][:] = (self.norm if callable(self.norm) else
+                                  getattr(np, self.norm)
+                                 )(stats['weight'])
+
+        nans = np.isnan(stats['mean'])
+        stats['weight'][nans] = 0.
+        stats['mean'][nans]   = 0.
+        return stats
+
+    @staticmethod
+    def __compute(vals):
+        if vals.dtype != 'O':
+            vals = vals['data']
+        cnt = len(vals)
+        return ((0,                         np.NaN)                     if cnt == 0 else
+                (vals[0].size,              np.nanmean(vals[0]))        if cnt == 1 else
+                (sum(_.size for _ in vals), np.nanmean(np.concatenate(vals))))
+
+    def correctevents(self, evts):
+        "corrects the biases on current peaks"
+        stats  = self.tostats(evts)
+        biases = self(stats)
+        evts['peaks'] = np.average(stats['mean']+biases, 1, stats['weight'])
+        for i in evts['events']:
+            for j, k in zip(i, biases):
+                j['data'][:] += k
+        return evts
+
+    def __call__(self, stats):
+        raise NotImplementedError()
 
 class MinBiasPeakAlignmentAction:
     """
@@ -227,31 +274,15 @@ class MinBiasPeakAlignmentAction:
     def __init__(self, **_):
         pass
 
-class MinBiasPeakAlignment:
+class MinBiasPeakAlignment(PeakAlignment):
     """
     Provided with a list of peaks and their events, aligns them by removing the bias
     per cycle.
     """
     iterations = [MinBiasPeakAlignmentAction()]
-    norm       = 'ones_like' # could be sqrt
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
-        pass
-
-    DTYPE      = np.dtype([('weight', 'f4'), ('mean', 'f4')])
-    def tostats(self, peaks) -> np.ndarray:
-        "changes a list of peaks to stats"
-        stats = np.array([[self.__compute(i['data']) for i in j] for j in peaks['events']],
-                         dtype = self.DTYPE)
-        if self.norm:
-            stats['weight'][:] = (self.norm if callable(self.norm) else
-                                  getattr(np, self.norm)
-                                 )(stats['weight'])
-
-        nans = np.isnan(stats['mean'])
-        stats['weight'][nans] = 0.
-        stats['mean'][nans]   = 0.
-        return stats
+        super().__init__(**_)
 
     def __call__(self, stats: np.ndarray):
         if len(stats) == 0:
@@ -287,9 +318,52 @@ class MinBiasPeakAlignment:
                 delta          -= np.median(delta)
         return delta
 
+class GELSPeakAlignment(PeakAlignment):
+    """
+    Provided with a list of peaks and their events, aligns them by removing the bias
+    per cycle.
+
+    The following equation is minimized:
+
+        ∑_i  ∑_j ((1/n_i ∑_k(x_ik + δ(x_ik))) - x_ij - δ(x_ij))² +  α (1/n_peaks∑ δ_i)²
+
+    where the first summation (i) is over peaks and the next ones (j and k) are
+    over items in the peaks.
+
+    The first summation over peaks is for finding the best biases whereas the second
+    one is for limiting the range of the biases.
+    """
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
+
     @staticmethod
-    def __compute(vals):
-        cnt = len(vals)
-        return ((0,                         np.NaN)                     if cnt == 0 else
-                (vals[0].size,              np.nanmean(vals[0]))        if cnt == 1 else
-                (sum(_.size for _ in vals), np.nanmean(np.concatenate(vals))))
+    def matrixes(peaks:np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        "Returns a matrix which can be used to minimize the distances"
+        good = peaks['weight'] > 0.
+        npks = good.sum()
+
+        arr  = np.zeros((npks, peaks.shape[1]), 'f8')
+        vect = np.zeros(arr.shape[0], 'f8')
+
+        ind  = 0
+        for vals, corr in zip(peaks, good):
+            pos                      = vals['mean'][corr]
+            curr                     = vals['weight']/vals['weight'].sum()
+            vect[ind:ind+corr.sum()] = pos - np.mean(pos)
+            for j, k in enumerate(np.nonzero(corr)[0]):
+                arr[ind+j,:]  = curr
+                arr[ind+j,k] -= 1.
+            ind += corr.sum()
+        return arr, vect
+
+    def __call__(self, peaks: np.ndarray) -> np.ndarray:
+        if len(peaks) == 0:
+            return np.zeros((0,), 'f4')
+
+        good         = np.sum(peaks['weight'] > 0, axis = 0) > 1
+        peaks        = peaks[:, good]
+        biases       = np.zeros(len(good), 'f4')
+        out          = lstsq(*self.matrixes(peaks), None)[0]
+        biases[good] = out - np.mean(out)
+        return biases

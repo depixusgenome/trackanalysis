@@ -3,7 +3,8 @@
 "All tasks & processors related to finding peaks"
 
 from .alignment     import (PeakCorrelationAlignmentTask, PeakCorrelationAlignmentProcessor,
-                            MinBiasPeakAlignmentTask, MinBiasPeakAlignmentProcessor)
+                            MinBiasPeakAlignmentTask, MinBiasPeakAlignmentProcessor,
+                            GELSPeakAlignmentTask, GELSPeakAlignmentProcessor)
 from .selector      import PeakSelectorTask, PeakSelectorProcessor, PeaksDict
 from .probabilities import PeakProbabilityProcessor, PeakProbabilityTask
 from .singlestrand  import SingleStrandTask, SingleStrandProcessor

@@ -20,7 +20,7 @@ from eventdetection.processor    import EventDetectionTask
 from peakfinding.selector        import PeakSelector, EVENTS_DTYPE
 from peakfinding.processor       import (PeakSelectorTask, PeakProbabilityTask,
                                          SingleStrandTask, SingleStrandProcessor,
-                                         MinBiasPeakAlignmentTask)
+                                         MinBiasPeakAlignmentTask, GELSPeakAlignmentTask)
 from peakfinding.histogram       import Histogram
 from peakfinding.groupby         import CWTPeakFinder,ZeroCrossingPeakFinder, PeakFlagger
 from peakfinding.alignment       import PeakCorrelationAlignment
@@ -312,6 +312,32 @@ def test_minbiasalignment():
                       0.07456262,  0.17470905,  0.27485523,  0.37500241], dtype='f4')
     assert_allclose(found, truth)
 
+def test_gels():
+    "test min bias alignment of peaks"
+    data  = Experiment(baseline = None, thermaldrift = None).track(seed = 1)
+    track = Track(**data)
+    lst   = (InMemoryTrackTask(track), EventDetectionTask(),
+             PeakSelectorTask(peakalign = None),
+             GELSPeakAlignmentTask())
+    peaks = next(create(*lst).run())
+    _     = peaks[0]  # test everything runs
+
+    cycles = np.array([(1. if i > 5 else 0., 0.) for i in range(10)],
+                      dtype  = GELSPeakAlignmentTask.DTYPE)
+    stats  = np.array([np.roll(cycles, i) for i in range(4)],
+                      dtype  = GELSPeakAlignmentTask.DTYPE)
+    for i in range(4):
+        stats[i,:]['mean'][:] += i*10
+
+    truth  = np.arange(10, dtype = 'f4')*.1
+    truth -= np.median(truth)
+    for i in range(10):
+        stats[:,i]['mean'][:] -= truth[i]
+    found = lst[-1](stats)
+    truth = np.array([-0.47142908, -0.37142903, -0.27142864,  0., 0., 0.,
+                      0.12857169,  0.22857153,  0.32857174,  0.4285718],
+                     dtype= 'f4')
+    assert_allclose(found, truth)
+
 if __name__ == '__main__':
-    test_singlestrandpeak()
-    test_precision()
+    test_gels()

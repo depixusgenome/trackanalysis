@@ -10,7 +10,8 @@ from   model                import Task, Level
 from   control.processor    import Processor
 from   signalfilter         import rawprecision
 from   data.views           import BEADKEY  # pylint: disable=unused-import
-from   ..alignment          import PeakCorrelationAlignment, MinBiasPeakAlignment
+from   ..alignment          import (PeakCorrelationAlignment, MinBiasPeakAlignment,
+                                    GELSPeakAlignment)
 
 class PeakCorrelationAlignmentTask(PeakCorrelationAlignment, Task):
     """
@@ -62,29 +63,20 @@ class MinBiasPeakAlignmentTask(MinBiasPeakAlignment, Task):
     Aligns cycles.
     """
     if __doc__:
-        __doc__ += getattr(MinBiasPeakAlignment, '__doc__')
-    level   = Level.peak
+        __doc__ += MinBiasPeakAlignment.__doc__
+    level = Level.peak
     def __init__(self, **kwa):
-        Task.__init__(self)
-        super().__init__(**kwa)
+        MinBiasPeakAlignment.__init__(self, **kwa)
+        Task.__init__(self, **kwa)
 
 class MinBiasPeakAlignmentProcessor(Processor[MinBiasPeakAlignmentTask]):
-    """
-    Aligns cycles.
-    """
+    "Aligns cycles."
     if __doc__:
-        __doc__ += getattr(MinBiasPeakAlignment, '__doc__')
+        __doc__ = MinBiasPeakAlignmentTask.__doc__
 
-    @classmethod
-    def _action(cls, tsk, _, info):
-        stats  = tsk.tostats(info[1])
-        deltas = tsk(stats)
-
-        info[1]['peaks'] = np.average(stats['mean']+deltas, 1, stats['weight'])
-        for i in info[1]['events']:
-            for j, k in zip(i, deltas):
-                j['data'][:] += k
-        return info
+    @staticmethod
+    def _action(tsk, _, info):
+        return info[0], tsk.correctevents(info[1])
 
     @classmethod
     def apply(cls, toframe = None, **cnf):
@@ -92,8 +84,39 @@ class MinBiasPeakAlignmentProcessor(Processor[MinBiasPeakAlignmentTask]):
         # pylint: disable=not-callable
         if toframe is None:
             return partial(cls.apply, **cnf)
-        tsk = MinBiasPeakAlignment(**cnf)
-        return toframe.new().withaction(partial(cls._action, tsk))
+        return toframe.new().withaction(partial(cls._action,  cls.newtask(**cnf)))
+
+    def run(self, args):
+        "updates frames"
+        args.apply(self.apply(**self.config()))
+
+class GELSPeakAlignmentTask(GELSPeakAlignment, Task):
+    """
+    Aligns cycles.
+    """
+    if __doc__:
+        __doc__ += MinBiasPeakAlignment.__doc__
+    level = Level.peak
+    def __init__(self, **kwa):
+        GELSPeakAlignment.__init__(self, **kwa)
+        Task.__init__(self, **kwa)
+
+class GELSPeakAlignmentProcessor(Processor[GELSPeakAlignmentTask]):
+    "Aligns cycles"
+    if __doc__:
+        __doc__ = GELSPeakAlignmentTask.__doc__
+
+    @staticmethod
+    def _action(tsk, _, info):
+        return info[0], tsk.correctevents(info[1])
+
+    @classmethod
+    def apply(cls, toframe = None, **cnf):
+        "applies the task to a frame or returns a function that does so"
+        # pylint: disable=not-callable
+        if toframe is None:
+            return partial(cls.apply, **cnf)
+        return toframe.new().withaction(partial(cls._action,  cls.newtask(**cnf)))
 
     def run(self, args):
         "updates frames"
