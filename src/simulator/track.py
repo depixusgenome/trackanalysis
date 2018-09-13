@@ -228,7 +228,9 @@ class TrackSimulator:
     def phases(self):
         "returns an array of cycles start positions"
         ends = np.repeat([list(self.durations)], self.ncycles, axis = 0).cumsum()
-        return np.insert(ends, 0, 0)[:-1].reshape((self.ncycles, len(self.durations)))
+        return (np.insert(ends, 0, 0)[:-1]
+                .reshape((self.ncycles, len(self.durations)))
+                .astype('i4'))
 
     @staticmethod
     def seed(seed):

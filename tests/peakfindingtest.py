@@ -48,7 +48,7 @@ def test_correlationalignment():
     biases = CORR(data, 5, 5, 1, 3, 2., None)
     np.testing.assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
 
-    biases = CORR(data, 5, 5, 1, 3, 2, 0.05)
+    biases = CORR(data, 5, 5, 1, 3, 2, 0.001)
     np.testing.assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
 
 def test_randcorrelationalignment():
@@ -245,7 +245,7 @@ def test_precision():
 
     truth = [np.mean(i[i>=5]) for i in cast(np.ndarray, sim).T]
     exp   = np.array([i.averageduration for _, i in vals[1:]])
-    assert_allclose(exp, truth, rtol = 1.5e-2, atol = 1e-3)
+    assert np.all(np.abs(exp-truth) < 2)
 
 def test_dataframe():
     "tests dataframe production"
@@ -313,4 +313,5 @@ def test_minbiasalignment():
     assert_allclose(found, truth)
 
 if __name__ == '__main__':
-    test_minbiasalignment()
+    test_singlestrandpeak()
+    test_precision()

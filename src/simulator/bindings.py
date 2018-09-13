@@ -554,7 +554,7 @@ class Experiment(Object):
         kwa.setdefault('key',      'sim')
         kwa.update(data   = dict((i, j[1]) for i, j in enumerate(itms)),
                    truth  = dict((i, j[0]) for i, j in enumerate(itms)),
-                   phases = phases)
+                   phases = phases.astype('i4'))
         return kwa
 
     def __beadstructure(self, events: np.ndarray = None) -> np.ndarray:
