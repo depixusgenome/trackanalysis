@@ -159,6 +159,9 @@ namespace legacy
         if(!sdi)
             res["calibrations"] = calib;
         res["positions"] = pos;
+        res["instrument"] = pybind11::dict();
+        res["instrument"]["type"] = pybind11::str(sdi ? "sdi":"picotwist");
+        res["instrument"]["name"] = rec.instrumentname();
 
         auto dim = rec.dimensions();
         res["dimensions"] = pybind11::make_tuple(pybind11::make_tuple(std::get<0>(dim),

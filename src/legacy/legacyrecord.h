@@ -77,7 +77,8 @@ namespace legacy
         std::vector<float>  bead  (size_t i, int tpe) const;
         std::vector<int>    cycles()         const { decltype(cycles()) x; cycles(x);   return x; }
 
-        float  camerafrequency() const;
+        float       camerafrequency() const;
+        std::string instrumentname() const;
         bool   sdi() const;
 
         private:

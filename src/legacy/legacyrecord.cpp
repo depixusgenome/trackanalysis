@@ -5059,6 +5059,13 @@ namespace legacy
     float  GenRecord::camerafrequency() const
     { return _ptr == nullptr ? 0 : _ptr->Pico_param_record.camera_param.camera_frequency_in_Hz; }
 
+    std::string  GenRecord::instrumentname() const
+    { 
+        if(_ptr == nullptr || _ptr->Pico_param_record.micro_param.microscope_user_name == nullptr)
+            return std::string();
+        return _ptr->Pico_param_record.micro_param.microscope_user_name;
+    }
+
     bool GenRecord::islost(int i) const
     {
         if(_ptr == nullptr || i < 0 || i >= _ptr->n_bead)

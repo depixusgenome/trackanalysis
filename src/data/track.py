@@ -127,6 +127,11 @@ class FoV:
         tpe = iter if hasattr(arr, '__next__') else type(arr)
         return tpe([(sl1*i+int1, sl2*j+int2) for i, j in arr]) # type: ignore
 
+class InstrumentType(Enum):
+    "The type of instrument"
+    picotwist = "picotwist"
+    sdi       = "sdi"
+
 class Secondaries:
     """
     Consists in arrays of sparse measures:
@@ -332,6 +337,9 @@ class PhaseManipulator:
                 phases[cid,:] if ells[1]   else
                 phases[cid,pid]) - phases[0,0]
 
+
+
+
 @levelprop(Level.project)
 class Track:
     """
@@ -376,6 +384,7 @@ class Track:
     if __doc__:
         __doc__= __doc__.format(secondaries = _doc(Secondaries), fov = _doc(FoV))
     key: str   = None
+    instrument = cast(Dict[str, Any],      LazyProperty())
     phases     = cast(np.ndarray,          LazyProperty())
     framerate  = cast(float,               LazyProperty())
     fov        = cast(FoV,                 LazyProperty())
@@ -460,6 +469,14 @@ class Track:
         return info
 
     def __setstate__(self, values):
+        if isinstance(values.get('fov', None), dict):
+            fov           = values['fov']
+            fov["beads"]  = {i: Bead(**j) for i, j in fov['beads'].items()}
+            values['fov'] = FoV(**fov)
+
+        if isinstance(values.get('instrument', {}).get("type", None), str):
+            values['instrument']['type'] = InstrumentType(values['instrument']['type'])
+
         self.__init__(**values)
         keys = frozenset(self.__getstate__().keys()) | frozenset(('data', 'secondaries'))
         self.__dict__.update({i: j for i, j in values.items() if i not in keys})
@@ -480,6 +497,7 @@ class Track:
 
     _framerate                  = 30.
     _fov: FoV                   = None
+    _instrument: Dict[str, Any] = {"type": InstrumentType.picotwist, "name": None}
     _phases                     = np.empty((0,9), dtype = 'i4')
     _data:          DATA        = None # type: ignore
     _secondaries:   DATA        = None

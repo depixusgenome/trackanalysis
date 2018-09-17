@@ -361,6 +361,7 @@ class Handler:
                                    notall = getattr(track, 'notall', True),
                                    axis   = getattr(track, 'axis',   'Zaxis'))
         state  = track.__getstate__()
+        self.__instrument(state, kwargs)
         self.__fov (state, kwargs)
         self.__data(state, kwargs)
 
@@ -379,6 +380,7 @@ class Handler:
         data['dimensions']   = track.fov.dim
         data['positions']    = {i: j.position for i, j in track.fov.beads.items()}
         data['calibrations'] = {i: j.image    for i, j in track.fov.beads.items()}
+        data["instrument"]   = track.instrument
 
         # add a modification date as the original one is needed
         if hasattr(track, '_modificationdate'):
@@ -457,30 +459,38 @@ class Handler:
         state['phases']      = kwargs.pop('phases').astype('i4')
 
     @staticmethod
+    def __instrument(res, kwargs):
+        res['instrument'] = {"type": "picotwist", "name": None}
+        if kwargs is None:
+            return
+        if 'instrument' in kwargs:
+            res['instrument'] = kwargs.pop("instrument")
+        elif 'calibrations' not in kwargs:
+            res['instrument']["type"] = "sdi"
+
+    @staticmethod
     def __fov(res, kwargs):
         if kwargs is None:
             return
 
-        from .track import FoV, Bead
-        calib = kwargs.pop('calibrations', {})
-        res['fov'] = FoV()
+        res['fov'] = {}
         if 'fov' in kwargs:
-            res['fov'].image = kwargs.pop('fov')
-            if res['fov'].image is None and sys.platform.startswith("win"):
+            res['fov']['image'] = kwargs.pop('fov')
+            if res['fov']['image'] is None and sys.platform.startswith("win"):
                 if isinstance(res['path'], (list, tuple)):
                     path = str(res['path'][0])
                 else:
                     path = str(res['path'])
-                res['fov'].image = readfov(path)
+                res['fov']['image'] = readfov(path)
 
         if 'dimensions' in kwargs:
-            res['fov'].dim   = kwargs.pop('dimensions')
+            res['fov']['dim']   = kwargs.pop('dimensions')
 
+        calib = kwargs.pop('calibrations', {})
         if 'positions' in kwargs:
-            res['fov'].beads = {i: Bead(position = j,
-                                        image    = calib.get(i, Bead.image))
-                                for i, j in kwargs.pop('positions', {}).items()
-                                if i in kwargs}
+            res['fov']['beads'] = {i: dict(position = j, image = calib.get(i, None))
+                                   for i, j in kwargs.pop('positions', {}).items()
+                                   if i in kwargs}
 
 def checkpath(track, **opts) -> Handler:
     """
