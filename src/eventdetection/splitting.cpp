@@ -179,7 +179,7 @@ namespace
         auto   info = _removenans(nandata);
         auto & good = std::get<0>(info);
         auto & nans = std::get<1>(info);
-        if(good.size() == 0)
+        if(good.size() <= 2)
             return {};
         if(prec <= 0.0f)
             prec = signalfilter::stats::hfsigma(good.size(), &good[0]);
@@ -230,6 +230,12 @@ float DerivateSplitDetector::threshold(float precision, grade_t const & data) co
 void DerivateSplitDetector::grade(float precision, grade_t & data) const
 {
     auto wlen = this->gradewindow;
+    if(wlen  <= data.size())
+    {
+        data = std::numeric_limits<float>::max();
+        return;
+    }
+
     auto tmp(_sum(wlen, data));
     auto sz   = data.size();
     auto tsz  = tmp.size();
@@ -266,6 +272,12 @@ float ChiSquareSplitDetector::threshold(float prec) const
 void ChiSquareSplitDetector::grade(float precision, grade_t & data) const
 {
     auto const wlen = this->gradewindow;
+    if(wlen  <= data.size())
+    {
+        data = std::numeric_limits<float>::max();
+        return;
+    }
+
     auto const rho  = this->threshold(precision);
     _chi2grade(wlen, rho, data);
 }
@@ -277,6 +289,8 @@ void MultiGradeSplitDetector::grade(float precision, grade_t & grade) const
 {
     auto data(grade);
     this->derivate.grade(precision, grade);
+    if(this->minpatchwindow <= grade.size() || this->chisquare.gradewindow <= grade.size())
+        return;
 
     auto const sz   = grade.size();
     auto const hmin = this->minpatchwindow/2_s;
