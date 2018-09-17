@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycle alignment: define an absolute zero common to all cycles"
-from   typing                  import Union, Optional, Iterable, List, Tuple, cast
+from   typing                  import Union, Optional, Iterable, List, Tuple
 
 import numpy                   as     np
 from   numpy.lib.stride_tricks import as_strided
@@ -212,7 +212,7 @@ class PeakCorrelationAlignment:
         "runs the algorithm"
         return cls(**kwa)(data)
 
-class PeakAlignment:
+class PeakPostAlignment:
     """
     contains means for getting event stats
     """
@@ -274,7 +274,7 @@ class MinBiasPeakAlignmentAction:
     def __init__(self, **_):
         pass
 
-class MinBiasPeakAlignment(PeakAlignment):
+class MinBiasPeakAlignment(PeakPostAlignment):
     """
     Provided with a list of peaks and their events, aligns them by removing the bias
     per cycle.
@@ -318,36 +318,64 @@ class MinBiasPeakAlignment(PeakAlignment):
                 delta          -= np.median(delta)
         return delta
 
-class GELSPeakAlignment(PeakAlignment):
+class GELSPeakAlignment(PeakPostAlignment):
     """
     Provided with a list of peaks and their events, aligns them by removing the bias
     per cycle.
 
     The following equation is minimized:
 
-        ∑_i  ∑_j ((1/n_i ∑_k(x_ik + δ(x_ik))) - x_ij - δ(x_ij))² +  α (1/n_peaks∑ δ_i)²
+        ∑_i  ∑_j ((1/n_i ∑_k(x_ik + δ(x_ik))) - x_ij - δ(x_ij))²
+        + α x (distortion constraints)
 
     where the first summation (i) is over peaks and the next ones (j and k) are
-    over items in the peaks.
+    over items in the peaks. The summation over peaks is for finding the best biases.
 
-    The first summation over peaks is for finding the best biases whereas the second
-    one is for limiting the range of the biases.
+    Two other constraints are added in order to limit the distortion of the
+    z-axis:
+
+    1. Consider that cycles might be disconnected in that a first set has
+    bindings only ever for one set of peaks and another set cycles for another
+    *disconnected* set of peaks. In order to limit this, we add a constraint
+    that forces all cycles to keep the same average distance between
+    themselves.
+    2. The last constraint is that the average of all bindings should remain the same.
     """
+    alpha = 1.
+    beta  = 1.
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
 
-    @staticmethod
-    def matrixes(peaks:np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def matrixes(self, peaks:np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         "Returns a matrix which can be used to minimize the distances"
-        good = peaks['weight'] > 0.
-        npks = good.sum()
+        good  = peaks['weight'] > 0.
+        npks  = good.sum()
 
-        arr  = np.zeros((npks, peaks.shape[1]), 'f8')
-        vect = np.zeros(arr.shape[0], 'f8')
+        cycs  = self.__computecycles(good)
+        arr   = np.zeros((npks+len(cycs), peaks.shape[1]), 'f8')
+        vect  = np.zeros(arr.shape[0], 'f8')
+        ind   = self.__addpeakconstraints(peaks, good, arr, vect)
+        self.__addcycleconstraints(peaks, good, cycs, arr[ind:,:], vect[ind:])
+        self.__addavgconstraint(good, arr[-1:,:])
+        return arr, vect
 
+    def __call__(self, peaks: np.ndarray) -> np.ndarray:
+        if len(peaks) == 0:
+            return np.zeros((0,), 'f4')
+
+        peaks        = peaks[np.sum(peaks['weight'] > 0, axis = 1) > 0, :]
+        good         = np.sum(peaks['weight'] > 0, axis = 0) > 0
+        out          = lstsq(*self.matrixes(peaks[:, good]), None)[0]
+        biases       = np.zeros(peaks.shape[1], 'f4')
+        biases[good] = out - np.mean(out)
+        return biases
+
+    @staticmethod
+    def __addpeakconstraints(peaks, good, arr, vect):
         ind  = 0
         for vals, corr in zip(peaks, good):
+            assert corr.sum() > 0
             pos                      = vals['mean'][corr]
             curr                     = vals['weight']/vals['weight'].sum()
             vect[ind:ind+corr.sum()] = pos - np.mean(pos)
@@ -355,15 +383,46 @@ class GELSPeakAlignment(PeakAlignment):
                 arr[ind+j,:]  = curr
                 arr[ind+j,k] -= 1.
             ind += corr.sum()
-        return arr, vect
+        return ind
 
-    def __call__(self, peaks: np.ndarray) -> np.ndarray:
-        if len(peaks) == 0:
-            return np.zeros((0,), 'f4')
+    def __addavgconstraint(self, good, arr):
+        arr[0,:]  = np.sum(good, axis = 0)
+        arr[0,:] *= self.beta/np.sum(arr[0,:])
 
-        good         = np.sum(peaks['weight'] > 0, axis = 0) > 1
-        peaks        = peaks[:, good]
-        biases       = np.zeros(len(good), 'f4')
-        out          = lstsq(*self.matrixes(peaks), None)[0]
-        biases[good] = out - np.mean(out)
-        return biases
+    @staticmethod
+    def __computecycles(good):
+        rem       = [([i], np.copy(j)) for i, j in enumerate(good)]
+        cycs      = [rem.pop()]
+        pks, delt = cycs[-1]
+        while len(rem):
+            leftover = []
+            for i, j in rem:
+                if np.sum(j & delt) > 0:
+                    pks.extend(i)
+                    delt |= j
+                else:
+                    leftover.append((i,j))
+
+            if len(leftover) == len(rem):
+                cycs.append(leftover.pop())
+                pks, delt = cycs[-1]
+
+            rem = leftover
+        return [i for i, _ in cycs]
+
+    # pylint: disable=too-many-arguments
+    def __addcycleconstraints(self, peaks, good, cycs, arr, vect):
+        factor = self.alpha/sum(np.sum(good[j]) for j in cycs[0])
+        cur    = np.zeros_like(arr[0,:])
+        mean   = 0.
+        for j in cycs[0]:
+            cur[good[j]] += factor
+            mean         += factor*peaks[j,:]['mean'].sum()
+
+        vect[:] = mean
+        for i, cycle in enumerate(cycs[1:]):
+            factor    = self.alpha/sum(np.sum(good[j]) for j in cycle)
+            arr [i,:] = cur
+            for j in cycle:
+                arr [i,:][good[j]] -= factor
+                vect[i]            -= factor*peaks[j,:]['mean'].sum()

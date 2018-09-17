@@ -334,7 +334,8 @@ def test_gels():
     for i in range(10):
         stats[:,i]['mean'][:] -= truth[i]
     found = lst[-1](stats)
-    truth = np.array([-0.47142908, -0.37142903, -0.27142864,  0., 0., 0.,
+
+    truth = np.array([-0.47142908, -0.37142903, -0.27142864,  0.,  0., 0.,
                       0.12857169,  0.22857153,  0.32857174,  0.4285718],
                      dtype= 'f4')
     assert_allclose(found, truth)

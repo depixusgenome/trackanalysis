@@ -7,7 +7,8 @@ import numpy                as     np
 from utils                  import (initdefaults, asobjarray, asdataarrays, asview,
                                     updatecopy, EVENTS_DTYPE, EventsArray)
 from signalfilter           import PrecisionAlg, PRECISION
-from .alignment             import PeakCorrelationAlignment, MinBiasPeakAlignment
+from .alignment             import (PeakCorrelationAlignment, GELSPeakAlignment,
+                                    PeakPostAlignment)
 from .histogram             import Histogram
 from .groupby               import (ByHistogram,PeakFinder)
 from .peaksarray            import (Input, Output, # pylint: disable=unused-import
@@ -64,11 +65,11 @@ class PeakSelector(PrecisionAlg):
     *aligned* events.
     """
 
-    rawfactor                       = 2.
-    histogram                       = Histogram(edge = 2)
-    align: PeakCorrelationAlignment = None
-    peakalign                       = MinBiasPeakAlignment()
-    finder: PeakFinder              = ByHistogram()
+    rawfactor                            = 2.
+    histogram                            = Histogram(edge = 2)
+    align:      PeakCorrelationAlignment = None
+    peakalign:  PeakPostAlignment        = GELSPeakAlignment()
+    finder:     PeakFinder               = ByHistogram()
 
     if __doc__:
         __doc__ += "\n    # Default algorithms\n"
