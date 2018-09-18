@@ -230,7 +230,7 @@ float DerivateSplitDetector::threshold(float precision, grade_t const & data) co
 void DerivateSplitDetector::grade(float precision, grade_t & data) const
 {
     auto wlen = this->gradewindow;
-    if(wlen  <= data.size())
+    if(wlen  >= data.size())
     {
         data = std::numeric_limits<float>::max();
         return;
@@ -272,7 +272,7 @@ float ChiSquareSplitDetector::threshold(float prec) const
 void ChiSquareSplitDetector::grade(float precision, grade_t & data) const
 {
     auto const wlen = this->gradewindow;
-    if(wlen  <= data.size())
+    if(wlen  >= data.size())
     {
         data = std::numeric_limits<float>::max();
         return;
@@ -289,7 +289,7 @@ void MultiGradeSplitDetector::grade(float precision, grade_t & grade) const
 {
     auto data(grade);
     this->derivate.grade(precision, grade);
-    if(this->minpatchwindow <= grade.size() || this->chisquare.gradewindow <= grade.size())
+    if(this->minpatchwindow >= grade.size() || this->chisquare.gradewindow >= grade.size())
         return;
 
     auto const sz   = grade.size();
