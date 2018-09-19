@@ -2,17 +2,17 @@
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
 import itertools
-from typing import (Callable, Iterable, Iterator, NamedTuple, Optional,
-                    Sequence, Tuple, Union)
+from   typing                import (Callable, Iterable, Iterator, NamedTuple,
+                                     Optional, Sequence, Tuple, Union)
 
-import numpy as np
-from scipy.interpolate import interp1d
+import numpy                 as     np
+from   scipy.interpolate     import interp1d
 
-from signalfilter import PrecisionAlg
-from signalfilter.convolve import KernelConvolution
-from utils import (EVENTS_DTYPE, NoArgs, asdataarrays, initdefaults,
-                   kwargsdefaults)
-from utils.logconfig import getLogger
+from   signalfilter          import PrecisionAlg
+from   signalfilter.convolve import KernelConvolution
+from   utils                 import (EVENTS_DTYPE, NoArgs, asdataarrays,
+                                     initdefaults, asobjarray, kwargsdefaults)
+from   utils.logconfig       import getLogger
 
 
 LOGS       = getLogger(__name__)
@@ -128,6 +128,21 @@ class Histogram(PrecisionAlg):
             if isinstance(fcn, str):
                 fcn = getattr(np, fcn)
         return self.__eventpositions(events, bias, fcn)
+
+    def positionsandprecision(self, data, precision) -> Optional[Tuple[np.ndarray, float]]:
+        "computes positions and the precision"
+        data  = asobjarray(data)
+        first = next((i for i in data if len(i)), None)
+        if first is None:
+            return None
+
+        if getattr(first, 'dtype', 'f') == EVENTS_DTYPE or not np.isscalar(first[0]):
+            return self.getprecision(precision, data), self.eventpositions(data)
+
+        if precision is None:
+            return data, self.precision
+
+        return data, precision
 
     def kernelarray(self) -> np.ndarray:
         "the kernel used in the histogram creation"

@@ -23,7 +23,7 @@ from peakfinding.processor       import (PeakSelectorTask, PeakProbabilityTask,
                                          MinBiasPeakAlignmentTask, GELSPeakAlignmentTask)
 from peakfinding.histogram       import Histogram
 from peakfinding.groupby         import CWTPeakFinder,ZeroCrossingPeakFinder, PeakFlagger
-from peakfinding.alignment       import PeakCorrelationAlignment
+from peakfinding.alignment       import PeakCorrelationAlignment, PeakExpectedValueAlignment
 from peakfinding.reporting.batch import computereporters
 from testingcore                 import path as utfilepath
 from signalfilter                import NonLinearFilter
@@ -37,10 +37,41 @@ CORR = lambda f, a, b, c, d, e, g: PeakCorrelationAlignment.run(f,
                                                                 kernel_window = d,
                                                                 kernel_width  = e)
 
-def test_correlationalignment():
+def test_expectedvaluealignment():
     "align on best correlation"
     data = [[20, 50], [21, 51], [22, 52]]
 
+    biases = PeakExpectedValueAlignment.run(data, 1, estimations = 3)
+    np.testing.assert_allclose(biases, [1., 0., -1.], atol = 1e-1)
+
+    biases = PeakExpectedValueAlignment.run(data, 1, estimations = 3, discardrange=.5)
+    np.testing.assert_allclose(biases, [1., 0., -1.], atol = 1e-1)
+
+def test_randexpectedvaluealignment():
+    "align on best correlation"
+    peaks, labels  = randpeaks(100,
+                               peaks    = [20, 50, 60, 90],
+                               rates    = .7,
+                               bias     = 2.,
+                               brownian = None,
+                               stretch  = None,
+                               seed     = 0,
+                               labels   = 'range')
+    biases = PeakExpectedValueAlignment.run(peaks, 1, estimations = 3)
+    res    = peaks+biases
+
+    orig   = np.array([np.concatenate([pks[labs == i] for pks, labs in zip(peaks, labels)])
+                       for i in range(4)])
+    cured  = np.array([np.concatenate([pks[labs == i] for pks, labs in zip(res, labels)])
+                       for i in range(4)])
+
+    cstd   = np.array([i.std() for i in cured])
+    ostd   = np.array([i.std() for i in orig])
+    assert  all(cstd < ostd/90.)
+
+def test_correlationalignment():
+    "align on best correlation"
+    data = [[20, 50], [21, 51], [22, 52]]
 
     biases = CORR(data, 1, 5, 1, 0, .1, None)
     np.testing.assert_allclose(biases, [1., 0., -1.])
@@ -341,4 +372,5 @@ def test_gels():
     assert_allclose(found, truth)
 
 if __name__ == '__main__':
-    test_gels()
+    test_randexpectedvaluealignment()
+    test_randcorrelationalignment()
