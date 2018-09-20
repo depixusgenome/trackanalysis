@@ -6,7 +6,7 @@ from   typing                  import (Union, Optional, Iterable, List, Tuple,
 
 import numpy                   as     np
 from   numpy.lib.stride_tricks import as_strided
-from   numpy.linalg            import lstsq
+from   numpy.linalg            import lstsq, norm as lnorm
 from   scipy.optimize          import minimize_scalar
 
 from   utils                   import initdefaults, updatecopy, kwargsdefaults
@@ -203,65 +203,38 @@ class PeakCorrelationAlignment:
         "runs the algorithm"
         return cls(**kwa)(data)
 
-class PeakExpectedValueAlignment:
+class SymetricExpectedValueAlignment:
     "Aligns cycles using a maximum likelihood position on events in the cycle"
-    rigidity            = .1
     eventwindow         = 4
     searchwindow        = 2.5
-    estimations         = 2
+    estimations         = 1
     discardrange: float = None
     @initdefaults
     def __init__(self, **kwa):
         pass
 
-    def __call__(self,
-                 data:      Union[np.ndarray, Iterable[np.ndarray]],
-                 precision: Union[None, float, Histogram])-> np.ndarray:
-        if isinstance(precision, Histogram):
-            data, prec = precision.positionsandprecision(data, precision)
-        else:
-            tmp        = np.empty(len(cast(Sized, data)), dtype = 'O')
-            tmp[:]     = [np.asarray(i, dtype = 'f4') for i in data]
-            data, prec = tmp, precision
-        assert np.isscalar(prec)
-        allb  = np.zeros(len(data), dtype = 'f4')
-
-        ievts = np.array([len(i) > 0 for i in data], dtype = 'bool')
-        data  = data[ievts]
-        icycs = np.concatenate([np.full(len(j), i, dtype = 'i4')
-                                for i, j in enumerate(data)])
-        bias  = np.zeros(len(data), dtype = 'f4')
-        for _ in range(self.estimations):
-            self.computebias(data, icycs, bias, prec)
-
-        if self.discardrange is not None:
-            cpy         = self.computebias(data, icycs, np.copy(bias), prec)
-            good        = np.abs(cpy-bias) < self.discardrange*prec
-            bias[~good] = np.NaN
-            bias[good] -= np.mean(bias[good])
-
-        allb[ievts] = bias
-        return allb
-
     def biascost(self, delta, precision, cur, vals) -> float:
         "best bias for a given cycle"
         cost  = 0.
-        wevts = 0
-        cnt   = 0
         rng   = self.eventwindow*precision
         cur   = cur+delta
         for i, j, point in zip(np.searchsorted(vals, cur-rng),
                                np.searchsorted(vals, cur+rng, 'right'),
                                cur):
             if i == j:
-                cost += rng**2
-            else:
-                arr    = vals[i:j]
-                wgt    = np.exp(-.5*((arr-point)/precision)**2)
-                cost  += ((point+np.inner(arr, wgt))/(wgt.sum()+1.)-point)**2
-                wevts += np.log(j-i+1)
-            cnt  += 1
-        return cost/cnt + self.rigidity/(wevts+0.001)*delta**2
+                continue
+
+            curpos = self.__avg(vals[i:j], point, point, precision)
+            minpos = np.searchsorted(vals, vals[i:j]-rng)
+            maxpos = np.searchsorted(vals, vals[i:j]+rng, 'right')
+            pts    = np.array([self.__avg(vals[i1:i2], val, point, precision)
+                               for i1, i2, val in zip(minpos, maxpos, vals[i:j])],
+                              dtype = 'f4')
+
+            cost  += lnorm(self.__norm(curpos-pts, precision)
+                           -self.__norm(curpos-vals[i:j], precision))**2/(j-i+1)
+
+        return cost
 
     def computebias(self,
                     events:   np.ndarray,
@@ -282,13 +255,86 @@ class PeakExpectedValueAlignment:
         previous   -= np.mean(previous)
         return previous
 
+    def __call__(self,
+                 data:      Union[np.ndarray, Iterable[np.ndarray]],
+                 precision: float     = None,
+                 projector: Histogram = None)-> np.ndarray:
+        if projector is not None:
+            data, prec = projector.positionsandprecision(data, precision)
+        elif precision is None:
+            raise ValueError()
+        else:
+            tmp        = np.empty(len(cast(Sized, data)), dtype = 'O')
+            tmp[:]     = [np.asarray(i, dtype = 'f4') for i in data]
+            data, prec = tmp, cast(float, precision)
+        allb  = np.zeros(len(data), dtype = 'f4')
+
+        ievts = np.array([len(i) > 0 for i in data], dtype = 'bool')
+        data  = data[ievts]
+        icycs = np.concatenate([np.full(len(j), i, dtype = 'i4')
+                                for i, j in enumerate(data)])
+        bias  = np.zeros(len(data), dtype = 'f4')
+        for _ in range(self.estimations):
+            self.computebias(data, icycs, bias, prec)
+
+        if self.discardrange is not None:
+            cpy         = self.computebias(data, icycs, np.copy(bias), prec)
+            good        = np.abs(cpy-bias) < self.discardrange*prec
+            bias[~good] = np.NaN
+            bias[good] -= np.mean(bias[good])
+
+        allb[ievts] = bias
+        return allb
+
     @classmethod
     def run(cls,
             data:      Iterable[np.ndarray],
-            precision: Union[None, float, Histogram],
-            **kwa):
+            precision: float     = None,
+            projector: Histogram = None,
+            **kwa)-> np.ndarray:
         "runs the algorithm"
-        return cls(**kwa)(data, precision)
+        return cls(**kwa)(data, precision, projector)
+
+    @classmethod
+    def __avg(cls, pos, center, point, prec):
+        wpts = cls.__norm(np.copy(pos), prec)
+        wcur = np.exp(-.5*((center-point)/prec)**2)
+        return (np.inner(wpts, pos)+point*wcur)/(wcur+wpts.sum())
+
+    @staticmethod
+    def __norm(pos, prec):
+        pos /= prec
+        pos *= pos
+        pos *= -.5
+        return np.exp(pos)
+
+class PeakExpectedValueAlignment(SymetricExpectedValueAlignment):
+    "Aligns cycles using a maximum likelihood position on events in the cycle"
+    estimations = 2
+    rigidity    = .1
+    @initdefaults
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+    def biascost(self, delta, precision, cur, vals) -> float:
+        "best bias for a given cycle"
+        cost  = 0.
+        wevts = 0
+        cnt   = 0
+        rng   = self.eventwindow*precision
+        cur   = cur+delta
+        for i, j, point in zip(np.searchsorted(vals, cur-rng),
+                               np.searchsorted(vals, cur+rng, 'right'),
+                               cur):
+            if i == j:
+                cost += rng**2
+            else:
+                arr    = vals[i:j]
+                wgt    = np.exp(-.5*((arr-point)/precision)**2)
+                cost  += ((point+np.inner(arr, wgt))/(wgt.sum()+1.)-point)**2
+                wevts += np.log(j-i+1)
+            cnt  += 1
+        return cost/cnt + self.rigidity/(wevts+0.001)*delta**2
 
 class PeakPostAlignment:
     """
