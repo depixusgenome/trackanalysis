@@ -7,7 +7,7 @@ from   typing                  import (Union, Optional, Iterable, List, Tuple,
 import numpy                   as     np
 from   numpy.lib.stride_tricks import as_strided
 from   numpy.linalg            import lstsq, norm as lnorm
-from   scipy.optimize          import minimize_scalar
+from   scipy.optimize          import minimize_scalar, fmin_cobyla
 
 from   utils                   import initdefaults, updatecopy, kwargsdefaults
 from   .histogram              import Histogram
@@ -203,12 +203,42 @@ class PeakCorrelationAlignment:
         "runs the algorithm"
         return cls(**kwa)(data)
 
-class SymetricExpectedValueAlignment:
-    "Aligns cycles using a maximum likelihood position on events in the cycle"
+class SymetricExpectedPositionAlignment:
+    """
+    For each cycle, we find the best position such that expected position
+    probabilities are symetric.
+
+    Expected probabilities are for a given event and its neighbour the gaussian
+    from that neighbour to the expected position of the event.
+
+    The expected position of an event is the average of neighbouring events weighted
+    by a gaussian from those neighbours to the event.
+
+    In otherwords, we minimize ||B - B'||², where B is a NxN matrix with N the
+    number of events and:
+
+        B_ij           = Gauss(x_ij, x_ii, e_i)
+
+    where:
+
+        e_i            = ∑_j x_ij Gauss(x_ij, x_ii, x_ii)
+        Gauss(α, β, γ) = exp(-( (α-β) δ(||α - γ|| < ξ σ) /σ )²/2)
+
+    This minimization is performed along every axis (ie event) independently
+    once per estimation.
+
+    Setting `averageout` to a value between 0 and 1, it's possible to average
+    bias values at every estimation using the following formula:
+
+
+        bias_i        = (1-averageout) bias_i + averageout averagebias_i
+        averagebias_i = ∑_j bias_j Gauss(x_ij, x_ii, x_ii)
+    """
     eventwindow         = 4
     searchwindow        = 2.5
     estimations         = 1
     discardrange: float = None
+    averageout          = .5
     @initdefaults
     def __init__(self, **kwa):
         pass
@@ -242,17 +272,16 @@ class SymetricExpectedValueAlignment:
                     previous: np.ndarray,
                     precision: float) -> np.ndarray:
         "computes all best biases"
-        vals        = np.concatenate(events)+previous[icyc]
-        inds        = np.argsort(vals)
-        vals        = vals[inds]
-        icyc        = icyc[inds]
+        vals, cycs  = self.__data(events, icyc, previous)
         bnds        = (-self.searchwindow*precision, self.searchwindow*precision)
 
         previous[:] = [minimize_scalar(self.biascost,
-                                       args   = (precision, cur, vals[icyc != i]),
+                                       args   = (precision, cur, vals[cycs != i]),
                                        bounds = bnds, method = 'bounded').x
                        for i, cur in enumerate(events)]
-        previous   -= np.mean(previous)
+
+        self.__averageout(vals, cycs, previous, precision)
+        previous   -= np.median(previous)
         return previous
 
     def __call__(self,
@@ -281,7 +310,7 @@ class SymetricExpectedValueAlignment:
             cpy         = self.computebias(data, icycs, np.copy(bias), prec)
             good        = np.abs(cpy-bias) < self.discardrange*prec
             bias[~good] = np.NaN
-            bias[good] -= np.mean(bias[good])
+            bias[good] -= np.median(bias[good])
 
         allb[ievts] = bias
         return allb
@@ -294,6 +323,27 @@ class SymetricExpectedValueAlignment:
             **kwa)-> np.ndarray:
         "runs the algorithm"
         return cls(**kwa)(data, precision, projector)
+
+    @staticmethod
+    def __data(events, icyc, previous) -> Tuple[np.ndarray, np.ndarray]:
+        vals = np.concatenate(events)+previous[icyc]
+        inds = np.argsort(vals)
+        return vals[inds], icyc[inds]
+
+    def __averageout(self, vals, cycs, previous, precision):
+        if self.averageout <= 0.:
+            return
+
+        rng = self.eventwindow*precision
+        tmp = np.copy(previous)
+        for i in range(cycs.max()):
+            cur    = vals[cycs == i]
+            minpos = np.searchsorted(vals, cur-rng)
+            maxpos = np.searchsorted(vals, cur+rng, 'right')
+            avg    = np.mean([np.average(tmp[cycs[i1:i2]],
+                                         weights = self.__norm(vals[i1:i2]-point, precision))
+                              for i1, i2, point in zip(minpos, maxpos, cur)])
+            previous[i] = previous[i]*(1.-self.averageout) + self.averageout*avg
 
     @classmethod
     def __avg(cls, pos, center, point, prec):
@@ -308,10 +358,114 @@ class SymetricExpectedValueAlignment:
         pos *= -.5
         return np.exp(pos)
 
-class PeakExpectedValueAlignment(SymetricExpectedValueAlignment):
+class SymetricExpectedPositionCOBYLAAlignment:
+    """
+    For each cycle, we find the best position such that expected position
+    probabilities are symetric and that expected position are clustered together
+
+    Expected probabilities are for a given event and its neighbour the gaussian
+    from that neighbour to the expected position of the event.
+
+    The expected position of an event is the average of neighbouring events weighted
+    by a gaussian from those neighbours to the event.
+
+    In otherwords, we minimize ||B - B'||² - ||C||², where B and C are a NxN
+    matrix with N the number of events and:
+
+        B_ij           = Gauss(x_ij, x_ii, e_i)
+        C_ij           = Gauss(e_i, e_j, e_i)
+
+    where:
+
+        e_i            = ∑_j x_ij Gauss(x_ij, x_ii, x_ii)
+        Gauss(α, β, γ) = exp(-( (α-β) δ(||α - γ|| < ξ σ) /σ )²/2)
+
+    This minimization is performed along all axes (ie events) at a time using a
+    COBYLA minimizer
+    """
+    eventwindow     = 4
+    searchwindow    = 2.5
+    weights         = 1., 1.
+    constraintrange = 3.
+    rhobegin        = 1/3
+    rhoend          = 1/20
+    @initdefaults
+    def __init__(self, **kwa):
+        pass
+
+    @classmethod
+    def run(cls,
+            data:      Iterable[np.ndarray],
+            precision: float     = None,
+            projector: Histogram = None,
+            **kwa)-> np.ndarray:
+        "runs the algorithm"
+        return cls(**kwa)(data, precision, projector)
+
+    def __call__(self,
+                 data:      Union[np.ndarray, Iterable[np.ndarray]],
+                 precision: float     = None,
+                 projector: Histogram = None)-> np.ndarray:
+        """
+        Estimation of all cycle deltas at a time.
+
+        This takes a minute to run.
+        """
+        if projector is not None:
+            data, prec = projector.positionsandprecision(data, precision)
+        elif precision is None:
+            raise ValueError()
+        else:
+            tmp        = np.empty(len(cast(Sized, data)), dtype = 'O')
+            tmp[:]     = [np.asarray(i, dtype = 'f4') for i in data]
+            data, prec = tmp, cast(float, precision)
+
+        return fmin_cobyla(lambda x: self.biascost(x, data, prec),
+                           x0     = np.zeros(len(data), 'f8'),
+                           cons   = lambda x: self.biasconstraint(x, prec),
+                           rhobeg = prec*self.rhobegin, rhoend = prec*self.rhoend)
+
+    def biasconstraint(self, biases: np.ndarray, precision: float) -> float:
+        "best bias for a given cycle"
+        return np.sum(precision*self.constraintrange-np.abs(biases))
+
+    def biascost(self, bias: np.ndarray, events: np.ndarray, precision: float) -> float:
+        "bias cost"
+        evts      = np.sort(np.concatenate([i+j for i, j in zip(events, bias)]))
+        minpos    = np.searchsorted(evts, evts-self.eventwindow*precision)
+        maxpos    = np.searchsorted(evts, evts+self.eventwindow*precision, 'right')
+        epos      = np.array([self.__avg(evts[ix1:ix2], pos, precision)
+                              for ix1, ix2, pos in zip(minpos, maxpos, evts)],
+                             dtype = 'f4')
+        expect    = np.empty(len(evts), dtype = 'O')
+        expect[:] = [self.__wgt(evts[ix1:ix2], pos, precision)
+                     for ix1, ix2, pos in zip(minpos, maxpos, epos)]
+
+        cost      = 0.
+        if self.weights[0]:
+            for ipos, ix1, ix2 in zip(range(len(evts)), minpos, maxpos):
+                tmp   = [i[j] for i, j in zip(expect[ix1:ix2], ipos-minpos[ix1:ix2])]
+                cost += lnorm(expect[ipos] - tmp)**2
+
+        if self.weights[1]:
+            pkcount  = sum(lnorm(self.__wgt(epos[ix1:ix2], pos, precision))**2
+                           for ix1, ix2, pos in zip(minpos, maxpos, epos))
+            cost    -= self.weights[1] * pkcount
+        return cost
+
+    @staticmethod
+    def __wgt(left: np.ndarray, right:float, precision: float):
+        return np.exp(-.5*((left-right)/precision)**2)
+
+    @classmethod
+    def __avg(cls, left: np.ndarray, right:float, precision: float):
+        return np.average(left, weights = cls.__wgt(left, right, precision))
+
+class PeakExpectedPositionAlignment(SymetricExpectedPositionAlignment):
     "Aligns cycles using a maximum likelihood position on events in the cycle"
     estimations = 2
     rigidity    = .1
+    averageout  = 0.
     @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
