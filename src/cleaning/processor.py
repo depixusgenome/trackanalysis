@@ -27,6 +27,9 @@ class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
         super().__init__(**kwa)
         Task.__init__(self, **kwa)
 
+    def __eq__(self, other):
+        return Task.__eq__(self, other)
+
     def __getstate__(self):
         state = super().__getstate__()
         state.update(self.__dict__)

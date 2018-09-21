@@ -74,6 +74,9 @@ class DataCleaning(AberrantValuesRule, # pylint: disable=too-many-ancestors
         for base in DataCleaning.__bases__:
             base.__init__(self, **_) # type: ignore
 
+    def __eq__(self, other):
+        return all(base.__eq__(self, other) for base in DataCleaning.__bases__)
+
     def __getstate__(self):
         state = dict(self.__dict__)
         for base in DataCleaning.__bases__:
