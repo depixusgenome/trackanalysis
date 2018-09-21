@@ -3,20 +3,104 @@
 """
 Scripts for aligning beads & tracks
 """
-from   typing                               import Dict
+from   typing                               import Dict, NamedTuple, Any, Optional
 import pandas                               as     pd
 import numpy                                as     np
-import holoviews                            as     hv # pylint: disable=import-error
+import holoviews                            as     hv
 from   utils                               import initdefaults
+from   sequences                           import (Translator,
+                                                   read  as _seqread,
+                                                   peaks as _seqpeaks)
 from   peakcalling.toreference             import (Range, # pylint: disable=unused-import
                                                    CorrectedHistogramFit, Pivot)
 from   peakcalling.tohairpin               import ChiSquareFit, matchpeaks, HairpinFitter
 from   peakfinding.groupby.histogramfitter import PeakFlagger
-from   model.__scripting__.tasks           import Tasks
+from   model.__scripting__.tasks           import Tasks, Task
 
-def createpeaks(tracks, **kwa):
+def getreference(tracks) -> Optional[str]:
+    "returns the reference track"
+    return next((i for i in tracks
+                 if sum(i.lower().count(j) for j in 'atcg') != len(i)),
+                None)
+
+def getoligos(tracks) -> Dict[str, str]:
+    "return the oligo for a track"
+    return {Translator.reversecomplement(i.lower()): i
+            for i in tracks
+            if sum(i.lower().count(j) for j in 'atcg') == len(i)}
+
+def createpeaks(tracks, *args: Task, fullstats = True, target = None, **kwa):
     "create peaks for all tracks"
-    return PeaksAlignment(**kwa).peaks(tracks)
+    kwa.update((i, Tasks(i)(**j)) for i, j in kwa.items() if isinstance(j, dict))
+    kwa.update((Tasks(_).name, _) for _ in args)
+
+    data = PeaksAlignment(**kwa).peaks(tracks)
+
+    if fullstats:
+        vals = [(i, j, k) for i, j in tracks.items()
+                for k in data[data.track == i].bead.unique()]
+        data = (data
+                .set_index(["track", "bead"])
+                .join(pd.DataFrame({"hfsigma": [j.rawprecision(k) for i, j, k in vals],
+                                    "track":   [i for i, j, k in vals],
+                                    "bead":    [k for i, j, k in vals]})
+                      .set_index(["track", "bead"]))
+               )
+
+    if target:
+        mers  = getoligos(tracks)
+        lst   = [getreference(tracks)] if getreference(tracks) else []
+
+        size  = max(len(i) for i in mers)
+        assert all(len(i) == size for i in mers)
+        assert len(mers)+len(lst) == len(tracks)
+
+        targ  = target.lower()
+        lst  += [mers[targ[k:k+size]]
+                 for k in range(len(targ)-size+1) # type: ignore
+                 if targ[k:k+size] not in targ[:k+size] and targ[k:k+size] in mers]
+
+        tord = pd.DataFrame({'trackorder': np.arange(len(tracks)), 'track': lst})
+        data = data.join(tord.set_index('track')).reset_index()
+        data.sort_values('trackorder', inplace = True)
+    return data
+
+class HPPositions(NamedTuple): # pylint: disable=missing-docstring
+    seq: str
+    target: str
+    oligo: str
+    pos: pd.DataFrame
+
+def hppositions(tracks, fname:str):
+    "return a pd.DataFrame of positions"
+    allv   = dict(_seqread(fname))
+    seq    = allv["full"].upper()
+    target = allv["target"].upper()
+    oligo  = allv["oligo"].upper()
+
+    ref   = getreference(tracks)
+    assert isinstance(ref, str)
+    tmp   = {j: _seqpeaks(seq, i)
+             for i, j in list(getoligos(tracks).items())+[(ref, ref)]}.items()
+    pos   = pd.DataFrame(dict(track    = [i for i, j in tmp for k in j],
+                              position = [k for i, j in tmp for k in j['position']],
+                              strand   = [k for i, j in tmp for k in j['orientation']]))
+
+    tgt           = _seqpeaks(seq, target)['position'][0]
+    pos['target'] = ((pos.position <= tgt) & (pos.position > (tgt-len(target))))
+    return HPPositions(seq, target, oligo, pos)
+
+def resolutiongraph(data, *keys: str, rng = (0., 8.)):
+    "show resolutions"
+    def _fcn(key):
+        info = data[key].assign(resolution = data[key].resolution*1e3)
+        return hv.BoxWhisker(info, ['trackcount', 'bead'],  'resolution')
+
+    out = (hv.DynamicMap(_fcn, kdims = ['data'])
+           .redim.values(data = list(keys))
+           .redim.range(resolution = rng))
+
+    return out if len(keys) != 1 else out[keys[0]]
 
 class PeaksAlignment:
     """
@@ -164,7 +248,7 @@ class PeaksAlignment:
             new = {i: self.hpalign.optimize(j)  for i, j in pos.items()}
             return {i: (j[0], j[1]*new[i][1], j[1]*j[2]+new[i][2]/j[1]) for i, j in corr.items()}
 
-        elif self.refalign is not None:
+        if self.refalign is not None:
             out  = self.hpalign.optimize(pos[ref])
             corr = {i: (j[0], j[1]*out[1], j[1]*j[2]+out[2]/j[1]) for i, j in corr.items()}
             if self.hprefalign and len(self.hprefalign.peaks):
@@ -253,8 +337,8 @@ class PeaksAlignment:
                 ).redim.label(avg = 'base pairs')
                 *(hv.Scatter(data, ref, cols, label = 'peaks')
                   (plot  = dict(size_index     = 'resolution',
-                                scaling_factor = 10000 ),
-                   style = dict(alpha = .01))
+                                scaling_factor = 15000),
+                   style = dict(alpha = .01, line_alpha=.1))
                  ).redim.label(**{cols[0]: 'base pairs'})
                )
 
@@ -280,3 +364,43 @@ class PeaksAlignment:
                             np.repeat(positions, len(xvals))), **args)
         return out(plot  = plot  if plot else dict(),
                    style = style if style else dict())
+
+class PeaksAlignmentConfig(PeaksAlignment):
+    """
+    config for aligning peaks
+    """
+    def __init__(self, hpin = None, pivots = None, **kwa):
+        super().__init__(**kwa)
+        self.hpin:   HPPositions    = HPPositions(*hpin) if hpin else None
+        self.pivots: Dict[int, Any] = pivots if pivots else {}
+        if self.hpin:
+            self.sethppeaks(self.hpin.seq, self.hpin.oligo)
+
+    def show(self, data, # pylint: disable=too-many-arguments
+             keys       = (),
+             beads      = (),
+             trackorder = 'trackorder',
+             align      = True) -> hv.DynamicMap:
+        "return a dynamic map"
+        def _fcn(key, bead):
+            return self.display(data[key][data[key].bead == bead], 'ref',
+                                trackorder = trackorder,
+                                align      = align,
+                                pivot      = self.pivots.get(bead, 'min'))
+
+        out = (hv.DynamicMap(_fcn, kdims = ['data', 'bead'])
+               .redim.values(data = list(keys), bead = list(beads)))
+        if self.hpin:
+            pos    = self.hpin.pos
+            tracks = list(pos.track.unique())
+            ref    = pos[pos.track == getreference(tracks)].position.values
+            out    = (out
+                      *hv.Scatter(pos[pos.target & pos.strand], 'track', 'position')
+                      (style ={'color':'green'})
+                      *hv.Scatter(pos[pos.target & ~pos.strand], 'track', 'position')
+                      (style ={'color':'red'})
+                      *hv.Scatter((np.repeat(tracks, ref.size),
+                                   np.concatenate([ref]*len(tracks))))
+                      (style ={'color':'gray'})
+                     )
+        return out

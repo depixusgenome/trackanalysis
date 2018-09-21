@@ -38,7 +38,7 @@ class PeakCorrelationAlignmentAction:
     def costarray(self, wtab, projector) -> Union[int,np.ndarray]:
         "computes a z-cost array"
         if not self.zcost:
-            return lambda x: x,
+            return lambda x: (x,)
 
         osamp = projector.exactoversampling
         if wtab.cost[1:] == (self.maxmove, self.zcost, osamp):
@@ -429,6 +429,7 @@ class SymetricExpectedPositionCOBYLAAlignment:
         "best bias for a given cycle"
         return np.sum(precision*self.constraintrange-np.abs(biases))
 
+    # pylint: disable=too-many-locals
     def biascost(self, bias: np.ndarray, events: np.ndarray, precision: float) -> float:
         "bias cost"
         evts      = np.sort(np.concatenate([i+j for i, j in zip(events, bias)]))
