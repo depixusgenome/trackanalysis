@@ -34,34 +34,38 @@ def createpeaks(tracks, *args: Task, fullstats = True, target = None, **kwa):
     kwa.update((i, Tasks(i)(**j)) for i, j in kwa.items() if isinstance(j, dict))
     kwa.update((Tasks(_).name, _) for _ in args)
 
-    data = PeaksAlignment(**kwa).peaks(tracks)
-
-    if fullstats:
-        vals = [(i, j, k) for i, j in tracks.items()
-                for k in data[data.track == i].bead.unique()]
-        data = (data
-                .set_index(["track", "bead"])
-                .join(pd.DataFrame({"hfsigma": [j.rawprecision(k) for i, j, k in vals],
-                                    "track":   [i for i, j, k in vals],
-                                    "bead":    [k for i, j, k in vals]})
-                      .set_index(["track", "bead"]))
-               )
-
     if target:
-        mers  = getoligos(tracks)
+        mers  = {Translator.reversecomplement(i): j
+                 for i, j in getoligos(tracks).items()}
         lst   = [getreference(tracks)] if getreference(tracks) else []
 
         size  = max(len(i) for i in mers)
         assert all(len(i) == size for i in mers)
         assert len(mers)+len(lst) == len(tracks)
 
-        targ  = target.lower()
+        targ  = Translator.reversecomplement(target.lower())
         lst  += [mers[targ[k:k+size]]
                  for k in range(len(targ)-size+1) # type: ignore
-                 if targ[k:k+size] not in targ[:k+size] and targ[k:k+size] in mers]
+                 if targ[k:k+size] not in targ[:k+size-1] and targ[k:k+size] in mers]
 
         tord = pd.DataFrame({'trackorder': np.arange(len(tracks)), 'track': lst})
-        data = data.join(tord.set_index('track')).reset_index()
+        tord.set_index('track', inplace = True)
+
+    data = PeaksAlignment(**kwa).peaks(tracks)
+
+    if fullstats:
+        vals = [(i, j, k) for i, j in tracks.items()
+                for k in data[data.track == i].bead.unique()]
+        fdf  = (pd.DataFrame({"hfsigma": [j.rawprecision(k) for i, j, k in vals],
+                              "track":   [i for i, j, k in vals],
+                              "bead":    [k for i, j, k in vals]})
+                .set_index(["track", "bead"]))
+        data.set_index(["track", "bead"], inplace = True)
+        data = data.join(fdf)
+
+    if target:
+        data = data.join(tord)
+        data.reset_index(inplace = True)
         data.sort_values('trackorder', inplace = True)
     return data
 
