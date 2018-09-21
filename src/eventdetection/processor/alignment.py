@@ -9,9 +9,9 @@ import numpy              as     np
 from   utils              import initdefaults
 from   model              import Task, Level, PHASE
 from   control.processor  import Processor
-from   .._core            import (ExtremumAlignment, # pylint: disable=import-error
-                                  PhaseEdgeAlignment, ExtremumAlignmentMode,
-                                  translate, medianthreshold)
+from   .._core            import (translate, medianthreshold, # pylint: disable=import-error
+                                  ExtremumAlignment, ExtremumAlignmentMode,
+                                  PhaseEdgeAlignment, PhaseEdgeAlignmentMode)
 
 def _min_extension():
     try:
@@ -115,11 +115,14 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
         def bias(self, phase, window, edge, percentile):
             "aligns a phase"
             if edge is not None:
+                mode  = (PhaseEdgeAlignmentMode.left if edge == 'left' else
+                         PhaseEdgeAlignmentMode.right)
                 align = PhaseEdgeAlignment(window     = window,
-                                           edge       = edge,
+                                           mode       = mode,
                                            percentile = percentile)
             else:
-                mode  = ExtremumAlignmentMode.median
+                mode  = (ExtremumAlignmentMode.min if phase == PHASE.pull else
+                         ExtremumAlignmentMode.max)
                 align = ExtremumAlignment(binsize = window, mode = mode)
             return align.compute(self.bead, self.phase(phase), self.phase(phase+1))
 
