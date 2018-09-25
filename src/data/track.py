@@ -24,7 +24,7 @@ _PRECISIONS  = Dict[BEADKEY, float]
 
 def _doc(tpe):
     if tpe.__doc__:
-        doc = tpe.__doc__.strip()
+        doc = cast(str, tpe.__doc__).strip()
         return doc[0].lower()+doc[1:].replace('\n', '\n    ')+"\n"
     return None
 
@@ -70,7 +70,7 @@ class FoV:
     * `beads` is a dictionnary of information per bead:
     """
     if __doc__:
-        __doc__ += ''.join(f'    {i}\n' for i in Bead.__doc__.split('\n')[-4:])
+        __doc__ += ''.join(f'    {i}\n' for i in cast(str, Bead.__doc__).split('\n')[-4:])
 
     image                       = np.empty((0,0), dtype = np.uint8)
     beads:         BEADS        = {}
@@ -229,7 +229,7 @@ class ResettingProperty:
 
 class ViewDescriptor:
     "Access to views"
-    tpe : type           = None
+    tpe : Optional[type] = None
     args: Dict[str, Any] = dict()
     def __get__(self, instance, owner):
         return self if instance is None else instance.view(self.tpe, **self.args)
@@ -270,7 +270,7 @@ class PhaseManipulator:
         phases = trk.phases[cycs]
         first  = phases[:,0]
         if isinstance(cycs, slice):
-            last = trk.phases[cycs.start+1:cycs.stop+1:cycs.step,0]
+            last = trk.phases[cycs.start+1:cycs.stop+1:cycs.step,0] # type: ignore
         else:
             tmp  = cycs+1
             last = trk.phases[tmp[tmp < len(trk.phases)],0]
@@ -306,15 +306,17 @@ class PhaseManipulator:
     ncycles  = cast(int, property(lambda self: self._track.ncycles))
     nphases  = cast(int, property(lambda self: self._track.nphases))
     if __doc__:
-        __doc__ += f"   * `cut`: {cut.__doc__.strip()}\n"
-        __doc__ += f"   * `duration`: {duration.__doc__.strip()}\n"
-        __doc__ += f"   * `select`: {select.__doc__.strip()}\n"
+        __doc__ += "   * `cut`: "      + cast(str, cut.__doc__)     .strip()+"\n"
+        __doc__ += "   * `duration`: " + cast(str, duration.__doc__).strip()+"\n"
+        __doc__ += "   * `select`: "   + cast(str, select.__doc__)  .strip()+"\n"
 
     def __duration(self, cid:PIDTYPE = None, pid:IDTYPE = None) -> Union[np.ndarray, int]:
         phases = self._track.phases
-        pid    = (range(pid, None if pid == -1 else pid+1) if isinstance(pid, int) else
-                  range(phases.shape[1])                   if isellipsis(pid)      else
-                  range(pid.start, pid.stop))
+
+        pid    = (range(pid, cast(int, None if pid == -1 else pid+1))
+                  if isinstance(pid, int) else
+                  range(phases.shape[1]) if isellipsis(pid)      else
+                  range(pid.start, cast(int, pid.stop)))
 
         start = 0 if pid.start is None else pid.start
         if pid.stop == start:
@@ -383,16 +385,16 @@ class Track:
     """
     if __doc__:
         __doc__= __doc__.format(secondaries = _doc(Secondaries), fov = _doc(FoV))
-    key: str   = None
-    instrument = cast(Dict[str, Any],      LazyProperty())
-    phases     = cast(np.ndarray,          LazyProperty())
-    framerate  = cast(float,               LazyProperty())
-    fov        = cast(FoV,                 LazyProperty())
-    secondaries= cast(Secondaries,         LazyProperty(tpe = Secondaries))
-    path       = cast(Optional[PATHTYPES], ResettingProperty())
-    axis       = cast(Axis,                ResettingProperty())
-    data       = cast(DATA,                property(lambda self: self.getdata(),
-                                                    lambda self, val: self.setdata(val)))
+    key: Optional[str] = None
+    instrument         = cast(Dict[str, Any],      LazyProperty())
+    phases             = cast(np.ndarray,          LazyProperty())
+    framerate          = cast(float,               LazyProperty())
+    fov                = cast(FoV,                 LazyProperty())
+    secondaries        = cast(Secondaries,         LazyProperty(tpe = Secondaries))
+    path               = cast(Optional[PATHTYPES], ResettingProperty())
+    axis               = cast(Axis,                ResettingProperty())
+    data               = cast(DATA,                property(lambda self: self.getdata(),
+                                                            lambda self, val: self.setdata(val)))
     @initdefaults('key',
                   **{i: '_' for i in locals() if i != 'key' and i[0] != '_'})
     def __init__(self, **_):
@@ -495,15 +497,15 @@ class Track:
         else:
             self.__dict__['_lazydata_'] = val
 
-    _framerate                  = 30.
-    _fov: FoV                   = None
-    _instrument: Dict[str, Any] = {"type": InstrumentType.picotwist, "name": None}
-    _phases                     = np.empty((0,9), dtype = 'i4')
-    _data:          DATA        = None # type: ignore
-    _secondaries:   DATA        = None
-    _rawprecisions              = {}
-    _path:          PATHTYPES   = None
-    _axis                       = Axis.Zaxis
+    _framerate                   = 30.
+    _fov:         Optional[FoV]  = None
+    _instrument:  Dict[str, Any] = {"type": InstrumentType.picotwist, "name": None}
+    _phases                      = np.empty((0,9), dtype = 'i4')
+    _data:        Optional[DATA] = None # type: ignore
+    _secondaries: Optional[DATA] = None
+    _rawprecisions               = {}
+    _path:        Optional[PATHTYPES] = None
+    _axis                             = Axis.Zaxis
 
     # pylint: disable=unused-argument,function-redefined,no-self-use
     @overload

@@ -55,8 +55,8 @@ class BeadInfo:
     """
     bead related info
     """
-    stretch: float               = CyclesModelConfig.estimatedstretch
-    bias   : float               = None
+    stretch: float           = CyclesModelConfig.estimatedstretch
+    bias   : Optional[float] = None
     @initdefaults
     def __init__(self, **kwa):
         pass
@@ -89,7 +89,7 @@ class CyclesPlotDisplay(PlotDisplay):
             old.__dict__.update(**info)
 
         res: INFO = dict(self.info)
-        res.setdefault(tasks.roottask, {})[tasks.bead] = old
+        res.setdefault(tasks.roottask, {})[tasks.bead] = cast(BeadInfo, old)
         return res
 
 class CyclesPlotModel(PlotModel):

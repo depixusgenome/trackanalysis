@@ -13,7 +13,7 @@ from .                      import (read as _readsequence, peaks as _sequencepea
 class SequenceConfig:
     "data for a DNA sequence"
     name                                       = "sequence"
-    path: str                                  = None
+    path:      Optional[str]                   = None
     sequences: Dict[str, str]                  = {}
     probes:    Sequence[str]                   = []
     history  : List[Union[str, Sequence[str]]] = []

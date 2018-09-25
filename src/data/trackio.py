@@ -521,15 +521,14 @@ def _savetrack(args):
     setattr(new, '_path', args[1])
     return args[0], new
 
+# pylint: disable=unused-argument,function-redefined
 @overload
-def savetrack(path: PATHTYPE, track: 'Track') -> 'Track': # pylint: disable=unused-argument
+def savetrack(path: PATHTYPE, track: 'Track') -> 'Track':
     "saves a track"
     pass
 
 @overload
-def savetrack(path  : PATHTYPE,     # pylint: disable=unused-argument,function-redefined
-              track : TDICT_T       # pylint: disable=unused-argument
-             ) -> TDICT_T:
+def savetrack(path  : PATHTYPE, track : TDICT_T) -> TDICT_T: # type: ignore
     "saves a tracksdict"
     pass
 

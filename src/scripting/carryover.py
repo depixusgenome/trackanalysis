@@ -9,7 +9,7 @@ import json
 import re
 from glob import glob
 from os.path import getmtime, split
-from typing import List, NamedTuple, Tuple
+from typing import List, NamedTuple, Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -133,13 +133,14 @@ class DuplicateData:
 
     def findhistory(self)->List[ChronoItem]:
         "finds chronological order of experiments using files mtime"
-        history = [ChronoItem(self.totimestamp(f),re.match(self._pattern,f).groups()[0].upper())
+        history = [ChronoItem(self.totimestamp(f),
+                              re.match(self._pattern,f).groups()[0].upper()) # type: ignore
                    for f in glob(self.path) if re.match(self._pattern,f)]
         self.history = sorted(history)
         return self.history
 
     @staticmethod
-    def findtrackfromana(anafile:str)->str:
+    def findtrackfromana(anafile:str) -> Optional[str]:
         "returns the track which is the source of anafile"
         # implementation might change
         ana = json.load(open(anafile,"r"))
@@ -148,7 +149,7 @@ class DuplicateData:
             name = name[0] if isinstance(name,list) else name
             return name
         except StopIteration:
-            LOGGER.info(f"could not extract track from {split(anafile)[1]}")
+            LOGGER.info("could not extract track from %s", split(anafile)[1])
         return None
 
     @staticmethod

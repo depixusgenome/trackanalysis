@@ -128,7 +128,7 @@ class FitBead(NamedTuple): # pylint: disable=missing-docstring
     peaks      : PEAKS_TYPE
     events     : PeakEvents
 
-class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]):
+class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=too-many-ancestors
     "iterator over peaks grouped by beads"
     level  = Level.bead
     @staticmethod
@@ -174,7 +174,7 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]):
                      events  : PeakEvents,
                      dist    : Dict[Optional[str], Distance],
                     ) -> FitBead:
-        best = min(dist, key = dist.__getitem__)
+        best = cast(str, min(dist, key = dist.__getitem__))
         silh = HairpinFitter.silhouette(dist, best)
         alg  = self.config.match.get(best, self.config.DEFAULT_MATCH())
         ids  = alg.pair(peaks, *dist.get(best, (0., 1., 0))[1:])
@@ -231,6 +231,6 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
                     out['avg']  .append([np.nanmean(j) for j in evt['data']])
                     out['start'].append(evt['start'])
         out2 = {i: np.concatenate(j) for i, j in out.items()}
-        out2.update({i: (out2['avg']-j.bias)*j.stretch
+        out2.update({cast(str, i): (out2['avg']-j.bias)*j.stretch
                      for i, j in res.distances.items()})
         return out2

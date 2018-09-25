@@ -26,9 +26,9 @@ if TYPE_CHECKING:
     class _Ellipsis:
         pass
 
-_m_none    = type('_m_none', (), {}) # pylint: disable=invalid-name
-_M_PROC_T  = Type[Processor]
-_M_PROCS_T = Union[Iterable[_M_PROC_T], _M_PROC_T]
+_m_none    = type('_m_none', (), {})                # pylint: disable=invalid-name
+_M_PROC_T  = Type[Processor]                        # pylint: disable=invalid-name
+_M_PROCS_T = Union[Iterable[_M_PROC_T], _M_PROC_T]  # pylint: disable=invalid-name
 PATHTYPE   = Union[str, Path]
 PATHTYPES  = Union[PATHTYPE,Tuple[PATHTYPE,...]]
 
@@ -40,7 +40,7 @@ class ProcessorController:
         self.data              = Cache()
         self.copy              = copy
 
-    def task(self, task:Union[Type[Task],int], noemission = False) -> Task:
+    def task(self, task:Union[Type[Task],int], noemission = False) -> Optional[Task]:
         "returns a task"
         tsk = None
         if isinstance(task, Task):
@@ -169,7 +169,7 @@ class BaseTaskController(Controller):
     def task(self,
              parent : Optional[RootTask],
              task   : Union[Type[Task], int],
-             noemission = False) -> Task:
+             noemission = False) -> Optional[Task]:
         "returns a task"
         ctrl = ProcessorController() if parent is None else self._items[parent]
         return ctrl.task(task, noemission = noemission)
@@ -184,7 +184,7 @@ class BaseTaskController(Controller):
         "returns the root cache, i;e. the track"
 
     @overload
-    def track(self, # pylint: disable=no-self-use,unused-argument,function-redefined
+    def track(self, # type: ignore # pylint: disable=no-self-use,unused-argument,function-redefined
               parent: '_Ellipsis') -> Iterator['Track']:
         "returns all root cache, i;e. tracks"
 

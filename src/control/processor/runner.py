@@ -82,7 +82,7 @@ class Runner:
 
         self.data:  Cache                         = data
         self.pool:  Optional[ProcessPoolExecutor] = pool
-        self.gen:   Iterator[TrackView]           = gen
+        self.gen:   Optional[Iterator[TrackView]] = gen
         self.level: Level                         = toenum(Level, level)
 
     def __getstate__(self):
@@ -106,7 +106,9 @@ class Runner:
 
     def tolevel(self, curr: Optional[Tuple[Level,Level]]):
         "Changes a generator to fit the processor's level"
-        if curr in (None, Level.none):
+        if curr is None:
+            return
+        if curr is Level.none:
             return
 
         old  = self.level
@@ -232,8 +234,8 @@ def pooledinput(pool, pickled, frame) -> dict:
         return dict(frame)
 
     else:
-        ind = max((i for i, j in enumerate(data) if j.canpool()),
-                  default = None)
+        tmp                = (i for i, j in enumerate(data) if j.canpool())
+        ind: Optional[int] = max(tmp, default = None) # type: ignore
         if ind is None:
             cnf  = dict(data = data)
         else:
@@ -242,7 +244,7 @@ def pooledinput(pool, pickled, frame) -> dict:
             for proc in args.data:
                 if not proc.task.disabled:
                     proc.run(args)
-            gen  = tuple(i.freeze() for i in args.gen
+            gen  = tuple(i.freeze() for i in cast(Iterator[TrackView], args.gen)
                          if i.parents == frame.parents[:len(cast(tuple, i.parents))])
             cnf  = dict(gen = gen, level = args.level, data = list(data[ind:]))
 

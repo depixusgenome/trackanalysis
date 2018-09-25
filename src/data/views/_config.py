@@ -5,7 +5,8 @@ from   inspect          import signature
 from   copy             import copy as shallowcopy
 from   itertools        import product
 from   functools        import partial
-from   typing           import Tuple, Iterable, Union, List, TypeVar, Hashable, cast
+from   typing           import (Tuple, Iterable, Union, List, TypeVar, Hashable,
+                                Callable, Optional, cast)
 import numpy            as     np
 
 from   utils            import isfunction
@@ -24,7 +25,7 @@ def _m_torange(sli):
 _m_INDEX = int, cast(type, np.integer), str, tuple
 
 CSelf = TypeVar('CSelf',  bound = 'TrackViewConfigMixin')
-class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
+class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name,inherit-non-class
     """
     This object provides a view on all {views} as well as *time* and *magnet altitude*.
     {datadescr}
@@ -62,12 +63,12 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
     ```python{chaincode}
     ```
     """
-    data:      TRACK_VIEW             = None
-    selected:  List                   = None
-    discarded: List                   = None
-    actions:   List                   = []
+    data:      Optional[TRACK_VIEW]   = None
+    selected:  Optional[List]         = None
+    discarded: Optional[List]         = None
+    actions:   List[Callable]         = []
     parents:   Union[Tuple, Hashable] = tuple()
-    _COPY:     bool                   = None
+    _COPY:     Optional[bool]         = None
     def __init__(self, **kw) -> None:
         super().__init__()
         get = lambda x: kw.get(x, shallowcopy(getattr(self.__class__, x)))

@@ -58,8 +58,8 @@ def read(stream:Union[Path, str, Dict[str,str], TextIO]) -> Iterator[Tuple[str,s
 
     return _read(cast(TextIO, open(cast(str, stream))))
 
-PEAKS_DTYPE = [('position', 'i4'), ('orientation', 'bool')]
-PEAKS_TYPE  = Sequence[Tuple[int, bool]]
+PEAKS_DTYPE = [('position', 'i4'), ('orientation', 'bool')] # pylint: disable=invalid-name
+PEAKS_TYPE  = Sequence[Tuple[int, bool]]                    # pylint: disable=invalid-name
 
 class Translator:
     "Translates a sequence to peaks"
@@ -255,11 +255,11 @@ class NonLinearities(Translator):
         """
         returns the difference to the a single strand in nm
         """
-        size  = np.zeros(len(self.sequence), dtype = 'f4')
+        size  = np.zeros(len(self.sequence), dtype = 'f4') # type: ignore
         diff  = self.doublestrand - self.singlestrand
         allo  = (oligos,) if isinstance(oligos, str) else oligos
         for olig in cast(Iterable[str], allo):
-            pks  = self.peaks(self.sequence, olig)
+            pks  = self.peaks(cast(str, self.sequence), olig)
             good = pks['position']
             if self.orientation is not None:
                 good = good[pks['orientation'] == self.orientation]

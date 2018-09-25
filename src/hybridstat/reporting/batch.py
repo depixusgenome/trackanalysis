@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Batch creator for hybridstat tasks"
-from typing                         import Optional, Dict, Iterator, Union, Sequence, cast
+from typing                         import (Optional, Dict, Iterator, Union,
+                                            Sequence, Iterable, cast)
 from copy                           import deepcopy
 from pathlib                        import Path
 import re
@@ -88,8 +89,8 @@ OLIGO_PATTERNS = {1: (r'.*[_-]{}[-_].*'
 
 class HybridstatIO(PathIO):
     "Paths (as regex) on which to run"
-    sequence: PATHTYPE                = None
-    idpath:   PATHTYPE                = None
+    sequence: Optional[PATHTYPE]      = None
+    idpath:   Optional[PATHTYPE]      = None
     useparams                         = False
     oligos: Union[Sequence[str], str] = OLIGO_PATTERNS[1]
     @initdefaults(frozenset(locals()))
@@ -135,7 +136,7 @@ class HybridstatBatchProcessor(BatchProcessor[HybridstatBatchTask]):
         if isinstance(oligos, str):
             trkpath = (track.path,) if isinstance(track.path, str) else track.path
             pattern = re.compile(oligos, re.IGNORECASE)
-            for path in trkpath:
+            for path in cast(Iterable[str], trkpath):
                 match = pattern.match(str(path))
                 if match is not None:
                     return [i.lower().replace('[','').replace(']', '')
@@ -151,7 +152,7 @@ class HybridstatBatchProcessor(BatchProcessor[HybridstatBatchTask]):
             return
 
         if paths.sequence is None:
-            if len(modl.identity.fit) == 0:
+            if len(getattr(modl.identity, 'fit')) == 0:
                 modl.identity = None
             return
 

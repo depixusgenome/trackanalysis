@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "Task & Processor for removing correlated drifts"
 from functools              import partial
-from typing                 import Dict, Union, Sequence, Tuple, Any, cast
+from typing                 import (Iterator, Dict, Union, Sequence, Tuple, Any,
+                                    Optional, cast)
 
 import numpy as np
 
@@ -20,15 +21,15 @@ from .stitching                 import StitchAlg, SingleFitStitch
 
 class DriftTask(Task, EventDetectionConfig):
     "Removes correlations between cycles"
-    level                 = Level.bead
-    phases                = PHASE.measure, PHASE.measure
-    events                = EventDetector()
-    collapse: CollapseAlg = CollapseToSock()
-    stitch:   StitchAlg   = SingleFitStitch()
-    zero                  = 10
-    precision: float      = None
-    rawfactor             = 1.
-    onbeads               = True
+    level                      = Level.bead
+    phases                     = PHASE.measure, PHASE.measure
+    events                     = EventDetector()
+    collapse: CollapseAlg      = CollapseToSock()
+    stitch:   StitchAlg        = SingleFitStitch()
+    zero                       = 10
+    precision: Optional[float] = None   # type: ignore
+    rawfactor                  = 1.
+    onbeads                    = True
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         Task.__init__(self)
@@ -39,12 +40,12 @@ class DriftTask(Task, EventDetectionConfig):
         "whether this task implies long computations"
         return True
 
-_DRIFT_CACHE = Dict[Union[int,Sequence[int]], Any]
+_DriftCache = Dict[Union[int,Sequence[int]], Any]
 class _BeadDriftAction:
     "Action to be passed to a Cycles"
     _DATA  = Sequence[np.ndarray]
     def __init__(self, args: Union[dict,DriftTask], cache = None) -> None:
-        self.cache: _DRIFT_CACHE = {} if cache is None else cache
+        self.cache: _DriftCache  = {} if cache is None else cache
         self.done:  set          = set()
         self.task:  DriftTask    = cast(DriftTask,
                                         args if isinstance(args, DriftTask)
@@ -57,7 +58,7 @@ class _BeadDriftAction:
     def __setstate__(self, vals):
         self.__init__(vals)
 
-    def __events(self, frame:Cycles) -> Events:
+    def __events(self, frame:Cycles) -> Iterator[Range]:
         if self.task.events is None:
             yield from (Range(0, i) for _, i in frame)
         else:

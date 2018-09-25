@@ -6,7 +6,7 @@ Classes defining a type of data treatment.
 **Warning** Those definitions must remain data-independant.
 """
 from pathlib        import Path
-from typing         import Sequence, Dict, Tuple, Union, List
+from typing         import Sequence, Dict, Tuple, Union, List, Optional
 
 from utils          import initdefaults
 from ..level        import Level
@@ -36,10 +36,10 @@ class TrackReaderTask(RootTask):
     * `key`: a name by which to call the track. Defaults to the filename.
     * `axis`: which axis to load, It can be "X" "Y" or "Z"
     """
-    path:      PATHTYPE = None
-    copy:      bool     = False
-    key:       str      = None
-    axis:      str      = 'Z'
+    path: Optional[PATHTYPE] = None
+    copy: bool               = False
+    key:  Optional[str]      = None
+    axis: str                = 'Z'
     def __init__(self, path = None, **kwa) -> None:
         super().__init__(**kwa)
         lst = 'path', 'key', 'axis'
@@ -58,10 +58,10 @@ class TrackReaderTask(RootTask):
 
 class CycleCreatorTask(Task):
     "Iterate over cycles and beads"
-    levelin    = Level.bead
-    levelou    = Level.cycle
-    first: int = None
-    last:  int = None
+    levelin              = Level.bead
+    levelou              = Level.cycle
+    first: Optional[int] = None
+    last:  Optional[int] = None
     @initdefaults(('first', 'last'))
     def __init__(self, **_) -> None:
         super().__init__()
@@ -81,8 +81,8 @@ class CycleSamplingTask(Task):
 
     * `cycles`: a slice or list of cycles to select.
     """
-    cycles: Union[Sequence[int], slice] = None
-    level                               = Level.bead
+    cycles: Union[Sequence[int], slice, None] = None
+    level                                     = Level.bead
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_) -> None:
         super().__init__()
@@ -102,12 +102,12 @@ class DataSelectionTask(Task):
     * `discarded`: the beads (`Beads`) or beads and cycles (`Cycles`) to be discarded.
     * `cycles`: the cycles to select (`Beads`).
     """
-    level                                  = Level.none
-    samples:   Union[Sequence[int], slice] = None
-    phases:    Union[Tuple[int,...], int]  = None
-    selected:  List                        = None
-    discarded: List                        = None
-    cycles:    slice                       = None
+    level                                        = Level.none
+    samples:   Union[None, Sequence[int], slice] = None
+    phases:    Union[None, Tuple[int,...], int]  = None
+    selected:  Optional[List]                    = None
+    discarded: Optional[List]                    = None
+    cycles:    Optional[slice]                   = None
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_) -> None:
         super().__init__()

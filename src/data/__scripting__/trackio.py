@@ -4,7 +4,7 @@
 "Loading and save tracks"
 import sys
 from   pathlib                   import Path
-from   typing                    import Optional, Union, Any, Dict
+from   typing                    import Optional, Union, Any, Dict, cast
 
 import anastore
 from   model.__scripting__.track import LocalTasks
@@ -32,7 +32,8 @@ class ScriptAnaIO(_TrackIO):
             if data is not None:
                 rep = lambda x: Path(str(x)
                                      .replace("\\", "/")
-                                     .replace('//samba.picoseq.org/shared/data', data))
+                                     .replace('//samba.picoseq.org/shared/data',
+                                              cast(str, data)))
         cnf['path']  = tuple(rep(i) for i in cnf['path'])
         cnf          = Handler.todict(Track(**cnf))
 

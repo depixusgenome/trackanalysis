@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "bringing togethe toobar components"
-from typing         import Dict, Any
-import bokeh.layouts as layouts
+from typing         import Dict, Any, Optional
+from bokeh.layouts  import layouts
 
 from utils          import initdefaults
 from view.base      import threadmethod, spawn
@@ -18,7 +18,7 @@ class DAQRecordTheme:
     title           = "Record path"
     filetypes       = "h5"
     description     = 'record files'
-    initialdir: str = None
+    initialdir: Optional[str] = None
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):

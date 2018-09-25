@@ -7,7 +7,7 @@ from   tornado.web import StaticFileHandler, RequestHandler
 
 ROUTE = 'view'
 if 'app.scripting' in sys.modules:
-    sys.modules['app.scripting'].addload(__name__)
+    sys.modules['app.scripting'].addload(__name__) # type: ignore
 
 def server(kwa):
     "adds a router to the server"

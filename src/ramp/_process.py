@@ -5,7 +5,7 @@
 subdivise this file into Opening/closing processors, and good, fixed and bad bead detection
 '''
 
-from typing import Set, List, Dict
+from typing import Set, List, Dict, cast
 import numpy
 import pandas as pd
 
@@ -169,7 +169,7 @@ class RampProcess:
         '''
         # check that the bead never opens
         closed = (data.dataz[data.bcids].max()-data.dataz[data.bcids].min())\
-                 <model.getMinExt()
+                 <model.getminext()
         clids = {i[0] for i in data.bcids if\
                  all([closed[bcid] for bcid in data.bcids if bcid[0]==i[0]]) }
         return RampProcess._beadids_corr2zmag(model,data,toconsider = clids)
@@ -191,8 +191,8 @@ class RampProcess:
 
         corr = dataz.corr()
         beadids=[]
-        for bid in toconsider:
-            if all(corr[(bid,cid)][("zmag",cid)]>model.corrThreshold
+        for bid in cast(set, toconsider):
+            if all(corr[(bid,cid)][("zmag",cid)]>model.corrthreshold
                    for cid in range(data.ncycles) ):
                 beadids.append(bid)
 

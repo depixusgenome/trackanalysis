@@ -4,7 +4,7 @@
 """
 Adds shortcuts for using holoview
 """
-from   typing             import List, Union
+from   typing             import List, Union, Optional
 from   functools          import partial, wraps
 from   concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
@@ -46,15 +46,15 @@ class TracksDictDisplay(BasicDisplay,
             Thus zooming and spanning is independant.
             * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
     """
-    _beads:     List[BEADKEY]          = None
-    _keys:      List[str]              = None
-    _name:      str                    = None
-    _overlay:   str                    = None
-    _reference: str                    = None
-    _refdims                           = True
-    _reflayout                         = 'left'
-    _labels:    Union[None, bool, str] = True
-    KEYWORDS                           = BasicDisplay.KEYWORDS | frozenset(locals())
+    _beads:     Optional[List[BEADKEY]] = None
+    _keys:      Optional[List[str]]     = None
+    _name:      Optional[str]           = None
+    _overlay:   Optional[str]           = None
+    _reference: Optional[str]           = None
+    _refdims                            = True
+    _reflayout                          = 'left'
+    _labels:    Union[None, bool, str]  = True
+    KEYWORDS                            = BasicDisplay.KEYWORDS | frozenset(locals())
     @staticmethod
     def addtodoc(new):
         "adds display documentation"

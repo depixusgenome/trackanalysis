@@ -10,8 +10,8 @@ from pathlib                import Path
 from openpyxl               import load_workbook
 from excelreports.creation  import writecolumns
 
-ID_TYPE  = Tuple[int,str,Optional[float],Optional[float]]
-IDS_TYPE = List[ID_TYPE]
+ID_TYPE  = Tuple[int,str,Optional[float],Optional[float]] # pylint: disable=invalid-name
+IDS_TYPE = List[ID_TYPE]  # pylint: disable=invalid-name
 
 def _id(row, ibead):
     val = row[ibead].value
@@ -70,13 +70,13 @@ def _read_summary(rows) -> IDS_TYPE:
         if ids.count(None) != 4:
             break
 
-    info = list() # type: List[Tuple[int,str,float,float]]
+    info: IDS_TYPE = list()
     if ids.count(None) == 0:
         cnv = (_id, lambda r, i: str(r[i].value), _tofloat, _tofloat) # type: Sequence[Callable]
         for row in rows:
             vals = tuple(fcn(row, idx) for fcn, idx in zip(cnv, ids))
             if None not in vals[:2]:
-                info.append(cast(Tuple[int, str, Optional[float], Optional[float]], vals))
+                info.append(vals) # type: ignore
     return info
 
 def _read_identifications(rows) -> IDS_TYPE:

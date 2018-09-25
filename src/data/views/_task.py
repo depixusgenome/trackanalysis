@@ -27,7 +27,7 @@ class TaskView(TrackView, Generic[Config, Key]):
 
         self.config: Config         = cast(Config, cnf)
         self.cache                  = cache
-        self.__keys: FrozenSet[Key] = None
+        self.__keys: Optional[FrozenSet[Key]] = None
 
     @classmethod
     def tasktype(cls) -> Type[Config]:

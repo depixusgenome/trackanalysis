@@ -35,14 +35,14 @@ class BeadController:
         if self.track is None:
             return iter(tuple())
 
-        selected = None
         procs    = self.__tasks.processors(self._ctrl)
         if procs is None:
             return iter(tuple())
 
+        selected = None
         for itm in procs.data.items():
             selected = itm.proc.beads(itm.cache(), selected)
-        return selected
+        return cast(Iterable[int], selected)
 
     @property
     def discarded(self):
@@ -101,7 +101,8 @@ class DataSelectionBeadController(BeadController):
     def discarded(self) -> Iterable[int]:
         "returns beads discarded by the DataSelectionTask"
         tsk = self.task
-        return cast(Iterable[int], tuple()) if tsk is None else tsk.discarded
+        return (cast(Iterable[int], tuple()) if tsk is None else
+                cast(Iterable[int], tsk.discarded))
 
     @discarded.setter
     def discarded(self, vals: Iterable[int]):

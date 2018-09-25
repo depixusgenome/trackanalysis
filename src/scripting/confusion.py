@@ -3,7 +3,7 @@
 "Compute confusion matrix using the experiments and the real sequence"
 from   inspect        import getmembers
 from   typing         import (Union, List, Sequence, Iterator, Tuple, Any,
-                              Iterable, NamedTuple)
+                              Iterable, NamedTuple, Optional)
 import numpy          as np
 import pandas         as pd
 
@@ -136,8 +136,9 @@ class DetectionFrameCreator(DataFrameCreator):
                                  axis = 0) < self.brother
         self.theo       = theo[strands[0]]
 
+    # pylint: disable=arguments-differ
     @classmethod
-    def iterate(cls, # type: ignore # pylint: disable=arguments-differ
+    def iterate(cls, # type: ignore
                 config: ConfusionMatrix, data: pd.DataFrame,
                 hptarget = 'target') -> Iterator[Iterator]:
         """
@@ -234,7 +235,8 @@ class LNAHairpinDataFrameCreator(DataFrameCreator):
         super().__init__(config)
         if references is None:
             references  = self.seq.references
-        self.references = oligopeaks(references, self.seq)[0 if strand.value else 1]
+        self.references = (oligopeaks(references, self.seq) # type: ignore
+                           [0 if strand.value else 1])
 
     @classmethod
     def iterate(cls, # type: ignore # pylint: disable=arguments-differ
@@ -282,7 +284,7 @@ class LNAHairpinDataFrameCreator(DataFrameCreator):
         return theopos
 
     @staticmethod
-    def expposcolumn(_, __, grp: pd.DataFrame) -> float:
+    def expposcolumn(_, __, grp: pd.DataFrame) -> Optional[float]:
         "the experimental positions in µm"
         try:
             return grp.exppos[grp.detection].first

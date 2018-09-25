@@ -5,7 +5,7 @@ Track Analysis inputs and outputs.
 
 This does not include track files io.
 """
-from   typing       import Union, IO, Any, Optional
+from   typing       import Union, IO, Any, Optional, cast
 from   contextlib   import closing
 from   pathlib      import Path
 import json
@@ -97,7 +97,7 @@ def load(path:Union[str,Path,IO], patch = 'tasks', fromxlsx = False, **kwa):
     cpy    = dict(kwa)
     cpy.update(fromxlsx = fromxlsx)
     for key, fcn in _EXTRACTORS:
-        if not cpy.get(key, key is None):
+        if not cpy.get(cast(str, key), key is None):
             continue
 
         stream = fcn(path, **kwa) # type: ignore

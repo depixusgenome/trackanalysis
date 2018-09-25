@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=too-many-ancestors
 "Updating PeaksDict for oligo mapping purposes"
-from   typing                   import List, Sequence, Tuple, Dict, Callable, Union, cast
+from   typing                   import (List, Sequence, Tuple, Dict, Callable,
+                                        Optional, Union, cast)
 from   concurrent.futures       import ProcessPoolExecutor
 from   copy                     import deepcopy
 from   scipy.interpolate        import interp1d
@@ -51,14 +52,14 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
     * *sequencestyle*, *eventstyle*, *peakstyle* can be used to set the style
     of corresponding graph elements.
     """
-    _zero           = True
-    _sequence       = None
-    _oligos         = None
-    _fit            = True
-    _reference: str = None
-    _sequencestyle  = dict(color = 'gray')
-    _reftask        = FitToReferenceTask()
-    KEYWORDS        = _PeaksDisplay.KEYWORDS | frozenset(locals())
+    _zero                     = True
+    _sequence                 = None
+    _oligos                   = None
+    _fit                      = True
+    _reference: Optional[str] = None
+    _sequencestyle            = dict(color = 'gray')
+    _reftask                  = FitToReferenceTask()
+    KEYWORDS                  = _PeaksDisplay.KEYWORDS | frozenset(locals())
     def __init__(self, items, **opts):
         super().__init__(items, **opts)
         if self._bias is not None or None not in (self._sequence, self._oligos):

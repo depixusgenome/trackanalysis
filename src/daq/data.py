@@ -3,7 +3,7 @@
 """
 The database
 """
-from   typing  import Iterable, Tuple
+from   typing  import Iterable, Tuple, cast
 import numpy   as     np
 from   .model  import DAQBeadsClient
 
@@ -29,7 +29,9 @@ class RoundRobinVector:
         """
         arr = self._array
         cur = self._index
-        return cur, arr[old.stop:cur.stop] if old.start <= cur.start < old.stop else arr[cur]
+        if cast(int, old.start) <= cast(int, cur.start) < cast(int, old.stop):
+            return cur, arr[old.stop:cur.stop]
+        return cur, arr[cur]
 
     def getnextlines(self, count) -> Tuple[np.ndarray, slice]:
         """
@@ -39,7 +41,7 @@ class RoundRobinVector:
         cur  = self._index
         size = self._length
         ind  = slice(cur.stop, cur.stop+count)
-        if ind.stop > len(arr):
+        if cast(int, ind.stop) > len(arr):
             cur      = slice(0, size-count)
             arr[cur] = arr[count-size:]
             ind      = slice(cur.stop, size)
@@ -116,8 +118,9 @@ class BeadsRoundRobinVector(RoundRobinVector):
         self._nbeads   = nbeads
     setup = __init__
 
+    # pylint: disable=arguments-differ
     @staticmethod
-    def fulltype(nbeads:int,    # type: ignore # pylint: disable=arguments-differ
+    def fulltype(nbeads:int,    # type: ignore
                  columns: np.dtype,
                  *_):
         "create the dtype for all beads"

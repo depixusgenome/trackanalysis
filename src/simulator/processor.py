@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Processes TrackSimulatorTask"
 import numpy as np
+from typing             import Optional
 from utils              import initdefaults, EventsArray
 from model.task         import RootTask
 from model.level        import Level, PHASE
@@ -13,8 +14,8 @@ from .bindings          import Experiment
 
 class _SimulatorTask(TrackSimulator):
     u"Class indicating that a track file should be added to memory"
-    nbeads: int = 1
-    seed:   int = None
+    nbeads: int           = 1
+    seed:   Optional[int] = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -30,10 +31,10 @@ class EventSimulatorTask(_SimulatorTask, RootTask):
 
 class ByPeaksEventSimulatorTask(Experiment, RootTask):
     u"Class that creates fake peak data each time it is called upon"
-    nbeads:  int = 1
-    seed:    int = None
-    ncycles: int = 20
-    levelou      = Level.peak
+    nbeads:  int           = 1
+    seed:    Optional[int] = None
+    ncycles: int           = 20
+    levelou                = Level.peak
     @initdefaults(frozenset(locals()) - {'levelou'})
     def __init__(self, **kwa):
         super().__init__(**kwa)

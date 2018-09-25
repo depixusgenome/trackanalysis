@@ -54,7 +54,7 @@ class ChartCreator:
         self._pos    = tuple(peaks.columnindex(u'Peak Position in Reference',
                                                u'Hybridisation Rate'))
         self._parent = parent
-        self._rseries:dict = None
+        self._rseries: Optional[Dict] = None
         self._row    = peaks.tablerow()+1
         self._sheet  = peakstype.sheet_name
 

@@ -4,7 +4,7 @@
 Stiches profiles together when some points are lacking.
 """
 from    typing          import (Optional, Union, # pylint: disable=unused-import
-                                Callable, Sequence, Iterable, cast)
+                                Callable, Sequence, Iterable, Iterator, cast)
 
 import  numpy as np
 from    numpy.lib.stride_tricks import as_strided
@@ -36,18 +36,18 @@ class StitchByDerivate(CollapseByDerivate):
             data = tuple(data)
         data  = cast(Sequence[Range], data)
 
-        der           = super().__call__
-        last: int     = None
-        tmp:  Profile = None
+        der                     = super().__call__
+        last: Optional[int]     = None
+        tmp:  Optional[Profile] = None
         for start, stop in _getintervals(prof.count, self.minoverlaps, np.less):
             if tmp is not None:
                 prof.value[last:start] += tmp.value[-1]-prof.value[last]
 
             sli  = slice(max(start-1, 0), stop+1)
-            mins = (max(sli.start, rng.start)                  for rng in data)
+            mins = cast(Iterator[int], (max(sli.start, rng.start) for rng in data))
             lens = (max(sli.stop-max(sli.start, rng.start), 0) for rng in data)
-            tmp  = der(Range(start, rng.values[start-rng.start:start-rng.start+stop])
-                       for start, stop, rng in zip(mins, lens, data))
+            tmp  = der(Range(i, rng.values[i-rng.start:i-rng.start+j])
+                       for i, j, rng in zip(mins, lens, data))
 
             ind  = 0 if start == 0 else 1
 
@@ -58,7 +58,7 @@ class StitchByDerivate(CollapseByDerivate):
 
             last  = stop
 
-        if tmp is not None and last < len(prof):
+        if tmp is not None and last is not None and last < len(prof):
             prof.value[last:] += tmp.value[-1]-prof.value[last]
         return prof
 
@@ -181,7 +181,7 @@ class SingleFitStitch:
         rngs   = _getintervals(prof.count, self.minoverlaps, np.greater_equal)
         if len(rngs) < 1:
             return prof
-        elif len(rngs) < 2:
+        if len(rngs) < 2:
             rngs = rngs[None]
         else:
             stride = rngs.strides[-1]*2, rngs.strides[-1]*2, rngs.strides[-1]

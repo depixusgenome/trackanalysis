@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
-from typing                     import Dict, List, Tuple
+from typing                     import Dict, List, Tuple, cast
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
@@ -178,13 +178,12 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         self._widgets['advanced'].ismain(_)
 
     def _reset(self, cache:CACHE_TYPE):
-        dicos = None
+        tmp = None
         try:
-            dicos = self.__data()
+            tmp = self.__data()
         finally:
-            self.__enabler.disable(cache, dicos is None)
-            if dicos is None:
-                dicos = self.__defaults()
+            self.__enabler.disable(cache, tmp is None)
+            dicos = self.__defaults() if tmp is None else tmp
 
             for i, j in dicos.items():
                 cache[self._src[i]].update(data = j)

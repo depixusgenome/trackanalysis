@@ -23,7 +23,7 @@ from   ..processor                  import (ExtremumAlignmentTask,
                                             EventDetectionTask)
 from   ..data                       import Events
 
-_RETURN_TYPE = FrozenSet[Tuple[int, int]]
+_RETURN_TYPE = FrozenSet[Tuple[int, int]] # pylint: disable=invalid-name
 class Comparator:
     """
     This allows selecting cycles which accept provided conditions.
@@ -133,7 +133,8 @@ class _EventsMixin:
     """
     One can also select cycles which accept provided conditions.
     """
-    __doc__ = __doc__ + '\n'.join(Comparator.__doc__.split('\n')[2:])
+    if __doc__:
+        __doc__ = __doc__ + '\n'.join(Comparator.__doc__.split('\n')[2:]) # type: ignore
 
     def swap(self,
              data: Union[Track, TracksDict, Cycles, str, Axis] = None,

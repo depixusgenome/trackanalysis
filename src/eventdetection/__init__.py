@@ -24,4 +24,4 @@ class EventDetectionConfig(PrecisionAlg):
         super().__init__(**_)
 
     if __doc__:
-        __doc__ +=  type(events).__doc__[type(events).__doc__.find("#")-5:]
+        __doc__ +=  type(events).__doc__[type(events).__doc__.find("#")-5:] # type: ignore

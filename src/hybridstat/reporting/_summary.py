@@ -46,7 +46,7 @@ class SummarySheet(Reporter):
         return 1
 
     @column_method("Newly Clustered", exclude = Reporter.nohairpin)
-    def _identified(self, _, bead:Bead) -> bool:
+    def _identified(self, _, bead:Bead) -> Optional[bool]:
         """
         Whether the bead was clustered now or whether its reference comes from
         a previous report
@@ -66,22 +66,20 @@ class SummarySheet(Reporter):
                    units   = 'µm',
                    fmt     = '0.0000',
                    exclude = lambda x: not x.isxlsx())
-    def _sigmapeaks(self, ref:Group, bead:Bead) -> float:
+    def _sigmapeaks(self, ref:Group, bead:Bead) -> Optional[float]:
         """
         Median uncertainty on peak positions.
         """
         if bead is None:
             if ref.key is None:
                 return None
-            else:
-                npeaks = len(self.config.hairpins[ref.key].peaks[:-1])
+            npeaks = len(self.config.hairpins[ref.key].peaks[:-1])
             return self._sigmap(npeaks)
-
         return self._sigmap(len(bead.peaks))
 
     @staticmethod
     @column_method("Silhouette", cond = dict(type = 'data_bar'))
-    def _silh(_, bead:Bead) -> float:
+    def _silh(_, bead:Bead) -> Optional[float]:
         """
         Silhouette of the bead: cluster quality factor.
         Values range from -1 (bad) to 1. (good).
@@ -95,7 +93,7 @@ class SummarySheet(Reporter):
 
     @staticmethod
     @column_method("Distance")
-    def _dist(_, bead:Bead) -> float:
+    def _dist(_, bead:Bead) -> Optional[float]:
         """
         distance to group's central bead:
         how likely this beads belongs to the group
@@ -191,7 +189,7 @@ class SummarySheet(Reporter):
         return '{}%'.format(int(100.*nundef/npks))
 
     @column_method("Valid Cycles")
-    def _ncycles(self, _, bead:Bead) -> int:
+    def _ncycles(self, _, bead:Bead) -> Optional[int]:
         "Number of valid cycles for a given bead."
         return None if bead is None else self.beadncycles(bead)
 

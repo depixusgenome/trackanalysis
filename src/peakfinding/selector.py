@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Selects peaks and yields all events related to each peak"
-from   typing               import Callable, cast
+from   typing               import Callable, Optional, cast
 import numpy                as     np
 
 from utils                  import (initdefaults, asobjarray, asdataarrays, asview,
@@ -65,18 +65,19 @@ class PeakSelector(PrecisionAlg):
     *aligned* events.
     """
 
-    rawfactor                            = 2.
-    histogram                            = Histogram(edge = 2)
-    align:      PeakCorrelationAlignment = None
-    peakalign:  PeakPostAlignment        = GELSPeakAlignment()
-    finder:     PeakFinder               = ByHistogram()
+    rawfactor                                      = 2.
+    histogram                                      = Histogram(edge = 2)
+    align:      Optional[PeakCorrelationAlignment] = None
+    peakalign:  Optional[PeakPostAlignment]        = GELSPeakAlignment()
+    finder:     PeakFinder                         = ByHistogram()
 
     if __doc__:
         __doc__ += "\n    # Default algorithms\n"
         __doc__ += f"\n    ## `{type(align).__module__}.{type(align).__qualname__}`\n"
-        __doc__ += type(PeakCorrelationAlignment).__doc__.replace("\n    #", "\n    ##")
+        __doc__ += (cast(str, type(PeakCorrelationAlignment).__doc__)
+                    .replace("\n    #", "\n    ##"))
         __doc__ += f"\n    ## `{type(finder).__module__}.{type(finder).__qualname__}`\n"
-        __doc__ += type(finder).__doc__.replace("\n    #", "\n    ##")
+        __doc__ += cast(str, type(finder).__doc__).replace("\n    #", "\n    ##")
 
     @initdefaults(frozenset(locals()) - {'rawfactor'})
     def __init__(self, **_):
@@ -118,7 +119,7 @@ class PeakSelector(PrecisionAlg):
     def __measure(self, peak, evts):
         if self.histogram.zmeasure is None:
             return peak
-        elif isinstance(self.histogram.zmeasure, str):
+        if isinstance(self.histogram.zmeasure, str):
             zmeas = getattr(np, self.histogram.zmeasure)
         else:
             zmeas = cast(Callable, self.histogram.zmeasure)

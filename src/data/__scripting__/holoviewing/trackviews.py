@@ -17,15 +17,15 @@ displayhook(Beads, Cycles)
 
 class Display(BasicDisplay): # pylint: disable=abstract-method
     "displays the beads or cycles"
-    _kdim                      = 'bead'
-    _labels  : Union[str,bool] = None
-    _tpe                       = 'curve'
-    _overlay                   = False
-    _keys                      = None
-    _stretch                   = 1.
-    _bias                      = 0.
-    _alpha                     = 1.
-    KEYWORDS                   = BasicDisplay.KEYWORDS | frozenset(locals())
+    _kdim                            = 'bead'
+    _labels  : Union[None, str,bool] = None
+    _tpe                             = 'curve'
+    _overlay                         = False
+    _keys                            = None
+    _stretch                         = 1.
+    _bias                            = 0.
+    _alpha                           = 1.
+    KEYWORDS                         = BasicDisplay.KEYWORDS | frozenset(locals())
     def __init__(self, items, **opts):
         super().__init__(items, **opts)
         if isinstance(self._tpe, str):

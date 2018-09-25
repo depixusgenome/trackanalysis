@@ -7,7 +7,7 @@ need to allow for beads with only a subset of good cycles
 need to add a little marker specifying when the data is loaded
 Add a test : if min molextension is too big
 '''
-from typing import Optional, Tuple , Set, List # pylint: disable=unused-import
+from typing import Optional, Tuple , Set, List
 import numpy
 import pandas as pd
 from data import Track
@@ -59,13 +59,13 @@ class RampModel:
 class RampData: # pylint: disable=too-many-public-methods
     '''sets up ramp analysis using RampModel for parametrisation'''
 
+    dzdt:  pd.DataFrame
+    bcids: List[Tuple[int,int]]
+    ncycles: int
+    det: pd.DataFrame
     def __init__(self, **kwargs) -> None:
         self.dataz = kwargs.get("data", None)
         self.model = kwargs.get("model", None)
-        self.dzdt = None # type: Optional[pd.DataFrame]
-        self.bcids = None # type: List[Tuple[int,int]]
-        self.ncycles = None # type: int
-        self.det = None # type: Optional[pd.DataFrame]
         self.track = kwargs.get("track", None)
         if self.dataz is not None :
             self._setup()
@@ -87,7 +87,9 @@ class RampData: # pylint: disable=too-many-public-methods
         '''
         returns the set of bead ids
         '''
-        return {i[0] for i in self.bcids}
+        if self.bcids:
+            return {i[0] for i in self.bcids}
+        return set()
 
     def zmagids(self):
         '''

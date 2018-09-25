@@ -99,7 +99,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
         if track is None:
             return self._defaults()
 
-        cycles, meas  = self._measures(track)
+        cycles, meas  = self._measures(track) # type: ignore
         if meas is None or len(meas) == 0:
             return self._defaults()
 
@@ -139,8 +139,9 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
     _theme: ExtensionPlotTheme
     def __init__(self, ctrl, mdl: QualityControlModelAccess) -> None:
         super().__init__(ctrl, mdl, False)
-        self._plotmodel.theme  = ExtensionPlotTheme()
-        self._plotmodel.config = ExtensionPlotConfig()
+        mdl        = cast(DriftControlPlotModel, self._plotmodel)
+        mdl.theme  = ExtensionPlotTheme()
+        mdl.config = ExtensionPlotConfig()
         self.addto(ctrl, False)
 
     def _addtodoc(self, *_):

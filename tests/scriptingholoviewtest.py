@@ -5,7 +5,7 @@
 "Tests interval detection"
 import sys
 from   typing  import TYPE_CHECKING
-sys.modules['ACCEPT_SCRIPTING'] = 'jupyter'
+sys.modules['ACCEPT_SCRIPTING'] = 'jupyter' # type: ignore
 from scripting import *
 from IPython   import get_ipython # pylint:disable=import-error,wrong-import-order
 

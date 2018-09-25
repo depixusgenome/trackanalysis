@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Batch creator basics"
 from typing             import (TypeVar, Iterator, Union, Iterable, Sequence,
-                                Type, cast)
+                                Type, Optional, cast)
 from pathlib            import Path
 from copy               import deepcopy, copy as shallowcopy
 from itertools          import chain
@@ -15,7 +15,7 @@ from data.trackio       import PATHTYPES, PATHTYPE
 from model.task         import RootTask, Task, Level
 from .base              import Processor
 
-class BatchTemplate(Iterable):
+class BatchTemplate(Iterable): # pylint: disable=inherit-non-class
     "Template of tasks to run"
     def __init__(self, **_):
         super().__init__()
@@ -37,8 +37,8 @@ class BatchTemplate(Iterable):
 
 class PathIO:
     "Paths (as regex) on which to run"
-    track:     PATHTYPES = ''
-    reporting: PATHTYPE  = None
+    track:     PATHTYPES           = ''
+    reporting: Optional[PATHTYPE]  = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
@@ -47,10 +47,10 @@ class BatchTask(RootTask):
     """
     Constructs a list of tasks depending on a template and paths.
     """
-    levelin      = Level.project
-    levelou      = Level.peak
-    paths:    Sequence[PathIO] = []
-    template: BatchTemplate    = None
+    levelin                           = Level.project
+    levelou                           = Level.peak
+    paths:    Sequence[PathIO]        = []
+    template: Optional[BatchTemplate] = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -120,14 +120,13 @@ class BatchProcessor(Processor[BTaskType]):
         if isinstance(path, dict):
             return pathtype(**path, **kwa)
 
-        elif isinstance(path, pathtype):
+        if isinstance(path, pathtype):
             return update(shallowcopy(path), **kwa)
 
-        elif isinstance(path, (tuple, str, Path)):
+        if isinstance(path, (tuple, str, Path)):
             return pathtype(track = path, **kwa)
 
-        else:
-            raise TypeError('Could not create {} using {}'.format(pathtype, path))
+        raise TypeError('Could not create {} using {}'.format(pathtype, path))
 
     @classmethod
     def model(cls, paths: PathIO, modl: BatchTemplate) -> Sequence[Task]:

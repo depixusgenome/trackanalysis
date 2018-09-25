@@ -7,8 +7,9 @@ from typing import (Dict, Any, FrozenSet, Optional, List, Union, Iterable,
                     Sequence, NamedTuple, Tuple, cast)
 import numpy  as np
 
-RAND_STATE = Union[int, None, np.random.RandomState]
-def randstate(seed: RAND_STATE = 0) -> np.random.RandomState:
+RandState = Union[int, None, np.random.RandomState]
+
+def randstate(seed: RandState = 0) -> np.random.RandomState:
     "return a random state"
     return seed if isinstance(seed, np.random.RandomState) else np.random.RandomState(seed)
 
@@ -231,7 +232,7 @@ class StrandClosing(Object):
     def __call__(self,
                  cnf: 'Experiment',
                  base: np.ndarray,
-                 seed: RAND_STATE = None) -> StrandClosingTruth:
+                 seed: RandState = None) -> StrandClosingTruth:
         rnd    = randstate(seed)
         inds   = cnf.phases.indexes('rampdown', 'measure')
         frames = self.start + np.int32(rnd.poisson(self.mean, cnf.ncycles))+inds[0]
@@ -264,6 +265,8 @@ class BrownianMotion(Object):
 
     def phasesigma(self, val)-> float:
         "phase 3 extension"
+        if self.sigma is None:
+            return 0.
         return  (self.sigma*self.pullfactor  if val == 3            else
                  self.sigma*self.relaxfactor if val == 0 or val > 6 else
                  self.sigma)
@@ -271,7 +274,7 @@ class BrownianMotion(Object):
     def __call__(self,
                  cnf   : 'Experiment',
                  events: np.ndarray = None,
-                 seed  : RAND_STATE = None) -> np.ndarray:
+                 seed  : RandState = None) -> np.ndarray:
         """
         Add brownian motion
         """
@@ -449,7 +452,7 @@ class Experiment(Object):
         "reset *all* attributes"
         self.__init__(**kwa)
 
-    def eventpositions(self, seed: RAND_STATE = None) -> np.ndarray:
+    def eventpositions(self, seed: RandState = None) -> np.ndarray:
         """
         Creates events positions
         """
@@ -459,7 +462,7 @@ class Experiment(Object):
             return evts
         return self.brownianmotion(self, seed = seed)
 
-    def eventdurations(self, seed: RAND_STATE = None) -> np.ndarray:
+    def eventdurations(self, seed: RandState = None) -> np.ndarray:
         """
         Creates events using provided positions, rates and durations.
         """
@@ -479,7 +482,7 @@ class Experiment(Object):
         roff[np.cumsum(roff, axis = 1) > self.phases['measure']] = 0.
         return roff
 
-    def events(self, seed: RAND_STATE = None) -> np.ndarray:
+    def events(self, seed: RandState = None) -> np.ndarray:
         "return a list of event data"
         durs = self.eventdurations(seed = seed)
 
@@ -505,7 +508,7 @@ class Experiment(Object):
              evts:  np.ndarray = None,
              drift: np.ndarray = None,
              base:  np.ndarray = None,
-             seed:  RAND_STATE = None
+             seed:  RandState = None
             ) -> Tuple[BeadTruth, np.ndarray]:
         """
         create one bead data
@@ -513,18 +516,14 @@ class Experiment(Object):
         rnd  = randstate(seed)
         if evts is None:
             evts = self.eventdurations(rnd)
-        bead = self.__beadstructure(evts)
-
-        if self.strandclosing:
-            closing = self.strandclosing(self, bead, rnd)
-        else:
-            closing = None
+        bead    = self.__beadstructure(evts)
+        closing = self.strandclosing(self, bead, rnd) if self.strandclosing else None
 
         if self.brownianmotion:
             self.brownianmotion(self, bead, rnd)
 
-        base  = (base                               if base is not None           else
-                 self.baseline(self, rnd)             if callable(self.baseline)     else
+        base  = (base                     if base is not None        else
+                 self.baseline(self, rnd) if callable(self.baseline) else
                  np.zeros(bead.size, dtype = 'f4'))
 
         if drift is None and callable(self.thermaldrift):
@@ -536,7 +535,7 @@ class Experiment(Object):
 
         return BeadTruth(closing, evts, base, drift), bead.ravel()
 
-    def track(self, nbeads: int = 1, seed: RAND_STATE = None, **kwa) -> Dict[str, Any]:
+    def track(self, nbeads: int = 1, seed: RandState = None, **kwa) -> Dict[str, Any]:
         """
         creates a track
         """

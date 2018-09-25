@@ -3,7 +3,8 @@
 """
 Basic stuff for dealing with peak calling
 """
-from   typing       import NamedTuple, Dict, Any, Optional, Union, Iterator, Tuple
+from   typing       import (NamedTuple, Dict, Any, Optional, Union,
+                            Iterator, Tuple, List, cast)
 from   enum         import Enum
 from   itertools    import product
 import numpy        as     np
@@ -26,7 +27,7 @@ class LBFGSParameters(NamedTuple): # pylint: disable=missing-docstring
     stopval:             float
     maxeval:             int
 
-OPTIM_TYPE = Union[CobylaParameters, LBFGSParameters]
+OptimType = Union[CobylaParameters, LBFGSParameters]
 
 class Range(NamedTuple): # pylint: disable=missing-docstring
     center:  Optional[float]
@@ -51,7 +52,7 @@ class Symmetry(Enum):
     left  = 'left'
     right = 'right'
 
-def config(self:OPTIM_TYPE, **kwa) -> Dict[str, float]:
+def config(self:OptimType, **kwa) -> Dict[str, float]:
     "returns the configuration"
     if isinstance(self, LBFGSParameters):
         vals = ('threshold_param_rel',
@@ -65,9 +66,9 @@ def config(self:OPTIM_TYPE, **kwa) -> Dict[str, float]:
 
 class OptimizationParams:
     "Optimizing parameters"
-    stretch           = Range(1./8.8e-4, 200., 100.)
-    bias              = Range(None,       60.*8.8e-4, 60.*8.8e-4)
-    optim: OPTIM_TYPE = LBFGSParameters(1e-4, 1e-8, 1e-4, 1e-8, 100)
+    stretch          = Range(1./8.8e-4, 200., 100.)
+    bias             = Range(None,       60.*8.8e-4, 60.*8.8e-4)
+    optim: OptimType = LBFGSParameters(1e-4, 1e-8, 1e-4, 1e-8, 100)
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
@@ -75,14 +76,13 @@ class OptimizationParams:
         "the stretch & bias constraints for the chisquare"
         scstr = ((self.stretch.center if self.stretch.center else 0.) - self.stretch.size,
                  (self.stretch.center if self.stretch.center else 0.) + self.stretch.size)
+        bcstr = None
         if self.bias.center is not None:
-            pots = [(self.bias.center - self.bias.size)*scstr[0],
-                    (self.bias.center - self.bias.size)*scstr[1],
-                    (self.bias.center + self.bias.size)*scstr[0],
-                    (self.bias.center + self.bias.size)*scstr[1]]
+            pots: List[float] = [(self.bias.center - self.bias.size)*scstr[0],
+                                 (self.bias.center - self.bias.size)*scstr[1],
+                                 (self.bias.center + self.bias.size)*scstr[0],
+                                 (self.bias.center + self.bias.size)*scstr[1]]
             bcstr = min(pots), max(pots)
-        else:
-            bcstr = None
         return scstr, bcstr
 
 class GriddedOptimization(OptimizationParams):
@@ -120,8 +120,8 @@ class PointwiseOptimization(OptimizationParams):
 
     def pointgrid(self, ref:np.ndarray, exp:np.ndarray) -> Iterator[Tuple[float, float]]:
         "computes stretch and bias for potential pairings"
-        minstretch = self.stretch.center - self.stretch.size
-        maxstretch = self.stretch.center + self.stretch.size
+        minstretch = cast(float, self.stretch.center) - cast(float, self.stretch.size)
+        maxstretch = cast(float, self.stretch.center) + cast(float, self.stretch.size)
         if self.bias.center is None:
             minbias, maxbias = -1e5, 1e5
         else:

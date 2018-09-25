@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Tasks related to peakfinding"
+from typing                         import Optional
 from functools                      import partial
 
 from utils                          import initdefaults
@@ -12,9 +13,9 @@ from ..probabilities                import Probability
 
 class PeakProbabilityTask(Task):
     "Computes probabilities for each peak"
-    level              = Level.peak
-    minduration: float = None
-    framerate:   float = None
+    level                        = Level.peak
+    minduration: Optional[float] = None
+    framerate:   Optional[float] = None
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         super().__init__(**kwa)

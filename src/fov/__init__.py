@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"all FoV view aspects here"
-from typing                 import Dict, List
+from typing                 import Dict, List, Optional
 import numpy as np
 from bokeh.models           import (ColumnDataSource, Range1d, TapTool, HoverTool,
                                     Selection)
@@ -80,7 +80,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
-        self.__idfov: int = None
+        self.__idfov: Optional[int] = None
 
     @property
     def __fov(self):

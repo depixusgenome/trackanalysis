@@ -170,7 +170,7 @@ class BeadTimeSeriesDisplay:
     xvar         = 'time'
     leftvar      = "z"
     rightvar     = "zmag"
-    current: int = None
+    current: Optional[int] = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass

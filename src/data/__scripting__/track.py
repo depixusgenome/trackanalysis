@@ -149,8 +149,10 @@ class TrackOperations:
 
 @extend(Track)
 class _TrackMixin:
-    __doc__  = ('    * `op` a'+TrackOperations.__doc__[6:]
-                +'\n    * `pathinfo` p'+PathInfo.__doc__[6:])
+    "Additional track methods"
+    if __doc__:
+        __doc__  = ('    * `op` a'          + cast(str, TrackOperations.__doc__)[6:]
+                    +'\n    * `pathinfo` p' + cast(str, PathInfo.__doc__)[6:])
     cleaned = LazyProperty('cleaned')
     def tasklist(self, *args):
         "creates a tasklist"

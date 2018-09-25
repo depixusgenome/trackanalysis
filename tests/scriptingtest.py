@@ -3,8 +3,9 @@
 # pylint: disable=redefined-builtin,wildcard-import,unused-wildcard-import
 # pylint: disable=wrong-import-position,ungrouped-imports,no-member
 "Tests interval detection"
+from   typing              import cast
 import sys
-sys.modules['ACCEPT_SCRIPTING'] = True
+sys.modules['ACCEPT_SCRIPTING'] = True # type: ignore
 import pickle
 from scripting             import Track, Tasks, localcontext #pylint: disable=no-name-in-module
 from data                  import Cycles
@@ -48,7 +49,7 @@ def test_track():
                 == [])
 
     assert track.tasks.subtraction is None
-    track.tasks.subtraction = 1
+    track.tasks.subtraction = 1 # type: ignore
     assert set(track.tasks.subtraction.beads) == {1}
     track.tasks.subtraction = 1,2
     assert set(track.tasks.subtraction.beads) == {1,2}
@@ -61,7 +62,7 @@ def test_track():
 
 def test_confusion():
     "test the confusion matrix"
-    peaks = pickle.load(open(utpath("hp6jan2018.peaks"), "rb"))
+    peaks = pickle.load(open(cast(str, utpath("hp6jan2018.peaks")), "rb"))
     peaks = peaks[peaks.track != 'ref']
     cnf   = ConfusionMatrix(oligos  = peaks.track.unique(),
                             seq     = LNAHairpin(path = utpath("hp6.fasta")))

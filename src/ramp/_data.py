@@ -23,14 +23,14 @@ class RampData: # pylint: disable=too-many-public-methods
     def __init__(self, **kwargs) -> None:
         self.dataz = kwargs.get("data", None)
         self.model = kwargs.get("model", None)
-        self.dzdt:Optional[pd.DataFrame] = None
-        self.bcids:List[Tuple[int,int]] = None
-        self.ncycles:int = None
+        self.dzdt:  Optional[pd.DataFrame]         = None
+        self.bcids: Optional[List[Tuple[int,int]]] = None
+        self.ncycles: Optional[int] = None
         self.det:Optional[pd.DataFrame] = None
         if self.dataz is not None :
             self._setup()
             if self.model is not None :
-                self.det = RampProcess.detect_outliers(self,self.model.scale)
+                self.det = RampProcess.detect_outliers(self,self.model.scale) # type: ignore
 
     @classmethod
     def open_track(cls,trk,model:RampModel):
@@ -44,6 +44,8 @@ class RampData: # pylint: disable=too-many-public-methods
         '''
         returns the set of bead ids
         '''
+        if self.bcids is None:
+            return  set()
         return {i[0] for i in self.bcids}
 
     def zmagids(self):

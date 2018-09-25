@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "easy access to cycles"
-from   typing import (TYPE_CHECKING, Iterator, # pylint: disable=unused-import
-                      Callable, Optional, Sequence, Tuple, Dict, Iterable,
-                      Union, Any, cast)
+from   typing import (TYPE_CHECKING, Iterator, Callable, Optional, Sequence,
+                      Tuple, Dict, Iterable, Union, Any, cast)
 from   copy   import copy as shallowcopy
 import numpy  as     np
 
@@ -58,10 +57,10 @@ class Cycles(TrackView, ITrackView):
                 * `track.cycles.selecting([(1,1), (1,2)])` selects bead 1 cycles 1 and 2""",
                                         views      = "cycles")
 
-    level      = Level.cycle
-    first: int = None
-    last:  int = None
-    _direct    = False  # type: bool
+    level                = Level.cycle
+    first: Optional[int] = None
+    last:  Optional[int] = None
+    _direct              = False
 
     @initdefaults(frozenset(locals()),
                   direct = lambda i, j: setattr(i, '_direct', j))
@@ -98,7 +97,8 @@ class Cycles(TrackView, ITrackView):
                 yield from ((thisid, cid) for cid in allcycles)
 
             else:
-                bid, tmp = thisid[0], thisid[1] # type: BEADKEY, Any
+                bid: BEADKEY = thisid[0]
+                tmp: Any     = thisid[1]
                 if isellipsis(bid) and isellipsis(tmp):
                     yield from ((col, cid) for col in beads for cid in allcycles)
                 elif isellipsis(bid):
@@ -147,7 +147,7 @@ class Cycles(TrackView, ITrackView):
         first   = 0                  if self.first is None else self.first
         last    = self.track.nphases if self.last  is None else self.last+1
         phase   = self.track.phase.select(..., (first, last))
-        data    = {} # type: Dict[BEADKEY, np.ndarray]
+        data: Dict[BEADKEY, np.ndarray] = {}
         def _getdata(bid:int, cid:int):
             bead = data.get(bid, None)
             if bead is None:
@@ -165,14 +165,15 @@ class Cycles(TrackView, ITrackView):
             if sel is None:
                 yield from cycles.__iter__() # pylint: disable=no-member
                 return
-            elif cycles.selected:
+            if cycles.selected:
                 parent = frozenset(cycles.keys())
                 sel    = [i for i in shallowcopy(cycles).selecting(sel, True).keys()
                           if i in parent]
             yield from shallowcopy(cycles).selecting(sel, clear = True).__iter__()
 
         elif self.direct:
-            yield from ((key, self.data[key]) for key in self.keys(sel))
+            tmp = cast(dict, self.data)
+            yield from ((key, tmp[key]) for key in self.keys(sel))
 
         else:
             yield from self.__iterfrombeads(sel)

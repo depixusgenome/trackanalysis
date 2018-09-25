@@ -114,7 +114,7 @@ class RandInit(BaseEM):
     used for demo and testing selection criteria
     if nsamples is not specified estimates number of peaks from kerneldensity
     """
-    nsamples : Union[int,Iterable[int]] = None
+    nsamples : Union[None, int,Iterable[int]] = None
     repeats  = 10
     withtime = True
     @initdefaults(frozenset(locals()))

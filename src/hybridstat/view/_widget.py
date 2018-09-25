@@ -84,9 +84,9 @@ class ReferenceWidget:
         return self.__widget
 
     def __data(self) -> dict:
-        lst   = list(self.__files())
-        menu  = [(j, str(i)) for i, j in enumerate(i for i, _ in lst)]
-        menu += [None, (self.__theme.none, '-1')]
+        lst        = list(self.__files())
+        menu: list = [(j, str(i)) for i, j in enumerate(i for i, _ in lst)]
+        menu      += [None, (self.__theme.none, '-1')]
 
         key   = self.__model.fittoreference.reference
         index = -1 if key is None else [i for _, i in lst].index(key)

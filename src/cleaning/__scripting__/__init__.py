@@ -127,17 +127,17 @@ class TrackCleaningScript:
                  forceclean               = False,
                  **kwa) -> pd.DataFrame:
         "returns beads and warnings where applicable"
-        ids   = [] # type: List[int]
-        types = [] # type: List[str]
-        cycs  = [] # type: List[int]
-        msgs  = [] # type: List[str]
+        ids  : List[int] = []
+        types: List[str] = []
+        cycs : List[int] = []
+        msgs : List[str] = []
 
         if forceclean or self.track.cleaned is False: # type: ignore
             if beads:
                 good = set(self.track.beads.keys())
-                cur  = [i for i in beads if i in good]
+                cur: Optional[List[int]] = [i for i in beads if i in good]
             else:
-                cur  = None
+                cur                      = None
             for i, j in self.process(cur, **kwa).items():
                 if j is None:
                     continue
@@ -168,8 +168,8 @@ class TrackCleaningScript:
         return a dataframe with all test values
         """
         if beads:
-            good = set(self.track.beads.keys())
-            cur  = [i for i in beads if i in good]
+            good                     = set(self.track.beads.keys())
+            cur: Optional[List[int]] = [i for i in beads if i in good]
         else:
             cur  = None
 
@@ -255,20 +255,23 @@ class TrackCleaningScriptData:
         data[-1] = proc.signal(self.track.beads) # type: ignore
         return self.track.apply(Tasks.alignment).withdata(data)
 
-TrackCleaningScript.__doc__ = (
-    TrackCleaningScript.__doc__[:-5]
-    +"""
-    * `track.cleaning.data` p"""
-    +TrackCleaningScriptData.__doc__.split('\n')[1].strip()[1:]+"\n"
-    +'\n   '.join(TrackCleaningScriptData.__doc__.split('\n')[2:]).replace('\n', '\n    ')
-    )
-Track.__doc__ += (
-    """
-    * `cleaning` p"""
-    +TrackCleaningScript.__doc__.split('\n')[1].strip()[1:]+"\n"
-    +TrackCleaningScript.__doc__.split('\n')[2]+"\n"
-    +'\n'.join(TrackCleaningScript.__doc__.split('\n')[3:]).replace('\n', '\n    ')
-    )
+if isinstance(TrackCleaningScript.__doc__, str):
+    TrackCleaningScript.__doc__ = (
+        TrackCleaningScript.__doc__[:-5]
+        +"""
+        * `track.cleaning.data` p"""
+        +TrackCleaningScriptData.__doc__.split('\n')[1].strip()[1:]+"\n" # type: ignore
+        +'\n   '
+        .join(TrackCleaningScriptData.__doc__.split('\n')[2:]) # type: ignore
+        .replace('\n', '\n    ')
+        )
+    Track.__doc__ += ( # type: ignore
+        """
+        * `cleaning` p"""
+        +TrackCleaningScript.__doc__.split('\n')[1].strip()[1:]+"\n"
+        +TrackCleaningScript.__doc__.split('\n')[2]+"\n"
+        +'\n'.join(TrackCleaningScript.__doc__.split('\n')[3:]).replace('\n', '\n    ')
+        )
 
 @addproperty(getattr(TracksDict, '__base__'), 'cleaning')
 class TracksDictCleaningScript:
@@ -359,12 +362,13 @@ class TracksDictCleaningScript:
             itms[i].tasks.subtraction = [j[-1] for j in beads]
         return itms
 
-TracksDict.__doc__ += (
-    """
-    ## Cleaning
+if isinstance(TracksDict.__doc__, str):
+    TracksDict.__doc__ += (
+        """
+        ## Cleaning
 
-    """+TracksDictCleaningScript.__doc__)
-TracksDict.__base__.__doc__ = TracksDict.__doc__ # type: ignore
+        """+TracksDictCleaningScript.__doc__) # type: ignore
+    TracksDict.__base__.__doc__ = TracksDict.__doc__ # type: ignore
 
 @addto(TracksDict.__base__)                      # type: ignore
 def basedataframe(self,

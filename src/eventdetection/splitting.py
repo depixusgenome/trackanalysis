@@ -167,11 +167,11 @@ class GradedSplitDetector(SplitDetector):
                    data      : np.ndarray,
                    deltas    : np.ndarray,
                    precision : Optional[float]
-                  ) -> float:
+                  ) -> Optional[float]:
         "Computes a threshold on the flatness characteristic"
         pass
 
-CONFIDENCE_TYPE = Union[None, float, Threshold]
+CONFIDENCE_TYPE = Union[None, float, Threshold] # pylint: disable=invalid-name
 class PyDerivateSplitDetector(GradedSplitDetector):
     """
     Detects flat stretches of value
@@ -217,7 +217,7 @@ class PyDerivateSplitDetector(GradedSplitDetector):
                    data      : np.ndarray,
                    deltas    : np.ndarray,
                    precision : Optional[float]
-                  ) -> float:
+                  ) -> Optional[float]:
         if callable(self.confidence):
             return self.confidence(data, deltas, precision) # pylint: disable=not-callable
 
@@ -256,7 +256,7 @@ class PyChiSquareSplitDetector(GradedSplitDetector):
                    data      : np.ndarray,
                    deltas    : np.ndarray,
                    precision : Optional[float]
-                  ) -> float:
+                  ) -> Optional[float]:
         if self.confidence is None:
             return precision
         if callable(self.confidence):
@@ -304,7 +304,7 @@ class MinMaxSplitDetector(GradedSplitDetector):
                    data      : np.ndarray,
                    _         : np.ndarray,
                    precision : Optional[float]
-                  ) -> float:
+                  ) -> Optional[float]:
         if self.confidence is None or self.confidence <= 0.:
             return precision
         return norm.threshold(True, self.confidence, precision)

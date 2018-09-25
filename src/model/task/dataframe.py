@@ -5,7 +5,7 @@ Task for creating dataframes
 
 **Warning** Those definitions must remain data-independant.
 """
-from   typing   import Sequence, Dict, Union, List, Callable
+from   typing   import Sequence, Dict, Union, List, Callable, Optional
 
 from   utils    import initdefaults
 from   ..level  import Level
@@ -27,7 +27,7 @@ class DataFrameTask(Task):
     merge                                      = False
     indexes:   Sequence[str]                   = ['track', 'bead', 'cycle', 'event']
     measures:  Dict[str, Union[bool, Callable, str]] = {}
-    transform: List[Callable]                  = None
+    transform: Optional[List[Callable]]              = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)

@@ -135,9 +135,9 @@ class CollapseToMean(_CollapseAlg):
 
     The collapse starts from the right-most interval and moves left.
     """
-    PRECISION                    = 0.003
-    weight: Union[Callable, str] = None
-    measure                      = 'mean'
+    PRECISION                          = 0.003
+    weight: Union[Callable, None, str] = None
+    measure                            = 'mean'
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)

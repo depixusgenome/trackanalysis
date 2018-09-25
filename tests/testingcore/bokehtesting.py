@@ -69,7 +69,7 @@ class DpxTestLoaded(Model):
                    key   = val)
         self.model = model
         self.event = evt
-        LOGS.debug(f"pressing: {key}")
+        LOGS.debug("pressing: %s", key)
         self.event_cnt += 1
 
     def change(self, model:Model, attrs: Union[str, Sequence[str]], value: Any):
@@ -78,7 +78,7 @@ class DpxTestLoaded(Model):
         self.attrs = list(attrs)[:-1] if isinstance(attrs, (tuple, list)) else []
         self.attr  = attrs[-1]        if isinstance(attrs, (tuple, list)) else attrs
         self.value = value
-        LOGS.debug(f"changing: {attrs} = {value}")
+        LOGS.debug("changing: %s = %s", attrs, value)
         self.value_cnt += 1
 
 class WidgetAccess:
@@ -96,14 +96,14 @@ class WidgetAccess:
                 if val is not self._none:
                     return val
             return next(i for doc in self._docs for i in doc.select({'type': value}))
-        else:
-            itms: tuple = tuple()
-            for doc in self._docs:
-                itms += tuple(doc.select({'name': value}))
-            if len(itms) > 0:
-                return WidgetAccess(itms)
-            key = value if self._key is None else self._key + '.' + value
-            return WidgetAccess(tuple(self._docs), key)
+
+        itms: tuple = tuple()
+        for doc in self._docs:
+            itms += tuple(doc.select({'name': value}))
+        if len(itms) > 0:
+            return WidgetAccess(itms)
+        key = value if self._key is None else self._key + '.' + value
+        return WidgetAccess(tuple(self._docs), key)
 
     def __getattr__(self, key):
         return super().__getattribute__(key) if key[0] == '_' else getattr(self(), key)
@@ -254,15 +254,15 @@ class _ManagedServerLoop:
         "send command to the view"
         if andstop:
             def _cmd():
-                LOGS.debug(f"running: {fcn.__name__}(*{args}, **{kwargs}")
+                LOGS.debug("running: %s(*%s, **%s)", fcn.__name__, args, kwargs)
                 fcn(*args, **kwargs)
-                LOGS.debug(f"done running and waiting {andwaiting}")
+                LOGS.debug("done running and waiting %s", andwaiting)
                 self.loop.call_later(andwaiting, self.loop.stop)
         else:
             def _cmd():
-                LOGS.debug(f"running: {fcn.__name__}(*{args}, **{kwargs}")
+                LOGS.debug("running: %s(*%s, **%s)", fcn.__name__, args, kwargs)
                 fcn(*args, **kwargs)
-                LOGS.debug(f"done running and not stopping")
+                LOGS.debug("done running and not stopping")
         self.doc.add_next_tick_callback(_cmd)
         self.loop.start()
 
@@ -305,15 +305,16 @@ class _ManagedServerLoop:
 
     def press(self, key:str, src = None, **kwa):
         "press one key in python server"
+        loading = cast(DpxTestLoaded, self.loading)
         if src is None:
             for root in self.doc.roots:
                 if isinstance(root, DpxKeyEvent):
-                    self.cmd(self.loading.press, key, root, **kwa)
+                    self.cmd(loading.press, key, root, **kwa)
                     break
             else:
                 raise KeyError("Missing DpxKeyEvent in doc.roots")
         else:
-            self.cmd(self.loading.press, key, src, **kwa)
+            self.cmd(loading.press, key, src, **kwa)
 
     def click(self, model: Union[str,dict,Model], **kwa):
         "Clicks on a button on the browser side"
@@ -352,7 +353,7 @@ class _ManagedServerLoop:
         else:
             mdl = model
         if browser:
-            self.cmd(self.loading.change, mdl, attrs, value)
+            self.cmd(cast(DpxTestLoaded, self.loading).change, mdl, attrs, value)
         else:
             assert isinstance(attrs, str)
             def _cb():

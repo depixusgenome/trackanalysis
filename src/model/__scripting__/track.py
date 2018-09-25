@@ -145,5 +145,6 @@ def localtasks(self: Track, *args, force = True, **kwa) -> Track:
     return cpy
 Track.localtasks = localtasks
 
-Track.__doc__ += ("""
-    * `tasks` a""" + LocalTasks.__doc__[6:])
+if LocalTasks.__doc__:
+    Track.__doc__ += ("""
+        * `tasks` a""" + cast(str, LocalTasks.__doc__)[6:])

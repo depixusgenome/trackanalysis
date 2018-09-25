@@ -49,9 +49,9 @@ class TasksDisplay(ConfigObject):
     """
     runtime globals on tasks
     """
-    name                = "tasks"
-    bead:     int       = None
-    roottask: RootTask  = None
+    name                         = "tasks"
+    bead:     Optional[int]      = None
+    roottask: Optional[RootTask] = None
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):

@@ -5,7 +5,7 @@ Adds a dictionnaries to access tracks, experiments, ...
 """
 from typing             import (KeysView, List, Dict, Any, # pylint: disable=unused-import
                                 Iterator, Tuple, TypeVar, Union, Set, Optional,
-                                Sequence, cast)
+                                Pattern, Sequence, Callable, cast)
 from pathlib            import Path
 from concurrent.futures import ThreadPoolExecutor
 from copy               import copy as shallowcopy
@@ -19,12 +19,16 @@ from .trackio           import LegacyGRFilesIO, LegacyTrackIO, PATHTYPES
 TDictType = TypeVar('TDictType', bound = 'TracksDict')
 TrackType = TypeVar('TrackType', bound = 'Track')
 def _leastcommonkeys(itr):
-    info = dict(itr)
-    keys = {i: i.split('_') for i in info.keys()}
+    info   = dict(itr)
+    keys   = {i: i.split('_') for i in info.keys()}
     common = None
     for i in keys.values():
-        common = set(i) if common is None else set(i) & common
-    keys = {i:'_'.join(k for k in j if k not in common) for i, j in keys.items()}
+        common = set(i) if common is None else set(i) & cast(set, common)
+
+    if common:
+        keys = {i:'_'.join(k for k in j if k not in common) for i, j in keys.items()}
+    else:
+        keys = {}
     if '' in keys.values():
         keys[next(i for i, j in keys.items() if j == '')] = 'ref'
     return {keys[i]: j for i, j in info.items()}
@@ -171,7 +175,7 @@ class TracksDict(dict):
              tracks  : Union[str, Sequence[str]],
              grs     : Union[None, str, Sequence[str]] = None,
              cgrdir  : Union[str, Sequence[str]]       = "cgr_dir",
-             match   : str                             = None,
+             match   : Union[Pattern, str]             = None,
              allaxes   = False,
              allleaves = False,
              **opts) -> KeysView[str]:
@@ -266,8 +270,8 @@ class TracksDict(dict):
         opts['allleaves'] = allleaves
         if isinstance(match, str) or hasattr(match, 'match'):
             grp = True
-            tmp = re.compile(match) if isinstance(match, str) else match
-            fcn = lambda i: tmp.match(str(i if isinstance(i, (str, Path)) else i[0]))
+            tmp = re.compile(match) if isinstance(match, str) else cast(Pattern, match)
+            fcn: Callable = lambda i: tmp.match(str(i if isinstance(i, (str, Path)) else i[0]))
         else:
             grp = False
             fcn = lambda i: (Path(str(i if isinstance(i, (str, Path)) else i[0])).stem
@@ -292,7 +296,7 @@ class TracksDict(dict):
                tracks  : Union[None, str, Sequence[str]] = None,
                grs     : Union[None, str, Sequence[str]] = None,
                cgrdir  : Union[None, str, Sequence[str]] = "cgr_dir",
-               match   : str                             = None,
+               match   : Union[Pattern, str]             = None,
                allleaves = False,
                allaxes   = False,
                **kwargs):
@@ -317,22 +321,25 @@ class TracksDict(dict):
 
         if tracks is not None:
             assert sum(i is None for i in (tracks, grs)) in (0, 1, 2)
-            self.scan(tracks, grs, match = match, allaxes = allaxes, **scan)
+            self.scan(tracks, grs, # type: ignore
+                      match = match, allaxes = allaxes, **scan)
     if getattr(update, '__doc__', None):
-        update.__doc__ += scan.__doc__[scan.__doc__.find('#')-5:] # pylint: disable=no-member
+        # pylint: disable=no-member
+        update.__doc__ = (cast(str, update.__doc__)
+                          +cast(str, scan.__doc__)[cast(str, scan.__doc__).find('#')-5:])
 
     def commonbeads(self, *keys) -> List[BEADKEY]:
         "returns the intersection of all beads in requested tracks (all by default)"
         if len(keys) == 0:
             keys = tuple(self.keys())
 
-        fcn   = lambda key: set(cast(Track, self[key]).beads.keys())
-        beads = None # type: Optional[Set[BEADKEY]]
+        fcn = lambda key: set(cast(Track, self[key]).beads.keys())
+        beads: Optional[Set[BEADKEY]] = None
         with ThreadPoolExecutor(self._NTHREADS) as pool:
             for cur in pool.map(fcn, keys):
                 beads = cur if beads is None else (cur & beads)
 
-        return sorted(beads)
+        return sorted(beads) if beads else []
 
     def availablebeads(self, *keys):
         "returns available beads for provided oligos"

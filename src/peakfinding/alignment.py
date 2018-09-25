@@ -234,11 +234,11 @@ class SymetricExpectedPositionAlignment:
         bias_i        = (1-averageout) bias_i + averageout averagebias_i
         averagebias_i = ∑_j bias_j Gauss(x_ij, x_ii, x_ii)
     """
-    eventwindow         = 4
-    searchwindow        = 2.5
-    estimations         = 1
-    discardrange: float = None
-    averageout          = .5
+    eventwindow                   = 4
+    searchwindow                  = 2.5
+    estimations                   = 1
+    discardrange: Optional[float] = None
+    averageout                    = .5
     @initdefaults
     def __init__(self, **kwa):
         pass

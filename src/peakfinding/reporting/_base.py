@@ -4,7 +4,7 @@
 Defines basic hybridstat related report objects and functions
 """
 from typing                 import (Optional, Sequence, # pylint:disable= unused-import
-                                    Callable, Dict, Iterator, Tuple)
+                                    Callable, Dict, Iterator, Optional, Tuple)
 from abc                    import abstractmethod
 
 import numpy as np
@@ -32,7 +32,7 @@ class ChartCreator:
         self._pos    = tuple(peaks.columnindex(u'Peak Position',
                                                u'Hybridisation Rate'))
         self._parent = parent
-        self._rseries= None      # type: dict
+        self._rseries: Optional[Dict] = None
         self._row    = peaks.tablerow()+1
         self._sheet  = peakstype.sheet_name
 

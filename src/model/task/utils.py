@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """ Utilitary tasks """
-from typing  import List, Callable
+from typing  import List, Callable, Optional
 from utils   import initdefaults
 from ..level import Level
 from .base   import Task
 
 class ActionTask(Task):
     "Adds a callable to a frame"
-    level          = Level.none
-    call: Callable = None
+    level                    = Level.none
+    call: Optional[Callable] = None
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):

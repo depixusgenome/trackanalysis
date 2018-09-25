@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycle alignment: define an absolute zero common to all cycles"
-from   typing import (Union, Optional, # pylint: disable=unused-import
-                      Sequence, Iterable, Iterator, cast)
+from   typing import (Union, Optional,
+                      Sequence, Iterable, Iterator, Callable, cast)
 from   enum   import Enum
 import numpy  as     np
 from   numpy.lib.index_tricks import as_strided
@@ -39,7 +39,7 @@ class ExtremumAlignment:
         if len(elem) <= 2:
             return np.NaN
 
-        elif len(elem) <= self.binsize:
+        if len(elem) <= self.binsize:
             return np.median(elem)
 
         bsize  = self.binsize
@@ -124,8 +124,8 @@ class CorrelationAlignment:
     oversampling = 5
     maxcorr      = 4
     nrepeats     = 6
-    kernel       = KernelConvolution() # type: Optional[KernelConvolution]
-    __DEFAULTS   = 'oversampling', 'maxcorr', 'nrepeats'
+    kernel: Optional[KernelConvolution] = KernelConvolution()
+    __DEFAULTS                          = 'oversampling', 'maxcorr', 'nrepeats'
     @initdefaults(__DEFAULTS)
     def __init__(self, **kwa):
         self.kernel = kwa.get("kernel", KernelConvolution(**kwa))
@@ -149,7 +149,7 @@ class CorrelationAlignment:
         osamp   = (int(self.oversampling)//2) * 2 + 1
         maxcorr = self.maxcorr*osamp
 
-        kern  = self.kernel(oversampling = osamp, range = 'same')
+        kern  = cast(Callable, self.kernel)(oversampling = osamp, range = 'same')
         ref   = np.empty((max(len(i) for i in data)*osamp+maxcorr*2,), dtype = 'f4')
         hists = []
 

@@ -49,11 +49,10 @@ class Probabilities(HasLengthPeak):
     def __cache(self, bead:Bead, ipk:int) -> Probability:
         key = (bead.key, ipk)
         val = self._values.get(key, None)
-        if val is not None:
-            return val
-
-        evt = bead.events[ipk][1]  # type: ignore
-        self._values[key] = val = self._proba(evt, self._ends)
+        if val is None:
+            evt = bead.events[ipk][1]  # type: ignore
+            self._values[key] = tmp = self._proba(evt, self._ends)
+            return tmp
         return val
 
     def array(self, name: str, ref:Group, ipk:int):
@@ -65,7 +64,7 @@ class Probabilities(HasLengthPeak):
                  if i.peaks['key'][j] == pkkey)
         return np.array([i for i in itr if i is not None], dtype = 'f4')
 
-    def __call__(self, name: str, ref:Group, bead:Bead, ipk:int):
+    def __call__(self, name: str, ref:Optional[Group], bead:Bead, ipk:int):
         "returns a probability value for a bead or the median for a hairpin"
         if bead is None:
             arr = self.array(name, ref, ipk)
@@ -73,17 +72,16 @@ class Probabilities(HasLengthPeak):
                 return None
             ret = np.median(arr)
             return ret if np.isfinite(ret) else None
-        else:
-            val = self.__cache(bead, ipk)
-            if name == 'resolution' and name not in val.__dict__:
-                # Per default, the resolution is not computed. We do it here
-                if val.nevents == 0:
-                    setattr(val, name, None)
-                else:
-                    evt = bead.events[ipk][1]  # type: ignore
-                    setattr(val, name, Probability.resolution(evt))
+        val = self.__cache(bead, ipk)
+        if name == 'resolution' and name not in val.__dict__:
+            # Per default, the resolution is not computed. We do it here
+            if val.nevents == 0:
+                setattr(val, name, None)
+            else:
+                evt = bead.events[ipk][1]  # type: ignore
+                setattr(val, name, Probability.resolution(evt))
 
-            return getattr(val, name)
+        return getattr(val, name)
 
 class Neighbours(HasLengthPeak):
     "Peak bases and neighbours"
@@ -200,10 +198,10 @@ class PositionInRef(HasLengthPeak):
 class PeaksSheet(Reporter):
     "Creates peaks sheet"
     _MINCHARTHEIGHT = 10
+    _pos  : PositionInRef
+    _neig : Optional[Neighbours]
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._neig  = None
-        self._pos   = None
         self._proba = Probabilities(self)
 
     @classmethod
@@ -211,7 +209,7 @@ class PeaksSheet(Reporter):
         "Returns the chart height"
         return min(cls._MINCHARTHEIGHT, npeaks)
 
-    def iterate(self) -> Iterator[Tuple[Group, Bead, int]]:
+    def iterate(self) -> Iterator[Tuple[Group, Optional[Bead], int]]:
         "Iterates through peaks of each bead"
         for group in self.config.groups:
             if group.key is None:
@@ -219,6 +217,7 @@ class PeaksSheet(Reporter):
 
             hpin = self.config.hairpins[group.key]
             yield from ((group, None, i) for i in range(len(hpin.peaks)))
+
             for bead in group.beads:
                 yield from ((group, bead, i) for i in range(len(bead.peaks)))
 
@@ -280,7 +279,7 @@ class PeaksSheet(Reporter):
 
     @staticmethod
     @column_method("Peak Position")
-    def _peakpos(_, bead:Bead, ipk:int) -> float:
+    def _peakpos(_, bead:Bead, ipk:int) -> Optional[float]:
         "Peak position as measured (µm)"
         return None if bead is None else bead.peaks['zvalue'][ipk]
 
@@ -296,12 +295,12 @@ class PeaksSheet(Reporter):
 
     @column_method("Neighbours", exclude = Reporter.nohairpin)
     def _neighbours(self, *args) -> Optional[str]:
-        return self._neig.neighbours(*args)
+        return None if self._neig is None else self._neig.neighbours(*args)
 
     @column_method("Strand", exclude = Reporter.nohairpin)
     def _orientation(self, *args) -> Optional[bool]:
         "Strand on which the oligo sticks"
-        return self._neig.orientation(*args)
+        return None if self._neig is None else self._neig.orientation(*args)
 
     @column_method("Hybridisation Rate", median = True)
     def _hrate(self, *args) -> Optional[float]:

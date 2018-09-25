@@ -3,7 +3,7 @@
 """
 Saves stuff from session to session
 """
-from   typing                  import Tuple, List
+from   typing                  import Tuple, List, Optional
 from   copy                    import deepcopy
 
 from   utils                   import initdefaults
@@ -17,13 +17,13 @@ class ScriptingTheme:
     """
     model for scripting
     """
-    name                  = "scripting"
-    save                  = False
-    alignalways           = True
-    order:    List[Tasks] = None
-    cleaning: List[Tasks] = None
-    fittohairpinrange     = dict(stretch = (900., 1400.), bias = (-.25, .25))
-    fittoreferencerange   = dict(stretch = (.8, 1.2),     bias = (-.15, .15))
+    name                            = "scripting"
+    save                            = False
+    alignalways                     = True
+    order:    Optional[List[Tasks]] = None
+    cleaning: Optional[List[Tasks]] = None
+    fittohairpinrange               = dict(stretch = (900., 1400.), bias = (-.25, .25))
+    fittoreferencerange             = dict(stretch = (.8, 1.2),     bias = (-.15, .15))
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):

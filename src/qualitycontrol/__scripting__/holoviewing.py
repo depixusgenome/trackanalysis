@@ -3,7 +3,7 @@
 """
 Adds quality control displays
 """
-from   typing                        import List, Dict, FrozenSet
+from   typing                        import List, Dict, FrozenSet, Optional
 from   itertools                     import chain
 
 import numpy                         as     np
@@ -111,8 +111,8 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
     """
     Adds items that should be qc'ed.
     """
-    _keys: List[str] = None
-    KEYWORDS         = ItemsDisplay.KEYWORDS | frozenset(locals())
+    _keys:   Optional[List[str]] = None
+    KEYWORDS                     = ItemsDisplay.KEYWORDS | frozenset(locals())
     def __getitem__(self, values):
         self._keys = (None   if isellipsis(values)       else
                       values if isinstance(values, list) else
@@ -190,7 +190,7 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
         return self(**kwa)._display(beads) # pylint:disable=no-member,protected-access
 
     # pylint: disable=no-member
-    display.__doc__ += '\n\n'+'\n'.join(f'    * `{i.__name__}`:{i.__doc__}'
+    display.__doc__ += '\n\n'+'\n'.join(f'    * `{i.__name__}`:{i.__doc__}' # type: ignore
                                         for i in (tsample, vcap, beadextent))
     __doc__          = display.__doc__.replace('        ', '    ')
 

@@ -95,7 +95,8 @@ class DAQBeadsClient(DAQClient):
     columns   = cast(np.dtype, ColDescriptor(BEADTYPE))
     address   = ('', 30002)
     multicast = '239.255.0.2'
-    def dtype(self, nbeads:int) -> np.dtype: # type: ignore # pylint: disable=arguments-differ
+    # pylint: disable=arguments-differ
+    def dtype(self, nbeads:int) -> np.dtype: # type: ignore
         "create the dtype for all beads"
         cols = self.columns.descr[:1]
         for i in range(nbeads):
@@ -167,9 +168,9 @@ class DAQPhase(ConfigObject):
     """
     All information related to one phase in a cycle
     """
-    duration: int   = None # in frames
-    zmag:     float = None # requested zmag position at end of phase (in µm)
-    speed:    float = None
+    duration: Optional[int]   = None # in frames
+    zmag:     Optional[float] = None # requested zmag position at end of phase (in µm)
+    speed:    Optional[float] = None
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -181,7 +182,7 @@ class DAQProtocol(ConfigObject):
     """
     name: ClassVar[str]          = ""
     framerate                    = 30
-    cyclecount                   = 120
+    cyclecount: Optional[int]    = 120
     phases: Tuple[DAQPhase, ...] = ()
     @initdefaults(frozenset(locals()) - {'cyclecount', 'phases', 'name'})
     def __init__(self, **kwa):
@@ -261,8 +262,8 @@ class DAQRamp(DAQProbe):
 
 class DAQRecording(ConfigObject):
     "everything for recording the data"
-    path: str     = None
-    started       = False
+    path: Optional[str] = None
+    started             = False
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass

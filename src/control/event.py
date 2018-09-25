@@ -118,7 +118,7 @@ class Event:
         if len(allfcns):
             global _CNT # pylint: disable=global-statement
             _CNT += 1
-            policy = EmitPolicy.get(policy, args)
+            policy = EmitPolicy.get(cast(EmitPolicy, policy), args)
             LOGS.debug("[%d] Handling %s", _CNT, lst)
             policy.run(allfcns, args)
             LOGS.debug("[%d] Handled", _CNT)
@@ -241,7 +241,7 @@ class Event:
         "creates a list of emissions"
         if len(names) == 0 or names[0] is fcn:
             fname = (fcn.func if isinstance(fcn, partial) else fcn).__name__
-            tmp   = (cls.__EM_NAME(fname).group(1),)
+            tmp   = (getattr(cls.__EM_NAME(fname), 'group')(1),)
             return frozenset(name.lower().strip() for name in tmp)
 
         return frozenset(name.lower().strip() for name in names)

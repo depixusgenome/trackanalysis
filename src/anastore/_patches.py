@@ -11,7 +11,7 @@ Patch mechanism
 
 """
 from copy    import copy
-from typing  import Callable, List, Sequence, cast# pylint: disable=unused-import
+from typing  import Optional, Callable, List, Sequence, cast
 import re
 
 from utils   import initdefaults
@@ -26,7 +26,7 @@ class RESET(DELETE):
 class Patches:
     "This must contain json patches up to the app's versions number"
     def __init__(self, *patches):
-        self._patches = list(patches) # type: List[Callable]
+        self._patches: List[Callable] = list(patches)
 
     def patch(self, fcn: Callable):
         "registers a patch"
@@ -61,8 +61,8 @@ class LocalPatch:
     """
     modifications    = ("peakcalling.processor.fittoreference.FitToReferenceTask", DELETE,
                         "peakcalling.processor.fittohairpin.FitToHairpinTask",     DELETE)
-    path: Callable[[Sequence[str]], Sequence[str]] = None
-    patches: Patches = None
+    path:    Optional[Callable[[Sequence[str]], Sequence[str]]] = None
+    patches: Optional[Patches]                                  = None
     _old:    Patches
 
     @initdefaults(frozenset(locals()))

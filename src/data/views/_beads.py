@@ -44,8 +44,8 @@ class Beads(TrackView, ITrackView):
             * `track.cycles.selecting([1, 2])` selects bead 1 and 2""",
                                         views      = "beads")
 
-    level         = Level.bead
-    cycles: slice = None
+    level                   = Level.bead
+    cycles: Optional[slice] = None
     def __init__(self, **kwa):
         super().__init__(self, **kwa)
         self.__withcycles(kwa.get('cycles', ...))
@@ -63,7 +63,7 @@ class Beads(TrackView, ITrackView):
         crng = cast(slice, self.cyclerange())
         if crng.stop < self.track.ncycles:
             start = self.track.phase.select(crng.start if crng.start else 0, 0)
-            return self.track.phase.select(crng.stop+1, 0) - start
+            return self.track.phase.select(cast(int, crng.stop)+1, 0) - start
         return self.track.nframes
 
     def __getitem__(self, keys) -> Union['Beads',np.ndarray]:
