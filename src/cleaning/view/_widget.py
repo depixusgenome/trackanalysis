@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cleaning beads"
-from    typing          import List, Tuple
+from    typing          import List, Tuple, Union
 from    abc             import ABC
 
 import  bokeh.core.properties as props
@@ -38,9 +38,9 @@ class BeadSubtractionModalDescriptor:
         pot = [i[-1] for i in mdl.availablefixedbeads]
         return f'{pot} ?' if pot else ''
 
-    def line(self) -> Tuple[str, str]:
+    def line(self) -> Tuple[Union[str, Tuple[str,str]], str]:
         "return the modal dialog line"
-        return ('Subtracted beads', f"%({self._name})220csvi")
+        return (('width: 40%', 'Subtracted beads'), f"%({self._name})220csvi")
 
     def __get__(self,inst,owner):
         if inst is None:

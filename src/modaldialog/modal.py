@@ -287,11 +287,17 @@ class DpxModal(Model):
         self.__running      = True
         self.startdisplay   = self.startdisplay+1
 
+    @staticmethod
+    def _build_elem(val):
+        if isinstance(val, tuple):
+            return f'<td style="{val[0]}">'+val[1]+'</td>'
+        return f'<td>'+val+'</td>'
+
     @classmethod
     def _build_body(cls, body, model):
         if isinstance(body, (tuple, list)):
             body = '<table>' + (''.join('<tr>'
-                                        + ''.join('<td>'+i+'</td>' for i in j)
+                                        + ''.join(cls._build_elem(i) for i in j)
                                         + '</tr>'
                                         for j in body)) + '</table>'
 
