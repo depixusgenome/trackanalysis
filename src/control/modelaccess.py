@@ -238,7 +238,7 @@ class TaskAccess(TaskPlotModelAccess):
 
         elif task is None:
             kwa['disabled'] = False
-            item = self.__deepcopy(self.configtask, **kwa)
+            item = self.__deepcopy(self.configtask, kwa)
             self._ctrl.tasks.addtask(root, item, index = self.index)
         else:
             kwa['disabled'] = False
