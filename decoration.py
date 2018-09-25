@@ -8,10 +8,11 @@ from    contextlib  import contextmanager
 from    functools   import wraps
 from    inspect     import signature, isgeneratorfunction
 from    typing      import (Dict, Tuple, Any, Optional, TypeVar,
-                            Generic, Callable, Union, IO, Iterator)
+                            Generic, Callable, Union, IO, Iterator, TYPE_CHECKING)
 import  numpy as np
 
-StreamUnion = Union[str,pathlib.Path,IO]
+if TYPE_CHECKING:
+    StreamUnion = Union[str,pathlib.Path,IO]
 
 class _PathPos:
     def __init__(self, fcn):
@@ -61,7 +62,8 @@ def fromstream(streamopts):
                     args, kwa = ppos.args(path, args, kwa)
                     yield from fcn(*args, **kwa)
 
-            _wrapgen.__annotations__[ppos.name] = StreamUnion
+            if TYPE_CHECKING:
+                _wrapgen.__annotations__[ppos.name] = StreamUnion # type: ignore
             return _wrapgen
 
         @wraps(fcn)
@@ -78,7 +80,8 @@ def fromstream(streamopts):
                 args, kwa = ppos.args(path, args, kwa)
                 return fcn(*args, **kwa)
 
-        _wrapfcn2.__annotations__[ppos.name] = StreamUnion
+        if TYPE_CHECKING:
+            _wrapfcn2.__annotations__[ppos.name] = StreamUnion # type: ignore
         return _wrapfcn2
     return _wrapper
 
@@ -153,8 +156,8 @@ def escapenans(*arrays: np.ndarray, reset = True):
         return _wrap
     return _escapenans(*arrays, reset = reset)
 
-T = TypeVar("T")
-class CachedIO(Generic[T]):
+T = TypeVar("T") # pylint: disable=invalid-name
+class CachedIO(Generic[T]): # pylint: disable=unsubscriptable-object
     "Caches io output"
     def __init__(self,
                  reader: Callable[..., T],
@@ -198,7 +201,7 @@ class CachedIO(Generic[T]):
                 self.__cache.popitem()
 
         self.__cache[path] = info
-        return info[1]
+        return info[1] # type: ignore
 
 def cachedio(fcn):
     "Caches io output"

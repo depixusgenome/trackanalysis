@@ -161,7 +161,8 @@ def startfile(filepath:str):
         old      = os.path.abspath(os.path.curdir)
         filepath = os.path.abspath(filepath)
         os.chdir(os.path.dirname(filepath))
-        os.startfile(os.path.split(filepath)[-1])  # pylint: disable=no-member
+        # pylint: disable=no-member
+        os.startfile(os.path.split(filepath)[-1]) # type: ignore
         os.chdir(old)
     elif os.name == 'posix':
         subprocess.Popen(('xdg-open', filepath),

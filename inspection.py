@@ -12,7 +12,7 @@ signature           = inspect.signature
 getmembers          = inspect.getmembers
 isgeneratorfunction = inspect.isgeneratorfunction
 
-def templateattribute(cls, index) -> type:
+def templateattribute(cls, index) -> Optional[type]:
     "returns a template attribute"
     if not isinstance(cls, type):
         cls = type(cls)
@@ -71,7 +71,7 @@ def ismethod(fcn) -> bool:
     if isinstance(fcn, cast(type, classmethod)):
         return True
 
-    elif next(iter(signature(fcn).parameters), '') in ('self', 'cls', 'mcs'):
+    if next(iter(signature(fcn).parameters), '') in ('self', 'cls', 'mcs'):
         return True
 
     return False

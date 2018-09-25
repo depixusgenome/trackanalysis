@@ -5,8 +5,8 @@ from   typing import (Iterable, Optional, # pylint: disable=unused-import
                       Iterator, Union, Sequence, Tuple, cast)
 import numpy as np
 
-EVENTS_TYPE  = Tuple[int, np.ndarray]
-EVENTS_DTYPE = np.dtype([('start', 'i4'), ('data', 'O')])
+EVENTS_TYPE  = Tuple[int, np.ndarray]                     # pylint: disable=invalid-name
+EVENTS_DTYPE = np.dtype([('start', 'i4'), ('data', 'O')]) # pylint: disable=invalid-name
 
 class EventsArray(np.ndarray):
     """
@@ -80,7 +80,7 @@ def asobjarray(arr:Iterable, view: type = None, **kwa)->np.ndarray:
         vals    = np.empty((len(tmp),), dtype = 'O')
         vals[:] = tmp
 
-    return asview(vals, view, **kwa)
+    return asview(vals, view, **kwa) # type: ignore
 
 def asdataarrays(aevents:Iterable[Iterable], view: type = None, **kwa)-> Optional[np.ndarray]:
     "converts  an Iterable[Iterable] to a np.array"
@@ -93,7 +93,7 @@ def asdataarrays(aevents:Iterable[Iterable], view: type = None, **kwa)-> Optiona
         for j, evt in enumerate(events):
             events[j] = _m_asarray(evt)
 
-    return asview(events, view, **kwa)
+    return asview(events, view, **kwa) # type: ignore
 
 def asview(vals:np.ndarray, view:type, **kwa) -> np.ndarray:
     "converts to a given view"
