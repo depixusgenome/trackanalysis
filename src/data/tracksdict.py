@@ -28,7 +28,8 @@ def _leastcommonkeys(itr):
     if common:
         keys = {i:'_'.join(k for k in j if k not in common) for i, j in keys.items()}
     else:
-        keys = {}
+        keys = {i:'_'.join(k for k in j) for i, j in keys.items()}
+
     if '' in keys.values():
         keys[next(i for i, j in keys.items() if j == '')] = 'ref'
     return {keys[i]: j for i, j in info.items()}

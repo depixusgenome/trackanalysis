@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Processes TrackSimulatorTask"
-import numpy as np
 from typing             import Optional
+import numpy as np
 from utils              import initdefaults, EventsArray
 from model.task         import RootTask
 from model.level        import Level, PHASE

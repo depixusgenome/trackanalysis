@@ -7,7 +7,7 @@ need to allow for beads with only a subset of good cycles
 need to add a little marker specifying when the data is loaded
 Add a test : if min molextension is too big
 '''
-from typing import Optional, Tuple , Set, List
+from typing import Tuple, List
 import numpy
 import pandas as pd
 from data import Track

@@ -3,8 +3,7 @@
 """
 Defines basic hybridstat related report objects and functions
 """
-from typing                 import (Optional, Sequence, # pylint:disable= unused-import
-                                    Callable, Dict, Iterator, Optional, Tuple)
+from typing                 import Optional, Sequence,  Dict, Tuple
 from abc                    import abstractmethod
 
 import numpy as np
@@ -78,8 +77,8 @@ class TrackInfo:
     path            = ''
     framerate       = 0.
     ncycles         = 0
-    uncertainties   = {}    # type: Dict[BEADKEY, float]
-    durations       = []    # type: Sequence[int]
+    uncertainties: Dict[BEADKEY, float] = {}
+    durations:     Sequence[int]        = []
     def __init__(self, track: Optional[Track]) -> None:
         if track is not None:
             self.path          = track.path
@@ -90,7 +89,7 @@ class TrackInfo:
 
 class ReporterInfo:
     u"All info relevant to the current analysis report"
-    beads         = [] # type: Sequence[Tuple[BEADKEY, Tuple[PeakOutput]]]
+    beads: Sequence[Tuple[BEADKEY, Tuple[PeakOutput]]] = []
     minduration   = 1
     track         = TrackInfo(None)
     @initdefaults(frozenset(locals()),

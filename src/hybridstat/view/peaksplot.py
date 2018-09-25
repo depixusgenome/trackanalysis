@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
-from typing                     import Dict, List, Tuple, cast
+from typing                     import Dict, List, Tuple
 
 import bokeh.core.properties as props
 from bokeh                      import layouts

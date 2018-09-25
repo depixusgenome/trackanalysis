@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "bringing togethe toobar components"
 from typing         import Dict, Any, Optional
-from bokeh.layouts  import layouts
+import bokeh.layouts as layouts
 
 from utils          import initdefaults
 from view.base      import threadmethod, spawn
