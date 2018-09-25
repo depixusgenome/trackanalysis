@@ -373,10 +373,11 @@ class PeaksAlignmentConfig(PeaksAlignment):
     """
     config for aligning peaks
     """
-    def __init__(self, hpin = None, pivots = None, **kwa):
+    def __init__(self, hpin = None, pivots = None, masks = None, **kwa):
         super().__init__(**kwa)
         self.hpin:   HPPositions    = HPPositions(*hpin) if hpin else None
         self.pivots: Dict[int, Any] = pivots if pivots else {}
+        self.masks:  Dict[int, Any] = masks  if masks else {}
         if self.hpin:
             self.sethppeaks(self.hpin.seq, self.hpin.oligo)
 
@@ -390,7 +391,8 @@ class PeaksAlignmentConfig(PeaksAlignment):
             return self.display(data[key][data[key].bead == bead], 'ref',
                                 trackorder = trackorder,
                                 align      = align,
-                                pivot      = self.pivots.get(bead, 'min'))
+                                pivot      = self.pivots.get(bead, 'min'),
+                                masks      = self.masks.get(bead, None))
 
         out = (hv.DynamicMap(_fcn, kdims = ['data', 'bead'])
                .redim.values(data = list(keys), bead = list(beads)))
