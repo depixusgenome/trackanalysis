@@ -13,7 +13,9 @@ from sequences.modelaccess      import SequencePlotModelAccess
 from utils                      import updatecopy, initdefaults
 from control.modelaccess        import TaskAccess
 
-from cleaning.view              import BeadSubtractionAccess
+from cleaning.view              import (BeadSubtractionAccess,
+                                        FixedBeadDetectionModel,
+                                        FIXED_LIST)
 from eventdetection.processor   import (EventDetectionTask, # pylint: disable=unused-import
                                         ExtremumAlignmentTask)
 from model.task                 import RootTask
@@ -367,6 +369,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         super().__init__(ctrl)
         self.peaksmodel      = PeaksPlotModel.create(ctrl, False)
         self.subtracted      = BeadSubtractionAccess(self)
+        self.fixedbeads      = FixedBeadDetectionModel(ctrl)
         self.alignment       = ExtremumAlignmentTaskAccess(self)
         self.eventdetection  = EventDetectionTaskAccess(self)
         self.peakselection   = PeakSelectorTaskAccess(self)
@@ -380,7 +383,12 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         super().addto(ctrl, name, noerase)
         self.fittoreference.addto(ctrl, noerase)
         self.identification.addto(ctrl, noerase)
+        self.fixedbeads.addto(ctrl, noerase)
 
+    @property
+    def availablefixedbeads(self) -> FIXED_LIST:
+        "return the availablefixed beads for the current track"
+        return self.fixedbeads.current(self._ctrl, self.roottask)
 
     @property
     def stretch(self) -> float:

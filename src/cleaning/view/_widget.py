@@ -30,12 +30,12 @@ class BeadSubtractionModalDescriptor:
     @staticmethod
     def getdefault(model) -> str:
         "return the modal dialog line"
-        model = getattr(model, '_model', model)
-        ref   = model.subtracted.referencebeads()
+        mdl = getattr(model, '_model', model)
+        ref = mdl.subtracted.referencebeads()
         if ref is not None:
             return f'ref = {ref}'
 
-        pot = [i[-1] for i in model.availablefixedbeads]
+        pot = [i[-1] for i in mdl.availablefixedbeads]
         return f'{pot} ?' if pot else ''
 
     def line(self) -> Tuple[str, str]:
@@ -216,15 +216,16 @@ class CleaningFilterWidget:
 
     def reset(self, resets:CACHE_TYPE):
         "resets the widget when opening a new file, ..."
-        task = self.__model.cleaning.task
+        mdl  = self.__model
+        task = mdl.cleaning.task
         if task is None:
-            task = self.__model.cleaning.configtask
+            task = mdl.cleaning.configtask
 
         info = {i:j for i, j in task.config().items() if hasattr(self.__widget, i)}
 
-        info['framerate'] = getattr(self.__model.track, 'framerate', 1./30.)
-        info['subtracted']= ', '.join(str(i) for i in sorted(self.__model.subtracted.beads))
-        info['fixedbeads']= ', '.join(f"{i[-1]}" for i in self.__model.availablefixedbeads)
+        info['framerate'] = getattr(mdl.track, 'framerate', 1./30.)
+        info['subtracted']= ', '.join(str(i) for i in sorted(mdl.subtracted.beads))
+        info['fixedbeads']= ', '.join(f"{i[-1]}" for i in mdl.availablefixedbeads)
 
         (self.__widget if resets is None else resets[self.__widget]).update(**info)
 
