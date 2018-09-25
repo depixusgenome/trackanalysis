@@ -16,7 +16,7 @@ def build_bokehjs(bld, *modules):
     bld(source      = srcs,
         name        = modules[0]+':bokeh',
         color       = 'BLUE',
-        rule        = f'python {cmd} '+' '.join(modules)+' -o ${TGT}',
+        rule        = f'{bld.env["PYTHON"][0]} {cmd} '+' '.join(modules)+' -o ${TGT}',
         target      = tgt,
         cls_keyword = lambda _: 'Bokeh',
         group       = 'bokeh')
