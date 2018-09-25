@@ -156,7 +156,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
         dist  = (0, 0, 0, 0)
         if fov is not None and ibead in fov.beads:
             bead  = fov.beads[ibead]
-            img   = (bead.image if bead.image.size else
+            img   = (bead.image  if getattr(bead.image, 'size', None) else
                      bead.thumbnail(self._theme.thumbnail, fov))
 
             pos   = bead.position
@@ -219,7 +219,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
         hexes = tohex(self._theme.colors)
         clrs  = hexes['good'], hexes['fixed'], hexes['bad'], hexes['discarded']
         disc  = set(DataSelectionBeadController(self._ctrl).discarded)
-        fixed = self._model.availablefixedbeads() - disc
+        fixed = {i[-1] for i in self._model.availablefixedbeads()} - disc
         bad   = self._model.badbeads() - disc - fixed
         ttips = self.__tooltips()
 
