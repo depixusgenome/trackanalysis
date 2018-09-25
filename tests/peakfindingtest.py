@@ -23,7 +23,7 @@ from peakfinding.processor       import (PeakSelectorTask, PeakProbabilityTask,
                                          MinBiasPeakAlignmentTask, GELSPeakAlignmentTask)
 from peakfinding.histogram       import Histogram
 from peakfinding.groupby         import CWTPeakFinder,ZeroCrossingPeakFinder, PeakFlagger
-from peakfinding.alignment       import PeakCorrelationAlignment, PeakExpectedValueAlignment
+from peakfinding.alignment       import PeakCorrelationAlignment, PeakExpectedPositionAlignment
 from peakfinding.reporting.batch import computereporters
 from testingcore                 import path as utfilepath
 from signalfilter                import NonLinearFilter
@@ -41,10 +41,10 @@ def test_expectedvaluealignment():
     "align on best correlation"
     data = [[20, 50], [21, 51], [22, 52]]
 
-    biases = PeakExpectedValueAlignment.run(data, 1, estimations = 3)
+    biases = PeakExpectedPositionAlignment.run(data, 1, estimations = 3)
     np.testing.assert_allclose(biases, [1., 0., -1.], atol = 1e-1)
 
-    biases = PeakExpectedValueAlignment.run(data, 1, estimations = 3, discardrange=.5)
+    biases = PeakExpectedPositionAlignment.run(data, 1, estimations = 3, discardrange=.5)
     np.testing.assert_allclose(biases, [1., 0., -1.], atol = 1e-1)
 
 def test_randexpectedvaluealignment():
@@ -57,7 +57,7 @@ def test_randexpectedvaluealignment():
                                stretch  = None,
                                seed     = 0,
                                labels   = 'range')
-    biases = PeakExpectedValueAlignment.run(peaks, 1, estimations = 3)
+    biases = PeakExpectedPositionAlignment.run(peaks, 1, estimations = 3)
     res    = peaks+biases
 
     orig   = np.array([np.concatenate([pks[labs == i] for pks, labs in zip(peaks, labels)])
@@ -236,8 +236,9 @@ def test_reporting():
         path.unlink()
     out   = mktemp()+"_peakfindingtest3.xlsx"
 
-    tasks = computereporters(dict(track    = (Path(utfilepath("big_legacy")).parent/"*.trk",
-                                              utfilepath("CTGT_selection")),
+    fname = Path(cast(str, utfilepath("big_legacy"))).parent/"*.trk"
+    tasks = computereporters(dict(track    = (fname,
+                                              cast(str, utfilepath("CTGT_selection"))),
                                   reporting= out))
 
     itms = next(tasks)
@@ -270,7 +271,7 @@ def test_precision():
     peaks = np.array([i for i, _ in vals])
     assert_allclose(peaks, [0., .1, .2, .3, .4, .5, .6], rtol = 1e-3, atol = 1e-3)
 
-    truth = np.sum(sim >= 5, 0)/100.
+    truth = np.sum(sim >= 5, 0)/100. # type: ignore
     exp   = np.array([i.hybridisationrate for _, i in vals[1:]])
     assert_allclose(exp, truth, rtol = 1e-3, atol = 1e-3)
 

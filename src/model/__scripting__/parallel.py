@@ -63,14 +63,13 @@ class Parallel:
                     lst.append(i)
             return pd.concat(lst)
 
-        elif callable(endaction):
+        if callable(endaction):
             return [cast(Callable, endaction)(i) for i in pool.map(self.run, self.args)]
 
-        else:
-            res = [i for i in pool.map(self.run, self.args)]
-            if all(len(i) == 1 for i in res):
-                return [i[0] for i in res]
-            return res
+        res = [i for i in pool.map(self.run, self.args)]
+        if all(len(i) == 1 for i in res):
+            return [i[0] for i in res]
+        return res
 
     @staticmethod
     def run(args: bytes):

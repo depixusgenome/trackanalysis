@@ -20,7 +20,7 @@ class WidgetTheme:
     def __init__(self, **kwa):
         pass
 
-T  = TypeVar("T", RadioButtonGroup, CheckboxGroup)
+T  = TypeVar("T", RadioButtonGroup, CheckboxGroup) # pylint: disable=invalid-name
 class BaseWidget(Generic[T]):
     "Allows aligning the cycles on a given phase"
     __widget: T

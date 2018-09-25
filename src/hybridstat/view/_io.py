@@ -53,7 +53,7 @@ class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO): # type: ignore
 class _SafeTask(FitToReferenceTask):
     "safe fit to ref"
 
-class _SafeDict(FitToReferenceDict):
+class _SafeDict(FitToReferenceDict): # pylint: disable=too-many-ancestors
     "iterator over peaks grouped by beads"
     def _getrefdata(self, key):
         try:

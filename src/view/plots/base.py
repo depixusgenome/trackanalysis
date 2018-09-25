@@ -31,8 +31,8 @@ from    .bokehext               import DpxKeyedRow, DpxHoverTool
 
 LOGS        = getLogger(__name__)
 ModelType   = TypeVar('ModelType', bound = PlotModelAccess)
-RANGE_TYPE  = Tuple[Optional[float], Optional[float]]
-CACHE_TYPE  = Dict[Model, Any]
+RANGE_TYPE  = Tuple[Optional[float], Optional[float]] # pylint: disable=invalid-name
+CACHE_TYPE  = Dict[Model, Any]                        # pylint: disable=invalid-name
 
 def checksizes(fcn):
     "Checks that the ColumnDataSource have same sizes"
@@ -107,7 +107,7 @@ class PlotAttrsView(PlotAttrs):
         palette = getattr(bokeh.palettes, self.palette, None)
         if palette is None:
             return [self.color]*count
-        elif isinstance(palette, dict):
+        if isinstance(palette, dict):
             colors: List[str] = max(palette.values(), key = len)
             npal   = len(colors)
             if indexes is None:
@@ -115,9 +115,8 @@ class PlotAttrsView(PlotAttrs):
             indexes    = tuple(indexes)
             minv, maxv = min(indexes), max(indexes)
             return [colors[int((i-minv)/(maxv-minv)*npal)] for i in indexes]
-        else:
-            colors  = palette(count)
-            return [colors[i] for i in indexes] if indexes is not None else colors
+        colors  = palette(count)
+        return [colors[i] for i in indexes] if indexes is not None else colors
 
     @classmethod
     def _text(cls, args):

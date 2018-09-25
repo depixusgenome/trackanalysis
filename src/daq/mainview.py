@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "All view pieces are brought together"
-import bokeh.layouts as     layouts
+import bokeh.layouts as     layouts # pylint: disable=useless-import-alias
 from .beadstableview import BeadsTableView
 from .camera         import DAQCameraView
 from .fovtableview   import FoVTableView

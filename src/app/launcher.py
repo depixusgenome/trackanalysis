@@ -114,7 +114,7 @@ class _FunctionHandler(FunctionHandler):
         kwa.setdefault('use_index',            True)
         kwa.setdefault('redirect_root',        True)
         kwa['port'] = int(kwa.get('port', DEFAULT_SERVER_PORT))
-        LOGS.debug(f"dynamic loads: {orders().dynloads()}")
+        LOGS.debug("dynamic loads: %s", orders().dynloads())
         for mdl in orders().dynloads():
             getattr(sys.modules.get(mdl, None), 'server', lambda x: None)(kwa)
         return kwa

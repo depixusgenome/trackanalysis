@@ -5,7 +5,7 @@ import  numpy                   as     np
 # pylint: disable=import-error,unused-import
 from    ._core                  import (constant as _cleaningcst, # pylint: disable=import-error
                                         clip     as _cleaningclip,
-                                        LocalNaNPopulation as LocalNaNPopulation,
+                                        LocalNaNPopulation,
                                         NaNDerivateIslands as DerivateIslands,
                                         AberrantValuesRule, PingPongRule,
                                         PopulationRule, HFSigmaRule, ExtentRule,

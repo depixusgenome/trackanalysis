@@ -13,7 +13,7 @@ from   peakfinding.processor      import PeakSelectorProcessor, PeakSelectorTask
 from   peakcalling.processor      import FitToReferenceTask, FitToReferenceDict, FitBead
 from   sequences.modelaccess      import SequencePlotModelAccess
 
-class GuiPeaksDict(PeaksDict):
+class GuiPeaksDict(PeaksDict):  # pylint: disable=too-many-ancestors
     "gui version of PeaksDict"
     def compute(self, ibead, precision: float = None):
         "Computes values for one bead"
@@ -28,7 +28,7 @@ class GuiPeaksDict(PeaksDict):
         dtl.histogram *= 100./(max(self.config.histogram.kernelarray())*self.track.ncycles)
         return ret
 
-STORE_T = List[PeakSelectorDetails]
+STORE_T = List[PeakSelectorDetails] # pylint: disable=invalid-name
 class GuiPeakSelectorProcessor(PeakSelectorProcessor):
     "gui version of PeakSelectorProcessor"
     def __init__(self, store, **kwa):
@@ -45,8 +45,8 @@ class GuiPeakSelectorProcessor(PeakSelectorProcessor):
 
     taskdicttype = classmethod(lambda cls: GuiPeaksDict) # type: ignore
 
-CACHE_T = Dict[BEADKEY, Tuple[float, float]]
-class GuiFitToReferenceDict(FitToReferenceDict):
+CACHE_T = Dict[BEADKEY, Tuple[float, float]] # pylint: disable=invalid-name
+class GuiFitToReferenceDict(FitToReferenceDict): # pylint: disable=too-many-ancestors
     "gui version of FitToReferenceDict"
     def __init__(self, *args, **kwa):
         super().__init__(*args, **kwa)

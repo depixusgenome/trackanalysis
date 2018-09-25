@@ -136,7 +136,7 @@ def _electron(server, **kwa):
 def _win_opts():
     if sys.platform.startswith("win"):
         # Get rid of console windows
-        import bokeh.util.compiler as compiler
+        import bokeh.util.compiler as compiler # pylint: disable=useless-import-alias
         # First find the nodejs path. This must be done with shell == False
         compiler._nodejs_path() # pylint: disable=protected-access
         # Now set shell == True to get rid of consoles

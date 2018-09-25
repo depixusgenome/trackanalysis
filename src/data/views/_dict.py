@@ -75,7 +75,7 @@ class TransformedTrackView:
         if fcn is not None:
             self._parent.data = fcn(self._data)
 
-TRACK_VIEW = Union[ITrackView, TransformedTrackView, Dict]
+TRACK_VIEW = Union[ITrackView, TransformedTrackView, Dict] # pylint: disable=invalid-name
 
 def createTrackView(level:Optional[Level] = Level.none, **kwargs):
     "Returns the item type associated to a level"

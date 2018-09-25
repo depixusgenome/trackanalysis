@@ -85,7 +85,8 @@ def selectcycles(trk:TRACKS, indexes:Union[slice, range, List[int]])-> TRACKS:
             secs[i] = j[vals[inds]]
 
     trk = Track(**track)
-    trk._lazydata_ = False # type: ignore # pylint: disable=protected-access
+    # pylint: disable=protected-access
+    trk._lazydata_ = False # type: ignore
     return trk
 
 def concatenatetracks(trk:TRACKS, *tracks:TRACKS)-> TRACKS:

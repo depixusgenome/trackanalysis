@@ -6,13 +6,13 @@ Allows creating modals from anywhere
 from typing             import Dict, List, Tuple, Any
 from abc                import ABC, abstractmethod
 from copy               import deepcopy
-from bokeh.document     import Document                     # pylint: disable=unused-import
+from bokeh.document     import Document
 from bokeh.models       import Widget, Button
 from utils              import initdefaults
 from utils.logconfig    import getLogger
 from .                  import dialog
 LOGS   = getLogger(__name__)
-T_BODY = Tuple[Tuple[str, str],...]
+T_BODY = Tuple[Tuple[str, str],...] # pylint: disable=invalid-name
 
 class AdvancedWidgetTheme:
     "AdvancedWidgetTheme"

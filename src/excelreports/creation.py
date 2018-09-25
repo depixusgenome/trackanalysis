@@ -21,7 +21,7 @@ _CUNITS   = 'column_units'
 _CEXCLUDE = 'column_exclude'
 _CCOND    = 'column_cond'
 _CFMT     = 'column_fmt'
-class _ColumnMethod(object):
+class _ColumnMethod:
     def __init__(self):
         self._index = 0
 

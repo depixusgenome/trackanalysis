@@ -19,7 +19,7 @@ from model              import Task, Level
 from .base              import Processor
 from .cache             import Cache
 
-DATA_TYPE = Union[Cache, Iterable[Processor], bytes]
+DATA_TYPE = Union[Cache, Iterable[Processor], bytes] # pylint: disable=invalid-name
 class RunnerUtils:
     "Methods used by the runner, set outside so as to be picklable"
     @staticmethod
@@ -233,26 +233,25 @@ def pooledinput(pool, pickled, frame) -> dict:
     if pool is None or not any(i.isslow() for i in data):
         return dict(frame)
 
+    tmp                = (i for i, j in enumerate(data) if j.canpool())
+    ind: Optional[int] = max(tmp, default = None) # type: ignore
+    if ind is None:
+        cnf  = dict(data = data)
     else:
-        tmp                = (i for i, j in enumerate(data) if j.canpool())
-        ind: Optional[int] = max(tmp, default = None) # type: ignore
-        if ind is None:
-            cnf  = dict(data = data)
-        else:
-            ind  = cast(int, ind)+1
-            args = Runner(data = data[:ind], pool = pool)
-            for proc in args.data:
-                if not proc.task.disabled:
-                    proc.run(args)
-            gen  = tuple(i.freeze() for i in cast(Iterator[TrackView], args.gen)
-                         if i.parents == frame.parents[:len(cast(tuple, i.parents))])
-            cnf  = dict(gen = gen, level = args.level, data = list(data[ind:]))
+        ind  = cast(int, ind)+1
+        args = Runner(data = data[:ind], pool = pool)
+        for proc in args.data:
+            if not proc.task.disabled:
+                proc.run(args)
+        gen  = tuple(i.freeze() for i in cast(Iterator[TrackView], args.gen)
+                     if i.parents == frame.parents[:len(cast(tuple, i.parents))])
+        cnf  = dict(gen = gen, level = args.level, data = list(data[ind:]))
 
-        cnf.update(nproc = pool.nworkers, parents = frame.parents) # type: ignore
-        res   = {} # type: dict
-        for val in pool.map(partial(_m_multi, cnf), range(cnf['nproc'])):
-            res.update(val)
-        return res
+    cnf.update(nproc = pool.nworkers, parents = frame.parents) # type: ignore
+    res   = {} # type: dict
+    for val in pool.map(partial(_m_multi, cnf), range(cnf['nproc'])):
+        res.update(val)
+    return res
 
 def run(data:  DATA_TYPE, # pylint: disable=too-many-arguments
         task:  Task                = None,

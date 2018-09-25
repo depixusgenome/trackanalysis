@@ -7,7 +7,7 @@ from typing import Tuple, Optional, Any, cast
 
 from utils  import initdefaults
 
-RANGE_TYPE  = Tuple[Optional[float], Optional[float]]
+RANGE_TYPE  = Tuple[Optional[float], Optional[float]] # pylint: disable=invalid-name
 
 class PlotState(Enum):
     "plot state"

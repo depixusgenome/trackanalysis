@@ -110,8 +110,7 @@ class DecentralizedController(Controller):
             if not isinstance(cur, type(obj)):
                 raise TypeError(f"key already registered to a different type: {name}")
             return cur
-        else:
-            assert name, (name, obj)
+        assert name, (name, obj)
 
         self._objects[name]  = obj
         self._defaults[name] = deepcopy(obj)

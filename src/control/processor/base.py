@@ -128,8 +128,7 @@ class Processor(Generic[TaskType]):
         "Returns a copy of a task's dict"
         if callable(cls.tasktype):
             return cls.tasktype(**kwargs) # pylint: disable=not-callable
-        else:
-            raise TypeError("{}.tasktype is not callable".format(cls))
+        raise TypeError("{}.tasktype is not callable".format(cls))
 
     @classmethod
     def _get_cached(cls, dico, act, frame, item):
@@ -197,7 +196,7 @@ class Processor(Generic[TaskType]):
         "updates the frames"
         raise NotImplementedError()
 
-CACHE_T = Dict[Type[_tasks.Task], Type[Processor]]
+CACHE_T = Dict[Type[_tasks.Task], Type[Processor]] # pylint: disable=invalid-name
 def register(proc: Union[None, Type[Processor], Iterable[Type[Processor]]] = None,
              force          = False,
              cache: CACHE_T = None,

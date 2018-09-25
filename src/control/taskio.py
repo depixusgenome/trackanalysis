@@ -9,8 +9,8 @@ from model.task         import TrackReaderTask
 from data.tracksdict    import TracksDict
 from utils.logconfig    import getLogger
 LOGS   = getLogger(__name__)
-PATH_T = Union[str, Path]
-OPEN_T = Union[PATH_T, Iterable[PATH_T], Dict[str, str]]
+PATH_T = Union[str, Path] # pylint: disable=invalid-name
+OPEN_T = Union[PATH_T, Iterable[PATH_T], Dict[str, str]] # pylint: disable=invalid-name
 class TaskIO:
     u"base class for opening files"
     def __init__(self, *_):

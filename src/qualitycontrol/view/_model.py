@@ -19,8 +19,9 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
         "returns the result of the beadselection"
         err = super().compute(frame, info, cache = cache, **cnf)
         if err:
-            cache.setdefault('messages', []).extend([(info[0],)+ i for i in err.args[0].data()])
-        return None
+            # pylint: disable=unsubscriptable-object
+            lst = [(info[0],)+ i for i in err.args[0].data()]
+            cache.setdefault('messages', []).extend(lst)
 
 class DataCleaningTaskAccess(TaskAccess, tasktype = DataCleaningTask):
     "access to the DataCleaningTask"

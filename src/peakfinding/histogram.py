@@ -99,6 +99,7 @@ class Histogram(PrecisionAlg):
         "Applies to one array"
         osamp = (int(self.oversampling)//2) * 2 + 1
         tmp   = np.int32(np.rint((arr-minv)/bwidth))
+        # pylint: disable=unsubscriptable-object
         res   = np.bincount(tmp[tmp >= 0], minlength = lenv)[:lenv]
         if self.kernel is not None:
             return self.kernel(oversampling = osamp, range = 'same')(res)
@@ -192,6 +193,7 @@ class Histogram(PrecisionAlg):
         return HistogramData(arr, minv, bwidth)
 
     def __rint_peaks(self, peaks, minv, bwidth, lenv):
+        # pylint: disable=unsubscriptable-object
         peaks       = np.int32(np.rint((peaks-[minv,0])/bwidth)) # type: ignore
         peaks       = peaks[np.logical_and(peaks[:,0] >= 0, peaks[:,0] < lenv)]
         defaultstd  = np.percentile(peaks[:,1][peaks[:,1]>0], self.stdpercentile)
@@ -263,7 +265,7 @@ class Histogram(PrecisionAlg):
 
         zmeas  -= minv
         zmeas  /= bwidth
-        items   = (np.int32(np.rint(i)) for i in zmeas)  # type: ignore
+        items: Iterator = (np.int32(np.rint(i)) for i in zmeas)  # type: ignore
         weight  = self.__weights(self.weight,   events)
 
         if not separate:

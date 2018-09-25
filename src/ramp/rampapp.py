@@ -96,7 +96,7 @@ class DisplayHist:
                             size = circle_size,
                             fill_color = fill_color)
 
-    def update(self, data)->None:
+    def update(self, data):
         '''
         updates the values displayed
         '''
@@ -115,12 +115,10 @@ class DisplayHist:
             # to correct for bokeh indices there is duplicates in cdf: set(tuple(x,y))
             cdf = numpy.array([(self.rawdata<=i).sum() for i in self.rawdata])
             cdf = cdf/float(cdf.size)
-            xycoords = set([(self.rawdata.values[i], cdf[i]) for i in range(len(cdf))])
+            xycoords = {(self.rawdata.values[i], cdf[i]) for i in range(len(cdf))}
 
             self.cdfdata.data = {"x" : [i[0] for i in xycoords],
                                  "cdf" : [i[1] for i in xycoords]}
-
-        return
 
 class Data:
     ''' Manages the data

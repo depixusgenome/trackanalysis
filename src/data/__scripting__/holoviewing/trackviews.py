@@ -150,9 +150,9 @@ class CycleDisplay(Display, display = Cycles):
 
         itms = self._items
         if kdim == 'cycle':
-            return ((kdim, list(set([i for _, i in itms.keys() if Beads.isbead(_)]))),)
+            return ((kdim, list({i for _, i in itms.keys() if Beads.isbead(_)})),)
         if kdim == 'bead':
-            return ((kdim, list(set([i for i, _ in itms.keys() if Beads.isbead(i)]))),)
+            return ((kdim, list({i for i, _ in itms.keys() if Beads.isbead(i)})),)
         return None
 
 class BeadDisplay(Display, display = Beads):
@@ -212,7 +212,7 @@ class BeadDisplay(Display, display = Beads):
         if self._kdim is not None and self._keys:
             return self._keys
         if self._kdim == 'bead':
-            return ((self._kdim, list(set([i for i in self._items.keys()
-                                           if self._items.isbead(i)]))),)
+            return ((self._kdim, list({i for i in self._items.keys()
+                                       if self._items.isbead(i)})),)
         return None
 __all__: List[str] = []

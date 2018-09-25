@@ -153,7 +153,8 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
     def _transform_ids(cls, sel):
         return cls._transform_to_bead_ids(sel)
 
-    def _keys(self, sel:Optional[Sequence], _: bool) -> Iterable:
+    # pylint: disable=signature-differs
+    def _keys(self, sel:Optional[Sequence], _: bool) -> Iterable[BEADKEY]: # type: ignore
         if self.config.defaultdata is not None:
             return super()._keys(sel, _)
 
@@ -169,7 +170,7 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
             view  = next(_runprocessors(ref))
             if isinstance(view, PeaksDict):
                 return FitData(self.config.fitalg.frompeaks(view[key]), (1., 0.))
-            elif isinstance(view, Events):
+            if isinstance(view, Events):
                 return FitData(self.config.fitalg.fromevents(view[key,...]), (1., 0.))
         return ref
 
@@ -190,7 +191,7 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
 
     def compute(self, key: BEADKEY) -> np.ndarray:
         "Action applied to the frame"
-        tmp  = cast(np.ndarray, self.data[key])
+        tmp  = cast(np.ndarray, cast(dict, self.data)[key])
         if isinstance(tmp, (Iterator, Generator, tuple)):
             tmp = list(tmp)
         data = FitToRefArray(tmp, discarded = getattr(tmp, 'discarded', 0))
@@ -229,8 +230,8 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
     ```
     """
     if __doc__:
-        __doc__ += ('\n'+PeaksDataFrameFactory.__doc__
-                    [PeaksDataFrameFactory.__doc__.find('# Agg')-5:])
+        __doc__ += ('\n'+PeaksDataFrameFactory.__doc__                # type: ignore
+                    [PeaksDataFrameFactory.__doc__.find('# Agg')-5:]) # type: ignore
     PREC     = 5e-6
     def __init__(self, task, frame):
         get = lambda i: (i  if task.measures.get(i, False) is True else

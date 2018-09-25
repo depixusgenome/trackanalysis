@@ -233,7 +233,7 @@ class Tasks(Enum):
 
     def tasktype(self) -> Type[Task]:
         "returns the task type"
-        if self.name == 'action':
+        if self.name == 'action': # pylint: disable=comparison-with-callable
             return ActionTask
         return type(self.default())
 

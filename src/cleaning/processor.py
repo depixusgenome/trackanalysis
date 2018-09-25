@@ -101,7 +101,8 @@ class DataCleaningException(ProcessorException):
                    'warning')
 
     def __str__(self):
-        return f"{self.args[0].parents}: {self.args[0].beadid}\n{self.args[0]}"
+        args = self.args[0] # pylint: disable=unsubscriptable-object
+        return f"{args.parents}: {args.beadid}\n{args}"
 
 class DataCleaningProcessor(Processor[DataCleaningTask]):
     "Processor for cleaning the data"

@@ -6,13 +6,13 @@ from bokeh.core.properties  import String, Int, List
 from bokeh.model            import Model
 from control.action         import Action
 
-class KeyStrokes(Dict[str, str]):
+class KeyStrokes(dict):
     """
     Model for key bindings
     """
     name = 'keystroke'
 
-class KeyCalls(Dict[str, Callable]):
+class KeyCalls(dict):
     """
     Model for key bindings
     """
@@ -26,8 +26,8 @@ class DpxKeyEvent(Model):
     __implementation__ = "keypress.coffee"
     def __init__(self, ctrl = None):
         super().__init__()
-        self._keys     = KeyCalls()
-        self._bindings = KeyStrokes()
+        self._keys:     Dict[str, str]      = KeyCalls()
+        self._bindings: Dict[str, Callable] = KeyStrokes()
         if ctrl is not None:
             self.observe(ctrl)
 

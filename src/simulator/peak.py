@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Creates peaks at various positions"
-from   typing   import (Union, Sequence, Optional, # pylint: disable=unused-import
-                        Dict, Tuple)
+from   typing   import Union, Sequence, Optional, Dict, Tuple
 import random
 import numpy as np
 from   numpy.lib.stride_tricks  import as_strided
@@ -12,8 +11,8 @@ from   utils                    import initdefaults, kwargsdefaults
 class FakeTrack:
     u"Placeholder"
     def __init__(self):
-        self.data  = dict()
-        self.beads = self.data
+        self.data: Dict  = dict()
+        self.beads: Dict = self.data
 
 class PeakSimulator:
     u"""
@@ -43,14 +42,14 @@ class PeakSimulator:
       If an int is provided, all events have that size. If a pair of ints is
       provided, events have a random size in the provided range.
     """
-    peaks    = np.arange(10)*10.
-    labels   = None     # type: Union[None, Sequence, str]
-    rates    = .1       # type: Union[None, float, Sequence[float]]
-    brownian = .1       # type: Optional[float]
-    bias     = .1       # type: Optional[float]
-    stretch  = .1       # type: Optional[float]
-    sizes    = (5, 20)  # type: Optional[Tuple[int,int]]
-    __KEYS   = frozenset(locals())
+    peaks                                          = np.arange(10)*10.
+    labels   : Union[None, Sequence, str]          = None
+    rates    : Union[None, float, Sequence[float]] = .1
+    brownian : Optional[float]                     = .1
+    bias     : Optional[float]                     = .1
+    stretch  : Optional[float]                     = .1
+    sizes    : Optional[Tuple[int,int]]            = (5, 20)
+    __KEYS                                         = frozenset(locals())
     @initdefaults(__KEYS)
     def __init__(self, **_):
         pass
@@ -126,7 +125,7 @@ class PeakSimulator:
 
         vals = np.float32(np.random.normal(0., self.brownian, rngs[-1,-1]))
         for i, sli in enumerate(rngs):
-            peaks[i] += vals[sli[0]:sli[1]]
+            peaks[i] += vals[sli[0]:sli[1]] # pylint: disable=unsubscriptable-object
 
     def peakstoevents(self, peaks):
         u"""

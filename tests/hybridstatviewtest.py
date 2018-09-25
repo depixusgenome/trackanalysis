@@ -81,7 +81,7 @@ def test_peaks_xlsxio():
     assert Path(out).exists()
     assert cnt > 0
 
-def test_peaksplot(bokehaction):
+def test_peaksplot(bokehaction): # pylint: disable=too-many-statements
     "test peaksplot"
     vals = [0.]*2
     def _printrng(old = None, model = None, **_):
@@ -144,7 +144,6 @@ def test_peaksplot(bokehaction):
         found = [0]
         def _startfile(path):
             found[0] = path
-            return
         bokehaction.setattr(widgetmod, 'startfile', _startfile)
         server.click('Peaks:IDPath', withnewpath = out)
         server.wait()

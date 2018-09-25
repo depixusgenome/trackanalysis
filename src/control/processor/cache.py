@@ -70,7 +70,7 @@ class CacheItem:
     cache   = property(lambda self: self.getCache(), setCache)
     proc    = property(lambda self: self._proc)
 
-REP_T = Tuple[int, Processor, Processor]
+REP_T = Tuple[int, Processor, Processor] # pylint: disable=invalid-name
 class CacheReplacement:
     """
     Context for replacing processors but keeping their cache
@@ -230,5 +230,4 @@ class Cache(Iterable[Processor], Sized):
                 raise NotImplementedError("Slicing a list of tasks?")
 
             return iter(item.proc for item in self._items[slice(start, stop)])
-        else:
-            return self._items[self.index(ide)]
+        return self._items[self.index(ide)]

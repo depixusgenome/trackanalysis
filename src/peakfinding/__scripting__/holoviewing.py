@@ -167,8 +167,8 @@ class PeaksDisplay(_CycleDisplay, display = PeaksDict): # type: ignore
     def getredim(self):
         "Returns the keys used by the dynamic map"
         if self._kdim == 'bead':
-            return ((self._kdim, list(set([i for i in self._items.keys()
-                                           if self._items.isbead(i)]))),)
+            return ((self._kdim, list({i for i in self._items.keys()
+                                       if self._items.isbead(i)})),)
         return None
 
 displayhook(PeaksDict)

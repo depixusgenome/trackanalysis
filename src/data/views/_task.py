@@ -50,7 +50,8 @@ class TaskView(TrackView, Generic[Config, Key]):
     def _get_data_keys(self):
         return self.data.keys()
 
-    def _keys(self, sel:Optional[Sequence[Key]]) -> Iterable[Key]:
+    # pylint: disable=arguments-differ
+    def _keys(self, sel:Optional[Sequence[Key]], _: bool = None) -> Iterable[Key]:
         if self.__keys is None:
             self.__keys = frozenset(self._get_data_keys())
 

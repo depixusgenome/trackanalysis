@@ -174,21 +174,20 @@ class BaseTaskController(Controller):
         ctrl = ProcessorController() if parent is None else self._items[parent]
         return ctrl.task(task, noemission = noemission)
 
+    # pylint: disable=no-self-use,unused-argument,function-redefined
     @overload
-    def track(self, parent: None) -> None: # pylint: disable=no-self-use,unused-argument
+    def track(self, parent: None) -> None:
         "returns None"
 
     @overload
-    def track(self, # pylint: disable=no-self-use,unused-argument,function-redefined
-              parent: RootTask) -> 'Track':
+    def track(self, parent: RootTask) -> 'Track':
         "returns the root cache, i;e. the track"
 
     @overload
-    def track(self, # type: ignore # pylint: disable=no-self-use,unused-argument,function-redefined
-              parent: '_Ellipsis') -> Iterator['Track']:
+    def track(self, parent: '_Ellipsis') -> Iterator['Track']: # type: ignore
         "returns all root cache, i;e. tracks"
 
-    def track(self, parent): # pylint: disable=function-redefined
+    def track(self, parent):
         "returns the root cache, i;e. the track"
         if parent is Ellipsis:
             return (i.data[0].cache() for i in self._items.values())

@@ -30,8 +30,7 @@ class UndoController(Controller):
             self.__model.append(self.__isundoing, lst)
             self.__isundoing = False
             return dict(items = lst)
-        else:
-            raise NoEmission("empty undo list")
+        raise NoEmission("empty undo list")
 
     @Controller.emit
     def undo(self) -> None:

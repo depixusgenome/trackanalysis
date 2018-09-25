@@ -180,6 +180,7 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
         ids  = alg.pair(peaks, *dist.get(best, (0., 1., 0))[1:])
         return FitBead(key, silh, dist, ids, events)
 
+    # pylint: disable=arguments-differ
     def compute(self, aitem: Union[BEADKEY, PeakEventsTuple]) -> FitBead:
         "Action applied to the frame"
         if Beads.isbead(aitem):

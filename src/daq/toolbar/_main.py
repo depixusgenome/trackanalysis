@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "bringing togethe toobar components"
 from typing         import Dict, Any, Optional
-import bokeh.layouts as layouts
+import bokeh.layouts as    layouts # pylint: disable=useless-import-alias
 
 from utils          import initdefaults
 from view.base      import threadmethod, spawn

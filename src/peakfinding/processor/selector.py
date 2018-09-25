@@ -94,6 +94,7 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
             * `peaks.selecting([1, 2])` selects bead 1 and 2""",
                                        views      = "peaks")
     level  = Level.peak
+    # pylint: disable=arguments-differ
     def compute(self, ibead, precision: float = None) -> PeakListArray:
         "Computes values for one bead"
         vals = (self.data.bead(ibead) if hasattr(self.data, 'bead') else # type: ignore

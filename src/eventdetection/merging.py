@@ -367,15 +367,14 @@ class PyEventSelector:
         minl = self.minduration
         if minl <= 0:
             return intervals
-        else:
-            intervals = intervals[np.nonzero(np.diff(intervals, 1) >= minl)[0]] # type: ignore
-            good      = np.fromiter((self.__good(minl, data[slice(*rng)]) for rng in intervals),
-                                    'bool', len(intervals))
-            intervals = intervals[good]
-            if edx != 0:
-                intervals[:,0] += edx
-                intervals[:,1] -= edx
-            return intervals
+        intervals = intervals[np.nonzero(np.diff(intervals, 1) >= minl)[0]] # type: ignore
+        good      = np.fromiter((self.__good(minl, data[slice(*rng)]) for rng in intervals),
+                                'bool', len(intervals))
+        intervals = intervals[good]
+        if edx != 0:
+            intervals[:,0] += edx
+            intervals[:,1] -= edx
+        return intervals
 
     @classmethod
     def run(cls, *args, **kwa):

@@ -119,7 +119,9 @@ class SubtractMedianSignal:
         return (0. if len(signals) == 0 else
                 reducesignals("median", meanrange[0], meanrange[1], signals))
 
-AGG_TYPE = Union[SubtractAverageSignal, SubtractMedianSignal, SubtractWeightedAverageSignal]
+AGG_TYPE = Union[SubtractAverageSignal, # pylint: disable=invalid-name
+                 SubtractMedianSignal,
+                 SubtractWeightedAverageSignal]
 
 class BeadSubtractionTask(Task):
     """
@@ -201,8 +203,8 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
 
         return task.filter(sub) if task.filter else sub
 
-FIXED_DATA = Tuple[float, float, float, BEADKEY]
-FIXED_LIST = List[FIXED_DATA]
+FIXED_DATA = Tuple[float, float, float, BEADKEY] # pylint: disable=invalid-name
+FIXED_LIST = List[FIXED_DATA]                    # pylint: disable=invalid-name
 class FixedBeadDetection:
     """
     Finds and sorts fixed beads

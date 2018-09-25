@@ -195,7 +195,7 @@ class TrackSimulator:
                         arr[ends[i]:ends[i+1]] += val
             return base
 
-        elif alg == 'stairs':
+        if alg == 'stairs':
             base = np.repeat(np.cos(np.arange(ncycles)*2.*np.pi/scale) * amp, size)
         else:
             base = getattr(np, alg)(np.arange(ncycles*size)*2.*np.pi/(size*scale)) * amp
@@ -368,7 +368,7 @@ class TrackSimulator:
         if brownian is None:
             return
 
-        elif isinstance(brownian, (float, int)):
+        if isinstance(brownian, (float, int)):
             if brownian > 0.:
                 cycles[:] += np.random.normal(0., brownian, cycles.shape)
 

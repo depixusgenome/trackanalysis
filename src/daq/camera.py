@@ -9,7 +9,7 @@ from   typing                 import Dict, Any, Tuple
 import numpy                  as     np
 import bokeh.core.properties  as     props
 
-import bokeh.layouts          as     layouts
+import bokeh.layouts          as     layouts # pylint: disable=useless-import-alias
 from   bokeh.models           import (ColumnDataSource, PointDrawTool, Range1d,
                                       LinearAxis, CustomJS)
 from   bokeh.plotting         import figure, Figure

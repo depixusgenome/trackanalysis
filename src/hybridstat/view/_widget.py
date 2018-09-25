@@ -105,7 +105,8 @@ class PeaksSequencePathWidget(SequencePathWidget):
             return sorted(lst, key = lambda i: dist[i].value)
         return super()._sort(lst)
 
-    def callbacks(self,  # type: ignore # pylint: disable=arguments-differ
+    # pylint: disable=arguments-differ
+    def callbacks(self,  # type: ignore
                   hover: SequenceHoverMixin,
                   tick1: SequenceTicker,
                   div:   'PeaksStatsDiv',
@@ -408,19 +409,16 @@ class PeakIDPathWidget:
                 ctrl.display.update(self.__peaks.peaksmodel.display, constraintspath = None)
                 return
 
-            elif not Path(path).exists():
+            if not Path(path).exists():
                 if not path.endswith(".xlsx"):
                     raise IOError(*self.__theme.tableerror)
-                try:
-                    writecolumns(path, "Summary",
-                                 [('Bead', [self.__peaks.bead]),
-                                  ('Reference', [self.__peaks.sequencekey]),
-                                  ('Stretch (base/µm)', [self.__peaks.stretch]),
-                                  ('Bias (µm)', [self.__peaks.bias])])
-                except:
-                    raise
-                else:
-                    startfile(path)
+
+                writecolumns(path, "Summary",
+                             [('Bead', [self.__peaks.bead]),
+                              ('Reference', [self.__peaks.sequencekey]),
+                              ('Stretch (base/µm)', [self.__peaks.stretch]),
+                              ('Bias (µm)', [self.__peaks.bias])])
+                startfile(path)
 
             ctrl.display.update(self.__peaks.peaksmodel.display,
                                 constraintspath = str(Path(path).resolve()))

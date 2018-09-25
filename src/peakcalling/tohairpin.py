@@ -60,8 +60,7 @@ class HairpinFitter(OptimizationParams):
             aval = dist[key].value
             bval = min(i[0] for k, i in dist.items() if k != key)
             return ((bval-aval)/max(aval, bval)-.5)*2.
-        else:
-            return 1. if len(dist) == 1 else -3.
+        return 1. if len(dist) == 1 else -3.
 
     def optimize(self, peaks: np.ndarray) -> Distance:
         "optimizes the cost function"
@@ -415,8 +414,8 @@ def matchpeaks(ref, peaks, window):
     arr[ids[:,1]] = ids[:,0]
     return arr
 
-PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
-PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]
+PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])  # pylint: disable=invalid-name
+PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray] # pylint: disable=invalid-name
 class PeakMatching(HairpinFitter, PointwiseOptimization):
     "Identifying experimental peaks with the theoretical ones"
     window          = 10.

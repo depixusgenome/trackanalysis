@@ -29,7 +29,6 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
         super().compute(frame, (info[0], curr), cache = cache, **cnf)
         DataCleaning(**cnf).aberrant(info[1], clip = True)
         cache['gui'] = np.isnan(curr)
-        return None
 
     @staticmethod
     def nans(mdl, nans):

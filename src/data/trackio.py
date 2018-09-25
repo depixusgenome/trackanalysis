@@ -20,7 +20,7 @@ import  numpy              as     np
 from    legacy             import readtrack, readgr, fov as readfov
 
 if TYPE_CHECKING:
-    # pylint: disable=unused-import
+    # pylint: disable=unused-import,invalid-name
     from data.track      import Track
     from data.tracksdict import TracksDict
     TDICT_T = TypeVar('TDICT_T', bound = 'TracksDict')
@@ -148,18 +148,17 @@ class LegacyGRFilesIO(_TrackIO):
             if '*' in fname:
                 return cls.__findtrk(fname, allpaths[1])
 
-            elif not allpaths[0].exists():
+            if not allpaths[0].exists():
                 raise IOError("Could not find path: " + str(allpaths[0]), "warning")
 
             return allpaths
 
-        else:
-            trk = next(i for i in allpaths if i.suffix == cls.TRKEXT)
-            grs = tuple(i for i in allpaths if i.suffix  == cls.GREXT)
-            if len(grs) == 0:
-                return None
+        trk = next(i for i in allpaths if i.suffix == cls.TRKEXT)
+        grs = tuple(i for i in allpaths if i.suffix  == cls.GREXT)
+        if len(grs) == 0:
+            return None
 
-            return (trk,) + grs
+        return (trk,) + grs
 
     @classmethod
     def open(cls, paths:Tuple[PATHTYPE,PATHTYPE], **kwa) -> dict: # type: ignore
