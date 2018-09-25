@@ -305,7 +305,7 @@ def addattributes(cls, *_, protected: Dict[str, Any] = None, **kwa):
         setattr(cls, i, j)
     cls.__init__.UPDATER.attrs  += tuple((i, i) for i in kwa)
 
-T = TypeVar('T')
+T = TypeVar('T') # pylint: disable=invalid-name
 def fieldnames(obj) -> FrozenSet[str]:
     "Returns attribute and property names of the object"
     dico = frozenset(name

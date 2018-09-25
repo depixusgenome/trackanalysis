@@ -142,7 +142,7 @@ def run(locs, direct, star, jupyter):
         locs.pop('run')
 
     # pylint: disable=no-member
-    getLogger("").info(f'{version.version()}{" for jupyter" if ISJUP else ""}')
+    getLogger("").info('%s%s', version.version(), " for jupyter" if ISJUP else "")
     if 'TUTORIAL' in locs:
         if _isjupyter():
             def tutorial():

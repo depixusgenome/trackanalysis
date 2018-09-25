@@ -11,8 +11,7 @@ from    typing      import (Dict, Tuple, Any, Optional, TypeVar,
                             Generic, Callable, Union, IO, Iterator, TYPE_CHECKING)
 import  numpy as np
 
-if TYPE_CHECKING:
-    StreamUnion = Union[str,pathlib.Path,IO]
+StreamUnion = Union[str,pathlib.Path,IO]
 
 class _PathPos:
     def __init__(self, fcn):
