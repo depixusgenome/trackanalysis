@@ -59,20 +59,24 @@ class _FunctionHandler(FunctionHandler):
     @classmethod
     def launchflexx(cls, view, **kwa):
         "Launches a bokeh server"
-        from flexx.webruntime           import launch as _flexxlaunch
+        from webruntime           import launch as _flexxlaunch
         port = kwa.get('port', str(DEFAULT_SERVER_PORT))
+        if isinstance(kwa.get('size', ()), list):
+            kwa['size'] = tuple(kwa['size'])
+
         if isinstance(view, Server):
             server = view
         else:
             server = cls.serveapplication(view, **kwa.pop('server', {}), port = port)
 
         cls.__monkeypatch_flexx(server)
-        view.MainControl.FLEXXAPP = _flexxlaunch('http://localhost:{}/'.format(port), **kwa)
+        view.MainControl.FLEXXAPP = _flexxlaunch('http://localhost:{}/'.format(port),
+                                                 **kwa)
         return server
 
     @staticmethod
     def __monkeypatch_flexx(server):
-        from flexx.webruntime.common    import StreamReader
+        from webruntime._common         import StreamReader
         def run(self, __old__ = StreamReader.run):
             "Stop the stream reader"
             __old__(self)
@@ -114,6 +118,9 @@ class _FunctionHandler(FunctionHandler):
         kwa.setdefault('use_index',            True)
         kwa.setdefault('redirect_root',        True)
         kwa['port'] = int(kwa.get('port', DEFAULT_SERVER_PORT))
+        kwa.pop('runtime', None)
+        if isinstance(kwa.get('size', ()), list):
+            kwa['size'] = tuple(kwa['size'])
         LOGS.debug("dynamic loads: %s", orders().dynloads())
         for mdl in orders().dynloads():
             getattr(sys.modules.get(mdl, None), 'server', lambda x: None)(kwa)
@@ -152,7 +159,7 @@ def setup(locs,           #
     setup(locals(), defaultcontrols = CONTROLS, defaultviews = VIEWS)
     ```
 
-    To launch an `flexx` window displayong `myview.MyView`:
+    To launch a `webruntime` window displayng `myview.MyView`:
 
     ```python
     from app.mycontext import launch

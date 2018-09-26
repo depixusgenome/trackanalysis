@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u'''Runs the rampapp using flexx framework'''
+'''Runs the rampapp using webruntime framework'''
 import click
 from bokeh.server.server import Server
 from bokeh.application import Application
 from bokeh.settings import settings
 from bokeh.application.handlers import FunctionHandler
-from flexx.webruntime import launch as _flexxlaunch
-from flexx.webruntime.common import StreamReader
 
 def _serverkwargs(kwa):
     server_kwargs = dict(kwa)
@@ -20,12 +18,12 @@ def _serverkwargs(kwa):
 
 @click.command()
 @click.option("--width", 'width', default = 800,
-              help = u'Sets width of the window')
+              help = 'Sets width of the window')
 @click.option("--height", 'height', default = 800,
-              help = u'Sets height of the window')
+              help = 'Sets height of the window')
 
 def run(width,height): # pylint: disable=unused-argument
-    u"Launches an view"
+    "Launches an view"
     from . import rampapp
     viewcls = rampapp.MyDisplay
     #spec_server=_serverkwargs({"title":"Ramp analysis",
@@ -36,9 +34,12 @@ def run(width,height): # pylint: disable=unused-argument
     start = viewcls.open
     server = Server(Application(FunctionHandler(start)), **spec_server)
 
+    from webruntime._common import StreamReader
+    from webruntime         import launch as _flexxlaunch
+
     old = StreamReader.run
     def reader_run(self):
-        u''' define StreamReader run function
+        ''' define StreamReader run function
         '''
         old(self)
         server.stop()

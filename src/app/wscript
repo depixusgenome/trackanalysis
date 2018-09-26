@@ -1,2 +1,2 @@
-require('python', click = 6.6, appdirs = "1.4.0", flexx = '0.4.1')
+require('python', click = 6.6, appdirs = "1.4.0", webruntime = '0.5.4')
 make(locals())

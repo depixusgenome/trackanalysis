@@ -83,56 +83,6 @@ def _from_module(view):
                               fromlist = view[view.rfind('.')+1:])
     return getattr(viewmod, view[view.rfind('.')+1:])
 
-def _electron(server, **kwa):
-    electron = None
-    iswin    = sys.platform.startswith('win')
-    for electron in (str(Path('node_modules')/'.bin'/'electron'), 'electron'):
-        try:
-            if subprocess.check_call([electron, '-v'],
-                                     shell  = iswin,
-                                     stdout = subprocess.DEVNULL,
-                                     stderr = subprocess.DEVNULL) == 0:
-                break
-        except subprocess.CalledProcessError:
-            pass
-        except FileNotFoundError:
-            pass
-    else:
-        electron = None
-
-    if electron is not None:
-        jscode = """
-            const {app, BrowserWindow} = require('electron')
-
-            let win
-
-            function createWindow () {
-                win = new BrowserWindow({width:1000, height:1000, title: "%s"})
-
-                win.loadURL("http:\\\\localhost:%d")
-                win.setMenu(null);
-
-                win.on('closed', () => { win = null })
-            }
-
-            app.on('ready', createWindow)
-
-            app.on('window-all-closed', () => { app.quit() })
-
-            app.on('activate', () => { if (win === null) { createWindow() } })
-            """ % (server.MainView.APPNAME,
-                   kwa.get('port', DEFAULT_SERVER_PORT))
-
-        import tempfile
-        path = tempfile.mktemp("_trackanalysis.js")
-        with open(path, "w", encoding="utf-8") as stream:
-            print(jscode, file = stream)
-
-        subprocess.Popen([electron, path], shell = iswin)
-        server.appfunction.stoponnosession = True
-    else:
-        server.show("/")
-
 def _win_opts():
     if sys.platform.startswith("win"):
         # Get rid of console windows
@@ -179,7 +129,7 @@ def _files(directory, files, bead):
             ctrl.display.update("tasks", bead = bead)
         INITIAL_ORDERS.append(_setbead)
 
-def _launch(view, app, desktop, kwa):
+def _launch(view, app, gui, kwa):
     viewcls = _from_path(view)
     if viewcls is None:
         viewcls = _from_module(view)
@@ -194,15 +144,16 @@ def _launch(view, app, desktop, kwa):
             and 'daq' not in app):
         app = 'daq.'+app
 
+    kwa['runtime'] = gui
+    lfcn           = 'launch' if gui.endswith('app') else 'serve'
     if '.' in app and 'A' <= app[app.rfind('.')+1] <= 'Z':
         mod  = app[:app.rfind('.')]
         attr = app[app.rfind('.')+1:]
         launchmod = getattr(__import__(mod, fromlist = [attr]), attr)
     else:
-        launchmod = __import__(app, fromlist = [('serve', 'launch')[desktop]])
+        launchmod = __import__(app, fromlist = [lfcn])
 
-    launch = getattr(launchmod, ('serve', 'launch')[desktop])
-    return launch(viewcls, **kwa)
+    return getattr(launchmod, lfcn)(viewcls, **kwa)
 
 def _port(port):
     return int(random.randint(5000, 8000)) if port == 'random' else int(port)
@@ -224,11 +175,11 @@ def defaultmain(view, gui, port, raiseerr, nothreading, defaultapp):
     _win_opts()
 
     kwargs = dict(port = _port(port), apponly = False)
-    server = _launch(view, defaultapp, gui == 'firefox', kwargs)
+    server = _launch(view, defaultapp, gui, kwargs)
 
-    if gui == 'chrome':
-        server.io_loop.add_callback(lambda: _electron(server, port = kwargs['port']))
-    elif gui == 'default':
+    if gui == 'default':
+        gui = 'browser'
+    if gui.endswith('browser'):
         server.io_loop.add_callback(lambda: server.show("/"))
 
     log = lambda: LOGS.info(' http://%(address)s:%(port)s',
@@ -254,8 +205,11 @@ def defaultclick(*others):
                            default    = str(DEFAULT_SERVER_PORT),
                            help       = 'Port used: use "random" for any')(fcn)
         fcn = click.option("-g", "--gui",
-                           type       = click.Choice(['firefox', 'chrome', 'default', 'none']),
-                           default    = 'firefox',
+                           type       = click.Choice(['app', 'browser', 'default',
+                                                      'firefox-browser', 'chrome-browser',
+                                                      'firefox-app', 'chrome-app',
+                                                      'none']),
+                           default    = 'app',
                            help       = 'The type of browser to use.')(fcn)
 
         for i in others:

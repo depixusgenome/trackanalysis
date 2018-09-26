@@ -8,7 +8,6 @@ from zipfile    import ZipFile
 from shutil     import rmtree, copy2
 import py_compile
 
-from waflib         import Logs
 from waflib.Build   import BuildContext
 
 import wafbuilder
@@ -60,7 +59,7 @@ class _CondaApp(BuildContext):
                  r'IR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"\n'
                  r'cd $DIR\n'
                  r'./bin/python')
-        for optext, opts in (('', ''), ('_chrome', ' -g chrome')):
+        for optext, opts in (('', '-g app'),):
             fname = str(self.options.STARTSCRIPT_PATH.make_node(name+optext+ext))
             with open(fname, 'w', encoding = 'utf-8') as stream:
                 print(cmd + r" app/cmdline.pyc " + val + opts + r' --port random',
@@ -70,29 +69,12 @@ class _CondaApp(BuildContext):
             cmd   = r"%~dp0python -I "
             fname = str(self.options.STARTSCRIPT_PATH.make_node(name+"_debug"+ext))
             with open(fname, 'w', encoding = 'utf-8') as stream:
-                print(cmd + r" app/cmdline.pyc " + val + r' -g default --port random',
+                print(cmd + r" app/cmdline.pyc " + val + r' -g browser --port random',
                       file = stream)
                 print(r"pause", file = stream)
 
     def __startscripts(self, mods):
         self.recurse(mods, "startscripts", mandatory = False)
-
-    @staticmethod
-    def __electron():
-        old   = Path(".").resolve()
-        wafbuilder.os.chdir(str(Path("build")/"OUTPUT"))
-
-        iswin = sys.platform.startswith("win")
-        npm   = 'npm' + ('.cmd' if iswin else '')
-        for path in ('.', 'bin', 'Scripts'):
-            if (Path(path)/npm).exists():
-                cmd = str(Path(path)/npm) + " install electron"
-                Logs.info(cmd)
-                wafbuilder.os.system(cmd)
-                break
-        else:
-            raise IOError("Could not install electron")
-        wafbuilder.os.chdir(str(old))
 
     @staticmethod
     def __compile(path, inp, outp):
@@ -184,8 +166,6 @@ class _CondaApp(BuildContext):
         if self.DOALL:
             wafbuilder.condasetup(self, copy = 'build/OUTPUT', runtimeonly = True)
         self.__startscripts(mods)
-        if self.DOALL:
-            self.__electron()
 
         self.add_group()
         self(rule = lambda _: self.__final(mods), always = True)
