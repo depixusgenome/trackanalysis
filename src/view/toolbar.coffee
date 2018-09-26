@@ -68,21 +68,31 @@ export class DpxToolbarView extends WidgetView
                     ' id="dpx-tb-flist-btn">'+
                     '<span class="bk-bs-caret"/>'+
                 '</button>'+
-                '<div id="dpx-tb-flist-menu">'
+                '<div id="dpx-tb-flist-menu"><table>'
         if @model.filelist.length > 0
             for j in [0..@model.filelist.length-1]
                 if j == @model.currentfile
                     active = ' bk-bs-active'
                 else
                     active = ''
-                itm += '<label class="bk-bs-radio"><input'
+                itm += '<tr><td><label class="bk-bs-radio"><input'
                 if j == @model.currentfile
                     itm += ' checked=true'
                 itm += " type='radio' id='dpx-tb-flist-#{j}' class='dpx-tb-flist-itm'/>"+
-                       "#{@model.filelist[j]}</label>"
+                       "#{@model.filelist[j]}</label></td>"+
+                       "<td><button type='button' class='bk-bs-btn bk-bs-btn-danger' "+
+                       "id='dpx-tb-flist-btn-#{j}' class='dpx-tb-flist-itm'>X</button></td>"+
+                       "</tr>"
 
-        itm += '</div></div>'
+        itm += '</table></div></div>'
         return itm
+
+    on_click_del_file: (evt) ->
+        evt.preventDefault()
+        evt.stopPropagation()
+
+        tmp            = evt.target.id.split('-')
+        @model.delfile = Number(tmp[tmp.length-1])
 
     on_click_file: (evt) ->
         evt.preventDefault()
@@ -141,6 +151,7 @@ export class DpxToolbarView extends WidgetView
         if @model.filelist.length > 0
             for i in [0..@model.filelist.length-1]
                 elem.find("#dpx-tb-flist-#{i}").change((e) => @on_click_file(e))
+                elem.find("#dpx-tb-flist-btn-#{i}").click((e) => @on_click_del_file(e))
 
         @on_change_frozen()
         return @
@@ -163,6 +174,7 @@ export class DpxToolbar extends Widget
         frozen:     [p.Bool,    true]
         open:       [p.Number,  0]
         currentfile:[p.Number,  -1]
+        delfile:    [p.Number,  -1]
         filelist:   [p.Array,   []]
         save:       [p.Number,  0]
         quit:       [p.Number,  0]

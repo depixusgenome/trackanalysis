@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "Toolbar"
 import time
-from typing               import Callable, TYPE_CHECKING, Iterator, Tuple, Any
+from typing               import Callable, Iterator, Tuple, Any, TYPE_CHECKING
+from itertools            import chain
 from functools            import partial
 from pathlib              import Path
 
@@ -133,6 +134,7 @@ class DpxToolbar(Widget):
     accepted    = props.String('')
     currentbead = props.Bool(True)
     currentfile = props.Int(-1)
+    delfile     = props.Int(-1)
     filelist    = props.List(props.String)
     seltype     = props.Bool(True)
     message     = props.String('')
@@ -290,16 +292,18 @@ class BeadInput:
 
         def _onproject(**_):
             bead  = bdctrl.bead
+            if bead is None:
+                return
+
             avail = set(bdctrl.availablebeads)
             if bead not in avail:
-                if any(i > bead for i in avail):
-                    bdctrl.bead = bead+1
-                elif any(i < bead for i in avail):
-                    bdctrl.bead = bead-1
-                else:
-                    tbar.bead = bead
-            else:
-                tbar.bead = bead
+                pot = next(chain((i for i in avail if i > bead),
+                                 (i for i in avail if i < bead)),
+                           None)
+                if pot is not None:
+                    bdctrl.bead = pot
+                    return
+            tbar.bead = bead
 
         tbar.on_change('bead', _chg_cb)
         ctrl.display.observe("tasks", _onproject)
@@ -413,17 +417,28 @@ class FileListInput:
                 stop[0] = False
 
         def _oncurrentfile_cb(attr, old, new):
-            new = int(new)
-            if new == -1:
+            inew = int(new)
+            if inew == -1:
                 return
 
             lst = list(FileList.get(ctrl))
-            if new >= len(lst):
+            if inew >= len(lst):
                 _setfilelist(model = [ctrl.display.get("tasks", "roottask")])
             elif not stop[0]:
-                ctrl.display.update("tasks", roottask = lst[new][1])
-
+                ctrl.display.update("tasks", roottask = lst[inew][1])
         tbar.on_change('currentfile', _oncurrentfile_cb)
+
+        def _ondelfile_cb(attr, old, new):
+            inew = int(new)
+            if inew == -1:
+                return
+
+            tbar.delfile = -1
+            lst          = list(FileList.get(ctrl))
+            if 0 <= inew < len(lst):
+                ctrl.tasks.closetrack(lst[inew][1])
+
+        tbar.on_change('delfile', _ondelfile_cb)
 
 class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
     "Toolbar"

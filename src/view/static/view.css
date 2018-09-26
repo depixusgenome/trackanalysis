@@ -439,3 +439,6 @@ width: 100%; }
 .dpx-widget label { margin-left: 9px; margin-top: 3px; margin-right: 3px; }
 .dpx-widget p { margin-left: 9px; margin-top: 3px; margin-right: 3px; }
 .dpx-widget input { height: 28px; }
+
+#dpx-tb-flist-menu button { width: 10px; float: right; padding-left: 3px;}
+#dpx-tb-flist-menu td { width: 100%; }
