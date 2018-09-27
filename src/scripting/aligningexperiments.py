@@ -3,19 +3,20 @@
 """
 Scripts for aligning beads & tracks
 """
-from   typing                               import Dict, NamedTuple, Any, Optional
+from   typing                               import Dict, NamedTuple, Optional
+from   copy                                 import copy
 import pandas                               as     pd
 import numpy                                as     np
 import holoviews                            as     hv
-from   utils                               import initdefaults
-from   sequences                           import (Translator,
-                                                   read  as _seqread,
-                                                   peaks as _seqpeaks)
-from   peakcalling.toreference             import (Range, # pylint: disable=unused-import
-                                                   CorrectedHistogramFit, Pivot)
-from   peakcalling.tohairpin               import ChiSquareFit, matchpeaks, HairpinFitter
-from   peakfinding.groupby.histogramfitter import PeakFlagger
-from   model.__scripting__.tasks           import Tasks, Task
+from   utils                                import initdefaults
+from   sequences                            import (Translator,
+                                                    read  as _seqread,
+                                                    peaks as _seqpeaks)
+from   peakcalling.toreference              import (Range, # pylint: disable=unused-import
+                                                    CorrectedHistogramFit, Pivot)
+from   peakcalling.tohairpin                import ChiSquareFit, matchpeaks, HairpinFitter
+from   peakfinding.groupby.histogramfitter  import PeakFlagger
+from   model.__scripting__.tasks            import Tasks, Task
 
 def getreference(tracks) -> Optional[str]:
     "returns the reference track"
@@ -218,8 +219,11 @@ class PeaksAlignment:
     def setpivot(data, position = 'max'):
         "moves peakposition and avg to a new position"
         pos   = lambda attr, x: x[attr] - getattr(x.peakposition, position)()
-        allp  = lambda x: x.assign(peakposition = pos('peakposition', x),
-                                   avg          = pos('avg', x))
+        if position is None:
+            allp  = lambda x: x.copy()
+        else:
+            allp  = lambda x: x.assign(peakposition = pos('peakposition', x),
+                                       avg          = pos('avg', x))
         if isinstance(data, pd.DataFrame):
             return allp(data)
         return [(i, allp(j)) for i, j in data]
@@ -239,7 +243,7 @@ class PeaksAlignment:
         pks     = {i: self.refalign.frompeaks(frompks(j)) for i, j in data}
         return {i: self.refalign.optimize(pks[ref], j) for i, j in pks.items()}
 
-    def tohairpin(self, data, ref = None, corr = None):
+    def tohairpin(self, data, ref = None, refpos = None, corr = None):
         """
         normalize to a given hairpin
         """
@@ -252,8 +256,15 @@ class PeaksAlignment:
             new = {i: self.hpalign.optimize(j)  for i, j in pos.items()}
             return {i: (j[0], j[1]*new[i][1], j[1]*j[2]+new[i][2]/j[1]) for i, j in corr.items()}
 
+        if refpos is None:
+            hpalign = self.hpalign
+        else:
+            hpalign = copy(self.hpalign)
+            arr     = [j for i, j in enumerate(hpalign.peaks) if i not in refpos]
+            hpalign.peaks = np.array(arr, dtype = 'f4')
+
         if self.refalign is not None:
-            out  = self.hpalign.optimize(pos[ref])
+            out  = hpalign.optimize(pos[ref])
             corr = {i: (j[0], j[1]*out[1], j[1]*j[2]+out[2]/j[1]) for i, j in corr.items()}
             if self.hprefalign and len(self.hprefalign.peaks):
                 pos  = {i: (j-corr[i][2])*corr[i][1] for i, j in pos.items()}
@@ -262,16 +273,16 @@ class PeaksAlignment:
                         for i, j in corr.items()}
             return corr
 
-        return {i: self.hpalign.optimize(j) for i, j in pos.items()}
+        return {i: hpalign.optimize(j) for i, j in pos.items()}
 
-    def correct(self, data, ref):
+    def correct(self, data, ref, refpos = None):
         """
         translate the data to a common zero
         """
         if ref is None:
             return data
         corr = self.toreference(data, ref)
-        corr = self.tohairpin(data, ref, corr)
+        corr = self.tohairpin(data, ref, refpos, corr)
         data = [(i, j.assign(peakposition = (j.peakposition-corr[i][2])*corr[i][1],
                              avg          = (j.avg-corr[i][2])*corr[i][1]))
                 for i, j in data]
@@ -281,6 +292,7 @@ class PeaksAlignment:
     def correctionfactors(self, tracks, ref, # pylint: disable=too-many-arguments
                           discarded = None,
                           masks     = None,
+                          refpos    = None,
                           pivot     = 'max'):
         "return the correction factors for the different beads or tracks"
         if not isinstance(tracks, pd.DataFrame):
@@ -292,11 +304,12 @@ class PeaksAlignment:
         data = self.maskpeaks(data, masks)
         data = self.setpivot(data, pivot)
         corr = self.toreference(data, ref)
-        return self.tohairpin(data, ref, corr)
+        return self.tohairpin(data, ref, refpos, corr)
 
     def __call__(self, tracks, ref, # pylint: disable=too-many-arguments
                  discarded = None,
                  masks     = None,
+                 refpos    = None,
                  pivot     = 'max'):
         if not isinstance(tracks, pd.DataFrame):
             tracks = self.peaks(tracks)
@@ -306,7 +319,7 @@ class PeaksAlignment:
                           attribute = 'bead' if isinstance(ref, int) else 'track')
         data = self.maskpeaks(data, masks)
         data = self.setpivot(data, pivot)
-        data = self.correct(data, ref)
+        data = self.correct(data, ref, refpos)
 
         out  = pd.concat([i for _, i in data]).sort_values(['bead', 'modification',
                                                             'peakposition', 'avg'])
@@ -320,6 +333,7 @@ class PeaksAlignment:
                 discarded  = None,
                 masks      = None,
                 align      = True,
+                refpos     = None,
                 pivot      = 'max',
                 trackorder = 'modification',
                 **seqs):
@@ -328,18 +342,19 @@ class PeaksAlignment:
             data = self.peaks(data)
 
         if align:
-            data = self(data, ref, discarded=discarded, masks=masks, pivot=pivot)
+            data = self(data, ref,
+                        discarded=discarded, masks=masks, pivot=pivot, refpos=refpos)
             ref  = None
 
         data = data.sort_values(['bead', trackorder, 'peakposition', 'avg'])
         if ref is None:
             ref  = 'identity' if 'identity' in data.columns else 'track'
-        cols = ['peakposition', 'resolution']
-        out  = ((hv.Scatter(data, ref, 'avg', label = 'events')
+        cols = ['resolution', 'hybridisationrate', 'averageduration']
+        out  = ((hv.Scatter(data, ref, ['avg']+cols[1:], label = 'events')
                  (plot  = dict(jitter = .75),
                   style = dict(alpha  = .2))
                 ).redim.label(avg = 'base pairs')
-                *(hv.Scatter(data, ref, cols, label = 'peaks')
+                *(hv.Scatter(data, ref, ['peakposition']+cols[:1], label = 'peaks')
                   (plot  = dict(size_index     = 'resolution',
                                 scaling_factor = 15000),
                    style = dict(alpha = .01, line_alpha=.1))
@@ -375,38 +390,53 @@ class PeaksAlignmentConfig(PeaksAlignment):
     """
     def __init__(self, hpin = None, pivots = None, masks = None, **kwa):
         super().__init__(**kwa)
-        self.hpin:   HPPositions    = HPPositions(*hpin) if hpin else None
-        self.pivots: Dict[int, Any] = pivots if pivots else {}
-        self.masks:  Dict[int, Any] = masks  if masks else {}
+        self.hpin:   HPPositions = HPPositions(*hpin) if hpin else None
+        self.pivots: Dict        = pivots if pivots else {}
+        self.masks:  Dict        = masks  if masks else {}
+        self.refpos: Dict        = {}
+        self.defaultpivot = 'min'
         if self.hpin:
             self.sethppeaks(self.hpin.seq, self.hpin.oligo)
+
+    def alignbead(self, data, key, bead, ref = 'ref'):
+        """
+        returns the aligned data for the bead
+        """
+        if np.isscalar(bead):
+            return self(data[key][data[key].bead == bead], ref,
+                        pivot      = self.pivots.get(bead, self.defaultpivot),
+                        masks      = self.masks.get(bead, None),
+                        refpos     = self.refpos.get(bead, None))
+        return pd.concat([self.alignbead(data, key, i, ref) for i in bead])
 
     def show(self, data, # pylint: disable=too-many-arguments
              keys       = (),
              beads      = (),
              trackorder = 'trackorder',
-             align      = True) -> hv.DynamicMap:
+             align      = True,
+             ref        = 'ref') -> hv.DynamicMap:
         "return a dynamic map"
         def _fcn(key, bead):
-            return self.display(data[key][data[key].bead == bead], 'ref',
+            return self.display(data[key][data[key].bead == bead], ref,
                                 trackorder = trackorder,
                                 align      = align,
-                                pivot      = self.pivots.get(bead, 'min'),
-                                masks      = self.masks.get(bead, None))
+                                pivot      = self.pivots.get(bead, self.defaultpivot),
+                                masks      = self.masks.get(bead, None),
+                                refpos     = self.refpos.get(bead, None))
 
         out = (hv.DynamicMap(_fcn, kdims = ['data', 'bead'])
                .redim.values(data = list(keys), bead = list(beads)))
         if self.hpin:
             pos    = self.hpin.pos
             tracks = list(pos.track.unique())
-            ref    = pos[pos.track == getreference(tracks)].position.values
+            rpos   = pos[pos.track == getreference(tracks)].position.values
             out    = (out
                       *hv.Scatter(pos[pos.target & pos.strand], 'track', 'position')
                       (style ={'color':'green'})
                       *hv.Scatter(pos[pos.target & ~pos.strand], 'track', 'position')
                       (style ={'color':'red'})
-                      *hv.Scatter((np.repeat(tracks, ref.size),
-                                   np.concatenate([ref]*len(tracks))))
+                      *hv.Scatter((np.repeat(tracks, rpos.size),
+                                   np.concatenate([rpos]*len(tracks))))
                       (style ={'color':'gray'})
                      )
         return out
