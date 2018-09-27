@@ -21,7 +21,8 @@ from eventdetection.processor   import (EventDetectionTask, # pylint: disable=un
 from model.task                 import RootTask
 from model.plots                import PlotModel, PlotTheme, PlotAttrs, PlotDisplay
 from peakfinding.histogram      import interpolator
-from peakfinding.processor      import PeakSelectorTask # pylint: disable=unused-import
+from peakfinding.processor      import (PeakSelectorTask, # pylint: disable=unused-import
+                                        SingleStrandTask)
 from peakfinding.selector       import PeakSelectorDetails
 from peakcalling                import match
 from peakcalling.toreference    import ChiSquareHistogramFit
@@ -362,6 +363,11 @@ class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
 class PeakSelectorTaskAccess(TaskAccess, tasktype = PeakSelectorTask):
     "access to the PeakSelectorTask"
 
+class SingleStrandTaskAccess(TaskAccess,
+                             tasktype = SingleStrandTask,
+                             disabled = True):
+    "access to the SingleStrandTask"
+
 # pylint: disable=too-many-instance-attributes
 class PeaksPlotModelAccess(SequencePlotModelAccess):
     "Access to peaks"
@@ -373,6 +379,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         self.alignment       = ExtremumAlignmentTaskAccess(self)
         self.eventdetection  = EventDetectionTaskAccess(self)
         self.peakselection   = PeakSelectorTaskAccess(self)
+        self.singlestrand    = SingleStrandTaskAccess(self)
         self.fittoreference  = FitToReferenceAccess(self)
         self.identification  = FitToHairpinAccess(self)
         if addto:

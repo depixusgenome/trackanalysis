@@ -465,6 +465,18 @@ class _IdAccessor:
             mdl.identification.updatedefault(self._name, *val)
         mdl.identification.resetmodel(mdl)
 
+class _SingleStrandDescriptor:
+    def getdefault(self,inst):
+        "returns default single strand suppression"
+        return (self if inst is None else
+                not getattr(inst,'_model').singlestrand.configtask.disabled)
+
+    def __get__(self,inst,owner) -> bool:
+        return getattr(inst,'_model').singlestrand.task is not None
+
+    def __set__(self,inst, value):
+        getattr(inst,'_model').singlestrand.update(disabled = not value)
+
 class _PeakDescriptor:
     def getdefault(self,inst):
         "returns default peak finder"
@@ -504,8 +516,9 @@ class AdvancedWidget(AdvancedTaskMixin):
                 ('Align cycles using peaks',         ' %(_align5)b'),
                 ('Peak kernel size (blank ⇒ auto)',  ' %(_precision)of'),
                 #('Use EM to find peaks',     '         %(_useem)b'),
-                ('Exhaustive fit algorithm',         ' %(_fittype)b'),
+                ('Discard the single strand peak',   ' %(_singlestrand)b'),
                 ('Use a theoretical peak 0 in fits', ' %(_peak0)b'),
+                ('Exhaustive fit algorithm',         ' %(_fittype)b'),
                 ('Max distance to theoretical peak', ' %(_dist2theo)d'),
                 *(getattr(cls, i).line for i in ('_themename', '_figwidth', '_figheight'))
                )
@@ -520,7 +533,8 @@ class AdvancedWidget(AdvancedTaskMixin):
     _eventcount = AdvancedTaskMixin.attr('peakselection.finder.grouper.mincount')
     _align5     = AdvancedTaskMixin.none('peakselection.align')
     _precision  = AdvancedTaskMixin.attr('peakselection.precision')
-    _useem      = _PeakDescriptor()
+    #_useem      = _PeakDescriptor()
+    _singlestrand = _SingleStrandDescriptor()
     _peak0      = _IdAccessor('fit', lambda i: i.firstpeak, lambda i: {'firstpeak': i})
     _fittype    = _IdAccessor('fit',
                               lambda i: isinstance(i, PeakGridFit),

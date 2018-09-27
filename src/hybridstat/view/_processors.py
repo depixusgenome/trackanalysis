@@ -9,9 +9,22 @@ from   control.processor.taskview import TaskViewProcessor
 from   control.modelaccess        import ReplaceProcessors
 from   model.task                 import RootTask
 from   peakfinding.selector       import PeakSelectorDetails
-from   peakfinding.processor      import PeakSelectorProcessor, PeakSelectorTask, PeaksDict
+from   peakfinding.processor      import (PeakSelectorProcessor, PeakSelectorTask,
+                                          PeaksDict, SingleStrandProcessor)
 from   peakcalling.processor      import FitToReferenceTask, FitToReferenceDict, FitBead
 from   sequences.modelaccess      import SequencePlotModelAccess
+
+class GuiPeakSelectorDetails(PeakSelectorDetails):
+    "gui version of PeakSelectorDetails"
+    __slots__ = ['maxlength']
+    def __init__(self, *args, **kwa):
+        super().__init__(*args, **kwa)
+        self.maxlength = None
+
+    def output(self, zmeasure):
+        "yields results from precomputed details"
+        out = super().output(zmeasure)
+        return out[:self.maxlength] if self.maxlength else out
 
 class GuiPeaksDict(PeaksDict):  # pylint: disable=too-many-ancestors
     "gui version of PeaksDict"
@@ -21,19 +34,22 @@ class GuiPeaksDict(PeaksDict):  # pylint: disable=too-many-ancestors
         prec = self._precision(ibead, precision)
         dtl  = self.config.detailed(evts, prec)
 
-        self.cache.clear()
-        self.cache.append(dtl)
-
-        ret            = tuple(self.config.details2output(dtl))
         dtl.histogram *= 100./(max(self.config.histogram.kernelarray())*self.track.ncycles)
-        return ret
+
+        self.cache.clear()
+        self.cache.append(GuiPeakSelectorDetails(dtl.positions,     dtl.histogram,
+                                                 dtl.minvalue,      dtl.binwidth,
+                                                 dtl.corrections,   dtl.peaks,
+                                                 dtl.events,        dtl.ids))
+
+        return tuple(self.config.details2output(dtl))
 
 STORE_T = List[PeakSelectorDetails] # pylint: disable=invalid-name
 class GuiPeakSelectorProcessor(PeakSelectorProcessor):
     "gui version of PeakSelectorProcessor"
     def __init__(self, store, **kwa):
         super().__init__(**kwa)
-        self.store              = store
+        self.store = store
 
     def __call__(self, **_):
         self.__init__(self.store, **_)
@@ -44,6 +60,27 @@ class GuiPeakSelectorProcessor(PeakSelectorProcessor):
         return self.store
 
     taskdicttype = classmethod(lambda cls: GuiPeaksDict) # type: ignore
+
+class GuiSingleStrandProcessor(SingleStrandProcessor):
+    "gui version of PeakSelectorProcessor"
+    def __init__(self, store = None, **kwa):
+        super().__init__(**kwa)
+        self.store: List[PeakSelectorDetails] = [] if store is None else store
+
+    def __call__(self, **_):
+        self.__init__(self.store, **_)
+        return self
+
+    def removesinglestrandpeak(self, frame, info):
+        info                    = super().removesinglestrandpeak(frame, info)
+        self.store[0].maxlength = len(info[1])
+        return info
+
+    def config(self):
+        "returns the config"
+        cnf = super().config()
+        cnf['store'] = self.store
+        return cnf
 
 CACHE_T = Dict[BEADKEY, Tuple[float, float]] # pylint: disable=invalid-name
 class GuiFitToReferenceDict(FitToReferenceDict): # pylint: disable=too-many-ancestors
@@ -82,10 +119,11 @@ class GuiFitToReferenceProcessor(TaskViewProcessor[FitToReferenceTask,
 
 def runbead(self) -> Tuple[Optional[FitBead], Optional[PeakSelectorDetails]]:
     "runs the bead with specific processors"
-    dtlstore = [] # type: List[PeakSelectorDetails]
-    procs    = GuiPeakSelectorProcessor(dtlstore), GuiFitToReferenceProcessor(dtlstore)
-    ctx      = SequencePlotModelAccess.runcontext(self, *procs)
-    with ctx as view:
+    dtlstore: List[PeakSelectorDetails] = []
+    procs    = (GuiPeakSelectorProcessor(dtlstore),
+                GuiFitToReferenceProcessor(dtlstore),
+                GuiSingleStrandProcessor(dtlstore))
+    with SequencePlotModelAccess.runcontext(self, *procs) as view:
         fits = None if view is None or self.bead not in view.keys() else view[self.bead]
 
     return (fits        if self.identification.task is not None else None,
@@ -94,9 +132,10 @@ def runbead(self) -> Tuple[Optional[FitBead], Optional[PeakSelectorDetails]]:
 def runrefbead(self, ref: RootTask, bead: BEADKEY
               ) -> Tuple[Sequence, Optional[PeakSelectorDetails]]:
     "runs the reference bead with specific processors"
-    dtlstore = [] # type: List[PeakSelectorDetails]
-    proc     = GuiPeakSelectorProcessor(dtlstore)
+    dtlstore: List[PeakSelectorDetails] = []
+    procs    = (GuiPeakSelectorProcessor(dtlstore),
+                GuiSingleStrandProcessor(dtlstore))
     ctrl     = self.tasks.processors(ref, PeakSelectorTask)
-    with ReplaceProcessors(ctrl, proc, copy = True) as view:
+    with ReplaceProcessors(ctrl, *procs, copy = True) as view:
         pks = view[bead] if view is not None else ()
     return pks, (dtlstore[0] if dtlstore else None)
