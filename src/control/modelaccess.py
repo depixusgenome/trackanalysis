@@ -156,14 +156,15 @@ class TaskAccess(TaskPlotModelAccess):
         super().__init__(ctrl)
         assert isinstance(self.configtask, self.tasktype)
 
-    def __init_subclass__(cls, **kwa):
+    def __init_subclass__(cls, attrs = (), **kwa):
         cls.side       = 0 if kwa.pop('side', 'LEFT') == 'LEFT' else 1
         cls.tasktype   = cast(Type[Task], kwa.pop('tasktype'))
         cls.configname = kwa.pop('configname',
                                  cls.tasktype.__name__.lower()[:-len('Task')])
-        cls.attrs      = tuple(kwa.items())
+        cls.attrs      = (tuple(kwa.items()) if attrs is Ellipsis else
+                          tuple((i, kwa[i]) for i in attrs))
 
-        inst = cls.tasktype(**dict(cls.attrs))
+        inst = cls.tasktype(**kwa)
         name = cls.configname
         assert name not in DEFAULT_TASKS or inst == DEFAULT_TASKS[name]
         DEFAULT_TASKS[name] = inst

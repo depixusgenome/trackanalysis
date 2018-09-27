@@ -126,13 +126,15 @@ class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
 class BeadsDriftTaskAccess(TaskAccess,
                            tasktype   = DriftTask,
                            onbeads    = True,
-                           configname = 'driftperbead'):
+                           configname = 'driftperbead',
+                           attrs      = ...):
     "access to beads drift task"
 
 class CyclesDriftTaskAccess(TaskAccess,
                             tasktype   = DriftTask,
                             onbeads    = False,
-                            configname = 'driftpercycle'):
+                            configname = 'driftpercycle',
+                            attrs      = ...):
     "access to beads drift task"
 
 class CyclesModelAccess(SequencePlotModelAccess):
