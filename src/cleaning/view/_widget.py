@@ -173,8 +173,8 @@ class DpxCleaning(Widget):
     subtractcurrent    = props.Int(0)
 
     __DFLT             = DataCleaningTask()
-    maxabsvalue        = props.Float(__DFLT.derivative.maxabsvalue)
-    maxderivate        = props.Float(__DFLT.derivative.maxderivate)
+    maxabsvalue        = props.Float(__DFLT.maxabsvalue)
+    maxderivate        = props.Float(__DFLT.maxderivate)
     minpopulation      = props.Float(__DFLT.minpopulation)
     minhfsigma         = props.Float(__DFLT.minhfsigma)
     maxhfsigma         = props.Float(__DFLT.maxhfsigma)

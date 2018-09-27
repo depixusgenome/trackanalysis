@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Removing aberrant points and cycles"
+from    typing                  import cast
 import  numpy                   as     np
 # pylint: disable=import-error,unused-import
 from    ._core                  import (constant as _cleaningcst, # pylint: disable=import-error
                                         clip     as _cleaningclip,
+                                        DerivateSuppressor,
                                         LocalNaNPopulation,
                                         NaNDerivateIslands as DerivateIslands,
                                         AberrantValuesRule, PingPongRule,
@@ -74,6 +76,12 @@ class DataCleaning(AberrantValuesRule, # pylint: disable=too-many-ancestors
         for base in DataCleaning.__bases__:
             base.__init__(self, **_) # type: ignore
 
+    maxabsvalue = cast(float,
+                       property(lambda self: self.derivative.maxabsvalue,
+                                lambda self, val: setattr(self.derivative, 'maxabsvalue', val)))
+    maxderivate = cast(float,
+                       property(lambda self: self.derivative.maxderivate,
+                                lambda self, val: setattr(self.derivative, 'maxderivate', val)))
     def __eq__(self, other):
         return all(base.__eq__(self, other) for base in DataCleaning.__bases__)
 
@@ -103,7 +111,6 @@ class DataCleaning(AberrantValuesRule, # pylint: disable=too-many-ancestors
         "remove abberant values"
         super().aberrant(bead, clip)
         return np.isfinite(bead).sum() <= len(bead) * self.minpopulation * 1e-2
-
 
 # pybind11 bug
 AberrantValuesRule.__base__.__setstate__ = lambda self, vals: self.configure(vals)
