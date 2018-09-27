@@ -316,7 +316,8 @@ class DpxModal(Model):
 
         def _hdl(itms, bdy = body):
             if isinstance(bdy, (list, tuple)):
-                bdy = ' '.join(' '.join(i) for i in bdy)
+                bdy = ' '.join(' '.join(k if isinstance(k, str) else k[1] for k in i)
+                               for i in bdy)
 
             converters = [i.converter(model, bdy) for i in self.__OPTIONS]
             ordered    = sorted(itms.items(), key = lambda i: bdy.index('%('+i[0]))
