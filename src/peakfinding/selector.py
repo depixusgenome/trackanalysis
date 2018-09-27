@@ -52,36 +52,19 @@ class PeakSelectorDetails: # pylint: disable=too-many-instance-attributes
         self.minvalue  = (self.minvalue-params[1])*params[0]
         self.binwidth *= params[0]
 
-class PeakSelector(PrecisionAlg):
-    """
-    Find binding positions and selects relevant events.
-
-    # Attributes
-
-    * `histogram`: algorithm for projecting all events onto the z axis. Multiple
-    events in a single neighborhood create peaks. These are the binding positions.
-    * `align`: algorithm for aligning cycles so as to minimize peak widths in the histogram.
-    * `finder`: algorithm for extracting binding positions from the histogram of
-    *aligned* events.
-    """
-
-    rawfactor                                      = 2.
-    histogram                                      = Histogram(edge = 2)
-    align:      Optional[PeakCorrelationAlignment] = None
-    peakalign:  Optional[PeakPostAlignment]        = GELSPeakAlignment()
-    finder:     PeakFinder                         = ByHistogram()
-
-    if __doc__:
-        __doc__ += "\n    # Default algorithms\n"
-        __doc__ += f"\n    ## `{type(align).__module__}.{type(align).__qualname__}`\n"
-        __doc__ += (cast(str, type(PeakCorrelationAlignment).__doc__)
-                    .replace("\n    #", "\n    ##"))
-        __doc__ += f"\n    ## `{type(finder).__module__}.{type(finder).__qualname__}`\n"
-        __doc__ += cast(str, type(finder).__doc__).replace("\n    #", "\n    ##")
-
-    @initdefaults(frozenset(locals()) - {'rawfactor'})
-    def __init__(self, **_):
-        super().__init__(**_)
+    def output(self, zmeasure) -> PeakListArray:
+        "yields results from precomputed details"
+        zmeas: Callable = (zmeasure if callable(zmeasure) else
+                           None     if zmeasure is None   else
+                           getattr(np, cast(str, zmeasure)))
+        vals = []
+        for label, peak in enumerate(self.peaks):
+            good = tuple(orig[pks == label]
+                         for orig, pks in zip(self.events, self.ids)) # type: ignore
+            if any(len(i) for i in good):
+                evts = self.__move(good, self.corrections, self.events.discarded)
+                vals.append((self.__measure(zmeas, peak, evts), evts))
+        return PeakListArray(vals, discarded = self.events.discarded)
 
     @staticmethod
     def __move(evts, deltas, discarded) -> PeaksArray:
@@ -116,13 +99,10 @@ class PeakSelector(PrecisionAlg):
 
         return asobjarray(objs, PeaksArray, discarded = discarded)
 
-    def __measure(self, peak, evts):
-        if self.histogram.zmeasure is None:
+    @staticmethod
+    def __measure(zmeas, peak, evts):
+        if zmeas is None:
             return peak
-        if isinstance(self.histogram.zmeasure, str):
-            zmeas = getattr(np, self.histogram.zmeasure)
-        else:
-            zmeas = cast(Callable, self.histogram.zmeasure)
 
         if getattr(evts, 'dtype', 'f4') == EVENTS_DTYPE:
             return zmeas([zmeas(i) for i in evts['data']])
@@ -142,6 +122,37 @@ class PeakSelector(PrecisionAlg):
 
         vals = [_measure(i) for i in evts if i is not None]
         return zmeas(np.concatenate(vals))
+
+class PeakSelector(PrecisionAlg):
+    """
+    Find binding positions and selects relevant events.
+
+    # Attributes
+
+    * `histogram`: algorithm for projecting all events onto the z axis. Multiple
+    events in a single neighborhood create peaks. These are the binding positions.
+    * `align`: algorithm for aligning cycles so as to minimize peak widths in the histogram.
+    * `finder`: algorithm for extracting binding positions from the histogram of
+    *aligned* events.
+    """
+
+    rawfactor                                      = 2.
+    histogram                                      = Histogram(edge = 2)
+    align:      Optional[PeakCorrelationAlignment] = None
+    peakalign:  Optional[PeakPostAlignment]        = GELSPeakAlignment()
+    finder:     PeakFinder                         = ByHistogram()
+
+    if __doc__:
+        __doc__ += "\n    # Default algorithms\n"
+        __doc__ += f"\n    ## `{type(align).__module__}.{type(align).__qualname__}`\n"
+        __doc__ += (cast(str, type(PeakCorrelationAlignment).__doc__)
+                    .replace("\n    #", "\n    ##"))
+        __doc__ += f"\n    ## `{type(finder).__module__}.{type(finder).__qualname__}`\n"
+        __doc__ += cast(str, type(finder).__doc__).replace("\n    #", "\n    ##")
+
+    @initdefaults(frozenset(locals()) - {'rawfactor'})
+    def __init__(self, **_):
+        super().__init__(**_)
 
     def detailed(self, evts: Input, precision: PRECISION = None) -> PeakSelectorDetails:
         "returns computation details"
@@ -179,15 +190,8 @@ class PeakSelector(PrecisionAlg):
         return out
 
     def details2output(self, dtl:PeakSelectorDetails) -> PeakListArray:
-        "yields results from precomputed details"
-        vals = []
-        for label, peak in enumerate(dtl.peaks):
-            good = tuple(orig[pks == label]
-                         for orig, pks in zip(dtl.events, dtl.ids)) # type: ignore
-            if any(len(i) for i in good):
-                evts = self.__move(good, dtl.corrections, dtl.events.discarded)
-                vals.append((self.__measure(peak, evts), evts))
-        return PeakListArray(vals, discarded = dtl.events.discarded)
+        "return results from precomputed details"
+        return dtl.output(self.histogram.zmeasure)
 
     def __call__(self, evts: Input, precision: PRECISION = None) -> PeakListArray:
         return self.details2output(self.detailed(evts, precision))
