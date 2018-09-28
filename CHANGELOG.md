@@ -1,3 +1,20 @@
+# tag cycles_v5.3
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Speed
+
+A number of algorithms have been ported to c++: cleaning and event detection.
+This is in order to speed up computations.
+
+### Peaks
+
+The user can now elect to discard the *single-strand* peak from the data. This is
+done through the *Advanced* menu.
+
+### Track Management
+
+Loaded tracks can be discarded using the same toolbar menu as for selecting them.
+
 # tag cycles_v5.2
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
