@@ -327,7 +327,7 @@ class PeaksAlignment:
             return out.assign(identity = out.bead.astype(str))
         return out
 
-    def display(self,   # pylint: disable=too-many-arguments
+    def display(self,   # pylint: disable=too-many-arguments,too-many-locals
                 data,
                 ref        = None,
                 discarded  = None,
