@@ -245,10 +245,10 @@ namespace rangemerging
 void PopulationMerger::run(float const * data, ints_t & intervals) const
 {
     using namespace rangemerging;
-    constexpr auto fcn  = [](PopulationMerger const & self,
-                             float            const * data,
-                             PopStats         const & left,
-                             PopStats         const & right)
+    auto fcn  = [](PopulationMerger const & self,
+                   float            const * data,
+                   PopStats         const & left,
+                   PopStats         const & right)
     {
         auto  check = [&self, data](PopStats const & one, PopStats const & other)
         {
@@ -283,10 +283,10 @@ void PopulationMerger::run(float const * data, ints_t & intervals) const
 void ZRangeMerger::run(float const * data, ints_t & intervals) const
 {
     using namespace rangemerging;
-    constexpr auto fcn = [](ZRangeMerger const & self,
-                            float        const *,
-                            PopStats     const & left,
-                            PopStats     const & right)
+    auto fcn = [](ZRangeMerger const & self,
+                  float        const *,
+                  PopStats     const & left,
+                  PopStats     const & right)
     {
         if(    (_delta<3,2>(left)  == 0.f && _isin<2, 2, 3>(right, left))
             || (_delta<3,2>(right) == 0.f && _isin<2, 2, 3>(left, right)))
