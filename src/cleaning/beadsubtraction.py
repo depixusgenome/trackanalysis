@@ -91,13 +91,16 @@ class SubtractMedianSignal:
     * if `average` is `True`: the same process is applied to cycles as it was
     to beads.  In other words, the median behavior of cycles is measured and
     repeated for every cycle.
-    * if `baseline` is `True`: a measure of the baseline position per cycle is computed
-    and added to the signal. The measure consists in computing:
+    * if `baseline` is `(PHASE.initial, 'median-median-median')`: a measure of
+    the baseline position per cycle is computed and added to the signal. The
+    measure consists in computing:
 
-        1. taking the median of each phase 1 for each bead.
-        2. removing the median of all measures, independently for each bead. Thus,
-        phase 1 measures for each bead should superpose.
-        3. For each frame, the median bead is selected.
+        1. taking the median (or mean: replace 1st *median* in string) of each
+        phase 1 for each bead.
+        2. removing the median (or mean: replace 2nd) of all measures,
+        independently for each bead. Thus, phase 1 measures for each bead
+        should superpose.
+        3. For each frame, the median (or mean: replace 3rd) position is selected.
     """
     phase                               = PHASE.measure
     average                             = False
@@ -123,7 +126,8 @@ class SubtractMedianSignal:
                 out[i:j] =  mdl[-1]
             out[pha[2][-1]:] = mdl[-1]
 
-        if self.baseline:
+        if self.baseline is not None:
+            # pylint: disable=unsubscriptable-object
             basl = phasebaseline(self.baseline[1], signals,
                                  frame.track.phase.select(..., self.baseline[0]),
                                  frame.track.phase.select(..., self.baseline[0]+1))
