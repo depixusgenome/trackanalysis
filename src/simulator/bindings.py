@@ -406,7 +406,7 @@ class _SingleStrandBinding:
 
 class BeadTruth(NamedTuple): # pylint: disable=missing-docstring
     strandclosing: Optional[StrandClosingTruth]
-    events:        np.ndarray
+    events:        Optional[np.ndarray]
     baseline:      Optional[np.ndarray]
     drift:         Optional[np.ndarray]
 
@@ -437,6 +437,7 @@ class Experiment(Object):
     strandclosing  = cast(StrandClosing,  _BehaviourDescriptor(StrandClosing))
     baseline       = cast(Baseline,       _BehaviourDescriptor(Baseline))
     thermaldrift   = cast(ThermalDrift,   _BehaviourDescriptor(ThermalDrift))
+    fixedbeadsize  = .1
     _ARGS          = Object.args(locals())
 
     positions      = cast(Sequence[float],           _BindingAttribute())
@@ -504,20 +505,71 @@ class Experiment(Object):
         #         for i,j in enumerate(evts.reshape(-1,npos))]
         return [[k for k in j if len(k)] for j in evts.reshape(-1,npos)]
 
+    def fixedbead(self,
+                  drift: np.ndarray = None,
+                  base:  np.ndarray = None,
+                  seed:  RandState  = None
+                 ) -> Tuple[BeadTruth, np.ndarray]:
+        """
+        create one fixed bead data
+        """
+        return self.__bead(None, drift, base, seed, True)
+
     def bead(self,
              evts:  np.ndarray = None,
              drift: np.ndarray = None,
              base:  np.ndarray = None,
-             seed:  RandState = None
+             seed:  RandState  = None,
             ) -> Tuple[BeadTruth, np.ndarray]:
         """
         create one bead data
         """
+        return self.__bead(evts, drift, base, seed, False)
+
+    def track(self,
+              nbeads: int       = 1,
+              nfixed: int       = 0,
+              seed:   RandState = None,
+              **kwa) -> Dict[str, Any]:
+        """
+        creates a track
+        """
+        rnd    = randstate(seed)
+
+        base   = (self.baseline    (self, rnd)      if callable(self.baseline) else
+                  np.zeros(self.ncycles*self.phases.indexes('length')[0], dtype = 'f4'))
+        drift  = self.thermaldrift(self, base, rnd) if callable(self.baseline) else None
+
+        itms   = [self.bead(..., drift, base, rnd) for i in range(nbeads)]
+        itms  += [self.fixedbead(drift, base, rnd) for i in range(nfixed)]
+        ends   = np.repeat([self.phases], self.ncycles, axis = 0).cumsum()
+        phases = np.insert(ends, 0, 0)[:-1].reshape((self.ncycles, len(self.phases)))
+
+        kwa.setdefault('framerate', 30.)
+        kwa.setdefault('key',      'sim')
+        kwa.update(data   = dict((i, j[1]) for i, j in enumerate(itms)),
+                   truth  = dict((i, j[0]) for i, j in enumerate(itms)),
+                   phases = phases.astype('i4'))
+        return kwa
+
+    def __bead(self, # pylint: disable=too-many-arguments
+               evts:  np.ndarray = None,
+               drift: np.ndarray = None,
+               base:  np.ndarray = None,
+               seed:  RandState  = None,
+               fixed: bool       = False
+              ) -> Tuple[BeadTruth, np.ndarray]:
+        """
+        create one bead data
+        """
         rnd  = randstate(seed)
-        if evts is None:
+        if fixed:
+            evts = None
+        elif evts is None or evts is Ellipsis:
             evts = self.eventdurations(rnd)
-        bead    = self.__beadstructure(evts)
-        closing = self.strandclosing(self, bead, rnd) if self.strandclosing else None
+        bead    = self.__beadstructure(evts, fixed)
+        closing = (self.strandclosing(self, bead, rnd)
+                   if not fixed and self.strandclosing else None)
 
         if self.brownianmotion:
             self.brownianmotion(self, bead, rnd)
@@ -535,28 +587,7 @@ class Experiment(Object):
 
         return BeadTruth(closing, evts, base, drift), bead.ravel()
 
-    def track(self, nbeads: int = 1, seed: RandState = None, **kwa) -> Dict[str, Any]:
-        """
-        creates a track
-        """
-        rnd    = randstate(seed)
-
-        base   = (self.baseline    (self, rnd)       if callable(self.baseline) else
-                  np.zeros(self.ncycles*self.phases.indexes('length')[0], dtype = 'f4'))
-        drift  = self.thermaldrift(self, base, rnd) if callable(self.baseline) else None
-
-        itms   = [self.bead(None, drift, base, rnd) for i in range(nbeads)]
-        ends   = np.repeat([self.phases], self.ncycles, axis = 0).cumsum()
-        phases = np.insert(ends, 0, 0)[:-1].reshape((self.ncycles, len(self.phases)))
-
-        kwa.setdefault('framerate', 30.)
-        kwa.setdefault('key',      'sim')
-        kwa.update(data   = dict((i, j[1]) for i, j in enumerate(itms)),
-                   truth  = dict((i, j[0]) for i, j in enumerate(itms)),
-                   phases = phases.astype('i4'))
-        return kwa
-
-    def __beadstructure(self, events: np.ndarray = None) -> np.ndarray:
+    def __beadstructure(self, events: Optional[np.ndarray], fixed: bool) -> np.ndarray:
         """
         create bead data from events.
 
@@ -565,19 +596,19 @@ class Experiment(Object):
         inds    = self.phases.indexes()
         base    = np.zeros((self.ncycles, inds[-1]), dtype = 'f4')
 
-        for i in (self.phases.initial, self.phases.pull, self.phases.relax):
-            base[:,inds[i]:inds[i+1]] = self.__phasez(i)
-
         def _lin(first, sec, phase):
             size = self.phases[phase]
             return ((sec-first)*(np.arange(size)/(size+1)+1./(size+1.))[:,None] + first).T
 
-        base[:,inds[0]:inds[1]] = _lin(self.__phasez(7),  base[:, inds[1]], 0)
+        for i in (self.phases.initial, self.phases.pull, self.phases.relax):
+            base[:,inds[i]:inds[i+1]] = self.__phasez(i, fixed)
+
+        base[:,inds[0]:inds[1]] = _lin(self.__phasez(7, fixed),  base[:, inds[1]], 0)
         base[:,inds[2]:inds[3]] = _lin(base[:,inds[2]-1], base[:, inds[3]], 2)
-        base[:,inds[4]:inds[5]] = _lin(base[:,inds[4]-1], self.__phasez(4), 4)
+        base[:,inds[4]:inds[5]] = _lin(base[:,inds[4]-1], self.__phasez(4, fixed), 4)
         base[:,inds[6]:inds[7]] = _lin(base[:,inds[6]-1], base[:, inds[7]], 6)
 
-        if events is not None and len(self.positions):
+        if events is not None and len(events) and len(self.positions):
             pos = self.positions
             for vect, evts in zip(base[:, inds[5]:inds[6]], np.cumsum(np.int32(events), axis = 1)):
                 vect[:evts[0]] = pos[0]
@@ -586,12 +617,13 @@ class Experiment(Object):
 
         return base
 
-    def __phasez(self, val)-> float:
+    def __phasez(self, val, fixed)-> float:
         "phase 3 extension"
         if val == 1:
             return 0.
         if val == 3:
-            return self.singlestrand.position*self.pullfactor
+            return (self.fixedbeadsize if fixed else
+                    self.singlestrand.position)*self.pullfactor
         if val == 4:
-            return self.singlestrand.position
+            return self.fixedbeadsize if fixed else self.singlestrand.position
         return -.1

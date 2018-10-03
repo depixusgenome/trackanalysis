@@ -142,12 +142,66 @@ namespace cleaning { namespace beadsubtraction {
         return pyout;
     }
 
+    ndarray<float> pyphasebaseline1(std::string tpe,
+                                  ndarray<float> pydata,
+                                  ndarray<int>   pyi1,
+                                  ndarray<int>   pyi2)
+    {
+        int const * i1 = pyi1.data();
+        int const * i2 = pyi2.data();
+        size_t      sz = pyi1.size();
+
+        ndarray<float> pyout(sz);
+        auto ptr(pyout.mutable_data());
+        std::fill(ptr, ptr+sz, std::numeric_limits<float>::quiet_NaN());
+
+        if(sz == 0)
+            return pyout;
+
+        data_t data = {pydata.data(), pydata.size()};
+        {
+            py::gil_scoped_release _;
+            auto out = phasebaseline(tpe, data, sz, i1, i2);
+            std::copy(out.begin(), out.end(), ptr);
+        }
+        return pyout;
+    }
+
+    ndarray<float> pyphasebaseline(std::string tpe,
+                                 std::vector<ndarray<float>> pydata,
+                                 ndarray<int>                pyi1,
+                                 ndarray<int>                pyi2)
+    {
+        int const * i1 = pyi1.data();
+        int const * i2 = pyi2.data();
+        size_t      sz = pyi1.size();
+
+        ndarray<float> pyout(sz);
+        auto ptr(pyout.mutable_data());
+        std::fill(ptr, ptr+sz, std::numeric_limits<float>::quiet_NaN());
+
+        if(pydata.size() == 0 || sz == 0)
+            return pyout;
+
+        std::vector<data_t> data;
+        for(auto const & i: pydata)
+            data.emplace_back(i.data(), i.size());
+        {
+            py::gil_scoped_release _;
+            auto out = phasebaseline(tpe, data, sz, i1, i2);
+            std::copy(out.begin(), out.end(), ptr);
+        }
+        return pyout;
+    }
+
     void pymodule(py::module & mod)
     {
         using namespace py::literals;
         mod.def("reducesignals", reducesignal);
         mod.def("reducesignals", reducesignal2);
         mod.def("reducesignals", reducesignal3);
+        mod.def("phasebaseline", pyphasebaseline);
+        mod.def("phasebaseline", pyphasebaseline1);
     }
 }}
 

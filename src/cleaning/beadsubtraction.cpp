@@ -86,6 +86,136 @@ namespace {
         }
         return out;
     }
+
+    template <typename K>
+    std::vector<float>
+    _measure(data_t const & signals, size_t sz, int const * i1, int const * i2, K && meas)
+    {
+        int          len  = int(std::get<1>(signals));
+        float const *data = std::get<0>(signals);
+        std::vector<float> out(sz, std::numeric_limits<float>::quiet_NaN());
+        for(size_t i = 0u; i < sz && i1[i] < len && i2[i] < len; ++i)
+            out[i] = meas(data+i1[i], data+i2[i], 0.f);
+        return out;
+    }
+
+    template <typename K1, typename K2>
+    std::vector<float>
+    _measure(std::vector<data_t> const & signals, size_t sz, int const * i1, int const * i2, K1 && meas,  K2 && agg)
+    {
+        auto len = std::numeric_limits<int>::max();
+        for(auto const & i: signals)
+            len = std::min(len, int(std::get<1>(i)));
+
+        std::vector<float const *> data;
+        for(auto const & j: signals)
+            data.push_back(std::get<0>(j));
+        auto e = data.size();
+
+        std::vector<float> orig(e);
+        for(size_t j = 0u; j < e; ++j)
+            orig[j] = meas(data[j]+i1[0], data[j]+i2[0], 0.f);
+
+        std::vector<float> out(sz, std::numeric_limits<float>::quiet_NaN());
+
+        std::vector<float> tmp(orig);
+        out[0] = 0.f;
+        for(size_t i = 1u; i < sz && i1[i] < len && i2[i] < len; ++i)
+        {
+            for(size_t j = 0u; j < e; ++j)
+                tmp[j] = meas(data[j]+i1[i], data[j]+i2[i], orig[i]);
+            out[i] = agg(tmp);
+        }
+        return out;
+    }
+
+    template <typename K1, typename K2, typename K3>
+    std::vector<float>
+    _measure(std::vector<data_t> const & signals, size_t sz, int const * i1, int const * i2,
+             K1 && meas,  K2 && zero, K3 && agg)
+    {
+        std::vector<std::vector<float>> data;
+        for(auto const & i: signals)
+        {
+            data.push_back(_measure(i, sz, i1, i2, meas));
+
+            auto tmp(data.back());
+            auto z = zero(tmp);
+            for(auto & x: data.back())
+                x -= z;
+        }
+
+        std::vector<float> out(sz, std::numeric_limits<float>::quiet_NaN());
+        std::vector<float> tmp(data.size());
+        for(size_t i = 0u, e = data.size(); i < sz; ++i)
+        {
+            for(size_t j = 0u; j < e; ++j)
+                tmp[j] = data[j][i];
+            out[i] = agg(tmp);
+        }
+        return out;
+    }
+
+
+    float _median(float const * x1, float const * x2, float delta)
+    { 
+        std::vector<float> tmp(x1, x2);
+        return signalfilter::stats::nanmedian(tmp)-delta; 
+    }
+
+    float _median2(std::vector<float> & data)
+    {   return signalfilter::stats::median(data); }
+
+    float _mean(float const * x1, float const * x2, float delta)
+    { 
+        double tot = 0.f;
+        size_t cnt = 0;
+        for(; x1 != x2; ++x1)
+            if(std::isfinite(x1[0]))
+            {
+                tot += x1[0];
+                ++cnt;
+            }
+        return tot/cnt - delta;
+    }
+
+    float _mean2(std::vector<float> const & data)
+    { 
+        double tot = 0.f;
+        size_t cnt = 0;
+        for(auto x: data)
+            if(std::isfinite(x))
+            {
+                tot += x;
+                ++cnt;
+            }
+        return tot/cnt;
+    }
+}
+
+std::vector<float> phasebaseline(std::string txt,
+                                 data_t signals,
+                                 size_t cnt, int const * ix1,  int const * ix2)
+{ return txt == "median" ? _measure(signals, cnt, ix1, ix2, _median) : 
+         txt == "mean"   ? _measure(signals, cnt, ix1, ix2, _mean)   : 
+         std::vector<float>();
+}
+
+#define DPX_PB_C2(X,Y)    \
+     txt == #X "-" #Y ? _measure(signals, cnt, ix1, ix2, _##X, _##Y##2) : 
+#define DPX_PB_C3(X,Y,Z)    \
+     txt == #X "-" #Y "-" #Z  ? _measure(signals, cnt, ix1, ix2, _##X, _##Y##2, _##Z##2) : 
+std::vector<float> phasebaseline(std::string txt,
+                                 std::vector<data_t> const & signals,
+                                 size_t cnt, int const * ix1,  int const * ix2)
+{ 
+    return DPX_PB_C2(median,median)        DPX_PB_C2(median,mean)
+           DPX_PB_C2(mean,median)          DPX_PB_C2(mean,mean)
+           DPX_PB_C3(median,median,median) DPX_PB_C3(median,mean,median)
+           DPX_PB_C3(mean,median,median)   DPX_PB_C3(mean,mean,median)
+           DPX_PB_C3(median,median,mean)   DPX_PB_C3(median,mean,mean)
+           DPX_PB_C3(mean,median,mean)     DPX_PB_C3(mean,mean,mean)
+           std::vector<float>();
 }
 
 std::vector<float> mediansignal(std::vector<data_t> const & signals, size_t i1, size_t i2)

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Task & Processor for subtracting beads from other beads"
-from   typing                       import List, Iterable, Tuple, Union, Callable, cast
+from   typing                       import (List, Iterable, Tuple, Union, Optional,
+                                            Callable, Dict, cast)
 from   functools                    import partial
 from   itertools                    import repeat
 import warnings
@@ -17,7 +18,7 @@ from   signalfilter.noisereduction  import Filter
 from   utils                        import initdefaults
 from   .datacleaning                import AberrantValuesRule, HFSigmaRule, ExtentRule
 from   ._core                       import (reducesignals, # pylint: disable=import-error
-                                            constant as _cleaningcst)
+                                            phasebaseline, constant as _cleaningcst)
 
 class SubtractAverageSignal:
     """
@@ -84,10 +85,23 @@ class SubtractMedianSignal:
 
     1. The bias is removed from each signal
     2. For each frame, the median of unbiased signals is selected.
-    3. The average bias is added to the result
+
+    Optionally:
+
+    * if `average` is `True`: the same process is applied to cycles as it was
+    to beads.  In other words, the median behavior of cycles is measured and
+    repeated for every cycle.
+    * if `baseline` is `True`: a measure of the baseline position per cycle is computed
+    and added to the signal. The measure consists in computing:
+
+        1. taking the median of each phase 1 for each bead.
+        2. removing the median of all measures, independently for each bead. Thus,
+        phase 1 measures for each bead should superpose.
+        3. For each frame, the median bead is selected.
     """
-    phase   = PHASE.measure
-    average = False
+    phase                               = PHASE.measure
+    average                             = False
+    baseline: Optional[Tuple[int, str]] = None # PHASE.initial, "median-median-median"
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -100,17 +114,22 @@ class SubtractMedianSignal:
             return 0.
 
         out = reducesignals("median", signals, pha)
-        if not self.average:
-            return out
+        if self.average:
+            mdl = reducesignals("median", [out[j:k] for j, k in zip(pha[0], pha[2])])
+            for i, _, k in zip(*pha):
+                out[i:k] = mdl[i-k:]
 
-        mdl = reducesignals("median", [out[j:k] for j, k in zip(pha[1], pha[2])])
-        for i, j, k in zip(*pha):
-            out[i:j] = mdl[j-k]
-            out[j:k] = mdl[j-k:]
+            for i, j in zip(pha[2], pha[0][1:]):
+                out[i:j] =  mdl[-1]
+            out[pha[2][-1]:] = mdl[-1]
 
-        for i, j in zip(pha[2], pha[0][1:]):
-            out[i:j] =  mdl[-1]
-        out[pha[2][-1]:] = mdl[-1]
+        if self.baseline:
+            basl = phasebaseline(self.baseline[1], signals,
+                                 frame.track.phase.select(..., self.baseline[0]),
+                                 frame.track.phase.select(..., self.baseline[0]+1))
+            for i in range(len(pha[0])-1):
+                out[pha[0][i]:pha[0][i+1]] += basl[i]
+            out[pha[0][-1]:] += basl[-1]
         return out
 
     @staticmethod
@@ -189,7 +208,7 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
         task  = self.task
 
         next(iter(frame.keys())) # unlazyfy # type: ignore
-        data = frame.data
+        data = cast(Dict, frame.data)
         itr  = (cast(Iterable[int], task.beads) if key is None else
                 cast(Iterable[int], list(zip(task.beads, repeat(key)))))
         if len(task.beads) == 0:
@@ -326,7 +345,7 @@ class FixedBeadDetection:
         phases  = beads.track.phase.select
         getsigs = HFSigmaRule(maxhfsigma=self.maxhfsigma).hfsigma
         sigph   = tuple(phases(..., i) for i in (PHASE.initial, PHASE.measure+1))
-        return lambda x: getsigs(x.data[0], *sigph).values
+        return lambda x: getsigs(cast(Dict, x.data)[0], *sigph).values
 
     def __exts(self, beads: Beads) -> Tuple[Callable[[Cycles], bool],
                                             Callable[[Cycles], np.ndarray]]:
@@ -344,5 +363,5 @@ class FixedBeadDetection:
             return height > self.maxextent
 
         def _slow(cycs: Cycles):
-            return getext(cycs.data[0], extph[2], extph[3]).values
+            return getext(cast(Dict, cycs.data)[0], extph[2], extph[3]).values
         return _fast, _slow

@@ -7,18 +7,21 @@ from   numpy.testing            import assert_equal, assert_allclose
 
 from testingcore                import path as utpath
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
-from cleaning.processor         import (DataCleaningTask, DataCleaningException,
+
+from   cleaning.processor       import (DataCleaningTask, DataCleaningException,
                                         DataCleaningProcessor)
 import cleaning.datacleaning    as     _datacleaning
-from cleaning.datacleaning      import (DataCleaning, LocalNaNPopulation,
+from   cleaning.datacleaning    import (DataCleaning, LocalNaNPopulation,
                                         DerivateIslands)
-from cleaning.beadsubtraction   import (SubtractAverageSignal, SubtractMedianSignal,
-                                        BeadSubtractionProcessor, FixedBeadDetection)
-import cleaning._core  as     cleaningcore # pylint:disable=no-name-in-module,import-error
-from simulator                  import randtrack, setseed
-from model.task.track           import TrackReaderTask
-from control.taskcontrol        import create
-from data                       import Beads
+from   cleaning.beadsubtraction import (SubtractAverageSignal, SubtractMedianSignal,
+                                        BeadSubtractionTask, BeadSubtractionProcessor,
+                                        FixedBeadDetection)
+import cleaning._core           as     cleaningcore # pylint:disable=no-name-in-module,import-error
+from   control.taskcontrol        import create
+from   data                       import Beads, Track
+from   model.task.track           import TrackReaderTask
+from   simulator                  import randtrack, setseed
+from   simulator.bindings         import Experiment
 
 def test_datacleaning():
     "test data cleaning"
@@ -321,12 +324,19 @@ def test_subtract(monkeypatch):
 
 def test_subtract_med():
     "tests subtractions"
-    allv = (None, None)
-    agg  = SubtractMedianSignal.apply
-    assert_allclose(agg([np.arange(5)]*5, allv),           np.arange(5))
-    assert_allclose(agg([np.arange(5), np.ones(5)], allv), np.arange(5)*.5+.5)
-    assert_allclose(agg([np.arange(5)]+[np.ones(5)]*2, allv), np.ones(5)*4./3.)
-    assert_allclose(agg([np.arange(6), np.ones(5)], allv), list(np.arange(5)*.5+.5)+[4.25])
+    agg  = lambda x: SubtractMedianSignal.apply([i.astype('f4') for i in x], (0,5))
+    assert_allclose(agg([np.arange(5)]*5),           np.arange(5))
+    assert_allclose(agg([np.arange(5), np.ones(5)]), np.arange(5)*.5+.5)
+    assert_allclose(agg([np.arange(5)]+[np.ones(5)]*2), np.ones(5))
+    assert_allclose(agg([np.arange(6), np.ones(5)]), list(np.arange(5)*.5+.5)+[4.5])
+
+    tsk             = BeadSubtractionTask(beads = [1,2,3,4])
+    tsk.agg.average = True
+    cache = {} # type: ignore
+    frame = BeadSubtractionProcessor.apply(Track(**Experiment().track(1, 5)).beads,
+                                           cache = cache, **tsk.config())
+    out   = frame[0]
+    assert out is not None
 
 def test_processor():
     "test processor"
@@ -386,4 +396,4 @@ def test_fixedbeadsorting():
     assert list(frames[frames.good].bead.values) == [4]
 
 if __name__ == '__main__':
-    test_processor()
+    test_subtract_med()
