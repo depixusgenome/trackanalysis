@@ -225,7 +225,9 @@ class PeaksAlignment:
         inf                   = np.iinfo('i4').max
         cols: Dict[str, list] = {i: [] for i in ('track', 'bead', attr, 'reference')}
         for bead, track in {k[1:] for k in data[['bead', 'track']].itertuples()}:
-            thisref  = np.asarray(ref[track] if isinstance(ref, dict) else ref.position,
+            thisref  = np.asarray(ref        if isinstance(ref, np.ndarray) else
+                                  ref[track] if isinstance(ref, dict)       else
+                                  ref[ref.track == track].position,
                                   dtype = 'f4')
             tmp      = data[data.bead==bead]
             peaks    = np.sort(tmp[tmp.track == track][attr].unique())
