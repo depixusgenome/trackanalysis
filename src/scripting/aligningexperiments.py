@@ -32,9 +32,6 @@ def getoligos(tracks) -> Dict[str, str]:
 
 def createpeaks(tracks, *args: Task, fullstats = True, target = None, **kwa):
     "create peaks for all tracks"
-    kwa.update((i, Tasks(i)(**j)) for i, j in kwa.items() if isinstance(j, dict))
-    kwa.update((Tasks(_).name, _) for _ in args)
-
     if target:
         mers  = {Translator.reversecomplement(i): j
                  for i, j in getoligos(tracks).items()}
@@ -51,6 +48,9 @@ def createpeaks(tracks, *args: Task, fullstats = True, target = None, **kwa):
 
         tord = pd.DataFrame({'trackorder': np.arange(len(tracks)), 'track': lst})
         tord.set_index('track', inplace = True)
+
+    kwa.update((i, Tasks(i)(**j)) for i, j in kwa.items() if isinstance(j, dict))
+    kwa.update((Tasks(_).name, _) for _ in args)
 
     data = PeaksAlignment(**kwa).peaks(tracks)
 
@@ -107,6 +107,34 @@ def resolutiongraph(data, *keys: str, rng = (0., 8.)):
 
     return out if len(keys) != 1 else out[keys[0]]
 
+class ZeroFinder:
+    """
+    Finds the zero position, discarding peaks below
+    """
+    minratio = .1
+    minrate  = .1
+    def __call(self, data: pd.DataFrame) -> pd.DataFrame:
+        peaks = data.groupby("peakposition").hybridisationrate.first().reset_index()
+        peaks.sort_values('peakposition', inplace = True)
+
+        pot   = peaks[peaks.hybridisationrate > self.minrate].peakposition.min()
+        rems  = peaks[peaks.peakposition < pot]
+        if len(rems) == 0:
+            return data
+
+        cnt  = peaks[peaks.peakposition == pot].hybridisationrate.values[0]
+        infs = rems[rems.hybridisationrate < cnt*self.minratio]
+        out  = infs.peakposition.unique()
+        if len(infs) < len(rems):
+            out = out[out < np.setdiff1d(rems.peakposition.values, out).min()]
+        if len(out):
+            return data[data.peakposition.apply(lambda x: x not in out)]
+        return data
+
+    def __call__(self, data):
+        return (self.__call(data) if isinstance(data, pd.DataFrame) else
+                [(i, self.__call(j)) for i, j in data])
+
 class PeaksAlignment:
     """
     Align beads or tracks
@@ -122,9 +150,10 @@ class PeaksAlignment:
                                          firstpeak = False,
                                          stretch   = Range(1.,   .05, .01),
                                          bias      = Range(None, .01, .005))
-    peakflagger  = PeakFlagger          (mincount = 1, window = 15)
+    peakflagger  = PeakFlagger(mincount = 1, window = 15)
     peakselector = Tasks.peakselector()
     singlestrand = Tasks.singlestrand()
+    findzero     = ZeroFinder()
     individually = False
 
     @initdefaults(frozenset(locals()),
@@ -163,9 +192,11 @@ class PeaksAlignment:
             return [(i, j) for i, j in items if i not in discarded]
         return items
 
-    @classmethod
-    def maskpeaks(cls, data, mask, attribute = 'peakposition'):
+    def maskpeaks(self, data, mask, attribute = 'peakposition'):
         "mask the peaks"
+        if callable(self.findzero):
+            data = self.findzero(data)
+
         if mask is None:
             return data
 
@@ -194,26 +225,22 @@ class PeaksAlignment:
         inf                   = np.iinfo('i4').max
         cols: Dict[str, list] = {i: [] for i in ('track', 'bead', attr, 'reference')}
         for bead, track in {k[1:] for k in data[['bead', 'track']].itertuples()}:
-            thisref  = ref[track] if isinstance(ref, dict) else ref
+            thisref  = np.asarray(ref[track] if isinstance(ref, dict) else ref.position,
+                                  dtype = 'f4')
             tmp      = data[data.bead==bead]
             peaks    = np.sort(tmp[tmp.track == track][attr].unique())
             if attr == 'peakposition':
-                flags = matchpeaks(thisref, peaks, self.peakflagger.window)
+                flags = matchpeaks(thisref, peaks.astype("f4"), 10.)
             else:
                 flags = self.peakflagger(thisref, [peaks])[0]
-
-            cols['reference'].append(thisref[flags[flags < inf]])
+            cols['reference'].append(thisref[flags[flags < inf]].astype('i4'))
             cols[attr].append(peaks[flags < inf])
             cols['track'].append([track]*len(cols[attr][-1]))
             cols['bead'].append(np.full(len(cols[attr][-1]), bead, dtype = 'i4'))
-
         out = pd.DataFrame({i: np.concatenate(j) for i, j in cols.items()})
-        out = out.assign(delta = out.peakposition-out.reference)
-        return out.join(out
-                        .groupby('bead')
-                        .agg(dict(reference = 'count', delta = lambda x: np.abs(x).mean()))
-                        .rename(columns = dict(reference = 'peakcount', delta = 'residual')),
-                        on = ['bead'])
+        out['delta'] = out.peakposition-out.reference
+        out.set_index(["track", "bead", "peakposition"], inplace = True)
+        return data.set_index(["track", "bead", "peakposition"]).join(out)
 
     @staticmethod
     def setpivot(data, position = 'max'):
@@ -327,7 +354,21 @@ class PeaksAlignment:
             return out.assign(identity = out.bead.astype(str))
         return out
 
-    def display(self,   # pylint: disable=too-many-arguments,too-many-locals
+class PeaksAlignmentConfig(PeaksAlignment):
+    """
+    config for aligning peaks
+    """
+    def __init__(self, hpin = None, pivots = None, masks = None, **kwa):
+        super().__init__(**kwa)
+        self.hpin:   HPPositions = HPPositions(*hpin) if hpin else None
+        self.pivots: Dict        = pivots if pivots else {}
+        self.masks:  Dict        = masks  if masks else {}
+        self.refpos: Dict        = {}
+        self.defaultpivot = 'min'
+        if self.hpin:
+            self.sethppeaks(self.hpin.seq, self.hpin.oligo)
+
+    def showone(self,   # pylint: disable=too-many-arguments,too-many-locals
                 data,
                 ref        = None,
                 discarded  = None,
@@ -363,16 +404,12 @@ class PeaksAlignment:
 
         args = dict(style = dict(color = 'gray', alpha = .5, size = 5), group = 'ref')
         for i, j in seqs.items():
-            out = self.hpindisplay(data, j, ref, label = i, **args)*out
+            out = self.showhpin(data, j, ref, label = i, **args)*out
 
         return out if self.hpalign else out
 
     @staticmethod
-    def hpindisplay(data, positions,
-                    ref   = None,
-                    plot  = None,
-                    style = None,
-                    **args):
+    def showhpin(data, positions, ref = None, plot = None, style = None, **args):
         """
         display hairpin positions
         """
@@ -383,20 +420,6 @@ class PeaksAlignment:
                             np.repeat(positions, len(xvals))), **args)
         return out(plot  = plot  if plot else dict(),
                    style = style if style else dict())
-
-class PeaksAlignmentConfig(PeaksAlignment):
-    """
-    config for aligning peaks
-    """
-    def __init__(self, hpin = None, pivots = None, masks = None, **kwa):
-        super().__init__(**kwa)
-        self.hpin:   HPPositions = HPPositions(*hpin) if hpin else None
-        self.pivots: Dict        = pivots if pivots else {}
-        self.masks:  Dict        = masks  if masks else {}
-        self.refpos: Dict        = {}
-        self.defaultpivot = 'min'
-        if self.hpin:
-            self.sethppeaks(self.hpin.seq, self.hpin.oligo)
 
     def alignbead(self, data, key, bead, ref = 'ref'):
         """
@@ -417,15 +440,22 @@ class PeaksAlignmentConfig(PeaksAlignment):
              ref        = 'ref') -> hv.DynamicMap:
         "return a dynamic map"
         def _fcn(key, bead):
-            return self.display(data[key][data[key].bead == bead], ref,
+            return self.showone(data[key][data[key].bead == bead], ref,
                                 trackorder = trackorder,
                                 align      = align,
                                 pivot      = self.pivots.get(bead, self.defaultpivot),
                                 masks      = self.masks.get(bead, None),
                                 refpos     = self.refpos.get(bead, None))
 
-        out = (hv.DynamicMap(_fcn, kdims = ['data', 'bead'])
-               .redim.values(data = list(keys), bead = list(beads)))
+        if len(keys) == 1:
+            _f2 = lambda x: _fcn(keys[0], x)
+            out = (hv.DynamicMap(_f2, kdims = ['bead']) .redim.values(bead = list(beads)))
+        elif len(beads) == 1:
+            _f3 = lambda x: _fcn(x, beads[0])
+            out = (hv.DynamicMap(_f3, kdims = ['data']) .redim.values(data = list(keys)))
+        else:
+            out = (hv.DynamicMap(_fcn, kdims = ['data', 'bead'])
+                   .redim.values(data = list(keys), bead = list(beads)))
         if self.hpin:
             pos    = self.hpin.pos
             tracks = list(pos.track.unique())
