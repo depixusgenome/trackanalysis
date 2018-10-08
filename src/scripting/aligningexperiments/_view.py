@@ -7,13 +7,16 @@ from   typing       import cast
 import pandas       as     pd
 import numpy        as     np
 import holoviews    as     hv
+from   bokeh.models                         import (LinearAxis,FuncTickFormatter,
+                                                    FixedTicker)
 
 from   model.__scripting__                  import Tasks
 from   peakfinding.processor                import PeaksDict, PeakSelectorTask
 from   peakfinding.__scripting__            import Detailed
 from   utils.decoration                     import extend
 from   ._identification                     import FalsePositivesIdentifier
-from   ._computations                       import PeaksAlignmentConfig, getreference
+from   ._computations                       import (PeaksAlignmentConfig,
+                                                    getreference, HPPositions)
 
 def showresolutions(data, *keys: str, rng = (0., 8.)):
     "show resolutions"
@@ -60,7 +63,7 @@ def showidentifiedpeaks(data, # pylint: disable=too-many-arguments
         ref          = 'reference'
 
     inds = vals.delta.isna().sum(level=0).sort_values().index
-    vals = pd.concat([vals.loc[i] for i in inds])
+    vals = pd.concat([vals.loc[[i]] for i in inds])
 
     opts = dict(xrotation=90, width=width)
     hmap = hv.HeatMap(vals.fillna(missingvalue), [ref, "bead"], "dist")
@@ -78,13 +81,38 @@ def showidentifiedpeaks(data, # pylint: disable=too-many-arguments
             << beads(plot=dict(width=height, yaxis = None))
             << pos  (plot=dict(height=height, width=width, xaxis = None)))
 
+def addsequenceticks(plot, seq, position):
+    "add sequence ticks and possibly a new axis"
+    if isinstance(seq, HPPositions):
+        code  = seq.seq.upper().replace(seq.target.upper(), seq.target.lower())
+        ticks = list(range(len(seq.seq)))
+    else:
+        code  = seq
+        ticks = list(range(len(seq)))
+
+    def _set(axis):
+        axis.formatter = FuncTickFormatter(code= f'return "{code}"[tick]')
+        axis.ticker    = FixedTicker(ticks = ticks)
+
+    if position in ('xaxis', 'yaxis'):
+        opts = lambda x, y: _set(getattr(x.state, position))
+
+    else:
+        rng = 'x_range' if position in ('above', 'bottom') else 'y_range'
+        def _add(plot, _):
+            plot.state.extra_x_ranges = {"seq":  getattr(plot.state, rng)}
+            linaxis = LinearAxis(**{'axis_label' : "sequence", f'{rng}_name': 'sequence'})
+            _set(linaxis)
+            plot.state.add_layout(linaxis, position)
+        opts = _add
+    return plot(plot=dict(finalize_hooks=[opts]))
+
 def showfalsepositives(itms, rng, precision = 1, scatter = False, **kwa):
     "display false positives"
     cls    = FalsePositivesIdentifier
     fpos   = cls.falsepositives(itms)
     tracks = sorted(fpos.track.unique())
     dico   = PeaksDict(config = cast(PeakSelectorTask, Tasks.peakselector(**kwa)))
-
     def _showfp(track):
         data  = fpos[fpos.track == track]
         beads = data.bead.unique()
@@ -165,7 +193,7 @@ class PeaksAlignmentConfigMixin:
         return out(plot  = plot  if plot else dict(),
                    style = style if style else dict())
 
-    def show(self, data, # pylint: disable=too-many-arguments
+    def show(self, data, # pylint: disable=too-many-arguments,too-many-locals
              keys       = (),
              beads      = (),
              trackorder = 'trackorder',
