@@ -161,7 +161,7 @@ class Detailed:
     binwidth    = property(lambda self: self.details.binwidth)
     corrections = property(lambda self: self.details.corrections)
     peaks       = property(lambda self: self.details.peaks)
-    zero        = property(lambda self: next(self.output, [0])[0])
+    zero        = property(lambda self: self.output[0][0] if len(self.output) else 0)
     events      = property(lambda self: self.details.events)
     ids         = property(lambda self: self.details.ids)
 
