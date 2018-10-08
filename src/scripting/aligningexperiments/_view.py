@@ -43,7 +43,7 @@ def showidentifiedpeaks(data, # pylint: disable=too-many-arguments
     Show expected peaks in a heatmap
     """
     # pylint: disable=too-many-locals
-    if dynmap is not None:
+    if dynmap:
         fcn = lambda x: showidentifiedpeaks(data.loc[[x]], missingvalue, None, False)
         return (hv.DynamicMap(fcn, kdims = ['track'])
                 .redim.values(track = sorted(data.index.levels[0].unique())))
@@ -127,17 +127,24 @@ class PeaksAlignmentConfigMixin:
         data = data.sort_values(['bead', trackorder, 'peakposition', 'avg'])
         if ref is None:
             ref  = 'identity' if 'identity' in data.columns else 'track'
+
         cols = ['resolution', 'hybridisationrate', 'averageduration']
-        out  = ((hv.Scatter(data, ref, ['avg']+cols[1:], label = 'events')
-                 (plot  = dict(jitter = .75),
-                  style = dict(alpha  = .2))
-                ).redim.label(avg = 'base pairs')
-                *(hv.Scatter(data, ref, ['peakposition']+cols[:1], label = 'peaks')
-                  (plot  = dict(size_index     = 'resolution',
-                                scaling_factor = 15000),
-                   style = dict(alpha = .01, line_alpha=.1))
-                 ).redim.label(**{cols[0]: 'base pairs'})
-               )
+        dim  = hv.Dimension("z", label = "base pairs")
+        args = ref, ['avg']+cols[1:]
+        opts = dict(plot  = dict(jitter = .75), style = dict(alpha  = .2))
+        if 'reference' in data:
+            isna = data.reference.isna()
+            out  = (hv.Scatter(data[~isna], *args, label = 'events')(**opts).redim(avg = dim)
+                    *hv.Scatter(data[isna], *args,
+                                label = 'unknown events')(**opts).redim(avg = dim))
+        else:
+            out  = hv.Scatter(data, *args, label = 'events')(**opts).redim(avg = dim)
+
+        out  *= (hv.Scatter(data, ref, ['peakposition']+cols[:1], label = 'peaks')
+                 (plot  = dict(size_index     = 'resolution',
+                               scaling_factor = 15000),
+                  style = dict(alpha = .01, line_alpha=.1))
+                 ).redim(**{cols[0]: dim})
 
         args = dict(style = dict(color = 'gray', alpha = .5, size = 5), group = 'ref')
         for i, j in seqs.items():
@@ -163,17 +170,23 @@ class PeaksAlignmentConfigMixin:
              beads      = (),
              trackorder = 'trackorder',
              align      = True,
-             ref        = 'ref') -> hv.DynamicMap:
+             ref        = None) -> hv.DynamicMap:
         "return a dynamic map"
         def _fcn(key, bead):
-            return self.showone(data[key][data[key].bead == bead], ref,
+            info = data if isinstance(data, pd.DataFrame) else data[key]
+            return self.showone(info[info.bead == bead], ref,
                                 trackorder = trackorder,
                                 align      = align,
                                 pivot      = self.pivots.get(bead, self.defaultpivot),
                                 masks      = self.masks.get(bead, None),
                                 refpos     = self.refpos.get(bead, None))
 
-        if len(keys) == 1:
+        if isinstance(data, pd.DataFrame):
+            _f1 = lambda x: _fcn(None, x)
+            if len(beads) == 0:
+                beads = sorted(data.bead.unique())
+            out = (hv.DynamicMap(_f1, kdims = ['bead']) .redim.values(bead = list(beads)))
+        elif len(keys) == 1:
             _f2 = lambda x: _fcn(keys[0], x)
             out = (hv.DynamicMap(_f2, kdims = ['bead']) .redim.values(bead = list(beads)))
         elif len(beads) == 1:
