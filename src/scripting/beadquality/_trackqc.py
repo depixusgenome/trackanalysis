@@ -134,8 +134,7 @@ def _adderrors(qcdf):
     col = col.astype('category')
 
     frame = col.reset_index()
-    frame = frame.groupby(["track",  "mostcommonerror"]).bead.count()
-    frame.reset_index(inplace = True)
+    frame = frame.groupby(["track",  "mostcommonerror"]).bead.count().reset_index()
 
     frame = pd.pivot_table(frame, values = 'bead', columns = 'mostcommonerror', index = 'track')
     # pylint: disable=not-an-iterable
