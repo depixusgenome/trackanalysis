@@ -7,4 +7,5 @@ from ._computations   import (PeaksAlignment, PeaksAlignmentConfig,
                               hppositions, createpeaks)
 from ._identification import PeakIdentifier, FalsePositivesIdentifier
 from ._view           import (showidentifiedpeaks, showfalsepositives,
-                              showresolutions, showmissingpertrack)
+                              showresolutions, showmissingpertrack,
+                              addsequenceticks)

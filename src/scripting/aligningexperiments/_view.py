@@ -101,7 +101,7 @@ def addsequenceticks(plot, seq, position):
         rng = 'x_range' if position in ('above', 'bottom') else 'y_range'
         def _add(plot, _):
             plot.state.extra_x_ranges = {"seq":  getattr(plot.state, rng)}
-            linaxis = LinearAxis(**{'axis_label' : "sequence", f'{rng}_name': 'sequence'})
+            linaxis = LinearAxis(**{'axis_label' : "sequence", f'{rng}_name': 'seq'})
             _set(linaxis)
             plot.state.add_layout(linaxis, position)
         opts = _add
@@ -136,23 +136,20 @@ class PeaksAlignmentConfigMixin:
     def showone(self,   # pylint: disable=too-many-arguments,too-many-locals
                 data,
                 ref        = None,
-                discarded  = None,
-                masks      = None,
                 align      = True,
-                refpos     = None,
-                pivot      = 'max',
                 trackorder = 'modification',
+                scaling_factor = 1.5,
                 **seqs):
         "display the data"
         if not isinstance(data, pd.DataFrame):
             data = self.peaks(data)
 
         if align:
-            data = self(data, ref, # pylint: disable=not-callable
-                        discarded=discarded, masks=masks, pivot=pivot, refpos=refpos)
+            data = self.alignbead(data, ref = ref) # type: ignore
             ref  = None
 
         data = data.sort_values(['bead', trackorder, 'peakposition', 'avg'])
+        assert 'resolution' in data.columns
         if ref is None:
             ref  = 'identity' if 'identity' in data.columns else 'track'
 
@@ -170,9 +167,9 @@ class PeaksAlignmentConfigMixin:
 
         out  *= (hv.Scatter(data, ref, ['peakposition']+cols[:1], label = 'peaks')
                  (plot  = dict(size_index     = 'resolution',
-                               scaling_factor = 15000),
+                               scaling_factor = scaling_factor),
                   style = dict(alpha = .01, line_alpha=.1))
-                 ).redim(**{cols[0]: dim})
+                 ).redim(**{'peakposition': dim})
 
         args = dict(style = dict(color = 'gray', alpha = .5, size = 5), group = 'ref')
         for i, j in seqs.items():
@@ -198,16 +195,13 @@ class PeaksAlignmentConfigMixin:
              beads      = (),
              trackorder = 'trackorder',
              align      = True,
-             ref        = None) -> hv.DynamicMap:
+             ref        = None,
+             **kwa) -> hv.DynamicMap:
         "return a dynamic map"
         def _fcn(key, bead):
             info = data if isinstance(data, pd.DataFrame) else data[key]
             return self.showone(info[info.bead == bead], ref,
-                                trackorder = trackorder,
-                                align      = align,
-                                pivot      = self.pivots.get(bead, self.defaultpivot),
-                                masks      = self.masks.get(bead, None),
-                                refpos     = self.refpos.get(bead, None))
+                                trackorder = trackorder, align = align, **kwa)
 
         if isinstance(data, pd.DataFrame):
             _f1 = lambda x: _fcn(None, x)

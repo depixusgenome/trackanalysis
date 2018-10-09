@@ -203,17 +203,22 @@ class PeaksAlignment:
         return _maskpeaks(data, mask)
 
     @staticmethod
-    def setpivot(data, position = 'max'):
+    def setpivot(data, position = None, bump = None):
         "moves peakposition and avg to a new position"
-        pos   = lambda attr, x: x[attr] - getattr(x.peakposition, position)()
-        if position is None:
-            allp  = lambda x: x.copy()
+        if position == 'abs':
+            allp  = lambda _, x: x.copy()
         else:
-            allp  = lambda x: x.assign(peakposition = pos('peakposition', x),
-                                       avg          = pos('avg', x))
+            if position is None:
+                position = 'max'
+            if bump is None:
+                bump = {}
+            allp = lambda i, x: x.assign(**{j: (x[j]
+                                                - getattr(x.peakposition, position)()
+                                                + bump.get(i, 0.))
+                                            for j in ('peakposition', 'avg')})
         if isinstance(data, pd.DataFrame):
-            return allp(data)
-        return [(i, allp(j)) for i, j in data]
+            return allp(0, data)
+        return [(i, allp(i, j)) for i, j in data]
 
     def toreference(self, data, ref):
         """
@@ -271,7 +276,9 @@ class PeaksAlignment:
         corr = self.toreference(data, ref)
         corr = self.tohairpin(data, ref, refpos, corr)
         data = [(i, j.assign(peakposition = (j.peakposition-corr[i][2])*corr[i][1],
-                             avg          = (j.avg-corr[i][2])*corr[i][1]))
+                             avg          = (j.avg-corr[i][2])*corr[i][1],
+                             std          = j['std']*corr[i][1],
+                             resolution   = j.resolution*corr[i][1]))
                 for i, j in data]
 
         return data
@@ -280,7 +287,8 @@ class PeaksAlignment:
                           discarded = None,
                           masks     = None,
                           refpos    = None,
-                          pivot     = 'max'):
+                          pivot     = None,
+                          bump      = None):
         "return the correction factors for the different beads or tracks"
         if not isinstance(tracks, pd.DataFrame):
             tracks = self.peaks(tracks)
@@ -289,7 +297,7 @@ class PeaksAlignment:
                           discarded = discarded,
                           attribute = 'bead' if isinstance(ref, int) else 'track')
         data = self.maskpeaks(data, masks)
-        data = self.setpivot(data, pivot)
+        data = self.setpivot(data, pivot, bump)
         corr = self.toreference(data, ref)
         return self.tohairpin(data, ref, refpos, corr)
 
@@ -297,15 +305,19 @@ class PeaksAlignment:
                  discarded = None,
                  masks     = None,
                  refpos    = None,
-                 pivot     = 'max'):
+                 pivot     = None,
+                 bump      = None):
         if not isinstance(tracks, pd.DataFrame):
             tracks = self.peaks(tracks)
+
+        if ref is None and len(tracks.track.unique()) > 1:
+            ref = getreference(tracks.track.unique())
 
         data = self.split(tracks,
                           discarded = discarded,
                           attribute = 'bead' if isinstance(ref, int) else 'track')
         data = self.maskpeaks(data, masks)
-        data = self.setpivot(data, pivot)
+        data = self.setpivot(data, pivot, bump)
         data = self.correct(data, ref, refpos)
 
         out  = pd.concat([i for _, i in data]).sort_values(['bead', 'modification',
@@ -324,17 +336,25 @@ class PeaksAlignmentConfig(PeaksAlignment):
         self.pivots: Dict        = pivots if pivots else {}
         self.masks:  Dict        = masks  if masks else {}
         self.refpos: Dict        = {}
+        self.bump:   Dict        = {}
         self.defaultpivot = 'min'
         if self.hpin:
             self.sethppeaks(self.hpin.seq, self.hpin.oligo)
 
-    def alignbead(self, data, key, bead, ref = 'ref'):
+    def alignbead(self, data, key = None, bead = None, ref = None):
         """
         returns the aligned data for the bead
         """
-        if np.isscalar(bead):
-            return self(data[key][data[key].bead == bead], ref,
-                        pivot      = self.pivots.get(bead, self.defaultpivot),
-                        masks      = self.masks.get(bead, None),
-                        refpos     = self.refpos.get(bead, None))
+        if bead is None or np.isscalar(bead):
+            if key is not None:
+                data = data[key]
+            if bead is not None:
+                data = data[data.bead == bead]
+            elif len(data.bead.unique()) == 1:
+                bead = data.bead.unique()[0]
+            return self(data, ref,
+                        pivot  = self.pivots.get(bead, self.defaultpivot),
+                        masks  = self.masks.get(bead, None),
+                        refpos = self.refpos.get(bead, None),
+                        bump   = self.bump.get(bead, None))
         return pd.concat([self.alignbead(data, key, i, ref) for i in bead])
