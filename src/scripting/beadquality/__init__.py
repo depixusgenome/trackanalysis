@@ -8,3 +8,4 @@ from ._trackqc          import *
 from ._statusevolution  import *
 from ._trackstatus      import *
 from ._beadstatus       import *
+from ._statusflow       import *
