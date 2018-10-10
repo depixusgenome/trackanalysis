@@ -18,11 +18,18 @@ from   ._identification                     import FalsePositivesIdentifier
 from   ._computations                       import (PeaksAlignmentConfig,
                                                     getreference, HPPositions)
 
-def showresolutions(data, *keys: str, rng = (0., 8.)):
+def showresolutions(data, *keys: str, rng = (0., 8.), maxresolution = 1.):
     "show resolutions"
+    def _fhook(plot, _):
+        xrng = plot.state.x_range.factors
+        plot.state.line(xrng, [maxresolution]*len(xrng), color = 'red')
+
     def _fcn(key):
-        info = data[key].assign(resolution = data[key].resolution*1e3)
-        return hv.BoxWhisker(info, ['trackcount', 'bead'],  'resolution')
+        info = data[key]
+        if  info.resolution.mean() < 1e-1:
+            info = info.assign(resolution = data[key].resolution*1e3)
+        box = hv.BoxWhisker(info, ['trackcount', 'bead'],  'resolution')
+        return box(plot= dict(finalize_hooks = [_fhook]))
 
     out = (hv.DynamicMap(_fcn, kdims = ['data'])
            .redim.values(data = list(keys))
