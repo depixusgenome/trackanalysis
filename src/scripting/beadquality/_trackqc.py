@@ -140,8 +140,7 @@ def _adderrors(qcdf):
     # pylint: disable=not-an-iterable
     setattr(frame, 'columns', [i for i in getattr(frame, 'columns')])
 
-    mods  = qcdf.messages.groupby("track").agg({'modification': 'first'})
-    frame = frame.join(mods)
+    frame = frame.join(qcdf.table[list(set(qcdf.table.columns)-set(frame.columns))])
     frame.sort_values('modification', inplace = True)
     return TrackQC(frame, qcdf.status, qcdf.messages)
 
