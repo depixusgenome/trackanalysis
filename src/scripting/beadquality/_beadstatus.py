@@ -8,6 +8,7 @@ from   typing    import Union, List, cast
 
 import holoviews as hv
 import pandas    as pd
+import numpy     as np
 
 from   utils     import initdefaults
 from   ._trackqc import TrackQC, mostcommonerror, beadqualitysummary
@@ -34,12 +35,23 @@ class BeadTrackStatus:
         errint  = {"":1., **{j: -i/len(errlist) for i, j in enumerate(errlist)}}
         frame['errorid'] = frame.mostcommonerror.apply(errint.__getitem__)
 
+        errint  = {"":0., **{j: -i/len(errlist) for i, j in enumerate(errlist)}}
+        frame['errors'] = frame.mostcommonerror.apply(errint.__getitem__)
+
         for i, j in zip((beads, tracks),('bead', 'track')):
             if i:
                 frame.set_index(j, inplace = True)
                 frame = frame.loc[list(cast(list, i)), :]
                 frame.reset_index(inplace = True)
-        return frame
+
+        ordtracks = list(frame.set_index('track').sort_values('modification').index)
+        ordbeads  = list(frame.groupby('bead').errors.sum().sort_values().index)
+        ind       = [(i,j) for i in ordtracks for j in ordbeads]
+        frame.set_index(['track', 'bead'], inplace = True)
+        return frame.join(pd.DataFrame({'order': np.arange(len(ordtracks)*len(ordbeads)),
+                                        'track': [i for i, _ in  ind],
+                                        'bead':  [i for _, i in ind]})
+                          .set_index(['track', 'bead'])).sort_values('order')
 
     def display(self, data: Union[TrackQC, pd.DataFrame],
                 tracks: List[str] = None,
@@ -47,7 +59,7 @@ class BeadTrackStatus:
         "Outputs heatmap with the status of the beads per track"
         return (hv.HeatMap(self.dataframe(data, tracks, beads),
                            kdims = ['bead', 'track'],
-                           vdims = ['errorid', 'mostcommonerror'])
+                           vdims = ['errorid', 'mostcommonerror', 'modification'])
                 (plot  = self.plotopts, style = self.styleopts))
 
 def displaybeadandtrackstatus(data: Union[TrackQC, pd.DataFrame],
