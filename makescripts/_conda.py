@@ -59,7 +59,7 @@ class _CondaApp(BuildContext):
                  r'IR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"\n'
                  r'cd $DIR\n'
                  r'./bin/python')
-        for optext, opts in (('', '-g app'),):
+        for optext, opts in (('', ' -g app '),):
             fname = str(self.options.STARTSCRIPT_PATH.make_node(name+optext+ext))
             with open(fname, 'w', encoding = 'utf-8') as stream:
                 print(cmd + r" app/cmdline.pyc " + val + opts + r' --port random',
