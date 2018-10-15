@@ -19,8 +19,8 @@ namespace
                          {long(2*sizeof(int)), long(sizeof(int)) });
         for(size_t i = 0u, e = arr.size(); i < e; ++i)
         {
-            out.mutable_at(i, 0) = arr[i].first;
-            out.mutable_at(i, 1) = arr[i].second;
+            out.mutable_at(i, 0) = (int) arr[i].first;
+            out.mutable_at(i, 1) = (int) arr[i].second;
         }
         return out;
     }
@@ -345,7 +345,7 @@ namespace eventdetection { namespace merging {
         auto cr = intervals.unchecked<2>();
         ints_t ints(cr.shape(0));
         auto sz = data.size();
-        for(int i = 0, e = cr.shape(0); i < e; ++i)
+        for(int i = 0, e = (int) cr.shape(0); i < e; ++i)
         {
             if(cr(i, 0) < 0 || cr(i, 0) > sz || cr(i, 1) < 0 || cr(i, 1) > sz)
                 throw py::index_error();

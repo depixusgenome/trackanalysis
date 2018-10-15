@@ -327,7 +327,7 @@ namespace cleaning { namespace datacleaning {
 
             auto a = self.attr("mindeltarange").cast<size_t>();
             auto b = self.attr("mindeltavalue").cast<T>();
-            ConstantValuesSuppressor<T> itm({b, a});
+            ConstantValuesSuppressor<T> itm; itm.mindeltavalue = b; itm.mindeltarange = a;
             itm.apply(pydata.size(), pydata.mutable_data());
         }
 
@@ -338,7 +338,7 @@ namespace cleaning { namespace datacleaning {
                 self = self.attr("constants");
             auto a = self.attr("maxabsvalue").cast<T>();
             auto b = self.attr("maxderivate").cast<T>();
-            DerivateSuppressor<T> itm({a, b});
+            DerivateSuppressor<T> itm; itm.maxabsvalue = a; itm.maxderivate = b;
             itm.apply(pydata.size(), pydata.mutable_data(), doclip, azero);
         }
     }

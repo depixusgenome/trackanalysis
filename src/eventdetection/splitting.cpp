@@ -120,7 +120,7 @@ namespace
         auto const data = std::get<0>(info);
         auto const sz   = std::get<1>(info);
 
-        precision      *= self.extensionratio;
+        precision      *= (float) self.extensionratio;
         auto newi(intervals);
         for(auto & i: newi)
         {
@@ -143,7 +143,7 @@ namespace
             for(auto j = i.first > wlen ? i.first-wlen : 0_s, e = i.first; j < e; ++j)
                 if(test(j)) { i.first = j; break; }
 
-            for(int j  = i.second-1, e = std::max(i.first, i.second-wlen); j >= e; --j)
+            for(int j  = int(i.second)-1, e = (int) std::max(i.first, i.second-wlen); j >= e; --j)
                 if(test(j)) { i.second = j+1; break; }
 
             for(int j = int(std::min(i.second+wlen-1_s, sz)), e = int(i.second); j >= e; --j)
@@ -214,7 +214,7 @@ namespace
         }
 
         data  = std::sqrt(data);
-        data *= 1.0f/(rho*std::sqrt(wlen));
+        data *= 1.0f/float(rho*std::sqrt(wlen));
     }
 
 }
@@ -223,8 +223,8 @@ float DerivateSplitDetector::threshold(float precision, grade_t const & data) co
 {
     grade_t tmp  = data;
     auto    perc = signalfilter::stats::percentile(&tmp[0], &tmp[0]+tmp.size(),
-                                                   this->percentile);
-    return perc+this->distance*precision;
+                                                   (float) this->percentile);
+    return float(perc+this->distance*precision);
 }
 
 void DerivateSplitDetector::grade(float precision, grade_t & data) const
@@ -241,7 +241,8 @@ void DerivateSplitDetector::grade(float precision, grade_t & data) const
     auto tsz  = tmp.size();
     auto sl   = [](size_t i, size_t j) { return std::slice(i, j, 1_s); };
 
-    data[sl(wlen, sz-wlen)] = tmp[sl(wlen-1_s, sz-wlen)];
+    for(auto j = wlen; j < sz; ++j)
+        data[j] = tmp[j-1_s];
     data[0]                 = tmp[0];
     if(wlen > 1)
     {
@@ -255,7 +256,7 @@ void DerivateSplitDetector::grade(float precision, grade_t & data) const
         data[sz-1_s-i] -= (tmp[tsz-1_s]*(wlen-i-1_s)+tmp[tsz-1_s-i]*(i+1_s))/wlen;
 
     data  = std::abs(data);
-    data *= 1./this->threshold(precision, data);
+    data *= 1.0f/this->threshold(precision, data);
 }
 
 ints_t DerivateSplitDetector::compute(float precision, data_t data) const
@@ -264,9 +265,9 @@ ints_t DerivateSplitDetector::compute(float precision, data_t data) const
 float ChiSquareSplitDetector::threshold(float prec) const
 {
     namespace bm = boost::math;
-    auto x = bm::quantile(bm::complement(bm::chi_squared(this->gradewindow-1),
+    auto x = bm::quantile(bm::complement(bm::chi_squared((double) (this->gradewindow-1)),
                                          this->confidence));
-    return prec*x/this->gradewindow;
+    return float(prec*x/this->gradewindow);
 }
 
 void ChiSquareSplitDetector::grade(float precision, grade_t & data) const
@@ -313,9 +314,9 @@ void MultiGradeSplitDetector::grade(float precision, grade_t & grade) const
                     { 
                         if(i2-i1 >= wmin)
                         {
-                            std::slice gs(i1+hmin,       i2-i1-2_s*hmin, 1_s);
-                            std::slice ts(i1-first+hmin, i2-i1-2_s*hmin, 1_s);
-                            grade[gs] = tmp[ts];
+                            auto k = i1-first+hmin;
+                            for(auto j = i1+hmin, je = i2-hmin; j < je; ++j, ++k)
+                                grade[j] = tmp[k];
                         }
                     });
         };

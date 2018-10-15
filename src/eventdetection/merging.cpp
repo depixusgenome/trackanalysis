@@ -8,8 +8,8 @@
 namespace eventdetection { namespace merging {
 
 namespace {
-    float get0(ints_t const & intr, size_t i) { return intr[i].first; }
-    float get1(ints_t const & intr, size_t i) { return intr[i].second; }
+    size_t get0(ints_t const & intr, size_t i) { return intr[i].first; }
+    size_t get1(ints_t const & intr, size_t i) { return intr[i].second; }
 }
 
 namespace statsmerging

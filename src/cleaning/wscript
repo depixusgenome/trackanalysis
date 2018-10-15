@@ -1,4 +1,5 @@
-make(locals())
+require('cxx', ('boost_math', 'boost_accumulators'), 1.63, False)
+make(locals(), use=['BOOST'])
 
 @patch
 def postfix_build(bld):

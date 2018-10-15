@@ -208,7 +208,7 @@ namespace cleaning
             for(size_t i = 0; i < sz; ++i)
                 if(std::isfinite(data[i]))
                     ++cnt;
-            return sz == 0 ? 0. : cnt/sz*100.0f;
+            return sz == 0 ? 0.0f : cnt/sz*100.0f;
         }
 
         template <typename T>
@@ -220,14 +220,14 @@ namespace cleaning
             {
                 auto maxv = std::max_element(data, data+sz);
                 auto minv = std::min_element(data, data+sz);
-                return maxv-minv;
+                return float(maxv-minv);
             }
 
             std::vector<float> cpy(data, data+sz);
             auto dt   = cpy.data();
-            auto maxv = signalfilter::stats::nanpercentile(dt, dt+sz, self.maxpercentile);
-            auto minv = signalfilter::stats::nanpercentile(dt, dt+sz, self.minpercentile);
-            return maxv-minv;
+            auto maxv = signalfilter::stats::nanpercentile(dt, dt+sz, (float) self.maxpercentile);
+            auto minv = signalfilter::stats::nanpercentile(dt, dt+sz, (float) self.minpercentile);
+            return float(maxv-minv);
         }
         float _test(ExtentRule const & self, size_t sz, float const *data)
         {   return _test_extent(self, sz, data); }
@@ -261,9 +261,9 @@ namespace cleaning
                                    info.data+info.start[icyc]);
                 out.values[icyc] = value;
                 if(_testmin(self, value))
-                    out.minv.push_back(icyc);
+                    out.minv.push_back((int) icyc);
                 if(_testmax(self, value))
-                    out.maxv.push_back(icyc);
+                    out.maxv.push_back((int) icyc);
             }
             return out;
         }
@@ -311,7 +311,7 @@ namespace cleaning
         {
             out.maxv.resize(initial.ncycles);
             for(auto i = size_t(0); i < initial.ncycles; ++i)
-                out.maxv.at(i) = i;
+                out.maxv.at(i) = int(i);
         }
         return out;
     }

@@ -63,9 +63,10 @@ info_t ExtremumAlignment::compute(DataInfo const && data) const
 
 info_t PhaseEdgeAlignment::compute(DataInfo const && data) const
 {
-    auto ptr  (data.data);
-    auto first(data.first), last (data.last);
-    int  sz   (window);
+    auto  ptr  (data.data);
+    auto  first(data.first), last (data.last);
+    float perc ((float) percentile);
+    int   sz   ((int) window);
 
     info_t out(data.ncycles);
     if(mode == PhaseEdgeAlignment::left)
@@ -74,7 +75,7 @@ info_t PhaseEdgeAlignment::compute(DataInfo const && data) const
             std::vector<float> tmp(ptr+first[i], ptr+std::min(first[i]+sz, last[i]));
             out[i] = -signalfilter::stats::nanpercentile(tmp.data(),
                                                          tmp.data()+tmp.size(),
-                                                         percentile);
+                                                         perc);
         }
     else
         for(size_t i = 0; i < data.ncycles; ++i)
@@ -82,7 +83,7 @@ info_t PhaseEdgeAlignment::compute(DataInfo const && data) const
             std::vector<float> tmp(ptr+std::max(first[i], last[i]-sz), ptr+last[i]);
             out[i] = -signalfilter::stats::nanpercentile(tmp.data(),
                                                          tmp.data()+tmp.size(),
-                                                         percentile);
+                                                         perc);
         }
     return out;
 }

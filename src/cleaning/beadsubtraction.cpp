@@ -65,7 +65,7 @@ namespace {
                     wtable.push_back(val-offsets.at(j));
             }
             if(wtable.size())
-                out.at(i) = fcn(wtable);
+                out.at(i) = (float) fcn(wtable);
         }
 
         for(size_t i = minlen, e = offsets.size(); i < len; ++i)
@@ -82,7 +82,7 @@ namespace {
                     wtable.push_back(val-offsets.at(j));
             }
             if(wtable.size())
-                out.at(i) = fcn(wtable);
+                out.at(i) = (float) fcn(wtable);
         }
         return out;
     }
@@ -176,7 +176,7 @@ namespace {
                 tot += x1[0];
                 ++cnt;
             }
-        return tot/cnt - delta;
+        return float(tot/cnt - delta);
     }
 
     float _mean2(std::vector<float> const & data)
@@ -189,7 +189,7 @@ namespace {
                 tot += x;
                 ++cnt;
             }
-        return tot/cnt;
+        return float(tot/cnt);
     }
 }
 
