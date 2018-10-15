@@ -1,6 +1,15 @@
+#if __GNUC__ == 7 && __GNUC_MINOR__ == 3
+# ifndef __cpp_noexcept_function_type
+#   define __cpp_noexcept_function_type 0
+# endif
+# pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
+#endif
 #include <boost/math/distributions/students_t.hpp>
 #include <boost/math/distributions/normal.hpp>
 #include "eventdetection/stattests.h"
+#if __GNUC__ == 7 && __GNUC_MINOR__ == 3
+# pragma GCC diagnostic pop
+#endif
 
 namespace bm = boost::math;
 

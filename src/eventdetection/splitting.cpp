@@ -1,9 +1,22 @@
 #include <limits>
+#if __GNUC__ == 7 && __GNUC_MINOR__ == 3
+# ifndef __cpp_noexcept_function_type
+#   define __cpp_noexcept_function_type 0
+# endif
+# ifndef __NVCC___WORKAROUND_GUARD
+#   define __NVCC___WORKAROUND_GUARD 0
+#   define __NVCC__ 0
+# endif
+# pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
+#endif
 #include <boost/accumulators/statistics/rolling_variance.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/min.hpp>
 #include <boost/accumulators/statistics/max.hpp>
 #include <boost/math/distributions/chi_squared.hpp>
+#if __GNUC__ == 7 && __GNUC_MINOR__ == 3
+# pragma GCC diagnostic pop
+#endif
 #include "signalfilter/accumulators.hpp"
 #include "eventdetection/splitting.h"
 
