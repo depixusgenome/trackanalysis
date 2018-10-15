@@ -1,6 +1,10 @@
 # tag cycles_v5.3
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
+The *cyclesplot* application was removed. It's already part of* **hybridstat*.
+Similarly, the *_chrome* applications have disappeared as a third party library
+now makes these redundant.
+
 ### Speed
 
 A number of algorithms have been ported to c++: cleaning and event detection.
