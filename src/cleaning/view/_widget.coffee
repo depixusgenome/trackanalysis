@@ -45,32 +45,28 @@ export class DpxCleaningView extends WidgetView
         html = "<div><div class='dpx-span'>"+
                    "<p>Fixed beads:</p><p id='dpx-cl-fixedbeads'>#{@model.fixedbeads}</p>"+
                "</div></div>"+
-                "<div><div class='dpx-span'>"+
+               "<div><div class='dpx-span'>"+
                    "<label #{ttips[0]}>Subtracted</label>"+
                    "#{@mk_txt("subtracted")}"+
-                   "#{@mk_btn("add", "╋", ttips[1])}"+
-               "</div></div>"+
-               "<div><div class='dpx-span'>"+
-                   "<div style='width: 75px;'><p #{ttips[2]}>|z| ≤</p>#{empty}#{empty}"+
-                        "<p #{ttips[5]}>% good  ≥</p></div>"+
-                   "<div>#{@mk_inp("maxabsvalue")}"+
-                        "#{@mk_inp("minextent")}"+
-                        "#{@mk_inp("minhfsigma", 0.05, 0.0001)}"+
-                        "#{@mk_inp("minpopulation", 100, 0.1)}</div>"+
-
-                   "<div><p #{ttips[4]}>|dz/dt| ≤</p>"+
-                        "<p #{ttips[3]}>≤ Δz ≤</p>"+
-                        "<p #{ttips[6]}>≤ σ[HF] ≤</p>"+
-                        "</p></div>"+
-                   "<div>#{@mk_inp("maxderivate")}"+
-                        "#{@mk_inp("maxextent")}"+
-                        "#{@mk_inp("maxhfsigma", 0.05,  0.001)}</p></div>"+
-
-               "</div></div>"+
+                   "#{@mk_btn("add", "╋", ttips[1])}</div></div>"+
+               "<div><table><tr><td #{ttips[2]}>|z| ≤</td>"+
+                          "<td>#{@mk_inp("maxabsvalue")}</td>"+
+                          "<td #{ttips[4]}>|dz/dt| ≤</td>"+
+                          "<td>#{@mk_inp("maxderivate")}</td>/<tr>"+
+                      "<tr><td></td>"+
+                          "<td>#{@mk_inp("minextent")}</td>"+
+                          "<td #{ttips[3]}>≤ Δz ≤</td>"+
+                          "<td>#{@mk_inp("maxextent")}</td>/<tr>"+
+                      "<tr><td></td>"+
+                          "<td>#{@mk_inp("minhfsigma", 0.05, 0.0001)}</td>"+
+                          "<td #{ttips[6]}>≤ σ[HF] ≤</td>"+
+                          "<td>#{@mk_inp("maxhfsigma", 0.05,  0.001)}</td></tr>"+
+                      "<tr><td #{ttips[5]}>% good  ≥</td>"+
+                          "<td>#{@mk_inp("minpopulation", 100, 0.1)}</td>"+
+                          "<td></td><td></td></tr></table></div>"+
                "<div><div class='dpx-span'>"+
                    "<label #{ttips[7]} style='width: 170px;'>Non-closing cycles (%) ≤</label>"+
-                   "#{@mk_inp("maxsaturation", 100.0, 1.0)}"+
-               "</div></div>"
+                   "#{@mk_inp("maxsaturation", 100.0, 1.0)}</div></div>"
 
 
         @el.innerHTML = html
