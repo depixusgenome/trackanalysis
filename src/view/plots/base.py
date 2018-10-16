@@ -83,6 +83,8 @@ class PlotAttrsView(PlotAttrs):
 
     def iterpalette(self, count, *tochange, indexes = None) -> Iterator['PlotAttrs']:
         "yields PlotAttrs with colors along the palette provided"
+        if self.palette is None:
+            raise AttributeError()
         info    = dict(self.__dict__)
         palette = getattr(bokeh.palettes, self.palette, None)
 
@@ -104,6 +106,8 @@ class PlotAttrsView(PlotAttrs):
 
     def listpalette(self, count, indexes = None) -> List[str]:
         "yields PlotAttrs with colors along the palette provided"
+        if self.palette is None:
+            raise AttributeError()
         palette = getattr(bokeh.palettes, self.palette, None)
         if palette is None:
             return [self.color]*count
@@ -175,20 +179,23 @@ class PlotAttrsView(PlotAttrs):
     def _default(args):
         args.pop('palette')
 
-    def addto(self, fig, **kwa) -> GlyphRenderer:
-        "adds itself to plot: defines color, size and glyph to use"
+    def __args(self, theme, kwa):
         args = dict(self.__dict__)
         args.pop('glyph')
         args.update(kwa)
         getattr(self, '_'+self.glyph, self._default)(args)
-        return getattr(fig, self.glyph)(**args)
+        args  = {i: j[theme] if isinstance(j, dict) else j for i, j in args.items()}
+        glyph = self.glyph[theme] if isinstance(self.glyph, dict) else self.glyph
+        return args, glyph
 
-    def setcolor(self, rend, cache = None, **kwa):
+    def addto(self, fig, theme = 'basic', **kwa) -> GlyphRenderer:
+        "adds itself to plot: defines color, size and glyph to use"
+        args, glyph = self.__args(theme, kwa)
+        return getattr(fig, glyph)(**args)
+
+    def setcolor(self, rend, cache = None, theme = None, **kwa):
         "sets the color"
-        args = dict(self.__dict__)
-        args.pop('glyph')
-        args.update(kwa)
-        getattr(self, '_'+self.glyph, self._default)(args)
+        args   = self.__args(theme, kwa)[0]
         colors = {}
         for i, j in args.items():
             if 'color' not in i:
@@ -295,11 +302,12 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
 
     def addtofig(self, fig, name, **attrs) -> GlyphRenderer:
         "shortcuts for PlotThemeView"
+        theme = self._model.themename
         if ('color' not in attrs
                 and isinstance(getattr(self._theme, 'colors', None), dict)
-                and name in getattr(self._theme, 'colors').get(self._model.themename, {})):
-            attrs['color'] = getattr(self._theme, 'colors')[self._model.themename][name]
-        return PlotAttrsView(getattr(self._theme, name)).addto(fig, **attrs)
+                and name in getattr(self._theme, 'colors').get(theme, {})):
+            attrs['color'] = getattr(self._theme, 'colors')[theme][name]
+        return PlotAttrsView(getattr(self._theme, name)).addto(fig, theme, **attrs)
 
     def figure(self, **attrs) -> Figure:
         "shortcuts for PlotThemeView"
@@ -323,6 +331,34 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
     def calllater(self, fcn):
         "calls a method later"
         self._doc.add_next_tick_callback(fcn)
+
+    def differedobserver(self, fcn, widget, *args):
+        "creates a method to update widgets later"
+        if callable(getattr(fcn, "update", None)):
+            fcn, widget = widget, fcn
+
+        if not callable(getattr(widget, "update", None)):
+            raise ValueError()
+
+        done = [False]
+        def _observer(**_):
+            if self.isactive() and not done[0]:
+                done[0] = True
+                data    = fcn()
+                @self._doc.add_next_tick_callback
+                def _later():
+                    widget.update(**data)
+                    done[0] = True
+
+        if len(args) % 2 != 0:
+            raise ValueError()
+
+        for i in range(0, len(args), 2):
+            if callable(getattr(args[i], 'observe', None)):
+                args[i].observe(args[i+1], _observer)
+            else:
+                args[i+1].observe(args[i], _observer)
+        return _observer
 
     def actionifactive(self, ctrl):
         u"decorator which starts a user action but only if state is set to active"

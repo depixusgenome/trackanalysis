@@ -38,9 +38,10 @@ class CyclesPlotTheme(PlotTheme):
                   'basic' : PlotAttrs('blue', 'line',   3)}
     tooltips   = [('(cycle, t, z)', '(@cycle, $~x{1}, $data_y{1.1111})')]
     radius     = 1.
-    histframes     = PlotAttrs('white', 'quad', 1, line_color = 'gray', fill_color = 'gray')
-    histcycles     = PlotAttrs('white', 'quad', 1, line_color = 'blue', fill_color = None,
-                               line_alpha = .5)
+    histframes     = PlotAttrs({'dark': 'darkgray', 'basic': 'gray'},
+                               'quad', 1, fill_color = 'gray')
+    histcycles     = PlotAttrs({"dark": 'darkcyan', "basic": "blue"},
+                               'quad', 1, fill_color = None, line_alpha = .5)
     histxtoplabel  = 'Cycles'
     histxlabel     = 'Frames'
     figsize        = 450, 450, 'fixed'

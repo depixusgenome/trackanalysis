@@ -111,7 +111,7 @@ class ConversionSliderTheme:
     "Conversion slider table theme"
     name    = "cycles.conversionslider"
     stretch = dict(start = 900,  step  = 5, end = 1400, title = 'Stretch (base/µm)')
-    bias    = dict(step  = 1e-4, ratio = .25, offset = .05, title = 'Bieas (µm)')
+    bias    = dict(step  = 1e-4, ratio = .25, offset = .05, title = 'Bias (µm)')
     width   = 280
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):

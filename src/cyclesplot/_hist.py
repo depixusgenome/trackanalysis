@@ -84,21 +84,22 @@ class HistMixin(ABC):
         self._histsource = ColumnDataSource(hist)
         self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 100.)}
 
-        axis  = LinearAxis(x_range_name          = "cycles",
-                           axis_label            = self._theme.histxtoplabel,
-                           axis_label_text_color = self._theme.histcycles.line_color)
-        self._hist.add_layout(axis, 'above')
 
         self.addtofig(self._hist, 'histframes',
                       source = self._histsource,
                       bottom = "bottom", top   = "top",
                       left   = "left",   right = "frames")
 
-        self.addtofig(self._hist, 'histcycles',
-                      source = self._histsource,
-                      bottom = "bottom", top   = "top",
-                      left   = "left",   right = "cycles",
-                      x_range_name = "cycles")
+        rend = self.addtofig(self._hist, 'histcycles',
+                             source = self._histsource,
+                             bottom = "bottom", top   = "top",
+                             left   = "left",   right = "cycles",
+                             x_range_name = "cycles")
+
+        axis  = LinearAxis(x_range_name          = "cycles",
+                           axis_label            = self._theme.histxtoplabel,
+                           axis_label_text_color = rend.glyph.line_color)
+        self._hist.add_layout(axis, 'above')
 
         self._ticker.create(self._ctrl, self._hist, self._model,
                             self._model.cycles.theme.yrightlabel, "right")

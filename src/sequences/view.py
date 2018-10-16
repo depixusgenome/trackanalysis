@@ -255,16 +255,14 @@ class SequencePathWidget:
                                  width = self.__theme.width,
                                  **self.__data())
 
-        def _observer(**_):
-            if mainview.isactive():
-                data = self.__data()
-                mainview.calllater(lambda : self.__widget.update(**data))
-        ctrl.theme  .observe(self.__model.config,  _observer)
-        ctrl.display.observe(self.__model.display, _observer)
+        mainview.differedobserver(self.__data, self.__widget,
+                                  ctrl.theme,   self.__model.config,
+                                  ctrl.display, self.__model.display)
 
         @mainview.actionifactive(ctrl)
         def _onclick(new):
             self.__onclick(ctrl, new)
+
         self.__widget.on_click(_onclick)
         return [Paragraph(text = self.__theme.label), self.__widget]
 
@@ -361,17 +359,15 @@ class OligoListWidget:
             self.__model.setnewprobes(ctrl, new)
         self.__widget.on_change('value', _onclick_cb)
 
-        def _observer(**_):
-            if mainview.isactive():
-                data = self.__data()
-                mainview.calllater(lambda : self.__widget.update(**data))
-        ctrl.theme  .observe(self.__model.config,  _observer)
-        ctrl.display.observe(self.__model.display, _observer)
+        mainview.differedobserver(self.__data, self.__widget,
+                                  ctrl.theme,   self.__model.config,
+                                  ctrl.display, self.__model.display)
         return [self.__widget]
 
     def reset(self, resets):
         "updates the widget"
-        resets[self.__widget].update(**self.__data())
+        data = self.__data()
+        resets[self.__widget].update(**data)
 
     def __data(self):
         hist = self.__model.config.history
