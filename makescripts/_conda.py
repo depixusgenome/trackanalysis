@@ -28,13 +28,8 @@ def setup(cnf):
     "Sets up the python environment"
     MODULES(cnf)
     wafbuilder.condasetup(cnf)
-    print('********************************************')
-    print('********************************************')
-    print("BOOST must be installed manually")
     if sys.platform.startswith("win"):
         print("COFFEESCRIPT is not mandatory & can be installed manually")
-    print('********************************************')
-    print('********************************************')
 
 class _CondaApp(BuildContext):
     fun = cmd = 'app'

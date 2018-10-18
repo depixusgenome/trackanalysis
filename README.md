@@ -62,33 +62,6 @@ The *undocumented* tags in the 3rd column are the relevant piece of information.
 Choose a tag from *conda-forge* (4th column). The tag always seems to be an integer.
 Its value doesn't seem to matter.
 
-#### boost library & linux
-
-The default boost libraries are installed using the linux application installer
-(*apt*,...). On a debian installation, the commandline is
-
-```shell
-sudo apt install libboost-all-dev
-```
-
-For non superusers, an option is to install boost from conda-forge. This
-requires providing the boost paths to `python waf configure` as well as executing
-the previous `ln -s` commands.
-
-
-Neither installations are not fully *waf* compatible. The latter expects a
-different name for libraries. The following command line is needed:
-
-```shell
-sudo ln -s /usr/lib/x86_64-linux-gnu/libboost_math_tr1l.so.1.62.0 /usr/lib/x86_64-linux-gnu/libboost_math_tr1l.so.1.62.so
-```
-
-For a conda-forge installation, the `sudo` is not needed and the paths need to
-be adapted.
-
-In both cases, the boost version (1.62 in the above example) should be adapted
-the one on your system.
-
 # Architecture
 
 The global architecture principle is *Model-View-Controller*.
