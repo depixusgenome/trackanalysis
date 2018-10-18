@@ -654,7 +654,7 @@ class ExperimentCreator(Object):
         pos        = np.append(rndstate.randint(0, min(self.bins[0], int(size/self.bins[1])-5),
                                                 nbindings),
                                int(size/self.bins[1]))
-        tpl        = deepcopy(self.experiment.__dict__)
+        tpl        = deepcopy(self.template.__dict__)
         tpl.update(positions = np.sort(pos)[::-1]*self.bins[1],
                    onrates   = np.insert(rnd(self.onrates,  nbindings), 0, 0),
                    offrates  = np.insert(rnd(self.offrates, nbindings), 0, 0),
