@@ -108,7 +108,7 @@ class _EnumDescriptor:
         self.default = default
 
     def __set_name__(self, _, name):
-        self.name = name[:-1]
+        self.name = name
 
     def __get__(self, inst, owner) -> str:
         return inst.__dict__[self.name] if inst is not None else self.default.name
@@ -446,6 +446,8 @@ class Experiment(Object):
     natures        = cast(Sequence[str],             _BindingAttribute('<U16'))
     singlestrand   = cast(Binding,                   _SingleStrandBinding())
     def __init__(self, **kwa):
+        if 'positions' in kwa and "bindings" not in kwa:
+            kwa['bindings'] = kwa.pop('positions')
         super().__init__(**kwa)
         _BindingAttribute.update(self, kwa)
 
