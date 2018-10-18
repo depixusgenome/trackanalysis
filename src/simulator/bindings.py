@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Simulates binding events"
-from copy   import copy
+from copy   import copy, deepcopy
 from enum   import Enum
 from typing import (Dict, Any, FrozenSet, Optional, List, Union, Iterable,
                     Sequence, NamedTuple, Tuple, cast)
@@ -156,13 +156,14 @@ class ThermalDrift:
             bead[:].reshape((-1, drift.size))[:] += drift
         return drift
 
-class KneedBaseline:
+class KneedBaseline(Object):
     """
     Add baseline to bead
     """
     sigma = 5e-3
     knee  = 30./1e3
     alpha = 1.
+    _ARGS = Object.args(locals())
     def __call__(self, cnf: 'Experiment', seed = None):
         size    = cnf.ncycles * np.sum(cnf.phases)+1
         #generate white noise in time domain
@@ -184,7 +185,7 @@ class KneedBaseline:
         assert len(out) >= size
         return out[:size-1]
 
-class Baseline:
+class Baseline(Object):
     """
     Add baseline to bead
     """
@@ -192,6 +193,7 @@ class Baseline:
     framerate = 30.
     params    = [1.089, 2.444]
     covar     = [[.01, .005], [.005,.04]]
+    _ARGS     = Object.args(locals())
 
     def shape(self, params, size) -> np.ndarray:
         "return the shape in the frequency domain: the spectral power density"
@@ -229,6 +231,7 @@ class StrandClosing(Object):
     """
     start = 40
     mean  = 3
+    _ARGS = Object.args(locals())
     def __call__(self,
                  cnf: 'Experiment',
                  base: np.ndarray,
@@ -640,8 +643,9 @@ class ExperimentCreator(Object):
     size      = (.2, (bins[0]-10)*bins[1])
     onrates   = [.05, .5]
     offrates  = [3, 30]
+    template  = Experiment()
     _ARGS     = Object.args(locals())
-    def experiment(self, ncycles = 100, seed = None):
+    def experiment(self, seed = None):
         "create an experiment"
         rndstate   = randstate(seed)
         rnd        = lambda x, *y: rndstate.rand(*y)*(x[1]-x[0])+x[0]
@@ -650,11 +654,12 @@ class ExperimentCreator(Object):
         pos        = np.append(rndstate.randint(0, min(self.bins[0], int(size/self.bins[1])-5),
                                                 nbindings),
                                int(size/self.bins[1]))
-        return Experiment(ncycles   = ncycles,
-                          positions = np.sort(pos)[::-1]*self.bins[1],
-                          onrates   = np.insert(rnd(self.onrates,  nbindings), 0, 0),
-                          offrates  = np.insert(rnd(self.offrates, nbindings), 0, 0),
-                          natures   = ["singlestrand"]+["probe"]*nbindings)
+        tpl        = deepcopy(self.experiment.__dict__)
+        tpl.update(positions = np.sort(pos)[::-1]*self.bins[1],
+                   onrates   = np.insert(rnd(self.onrates,  nbindings), 0, 0),
+                   offrates  = np.insert(rnd(self.offrates, nbindings), 0, 0),
+                   natures   = ["singlestrand"]+["probe"]*nbindings)
+        return self.template.__class__(**tpl)
 
     def createimage(self, info, bead):
         "transform bead data into an image"
@@ -663,26 +668,26 @@ class ExperimentCreator(Object):
         bead /= self.bins[1]
         bead -= np.min(bead)-1
         bead  = np.clip(bead, 0., self.bins[0]-1)
-        img    = np.zeros((self.bins[0], bead.shape[0], 3), dtype = 'f4')
+        img    = np.zeros((3, self.bins[0], bead.shape[0]), dtype = 'f4')
         zvals  = np.round(bead).astype('i4')
         order  = np.argsort(zvals, axis = 1)
         for i in range(bead.shape[0]):
             bcount = np.bincount(zvals[i,:], minlength = self.bins[0])
 
-            img[:,i,0]     = np.clip(np.log(1+bcount), 0, self.imgclip)
+            img[0,:,i]     = np.clip(np.log(1+bcount), 0, self.imgclip)
 
             bcount[zvals[i,-1]] -= 1
             inds           = np.nonzero(bcount)[0]
             valinds        = np.cumsum(np.insert(bcount[inds], 0, 0))
             dzvals         = np.append((bead[i,1:]-bead[i,:-1]), 0)[order[i,:]]
-            img[inds,i,1] += [dzvals[valinds[i]:valinds[i+1]].mean()
+            img[1,inds,i] += [dzvals[valinds[i]:valinds[i+1]].mean()
                               for i in range(len(inds))]
 
             bcount[zvals[i,-1]] += 1
             bcount[zvals[i,0]]  -= 1
             inds                 = np.nonzero(bcount)[0]
             valinds              = np.cumsum(np.insert(bcount[inds], 0, 0))
-            img[inds,i,2]       += [dzvals[valinds[i]:valinds[i+1]].mean()
+            img[2,inds,i]       += [dzvals[valinds[i]:valinds[i+1]].mean()
                                     for i in range(len(inds))]
 
         return img
