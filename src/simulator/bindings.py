@@ -655,6 +655,7 @@ class ExperimentCreator(Object):
                                                 nbindings),
                                int(size/self.bins[1]))
         tpl        = deepcopy(self.template.__dict__)
+        tpl.pop("bindings")
         tpl.update(positions = np.sort(pos)[::-1]*self.bins[1],
                    onrates   = np.insert(rnd(self.onrates,  nbindings), 0, 0),
                    offrates  = np.insert(rnd(self.offrates, nbindings), 0, 0),
