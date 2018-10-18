@@ -629,3 +629,85 @@ class Experiment(Object):
         if val == 4:
             return self.fixedbeadsize if fixed else self.singlestrand.position
         return -.1
+
+class ExperimentCreator(Object):
+    """
+    Create random experiments & images
+    """
+    imgclip   = 20
+    nbindings = np.arange(0, 11)
+    bins      = [1000, .5e-3]
+    size      = (.2, (bins[0]-10)*bins[1])
+    onrates   = [.05, .5]
+    offrates  = [3, 30]
+    _ARGS     = Object.args(locals())
+    def experiment(self, ncycles = 100, seed = None):
+        "create an experiment"
+        rndstate   = randstate(seed)
+        rnd        = lambda x, *y: rndstate.rand(*y)*(x[1]-x[0])+x[0]
+        nbindings  = rndstate.choice(self.nbindings)
+        size       = rnd(self.size)
+        pos        = np.append(rndstate.randint(0, min(self.bins[0], int(size/self.bins[1])-5),
+                                                nbindings),
+                               int(size/self.bins[1]))
+        return Experiment(ncycles   = ncycles,
+                          positions = np.sort(pos)[::-1]*self.bins[1],
+                          onrates   = np.insert(rnd(self.onrates,  nbindings), 0, 0),
+                          offrates  = np.insert(rnd(self.offrates, nbindings), 0, 0),
+                          natures   = ["singlestrand"]+["probe"]*nbindings)
+
+    def createimage(self, info, bead):
+        "transform bead data into an image"
+        data  = info['data'][bead]
+        bead  = np.vstack([data[i:j] for i, j in info['phases'][:,[5, 6]]])
+        bead /= self.bins[1]
+        bead -= np.min(bead)-1
+        bead  = np.clip(bead, 0., self.bins[0]-1)
+        img    = np.zeros((self.bins[0], bead.shape[0], 3), dtype = 'f4')
+        zvals  = np.round(bead).astype('i4')
+        order  = np.argsort(zvals, axis = 1)
+        for i in range(bead.shape[0]):
+            bcount = np.bincount(zvals[i,:], minlength = self.bins[0])
+
+            img[:,i,0]     = np.clip(np.log(1+bcount), 0, self.imgclip)
+
+            bcount[zvals[i,-1]] -= 1
+            inds           = np.nonzero(bcount)[0]
+            valinds        = np.cumsum(np.insert(bcount[inds], 0, 0))
+            dzvals         = np.append((bead[i,1:]-bead[i,:-1]), 0)[order[i,:]]
+            img[inds,i,1] += [dzvals[valinds[i]:valinds[i+1]].mean()
+                              for i in range(len(inds))]
+
+            bcount[zvals[i,-1]] += 1
+            bcount[zvals[i,0]]  -= 1
+            inds                 = np.nonzero(bcount)[0]
+            valinds              = np.cumsum(np.insert(bcount[inds], 0, 0))
+            img[inds,i,2]       += [dzvals[valinds[i]:valinds[i+1]].mean()
+                                    for i in range(len(inds))]
+
+        return img
+
+    def createtruth(self, experiment, info, ibead):
+        "transform bead truth into an image"
+        truth = info["truth"][ibead]
+        size  = info['phases'][0,6]-info['phases'][0,6]
+        bins  = np.zeros(self.bins[0], dtype = 'f4')
+
+        pos   = 5+np.round(np.array(experiment.positions)/self.bins[1]).astype('i4')
+        evts  = np.sum(truth.events > 0, axis = 0)
+        while pos[-1] >= len(bins):
+            pos = pos[:-1]
+            evts= evts[:-1]
+        bins[5]   = np.sum(np.sum(truth.events, axis = 1) < size)
+        bins[pos] = evts
+        return bins
+
+    def images(self, experiment = None, nimage = 1, seed = None):
+        "create & transform all track data into images"
+        if experiment is None:
+            experiment = self.experiment(seed = seed)
+
+        info = experiment.track(nimage, seed = seed)
+        for i in info['data']:
+            yield (self.createimage(info, i),
+                   self.createtruth(experiment, info, i))
