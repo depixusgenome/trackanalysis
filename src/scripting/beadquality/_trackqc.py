@@ -5,7 +5,7 @@ Means for creating and displaying the quality of a set of tracks
 """
 
 from   itertools import product
-from   typing    import NamedTuple, cast
+from   typing    import cast
 
 import holoviews as hv
 import pandas    as pd
@@ -98,7 +98,7 @@ class TrackQC:
         return self
 
     def trackqualitysummary(self,
-                            tracks: TracksDict, 
+                            tracks: TracksDict,
                             dfmsg:  pd.DataFrame = None) -> 'TrackQC':
         """
         Outputs:
