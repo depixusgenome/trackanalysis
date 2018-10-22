@@ -660,10 +660,10 @@ class ExperimentCreator(Object):
         bins       = self.bins[1]*scale
         pos        = np.append(rndstate.randint(0, min(self.bins[0]-bias, int(size/bins)),
                                                 nbindings),
-                               int(size/bins[1]))
+                               int(size/bins))
         tpl        = deepcopy(self.template.__dict__)
         tpl.pop("bindings")
-        tpl.update(positions = np.sort(pos)[::-1]*bins[1],
+        tpl.update(positions = np.sort(pos)[::-1]*bins,
                    onrates   = np.insert(rnd(self.onrates,  nbindings), 0, 0),
                    offrates  = np.insert(rnd(self.offrates, nbindings), 0, 0),
                    natures   = ["singlestrand"]+["probe"]*nbindings)
