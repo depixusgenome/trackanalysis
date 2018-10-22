@@ -454,6 +454,12 @@ class Experiment(Object):
         super().__init__(**kwa)
         _BindingAttribute.update(self, kwa)
 
+    @property
+    def npbindings(self) -> np.ndarray:
+        "return binding positions & on/off rates in a single np.ndarray"
+        return np.array(list(zip(self.positions, self.onrates, self.offrates)),
+                        dtype = [('pos', 'f4'), ("on", 'f4'), ('off', 'f4')])
+
     def setup(self, **kwa):
         "reset *all* attributes"
         self.__init__(**kwa)
@@ -645,18 +651,19 @@ class ExperimentCreator(Object):
     offrates  = [3, 30]
     template  = Experiment()
     _ARGS     = Object.args(locals())
-    def experiment(self, seed = None):
+    def experiment(self, seed = None, bias = 10, scale = 2):
         "create an experiment"
         rndstate   = randstate(seed)
         rnd        = lambda x, *y: rndstate.rand(*y)*(x[1]-x[0])+x[0]
         nbindings  = rndstate.choice(self.nbindings)
         size       = rnd(self.size)
-        pos        = np.append(rndstate.randint(0, min(self.bins[0], int(size/self.bins[1])-5),
+        bins       = self.bins[1]*scale
+        pos        = np.append(rndstate.randint(0, min(self.bins[0]-bias, int(size/bins)),
                                                 nbindings),
-                               int(size/self.bins[1]))
+                               int(size/bins[1]))
         tpl        = deepcopy(self.template.__dict__)
         tpl.pop("bindings")
-        tpl.update(positions = np.sort(pos)[::-1]*self.bins[1],
+        tpl.update(positions = np.sort(pos)[::-1]*bins[1],
                    onrates   = np.insert(rnd(self.onrates,  nbindings), 0, 0),
                    offrates  = np.insert(rnd(self.offrates, nbindings), 0, 0),
                    natures   = ["singlestrand"]+["probe"]*nbindings)
@@ -693,27 +700,25 @@ class ExperimentCreator(Object):
 
         return img
 
-    def createtruth(self, experiment, info, ibead):
+    def createtruth(self, experiment: Experiment, info, ibead, bias = 5):
         "transform bead truth into an image"
-        truth = info["truth"][ibead]
-        size  = info['phases'][0,6]-info['phases'][0,6]
-        bins  = np.zeros(self.bins[0], dtype = 'f4')
+        truth      = info["truth"][ibead]
+        size       = info['phases'][0,6]-info['phases'][0,6]
 
-        pos   = 5+np.round(np.array(experiment.positions)/self.bins[1]).astype('i4')
-        evts  = np.sum(truth.events > 0, axis = 0)
-        while pos[-1] >= len(bins):
-            pos = pos[:-1]
-            evts= evts[:-1]
-        bins[5]   = np.sum(np.sum(truth.events, axis = 1) < size)
-        bins[pos] = evts
-        return bins
+        img        = np.zeros((self.bins[0], truth.events.shape[0]), dtype = 'f4')
+        pos        = bias+np.round(np.array(experiment.positions, dtype = 'f4')
+                                   /self.bins[1]).astype('i4')
+        for i, j in enumerate(pos):
+            img[j,:] = np.log(truth.events[:,i] + 1)
 
-    def images(self, experiment = None, nimage = 1, seed = None):
+        img[bias]  = size - np.sum(truth.events, axis = 1)
+        return img
+
+    def images(self, experiment: Optional[Experiment] = None, nimage = 1, seed = None):
         "create & transform all track data into images"
-        if experiment is None:
-            experiment = self.experiment(seed = seed)
-
-        info = experiment.track(nimage, seed = seed)
+        cnf  = self.experiment(seed = seed) if experiment is None else experiment
+        info = cnf.track(nimage, seed = seed)
         for i in info['data']:
             yield (self.createimage(info, i),
-                   self.createtruth(experiment, info, i))
+                   self.createtruth(cnf, info, i),
+                   cnf.npbindings)
