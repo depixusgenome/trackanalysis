@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Adds shortcuts for using holoview"
+from   functools         import partial
+import pandas            as     pd
 import numpy             as     np
+
 from   utils.holoviewing import hv, BasicDisplay
 from   data.track        import Track, isellipsis # pylint: disable=unused-import
+from   ..analysis        import RampAnalysis, RampAverageZTask, RampDataFrameTask
 
 class RampDisplay(BasicDisplay, ramp = Track):
     """
@@ -30,6 +34,75 @@ class RampDisplay(BasicDisplay, ramp = Track):
     _alignmentlength = 5
     _stretch         = 1.
     _bias            = 0.
+    KEYWORDS         = frozenset({i for i in locals() if i[0] == '_' and i[1] != '_'})
+    def dataframe(self, **kwa) -> pd.DataFrame:
+        """
+        return a dataframe containing all info
+        """
+        ana = RampAnalysis(dataframetask = RampDataFrameTask(**kwa))
+        return ana.dataframe(self._items, self._beads)
+
+    def beads(self, status = "ok", **kwa):
+        "return beads which make it through a few filters"
+        ana = RampAnalysis(dataframetask = RampDataFrameTask(**kwa))
+        return ana.beads(self._items, status, self._beads)
+
+    @staticmethod
+    def _name(i):
+        if isinstance(i, int):
+            return f"bead {i}"
+        if isinstance(i, str):
+            return i
+        assert isinstance(i, tuple) and len(i) == 2
+        if i[1] == "":
+            assert isinstance(i[0], str)
+            return i[0]
+        tmp = 'bead ' if isinstance(i[0], int) else ''
+        return tmp+f"{i[0]}{('@low', '', '@high')[i[1]]}"
+
+    @staticmethod
+    def _crv(data, opts, labl, ind): # pylint: disable=inconsistent-return-statements
+        cols = sorted([i for i in data.columns if i.split("@")[0].strip() == ind])
+        cols = [hv.Dimension(i, label = labl) for i in cols]
+        tmp  = opts if ind != "consensus" else {}
+        ind  = hv.Dimension(ind, label = labl)
+        if len(cols) == 1 or len(cols) == 3:
+            crv = hv.Curve(data, "zmag", ind, label = ind.name)(**tmp)
+        if len(cols) == 1:
+            return crv
+        if len(cols) == 2:
+            return hv.Area(data, "zmag", cols, label = ind.name)(**tmp)
+        if len(cols) == 3:
+            return hv.Area(data, "zmag", cols[1:], label = ind.name)(**tmp)*crv
+        assert False
+
+    def average(self, opts = None, hmap = True, **kwa):
+        "return average bead"
+        ana  = RampAnalysis(averagetask = RampAverageZTask(**kwa))
+        data = ana.average(self._items, self._beads)
+        cols = [i for i in data.columns if i not in ("zmag", ("zmag", ""))]
+        meds = (ana.averagetask.getaction()(data[cols].values.T))
+        name = 'consensus'
+        if len(meds.shape) == 1:
+            data[name] = meds
+        else:
+            for i, j in enumerate(meds):
+                data[name,i] = j
+
+        data.columns = [self._name(i) for i in data.columns]
+        cols         = [i for i in data.columns
+                        if not any(j in i for j in ("zmag", "@low", "@high", name))]
+        _crv = partial(self._crv, data,
+                       (dict(style = dict(color = "gray", alpha = .5))
+                        if opts is None else opts),
+                       "bead length(%)" if ana.averagetask.normalize else "z")
+        if hmap:
+            crvs = {int(i.split()[1]): _crv(i) for i in cols}
+            mean = _crv(name)
+            return (hv.DynamicMap(lambda x: crvs[x]*mean, kdims = ['bead'])
+                    .redim.values(bead = list(crvs)))
+
+        return hv.Overlay([_crv(i) for i in cols + [name]])
 
     def __getitem__(self, values):
         if isinstance(values, int):
@@ -51,7 +124,8 @@ class RampDisplay(BasicDisplay, ramp = Track):
             cycles = ... if self._cycles is None else self._cycles
 
         items  = self._items.cycles
-        zmag   = {i[1]: j for i, j in items['zmag', cycles]}
+        zcyc   = self._items.cycles.withdata({0: self._items.secondaries.zmag})
+        zmag   = {i[1]: j for i, j in zcyc}
         length = self._alignmentlength
         if self._align.lower() == 'first':
             imax = dict.fromkeys(zmag.keys(), slice(length))        # type: ignore
@@ -62,7 +136,7 @@ class RampDisplay(BasicDisplay, ramp = Track):
                      for i, j in zmag.items()}
             imax  = {i: slice(max(0, j-length//2), j+length//2) for i, j in maxes.items()}
         else:
-            imax  = None
+            imax  = None # type: ignore
 
         def _concat(itms, order):
             return np.concatenate([itms[i] if j else [np.NaN] for i in order for j in range(2)])
@@ -82,6 +156,6 @@ class RampDisplay(BasicDisplay, ramp = Track):
 
     def getredim(self):
         beads = self._items.beads.keys() if self._beads is None else self._beads
-        return (('beads', list(beads)),)
+        return (('bead', list(beads)),)
 
 __all__ = [] # type: list
