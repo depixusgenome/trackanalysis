@@ -20,7 +20,7 @@ class RampDataFrameTask(Task):
     level       = Level.bead
     scale       = 10.0
     percentiles = 25., 75.
-    extension   = .2, .4, 1.5
+    extension   = .05, .4, 1.5
     hfsigma     = 1.e-4, 5.e-3
 
     @initdefaults(frozenset(locals()))

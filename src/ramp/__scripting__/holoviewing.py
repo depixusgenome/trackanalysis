@@ -42,6 +42,16 @@ class RampDisplay(BasicDisplay, ramp = Track):
         ana = RampAnalysis(dataframetask = RampDataFrameTask(**kwa))
         return ana.dataframe(self._items, self._beads)
 
+    def status(self, **kwa) -> hv.Table:
+        "return the status of the beads"
+        info = (self.dataframe(**kwa)
+                .groupby("bead")
+                .status.first().reset_index()
+                .groupby("status")
+                .agg({'bead': ('unique', 'count')}).reset_index())
+        info.columns = "status", "beads", "count"
+        return hv.Table(info, kdims = ["status"], vdims = ["beads", "count"])
+
     def beads(self, status = "ok", **kwa):
         "return beads which make it through a few filters"
         ana = RampAnalysis(dataframetask = RampDataFrameTask(**kwa))
@@ -64,7 +74,9 @@ class RampDisplay(BasicDisplay, ramp = Track):
     def _crv(data, opts, labl, ind): # pylint: disable=inconsistent-return-statements
         cols = sorted([i for i in data.columns if i.split("@")[0].strip() == ind])
         cols = [hv.Dimension(i, label = labl) for i in cols]
-        tmp  = opts if ind != "consensus" else {}
+        tmp  = dict(opts)
+        if ind == "consensus":
+            tmp['style'].pop('color', None)
         ind  = hv.Dimension(ind, label = labl)
         if len(cols) == 1 or len(cols) == 3:
             crv = hv.Curve(data, "zmag", ind, label = ind.name)(**tmp)
@@ -93,7 +105,7 @@ class RampDisplay(BasicDisplay, ramp = Track):
         cols         = [i for i in data.columns
                         if not any(j in i for j in ("zmag", "@low", "@high", name))]
         _crv = partial(self._crv, data,
-                       (dict(style = dict(color = "gray", alpha = .5))
+                       (dict(style = dict(color = "gray", alpha = .25))
                         if opts is None else opts),
                        "bead length(%)" if ana.averagetask.normalize else "z")
         if hmap:
