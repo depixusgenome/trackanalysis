@@ -658,9 +658,11 @@ class ExperimentCreator(Object):
         nbindings  = rndstate.choice(self.nbindings)
         size       = rnd(self.size)
         bins       = self.bins[1]*scale
-        pos        = np.append(rndstate.randint(0, min(self.bins[0]-bias, int(size/bins)),
-                                                nbindings),
-                               int(size/bins))
+        maxv       = min(self.bins[0]-bias, int(size/bins))
+        pos        = []
+        while len(pos) != nbindings:
+            pos = np.unique(rndstate.randint(0, maxv, nbindings))
+        pos        = np.append(pos, int(size/bins))
         tpl        = deepcopy(self.template.__dict__)
         tpl.pop("bindings")
         tpl.update(positions = np.sort(pos)[::-1]*bins,
