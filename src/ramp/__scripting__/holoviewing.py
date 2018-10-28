@@ -35,12 +35,15 @@ class RampDisplay(BasicDisplay, ramp = Track):
     _stretch         = 1.
     _bias            = 0.
     KEYWORDS         = frozenset({i for i in locals() if i[0] == '_' and i[1] != '_'})
-    def dataframe(self, **kwa) -> pd.DataFrame:
+    def dataframe(self, percycle = True, **kwa) -> pd.DataFrame:
         """
         return a dataframe containing all info
         """
-        ana = RampAnalysis(dataframetask = RampDataFrameTask(**kwa))
-        return ana.dataframe(self._items, self._beads)
+        if percycle:
+            ana = RampAnalysis(dataframetask = RampDataFrameTask(**kwa))
+            return ana.dataframe(self._items, self._beads)
+        ana = RampAnalysis(averagetask = RampAverageZTask(**kwa))
+        return ana.average(self._items, self._beads)
 
     def status(self, **kwa) -> hv.Table:
         "return the status of the beads"
@@ -90,31 +93,23 @@ class RampDisplay(BasicDisplay, ramp = Track):
 
     def average(self, opts = None, hmap = True, **kwa):
         "return average bead"
-        ana  = RampAnalysis(averagetask = RampAverageZTask(**kwa))
-        data = ana.average(self._items, self._beads)
-        cols = [i for i in data.columns if i not in ("zmag", ("zmag", ""))]
-        meds = (ana.averagetask.getaction()(data[cols].values.T))
-        name = 'consensus'
-        if len(meds.shape) == 1:
-            data[name] = meds
-        else:
-            for i, j in enumerate(meds):
-                data[name,i] = j
-
+        kwa["consensus"] = True
+        ana          = RampAnalysis(averagetask = RampAverageZTask(**kwa))
+        data         = ana.average(self._items, self._beads)
         data.columns = [self._name(i) for i in data.columns]
         cols         = [i for i in data.columns
-                        if not any(j in i for j in ("zmag", "@low", "@high", name))]
+                        if not any(j in i for j in ("zmag", "@low", "@high", "consensus"))]
         _crv = partial(self._crv, data,
                        (dict(style = dict(color = "gray", alpha = .25))
                         if opts is None else opts),
                        "bead length(%)" if ana.averagetask.normalize else "z")
         if hmap:
             crvs = {int(i.split()[1]): _crv(i) for i in cols}
-            mean = _crv(name)
+            mean = _crv("consensus")
             return (hv.DynamicMap(lambda x: crvs[x]*mean, kdims = ['bead'])
                     .redim.values(bead = list(crvs)))
 
-        return hv.Overlay([_crv(i) for i in cols + [name]])
+        return hv.Overlay([_crv(i) for i in cols + ["consensus"]])
 
     def __getitem__(self, values):
         if isinstance(values, int):

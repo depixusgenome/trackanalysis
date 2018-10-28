@@ -32,7 +32,7 @@ class RampAverageZTask(Task):
     Creates an average bead
     """
     level                                                   = Level.bead
-    action: Union[Callable, str, Tuple[str, Dict[str,Any]]] = "nanmedian"
+    action: Union[Callable, str, Tuple[str, Dict[str,Any]]] = "median"
     normalize                                               = True
     phases                                                  = 0, 3, 4, 7
     @initdefaults(locals())
@@ -50,6 +50,19 @@ class RampAverageZTask(Task):
             fcn = getattr(np, f"nan{arg[0]}", getattr(np, arg[0]))
             return partial(fcn, **cast(dict, arg[1]), axis = 0)
         raise AttributeError("unknown numpy action")
+
+    def consensus(self, frame, beads = None, name = "consensus", act = "median"):
+        "add a consensus bead"
+        fcn = self.getaction(act)
+        if all(isinstance(i, tuple) for i in frame.columns):
+            if beads is None:
+                beads = {i[0] for i in frame.columns if isinstance(i[0], int)}
+            for i in range(len(frame[next(iter(beads))].columns)):
+                frame[name, i] = fcn([frame[j, i].values for j in beads])
+        else:
+            if beads is None:
+                beads = {i for i in frame.columns if isinstance(i, int)}
+            frame[name] = fcn([frame[i].values for i in beads])
 
 class RampCycleTuple(NamedTuple): # pylint: disable=missing-docstring
     bead            : int
@@ -137,9 +150,9 @@ class RampAverageZProcessor(Processor[RampAverageZTask]):
     Creates an average bead
     """
     @classmethod
-    def apply(cls, toframe = None, **cnf):
+    def apply(cls, toframe = None, **kwa):
         "applies the task to a frame or returns a function that does so"
-        task = cast(RampAverageZTask, cls.tasktype(**cnf)) # pylint: disable=not-callable
+        task = cast(RampAverageZTask, cast(type, cls.tasktype)(**kwa))
         fcn  = partial(cls._apply, task)
         return fcn if toframe is None else fcn(toframe)
 
@@ -150,16 +163,18 @@ class RampAverageZProcessor(Processor[RampAverageZTask]):
     @classmethod
     def dataframe(cls, frame, **kwa) -> pd.DataFrame:
         "return all data from a frame"
-        data          = dict(cls.apply(frame, **kwa))
-        shape         = next(iter(data.values()))[1].shape
+        task  = cast(RampAverageZTask, cast(type, cls.tasktype)(**kwa))
+        data  = dict(cls._apply(task, frame))
+        shape = next(iter(data.values()))[1].shape
+
         if len(shape) > 1:
-            frame     = pd.DataFrame({(i, k): j[1][k,:]
-                                      for i, j in data.items()
-                                      for k in range(shape[0])})
-            frame["zmag"] = next(iter(data.values()))[0][shape[0]//2,:]
+            frame = pd.DataFrame({(i, k): j[1][k,:]
+                                  for i, j in data.items() for k in range(shape[0])})
         else:
-            frame     = pd.DataFrame({i: j[1] for i, j in data.items()})
-            frame["zmag"] = next(iter(data.values()))[0]
+            frame = pd.DataFrame({i: j[1] for i, j in data.items()})
+
+        zmag          = next(iter(data.values()))[0]
+        frame["zmag"] = zmag[shape[0]//2,:] if len(shape) > 1 else zmag
         return frame
 
     @classmethod
@@ -180,7 +195,7 @@ class RampAverageZProcessor(Processor[RampAverageZTask]):
             j[amax+1:] = info[1][k+amax+1:k+size]+(j[amax]-info[1][k+amax])
         arr    = act(vals)
         if task.normalize:
-            arr /= np.nanmax(arr)
+            arr *= 100./np.nanmax(arr)
 
         zmag = frame.track.secondaries.zmag
         zmag = [(zmag[k:k+size][::-1]+zmag[i:i+size])*.5 for i, j, k, l in phases]

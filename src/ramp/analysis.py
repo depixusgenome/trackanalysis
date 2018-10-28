@@ -58,4 +58,6 @@ class RampAnalysis:
                 beadlist: Optional[List[int]] = None) -> pd.DataFrame:
         "return average bead"
         beads = self.__beads(track, beadlist, "ok")
-        return RampAverageZProcessor.dataframe(beads, **self.averagetask.config())
+        frame = RampAverageZProcessor.dataframe(beads, **self.averagetask.config())
+        self.averagetask.consensus(frame)
+        return frame

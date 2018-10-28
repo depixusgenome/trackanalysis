@@ -1,11 +1,1 @@
-require('python', click = 6.6)
-make()
-
-def defaultmodules(opt):
-    mods             = 'data','view','legacy','ramp','model','control','utils'
-    opt.env.modules += tuple(opt.options.all_modules[i] for i in mods)
-
-@patch
-def postfix_build(bld):
-    if bld.cmd == 'install':
-        pass
+guimake('view.RampView', locals())

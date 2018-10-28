@@ -163,6 +163,11 @@ class Secondaries:
                                         doc = "the time axis (s)"))
     zmag    = cast(np.ndarray, property(lambda self: self.__track._secondaries["zmag"],
                                         doc = "the magnet altitude sampled at frame rate"))
+    @property
+    def zmagcycles(self) -> Cycles:
+        "the magnet altitude sampled at frame rate"
+        return self.__track.cycles.withdata({"zmag": self.zmag})
+
     def keys(self):
         "return the available secondaries"
         return set(self.data.keys()) | {"tservo", "tsample", "tsink", "vcap", "seconds", "zmag"}
@@ -313,10 +318,14 @@ class PhaseManipulator:
     def __duration(self, cid:PIDTYPE = None, pid:IDTYPE = None) -> Union[np.ndarray, int]:
         phases = self._track.phases
 
-        pid    = (range(pid, cast(int, None if pid == -1 else pid+1))
-                  if isinstance(pid, int) else
-                  range(phases.shape[1]) if isellipsis(pid)      else
-                  range(pid.start, cast(int, pid.stop)))
+        if isinstance(pid, int):
+            pid  = range(pid, cast(int, None if pid == -1 else pid+1))
+        elif isellipsis(pid):
+            pid  = range(phases.shape[1])
+        elif isinstance(pid, (slice, range)):
+            pid  = range(pid.start, cast(int, pid.stop))
+        else:
+            raise TypeError()
 
         start = 0 if pid.start is None else pid.start
         if pid.stop == start:
@@ -338,9 +347,6 @@ class PhaseManipulator:
                 phases[:,pid] if ells[0]   else
                 phases[cid,:] if ells[1]   else
                 phases[cid,pid]) - phases[0,0]
-
-
-
 
 @levelprop(Level.project)
 class Track:

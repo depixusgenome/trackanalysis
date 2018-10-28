@@ -2,16 +2,20 @@
 # -*- coding: utf-8 -*-
 "Decentralized controller"
 import pickle
-from  typing            import Dict, Any
 from  collections       import ChainMap
 from  contextlib        import contextmanager
 from  copy              import deepcopy, copy
+from  typing            import Dict, Any
+
 import numpy            as     np
+import pandas           as     pd
+
 from  utils             import initdefaults
 from  utils.logconfig   import getLogger
 from  .event            import Controller
-LOGS   = getLogger(__name__)
-DELETE = type('DELETE', (), {})
+LOGS    = getLogger(__name__)
+DELETE  = type('DELETE', (), {})
+Missing = type("Missing")
 
 def _isdiff(left, right):
     if type(left) is not type(right):
@@ -26,10 +30,10 @@ def _isdiff(left, right):
     return left != right and pickle.dumps(left) != pickle.dumps(right)
 
 def _good(model, i, j):
-    if not hasattr(model, i):
+    obj = getattr(model, i, Missing)
+    if obj is Missing:
         return False
-    obj = getattr(model, i)
-    if isinstance(j, np.ndarray) or isinstance(obj, np.ndarray):
+    if any(isinstance(k, (pd.DataFrame, np.ndarray)) for k in (j, obj)):
         return True
     try:
         return getattr(model, i) != j
@@ -42,7 +46,6 @@ def updatemodel(self, model, kwa, force = False, deflt = None):
 
     if len(kwa) == 0 and not force:
         return None
-
 
     if callable(getattr(model, 'configure', None)):
         dmdl = model.__getstate__()

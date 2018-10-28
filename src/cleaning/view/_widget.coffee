@@ -52,11 +52,11 @@ export class DpxCleaningView extends WidgetView
                "<div><table><tr><td #{ttips[2]}>|z| ≤</td>"+
                           "<td>#{@mk_inp("maxabsvalue")}</td>"+
                           "<td #{ttips[4]}>|dz/dt| ≤</td>"+
-                          "<td>#{@mk_inp("maxderivate")}</td>/<tr>"+
+                          "<td>#{@mk_inp("maxderivate")}</td></tr>"+
                       "<tr><td></td>"+
                           "<td>#{@mk_inp("minextent")}</td>"+
                           "<td #{ttips[3]}>≤ Δz ≤</td>"+
-                          "<td>#{@mk_inp("maxextent")}</td>/<tr>"+
+                          "<td>#{@mk_inp("maxextent")}</td></tr>"+
                       "<tr><td></td>"+
                           "<td>#{@mk_inp("minhfsigma", 0.05, 0.0001)}</td>"+
                           "<td #{ttips[6]}>≤ σ[HF] ≤</td>"+

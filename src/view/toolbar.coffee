@@ -71,10 +71,6 @@ export class DpxToolbarView extends WidgetView
                 '<div id="dpx-tb-flist-menu"><table>'
         if @model.filelist.length > 0
             for j in [0..@model.filelist.length-1]
-                if j == @model.currentfile
-                    active = ' bk-bs-active'
-                else
-                    active = ''
                 itm += '<tr><td><label class="bk-bs-radio"><input'
                 if j == @model.currentfile
                     itm += ' checked=true'
