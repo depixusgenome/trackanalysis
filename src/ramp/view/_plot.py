@@ -125,7 +125,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
                                zbead = cons[bead, 1]*factor)
         return outp
 
-class RampView(PlotView[RampPlotCreator]):
+class RampPlotView(PlotView[RampPlotCreator]):
     "Peaks plot view"
     TASKS = ('extremumalignment',)
     def ismain(self, ctrl):

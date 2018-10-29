@@ -2,59 +2,94 @@
 # -*- coding: utf-8 -*-
 "all view aspects here"
 from collections         import OrderedDict
-from typing              import Dict
+from typing              import Dict, Set
 
 from bokeh               import layouts
 from bokeh.models        import Panel, Spacer, Tabs
 
-from cleaning.view       import CleaningView
-from cyclesplot          import CyclesPlotView
-from fov                 import FoVPlotView
+from fov                 import BaseFoVPlotCreator, FoVPlotModel
 from model.plots         import PlotState
-from qualitycontrol.view import QualityControlView
 from view.base           import BokehView
+from view.plots          import PlotView
+from ._plot              import RampPlotView
+from ._model             import RampTaskPlotModelAccess, RampPlotDisplay
 
-from ._io                import setupio
-from .peaksplot          import PeaksPlotView
-
-class HybridStatTheme:
+class RampTabTheme:
     "HybridStatTheme"
-    name                   = "hybridstat"
+    name                   = "ramp.tab"
     width                  = 500
     height                 = 60
-    initial                = "cleaning"
+    initial                = "ramp"
     titles: Dict[str, str] = {}
 
-class HybridStatView(BokehView):
+class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess, # type: ignore
+                                        FoVPlotModel]):
+    "Plots a default bead and its FoV"
+    def __init__(self,  ctrl):
+        "sets up this plotter's info"
+        self._rampdisplay = RampPlotDisplay()
+        super().__init__(ctrl)
+
+    def observe(self, ctrl):
+        "sets-up model observers"
+        super().observe(ctrl)
+
+        @ctrl.display.observe(self._rampdisplay)
+        def _ondataframes(old = (), **_):
+            if len({"dataframe", "consensus"} & set(old)):
+                self.reset(False)
+
+    def addto(self, ctrl, noerase = True):
+        "adds the models to the controller"
+        super().addto(ctrl, noerase)
+        self._rampdisplay = ctrl.display.add(self._rampdisplay, noerase = noerase)
+
+    def _tooltips(self):
+        return self._goodtooltips({})
+
+    def _availablefixedbeads(self) -> Set[int]:
+        data = self._rampdisplay.dataframe.get(self._model.roottask, None)
+        return set() if data is None else set(data[data.status == "fixed"].bead.unique())
+
+    def _badbeads(self) -> Set[int]:
+        data = self._rampdisplay.dataframe.get(self._model.roottask, None)
+        return set() if data is None else set(data[data.status == "bad"].bead.unique())
+
+class FoVPlotView(PlotView[FoVPlotCreator]):
+    "FoV plot view"
+    TASKS = ()
+    def ismain(self, ctrl):
+        "Cleaning is set up by default"
+        self._ismain(ctrl, tasks = self.TASKS)
+
+class RampView(BokehView):
     "A view with all plots"
     KEYS : Dict[type, str]   = OrderedDict()
     KEYS[FoVPlotView]        = 'fov'
-    KEYS[QualityControlView] = 'qc'
-    KEYS[CleaningView]       = 'cleaning'
-    KEYS[CyclesPlotView]     = 'cycles'
-    KEYS[PeaksPlotView]      = 'peaks'
-    TASKS_CLASSES            = (CleaningView, PeaksPlotView)
-    TASKS = ((lambda lst: tuple(j for i, j in enumerate(lst) if j not in lst[:i]))
-             (sum((list(i.TASKS) for i in TASKS_CLASSES), []))) # type: ignore
+    KEYS[RampPlotView]       = 'ramp'
+    TASKS_CLASSES            = (RampPlotView,)
+    TASKS = ((lambda lst: tuple(j for i, j in enumerate(lst) # type: ignore
+                                if j not in lst[:i]))        # type: ignore
+             (sum((list(i.TASKS) for i in TASKS_CLASSES), [])))    # type: ignore
     def __init__(self, ctrl = None, **kwa):
         "Sets up the controller"
         super().__init__(ctrl = ctrl, **kwa)
         self._tabs   = None
         self._roots  = [] # type: ignore
-        self.__theme = ctrl.theme.add(HybridStatTheme())
+        self.__theme = ctrl.theme.add(RampTabTheme())
         self._panels = [cls(ctrl, **kwa) for cls in self.KEYS]
 
         for panel in self._panels:
             key                      = self.__key(panel)
             self.__theme.titles[key] = getattr(panel, 'PANEL_NAME', key.capitalize())
-        self.__theme.titles['fov']   = 'FoV'
+        if 'fov' in self.KEYS:
+            self.__theme.titles['fov']   = 'FoV'
 
         cur = self.__select(self.__initial())
         for panel in self._panels:
             desc = type(panel.plotter).state
             desc.setdefault(panel.plotter, (PlotState.active if panel is cur else
                                             PlotState.disabled))
-
 
     def __initial(self):
         "return the initial tab"
@@ -78,12 +113,13 @@ class HybridStatView(BokehView):
         for i in self.TASKS_CLASSES:
             self.__select(i).ismain(ctrl)
         ctrl.theme.updatedefaults("tasks.io", tasks = self.TASKS)
-        def _advanced():
-            for panel in self._panels:
-                if self.__state(panel) is PlotState.active:
-                    getattr(panel, 'advanced', lambda:None)()
-                    break
-        ctrl.display.updatedefaults('keystroke', advanced = _advanced)
+        if ctrl.display.get("keystroke", "advanced", defaultvalue = None):
+            def _advanced():
+                for panel in self._panels:
+                    if self.__state(panel) is PlotState.active:
+                        getattr(panel, 'advanced', lambda:None)()
+                        break
+            ctrl.display.updatedefaults('keystroke', advanced = _advanced)
 
     def addtodoc(self, ctrl, doc):
         "returns object root"
@@ -116,7 +152,7 @@ class HybridStatView(BokehView):
         mode.update(width = self.__theme.width, height = self.__theme.height)
         tabs = Tabs(tabs   = [_panel(panel) for panel in self._panels],
                     active = ind,
-                    name   = 'Hybridstat:Tabs',
+                    name   = 'Ramps:Tabs',
                     **mode)
 
         @ctrl.display.observe

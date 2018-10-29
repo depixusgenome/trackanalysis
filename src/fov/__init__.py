@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"all FoV view aspects here"
-from typing                 import Dict, List, Optional
+from typing                 import Dict, List, Optional, Set
 import numpy as np
 from bokeh.models           import (ColumnDataSource, Range1d, TapTool, HoverTool,
                                     Selection)
@@ -16,7 +16,8 @@ from qualitycontrol.view    import QualityControlModelAccess
 from signalfilter           import rawprecision
 from utils                  import initdefaults
 from view.colors            import tohex
-from view.plots.tasks       import TaskPlotCreator, TaskPlotModelAccess
+from view.plots.tasks       import (TaskPlotCreator, TaskPlotModelAccess,
+                                    TModelType, PlotModelType)
 from view.plots.base        import PlotView, CACHE_TYPE
 
 class FoVPlotTheme(PlotTheme):
@@ -70,7 +71,7 @@ class FoVPlotModel(PlotModel):
     theme   = FoVPlotTheme()
     display = PlotDisplay(name = "fov")
 
-class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
+class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
     "Plots a default bead and its FoV"
     _fig:         Figure
     _theme:       FoVPlotTheme
@@ -80,10 +81,10 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
-        self.__idfov: Optional[int] = None
+        self._idfov: Optional[int] = None
 
     @property
-    def __fov(self):
+    def _fov(self):
         trk = self._model.track
         return None if trk is None or trk.fov.image is None else trk.fov
 
@@ -105,7 +106,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
         self.addtofig(self._fig, 'calibimg', **{i:i for i in vals},
                       source = self._calibsource)
 
-        self._beadssource  = ColumnDataSource(**self.__beadsdata())
+        self._beadssource  = ColumnDataSource(**self._beadsdata())
         args = dict(x = 'x', y = 'y', radius = self._theme.radius, source = self._beadssource)
         gl1  = self.addtofig(self._fig, 'beads', **args)
         gl2  = self.addtofig(self._fig, 'text',  **args, text = 'text')
@@ -130,12 +131,12 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
         return self._fig
 
     def _reset(self, cache:CACHE_TYPE):
-        fov = self.__fov
-        if fov is not None and self.__idfov != id(fov):
-            self.__idfov = id(fov)
-            self.__imagedata(cache)
+        fov = self._fov
+        if fov is not None and self._idfov != id(fov):
+            self._idfov = id(fov)
+            self._imagedata(cache)
 
-        cache[self._beadssource].update(self.__beadsdata())
+        cache[self._beadssource].update(self._beadsdata())
         sel  = self._beadssource.selected
         good = [self._model.bead] if self._model.bead is not None else []
         if getattr(sel, 'indices', None) != good:
@@ -144,10 +145,10 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
             else:
                 cache[sel].update(indices = good)
 
-        self.__calibdata(cache)
+        self._calibdata(cache)
 
-    def __calibdata(self, cache:CACHE_TYPE):
-        fov   = self.__fov
+    def _calibdata(self, cache:CACHE_TYPE):
+        fov   = self._fov
         ibead = self._model.bead
         img   = np.zeros((10, 10))
         dist  = (0, 0, 0, 0)
@@ -171,8 +172,8 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
                                                     dw    = [dist[2]],
                                                     dh    = [dist[3]]))
 
-    def __imagedata(self, cache):
-        fov = self.__fov
+    def _imagedata(self, cache):
+        fov = self._fov
         if fov is None:
             img  = np.zeros((10, 10))
             dist = 1, 1
@@ -187,7 +188,51 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
         self.setbounds(cache, self._fig.x_range, 'x', [0, max(dist[:2])])
         self.setbounds(cache, self._fig.y_range, 'y', [0, max(dist[:2])])
 
-    def __tooltips(self):
+    def _beadsdata(self):
+        fov = self._fov
+        if fov is None:
+            return dict(data = dict.fromkeys(('x', 'y', 'text', 'color', 'ttips'), []))
+
+        hexes = tohex(self._theme.colors)
+        clrs  = hexes['good'], hexes['fixed'], hexes['bad'], hexes['discarded']
+        disc  = set(DataSelectionBeadController(self._ctrl).discarded)
+        fixed = self._availablefixedbeads() - disc
+        bad   = self._badbeads() - disc - fixed
+        ttips = self._tooltips()
+
+        items = fov.beads
+        data  = dict(x     = [i.position[0]  for i in items.values()],
+                     y     = [i.position[1]  for i in items.values()],
+                     text  = [f'{i}'         for i in items.keys()],
+                     color = [clrs[3 if i in disc  else
+                                   2 if i in bad   else
+                                   1 if i in fixed else
+                                   0] for i in items.keys()],
+                     ttips = [ttips[i] for i in items.keys()])
+        return dict(data = data)
+
+    def _goodtooltips(self, ttips):
+        row  = self._theme.tooltipgood
+        trk  = self._model.track
+        for bead in DataSelectionBeadController(self._ctrl).allbeads:
+            if bead not in ttips:
+                ttips[bead] = [row.format(rawprecision(trk, bead))]
+
+        return {i: ''.join(j) for i, j in ttips.items()}
+
+    def _tooltips(self):
+        raise NotImplementedError()
+
+    def _availablefixedbeads(self) -> Set[int]:
+        raise NotImplementedError()
+
+    def _badbeads(self) -> Set[int]:
+        raise NotImplementedError()
+
+class FoVPlotCreator(BaseFoVPlotCreator[QualityControlModelAccess, # type: ignore
+                                        FoVPlotModel]):
+    "Plots a default bead and its FoV"
+    def _tooltips(self):
         msgs                            = self._model.messages()
         ttips: Dict[BEADKEY, List[str]] = {}
         row                             = self._theme.tooltiprow
@@ -200,36 +245,13 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
                              plural  = 's' if cyc > 1 else '')
             ttips.setdefault(bead, []).append(val)
 
-        row  = self._theme.tooltipgood
-        trk  = self._model.track
-        for bead in DataSelectionBeadController(self._ctrl).allbeads:
-            if bead not in ttips:
-                ttips[bead] = [row.format(rawprecision(trk, bead))]
+        return self._goodtooltips(ttips)
 
-        return {i: ''.join(j) for i, j in ttips.items()}
+    def _availablefixedbeads(self) -> Set[int]:
+        return {i[-1] for i in self._model.availablefixedbeads()}
 
-    def __beadsdata(self):
-        fov = self.__fov
-        if fov is None:
-            return dict(data = dict.fromkeys(('x', 'y', 'text', 'color', 'ttips'), []))
-
-        hexes = tohex(self._theme.colors)
-        clrs  = hexes['good'], hexes['fixed'], hexes['bad'], hexes['discarded']
-        disc  = set(DataSelectionBeadController(self._ctrl).discarded)
-        fixed = {i[-1] for i in self._model.availablefixedbeads()} - disc
-        bad   = self._model.badbeads() - disc - fixed
-        ttips = self.__tooltips()
-
-        items = fov.beads
-        data  = dict(x     = [i.position[0]  for i in items.values()],
-                     y     = [i.position[1]  for i in items.values()],
-                     text  = [f'{i}'         for i in items.keys()],
-                     color = [clrs[3 if i in disc  else
-                                   2 if i in bad   else
-                                   1 if i in fixed else
-                                   0] for i in items.keys()],
-                     ttips = [ttips[i] for i in items.keys()])
-        return dict(data = data)
+    def _badbeads(self) -> Set[int]:
+        return self._model.badbeads()
 
 class FoVPlotView(PlotView[FoVPlotCreator]):
     "FoV plot view"

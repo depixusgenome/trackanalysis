@@ -93,7 +93,7 @@ class RampFilterWidget:
 class RampBeadStatusTheme:
     "RampBeadStatusTheme"
     name:   str             = "ramp.status"
-    height: int             = 120
+    height: int             = 100
     status: Dict[str, str]  = dflt({i: i for i in ("ok", "fixed", "bad")})
     columns: List[List]     = dflt([["status", "status", 40],
                                     ["count",  "count",  40],
@@ -168,10 +168,10 @@ class RampBeadStatusWidget:
 class RampZMagHintsTheme:
     "RampBeadStatusTheme"
     name:   str         = "ramp.zmaghints"
-    height: int         = 120
-    columns: List[List] = dflt([["val",  "Consensus",     150, "0.00"],
-                                ["err",  "Uncertainty",   150, "0.00"],
-                                ["zmag", "Z magnet (mm)", 150, "0.00"]])
+    height: int         = 125
+    columns: List[List] = dflt([["val",  "Consensus",     160, "0.00"],
+                                ["err",  "Uncertainty",   160, "0.00"],
+                                ["zmag", "Z magnet (mm)", 160, "0.00"]])
     units:  List[str]   = dflt(["(µm)", "(% strand size)"])
     rows:   List[float] = dflt([50, 66, 80, 95])
 
@@ -240,7 +240,6 @@ class RampZMagHintsWidget:
 class RampZMagResultsTheme:
     "RampBeadStatusTheme"
     name:   str       = "ramp.zmageresults"
-    height: int       = 160
     step:   float     = .01
     value:  float     = -.4
     title:  str       = "Zmag test = {zmag:.2f}­→ looses {bead:.2f} ± {err:.2f} {unit}"
@@ -305,10 +304,10 @@ class RampHairpinSizeTheme:
     title:  str    = "Hairpins bin size"
     binsize: float = .1
     binstep: float = .05
-    height: int    = 200
-    columns: List[List] = dflt([["z",       "Extension (µm)", 150, "0.00"],
-                                ["count",   "Count",          150, "0"],
-                                ["percent", "Percentage (%)", 150, "0"]])
+    height: int    = 125
+    columns: List[List] = dflt([["z",       "Extension (µm)", 160, "0.00"],
+                                ["count",   "Count",          160, "0"],
+                                ["percent", "Percentage (%)", 160, "0"]])
 
 class RampHairpinSizeWidget:
     "Table containing discrete zmag values"
