@@ -57,7 +57,7 @@ class RampPlotTheme(PlotTheme):
     widgetwidth      = 500
     dataformat       = "raw"
     toolbar          = dict(PlotTheme.toolbar)
-    toolbar['items'] = 'ypan,ybox_zoom,reset,save'
+    toolbar['items'] = 'pan,box_zoom,reset,save'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
