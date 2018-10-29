@@ -37,9 +37,9 @@ export class DpxRampView extends WidgetView
                     "<tr><td>#{@mk_inp("minhfsigma", 0.05, 0.0001)}</td>"+
                         "<td #{ttips[2]}>≤ σ[HF] ≤</td>"+
                         "<td>#{@mk_inp("maxhfsigma", 0.05,  0.001)}</td></tr>"+
-                    "<tr><td>#{@mk_inp("minextension")}</td>"+
+                    "<tr><td>#{@mk_inp("minextension", 10.0, 0.05)}</td>"+
                         "<td #{ttips[1]}>≤ Δz ≤</td>"+
-                        "<td>#{@mk_inp("maxextension")}</td></tr>"+
+                        "<td>#{@mk_inp("maxextension", 10.0, 0.05)}</td></tr>"+
                     "<tr><td></td>"+
                         "<td #{ttips[0]}>Δz fixed ≤</td>"+
                         "<td>#{@mk_inp("fixedextension")}</td></tr>"+

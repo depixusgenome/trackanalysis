@@ -185,6 +185,10 @@ class DpxCleaning(Widget):
 
 class CleaningFilterWidget:
     "All inputs for cleaning"
+    RND = dict(maxabsvalue   = 1, maxderivate   = 1,
+               minpopulation = 1, minhfsigma    = 4,
+               minextent     = 2, maxextent     = 2,
+               maxhfsigma    = 4, maxsaturation = 0)
     __widget: DpxCleaning
     def __init__(self, model:DataCleaningModelAccess) -> None:
         self.__model = model
@@ -221,8 +225,7 @@ class CleaningFilterWidget:
         if task is None:
             task = mdl.cleaning.configtask
 
-        info = {i:j for i, j in task.config().items() if hasattr(self.__widget, i)}
-
+        info = {i: np.around(getattr(task, i), j) for i, j in self.RND.items()}
         info['framerate'] = getattr(mdl.track, 'framerate', 1./30.)
         info['subtracted']= ', '.join(str(i) for i in sorted(mdl.subtracted.beads))
         info['fixedbeads']= ', '.join(f"{i[-1]}" for i in mdl.availablefixedbeads)

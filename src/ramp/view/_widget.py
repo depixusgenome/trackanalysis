@@ -39,6 +39,9 @@ class DpxRamp(Widget):
 class RampFilterWidget:
     "All inputs for cleaning"
     __widget: DpxRamp
+    RND = dict(minhfsigma     = 4, maxhfsigma   = 4,
+               minextension   = 2, maxextension = 2,
+               fixedextension = 2)
     def __init__(self, model:RampPlotModel) -> None:
         self.__model = model
 
@@ -87,6 +90,8 @@ class RampFilterWidget:
                 'fixedextension': mdl.config.dataframe.extension[1],
                 'maxextension'  : mdl.config.dataframe.extension[2],
                 'displaytype'   : ["raw", "norm", "cons"].index(mdl.theme.dataformat)}
+        for i, j in self.RND.items():
+            info[i] = np.around(info[i], j)
         (self.__widget if resets is None else resets[self.__widget]).update(**info)
 
 @dataclass
