@@ -87,7 +87,8 @@ class AdvancedWidgetMixin(ABC):
 
     def on_click(self):
         "modal dialog for configuration"
-        dialog(self.__doc, **self._args())
+        if not self.__widget.disabled:
+            dialog(self.__doc, **self._args())
 
     @staticmethod
     def reset(_):
