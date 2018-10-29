@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "The basic architecture"
-from    typing              import (Tuple, Optional, Type, Sequence, Union, Any,
-                                    Generic, Dict, TypeVar, List, Iterator,
-                                    Iterable, cast)
-from    collections         import OrderedDict
-from    abc                 import abstractmethod
-from    contextlib          import contextmanager
-from    functools           import wraps
-from    time                import time
+from    typing                  import (Tuple, Optional, Type, Sequence, Union, Any,
+                                        Generic, Dict, TypeVar, List, Iterator,
+                                        Iterable, cast)
+from    collections             import OrderedDict
+from    abc                     import abstractmethod
+from    contextlib              import contextmanager
+from    functools               import wraps
+from    time                    import time
+from    threading               import RLock
 
 import  numpy        as     np
 
@@ -377,12 +378,15 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         finally:
             self.state     = old
 
+    _LOCK = RLock()
+
     @contextmanager
     def resetting(self, cache = None):
         "Stops on_change events for a time"
-        old, self.state = self.state, PlotState.resetting
-        i = j = None
         try:
+            self._LOCK.acquire()
+            old, self.state = self.state, PlotState.resetting
+            i = j = None
             if cache is None:
                 cache = self._OrderedDict()
             yield cache
@@ -401,7 +405,9 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                 except Exception as exc:
                     raise RuntimeError(f'Error updating {i} = {j}') from exc
         finally:
-            self.state = old
+            if self.state == PlotState.resetting:
+                self.state = old
+            self._LOCK.release()
 
     @staticmethod
     def fixreset(arng):
