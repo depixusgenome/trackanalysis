@@ -63,10 +63,8 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
             self.addtofig(fig, i, x = 'zmag', y = 'z', source = j)
         self._display.addcallbacks(self._ctrl, fig)
 
-        mode    = self.defaultsizingmode(width = self._theme.widgetwidth)
-        widgets = self._createwidget(ctrl)
-        names   = "filtering", "status", "zmag", "bead"
-        left    = layouts.widgetbox(sum((widgets[i] for i in names), []), **mode)
+        mode = self.defaultsizingmode(width = self._theme.widgetwidth)
+        left = layouts.widgetbox(self._createwidget(ctrl), **mode)
         return self._keyedlayout(ctrl, fig, left = left)
 
     def _reset(self, cache: CACHE_TYPE):

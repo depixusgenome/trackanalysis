@@ -138,12 +138,12 @@ class RampBeadStatusWidget:
             data = data.groupby("status").bead.unique()
             for i, j in enumerate(self.__theme.status):
                 beads              = data.loc[j] if j in data.index else []
-                status["beads"][i] = self.__text(beads)
+                status["beads"][i] = self.__slider(beads)
                 status["count"][i] = len(beads)
         return status
 
     @staticmethod
-    def __text(beads):
+    def __slider(beads):
         if len(beads) == 0:
             return ""
 
@@ -168,12 +168,12 @@ class RampBeadStatusWidget:
 class RampZMagHintsTheme:
     "RampBeadStatusTheme"
     name:   str         = "ramp.zmaghints"
-    height: int         = 160
-    columns: List[List] = dflt([["val",  "Consensus",     100, "0.00"],
-                                ["err",  "Uncertainty",   100, "0.00"],
-                                ["zmag", "Z magnet (mm)", 100, "0.00"]])
-    units               = ["(µm)", "(% strand size)"]
-    rows                = [33, 50, 66, 80, 95]
+    height: int         = 120
+    columns: List[List] = dflt([["val",  "Consensus",     150, "0.00"],
+                                ["err",  "Uncertainty",   150, "0.00"],
+                                ["zmag", "Z magnet (mm)", 150, "0.00"]])
+    units:  List[str]   = dflt(["(µm)", "(% strand size)"])
+    rows:   List[float] = dflt([50, 66, 80, 95])
 
 class RampZMagHintsWidget:
     "Table containing discrete zmag values"
@@ -239,12 +239,12 @@ class RampZMagHintsWidget:
 @dataclass
 class RampZMagResultsTheme:
     "RampBeadStatusTheme"
-    name:   str   = "ramp.zmageresults"
-    height: int   = 160
-    step:   float = .01
-    value:  float = -.4
-    title:  str   = "Zmag = {zmag:.2f}­→ open up to {bead:.2f} ± {err:.2f} {unit}"
-    units         = ["(µm)", "(% strand size)"]
+    name:   str       = "ramp.zmageresults"
+    height: int       = 160
+    step:   float     = .01
+    value:  float     = -.4
+    title:  str       = "Zmag test = {zmag:.2f}­→ looses {bead:.2f} ± {err:.2f} {unit}"
+    units:  List[str] = dflt(RampZMagHintsTheme().units)
 
 class RampZMagResultsWidget:
     "Table containing discrete zmag values"
@@ -295,8 +295,86 @@ class RampZMagResultsWidget:
                         title = tit.format(bead = fcn(name, 1),
                                            zmag = zmag,
                                            err  = (fcn(name, 2)-fcn(name,0))*.5,
-                                           unit = self.__theme.units[unit]))
+                                           unit = self.__theme.units[unit][1:-1]))
         return itms
+
+@dataclass
+class RampHairpinSizeTheme:
+    "RampBeadStatusTheme"
+    name:   str    = "ramp.hairpinsize"
+    title:  str    = "Hairpins bin size"
+    binsize: float = .1
+    binstep: float = .05
+    height: int    = 200
+    columns: List[List] = dflt([["z",       "Extension (µm)", 150, "0.00"],
+                                ["count",   "Count",          150, "0"],
+                                ["percent", "Percentage (%)", 150, "0"]])
+
+class RampHairpinSizeWidget:
+    "Table containing discrete zmag values"
+    __table : DataTable
+    __slider: Slider
+    __src   : ColumnDataSource
+    def __init__(self, ctrl, model:RampPlotModel) -> None:
+        self.__model = model
+        self.__theme = ctrl.theme.add(RampHairpinSizeTheme())
+
+    def addtodoc(self, mainview, ctrl) -> List[Widget]:
+        "creates the widget"
+        cols = [TableColumn(field = i[0], title = i[1], width = i[2],
+                            formatter = DpxNumberFormatter(format     = i[3],
+                                                           text_align = 'right'))
+                for i in self.__theme.columns]
+        self.__src   = ColumnDataSource(self.__tabledata())
+        self.__table = DataTable(source         = self.__src,
+                                 columns        = cols,
+                                 editable       = False,
+                                 index_position = None,
+                                 width          = sum(i[2] for i in self.__theme.columns),
+                                 height         = self.__theme.height,
+                                 name           = "Ramps:ExtensionsTable")
+        self.__slider = Slider(title = self.__theme.title,
+                               name  = "Ramps:ExtensionsText",
+                               step  = self.__theme.binstep,
+                               **self.__sliderdata())
+
+        @mainview.actionifactive(ctrl)
+        def _onchange_cb(attr, old, new):
+            ctrl.theme.update(self.__theme, binsize = new)
+        self.__slider.on_change("value", _onchange_cb)
+        return [self.__slider, self.__table]
+
+    def observe(self, ctrl):
+        "observe the controller"
+        @ctrl.theme.observe(self.__theme)
+        def _observe(**_):
+            if self.__model.display.isactive():
+                self.__slider.update(**self.__sliderdata())
+                self.__src.update(data = self.__tabledata())
+
+    def reset(self, resets):
+        "resets the wiget when a new file is opened"
+        resets[self.__src].update(data = self.__tabledata())
+        resets[self.__slider].update(**self.__sliderdata())
+
+    def __sliderdata(self) -> Dict[str, float]:
+        task = self.__model.config.dataframe.extension
+        return {'start': task[0], "end": task[2], "value": self.__theme.binsize}
+
+    def __tabledata(self) -> Dict[str, np.ndarray]:
+        data = self.__model.getdisplay("dataframe")
+        out  = {'z': np.empty(0), 'count': np.empty(0), 'percent': np.empty(0)}
+        if data is not None:
+            data  = data[data.status == "ok"].groupby("bead").extent.median().values
+            bsize = self.__theme.binsize
+            inds  = np.round(data/bsize).astype(int)
+            izval = np.sort(np.unique(inds))
+            if len(izval):
+                cnt = np.array([np.sum(inds == i) for i in izval])
+                out.update(z       = [data[inds == i].mean() for i in izval],
+                           count   = cnt,
+                           percent = cnt* 100./cnt.sum())
+        return out
 
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
@@ -305,7 +383,8 @@ class WidgetMixin(ABC):
         self.__widgets = dict(filtering = RampFilterWidget(model),
                               status    = RampBeadStatusWidget(ctrl, model),
                               bead      = RampZMagHintsWidget(ctrl, model),
-                              zmag      = RampZMagResultsWidget(ctrl, model))
+                              zmag      = RampZMagResultsWidget(ctrl, model),
+                              extension = RampHairpinSizeWidget(ctrl, model))
 
     def _widgetobservers(self, ctrl):
         for widget in self.__widgets.values():
@@ -315,7 +394,8 @@ class WidgetMixin(ABC):
     def _createwidget(self, ctrl):
         widgets = {i: j.addtodoc(self, ctrl) for i, j in self.__widgets.items()}
         self.__objects = TaskWidgetEnabler(widgets)
-        return widgets
+        names   = "filtering", "status", "extension", "zmag", "bead"
+        return sum((widgets[i] for i in names), [])
 
     def _resetwidget(self, cache: CACHE_TYPE, disable: bool):
         for ite in self.__widgets.values():
