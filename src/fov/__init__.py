@@ -127,9 +127,6 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess, FoVPlotModel]):
                 self._ctrl.display.update("tasks", bead = bead)
 
         self._beadssource.on_change('selected', _onselect_cb)
-
-        for rng in self._fig.x_range, self._fig.y_range:
-            self.fixreset(rng)
         return self._fig
 
     def _reset(self, cache:CACHE_TYPE):

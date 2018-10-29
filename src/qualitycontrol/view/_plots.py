@@ -54,9 +54,6 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
         for pop in ('pop10', 'median', 'pop90'):
             val = self.addtofig(self._fig, pop, x = 'cycles', y = pop, source = self._src[1])
             self._rends.append((pop, val))
-
-        self.fixreset(self._fig.x_range)
-        self.fixreset(self._fig.y_range)
         return self._fig
 
     def _reset(self, cache:CACHE_TYPE):

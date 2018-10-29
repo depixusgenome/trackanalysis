@@ -110,12 +110,8 @@ export class DpxCleaning extends Widget
         @css_classes = ["dpx-cleaning", "dpx-widget"]
 
     onchangebounds: () ->
-        trng = @figure.extra_x_ranges['time']
-        xrng = @figure.x_range
-        if xrng.bounds?
-            xrng._initial_start = xrng.bounds[0]
-            xrng._initial_end   = xrng.bounds[1]
-
+        trng       = @figure.extra_x_ranges['time']
+        xrng       = @figure.x_range
         trng.start = xrng.start/@framerate
         trng.end   = xrng.end  /@framerate
 

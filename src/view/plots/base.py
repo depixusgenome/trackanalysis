@@ -15,7 +15,7 @@ import  numpy        as     np
 
 import  bokeh.palettes
 from    bokeh.document          import Document
-from    bokeh.models            import Range1d, Model, CustomJS, GlyphRenderer
+from    bokeh.models            import Range1d, Model, GlyphRenderer
 from    bokeh.plotting          import figure, Figure
 
 from    utils.logconfig         import getLogger
@@ -409,15 +409,6 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                 self.state = old
             self._LOCK.release()
 
-    @staticmethod
-    def fixreset(arng):
-        "Corrects the reset bug in bokeh"
-        assert isinstance(arng, Range1d)
-        jsc = CustomJS(code = ("if(!(cb_obj.bounds == null))"
-                               "{ cb_obj._initial_start = cb_obj.bounds[0];"
-                               "  cb_obj._initial_end   = cb_obj.bounds[1]; }"))
-        arng.callback = jsc
-
     def close(self):
         "Removes the controller"
         del self._ctrl
@@ -448,7 +439,8 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         curr = getattr(self._display, f'{axis}bounds') if axis else (None, None)
         attrs: Dict[str, Any] = OrderedDict(bounds = (vmin, vmax))
         attrs.update(start = vmin if curr[0]  is None else curr[0], # type: ignore
-                     end   = vmax if curr[1]  is None else curr[1])
+                     end   = vmax if curr[1]  is None else curr[1],
+                     reset_start = vmin, reset_end = vmax)
         if hasattr(rng, 'range_padding'):
             attrs['range_padding'] = over*100.
 

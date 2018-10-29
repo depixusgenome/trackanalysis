@@ -61,7 +61,6 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
             self.addtofig(fig, i, x = 'zmag', y = 'zbead', source = j)
         for i, j in zip(("consensusarea", "consensusline", "beadcycles"), self.__src):
             self.addtofig(fig, i, x = 'zmag', y = 'z', source = j)
-        self.fixreset(fig.y_range)
         self._display.addcallbacks(self._ctrl, fig)
 
         mode    = self.defaultsizingmode(width = self._theme.widgetwidth)

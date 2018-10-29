@@ -80,7 +80,6 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         axis = LinearAxis(x_range_name = "time", axis_label = self._theme.xtoplabel)
         fig.add_layout(axis, 'above')
 
-        self.fixreset(fig.y_range)
         self._display.addcallbacks(self._ctrl, fig)
 
         mode    = self.defaultsizingmode(width = self._theme.widgetwidth)

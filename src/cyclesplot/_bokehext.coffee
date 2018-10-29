@@ -33,11 +33,6 @@
         if not fig.y_range?
             return
 
-        yrng = fig.y_range
-        if yrng._initial_start? && yrng.bounds != null
-            yrng._initial_start = yrng.bounds[0]
-            yrng._initial_end   = yrng.bounds[1]
-
         if not fig.extra_x_ranges?
             return
 
@@ -47,6 +42,7 @@
         cycles.start = 0
         frames.start = 0
 
+        yrng         = fig.y_range
         bases        = fig.extra_y_ranges['bases']
         bases.start  = (yrng.start - @bias)*@stretch
         bases.end    = (yrng.end   - @bias)*@stretch
@@ -68,9 +64,9 @@
             cycles.end = Math.max.apply(Math, src.data['cycles'][ind1..ind2])+1
 
     on_change_raw_bounds: (frng, trng) ->
-        if frng._initial_start? && frng.bounds != null
-            frng._initial_start = frng.bounds[0]
-            frng._initial_end   = frng.bounds[1]
+        if trng.reset_start? && trng.bounds != null
+            trng.reset_start = trng.bounds[0]
+            trng.reset_end   = trng.bounds[1]
         trng.start = frng.start/@framerate
         trng.end   = frng.end  /@framerate
 

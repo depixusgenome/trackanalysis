@@ -1,9 +1,5 @@
     on_change_bounds: (fig, src) ->
-        yrng = fig.y_range
-        if yrng._initial_start? && yrng.bounds != null
-            yrng._initial_start = yrng.bounds[0]
-            yrng._initial_end   = yrng.bounds[1]
-
+        yrng         = fig.y_range
         bases        = fig.extra_y_ranges['bases']
         bases.start  = (yrng.start - @bias)*@stretch
         bases.end    = (yrng.end   - @bias)*@stretch
