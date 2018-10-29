@@ -97,6 +97,10 @@ class PlotDisplay:
         ctrl.display.observe(self, _onobserve)
         return fig
 
+    def isactive(self) -> bool:
+        "whether the plot is active"
+        return self.state == PlotState.active
+
 class PlotModel:
     """
     base plot model

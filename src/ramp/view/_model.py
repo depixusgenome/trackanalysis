@@ -88,7 +88,6 @@ class RampTaskPlotModelAccess(TaskPlotModelAccess):
         super().__init__(ctrl)
         self.alignment = ExtremumAlignmentTaskAccess(self)
 
-POOL = ProcessPoolExecutor(1)
 def _run(cache, proc):
     return proc.dataframe(next(iter(cache.run())), **proc.config())
 
@@ -122,17 +121,20 @@ def observetracks(self: RampPlotModel, ctrl):
 
         status[0] = stat = deepcopy(self.config)
         async def _thread():
-            info = {i: dict(getattr(self.display, i)) for i in args}
-            for name in args:
-                task  = getattr(self.config, name)
-                cache = ctrl.tasks.processors(root, root)
-                if stat is not status[0]:
-                    return
+            info  = {i: dict(getattr(self.display, i)) for i in args}
+            procs = {i: proctype[i](task = getattr(self.config, i)) for i in args}
+            cache = ctrl.tasks.processors(root, root)
 
-                subm             = POOL.submit(_run, cache, proctype[name](task = task))
-                info[name][root] = await wrap_future(subm)
+            if stat is status[0]:
+                with ProcessPoolExecutor(2) as pool:
+                    subm = {i: wrap_future(pool.submit(_run, cache, j))
+                            for i, j in procs.items()}
+                    for i, j in subm.items():
+                        info[i][root] = await j
 
-            _consensus(info, root)
+            if stat is status[0]:
+                _consensus(info, root)
+
             if stat is status[0]:
                 status[0] = None
                 ctrl.display.update(self.display, **info)

@@ -10,7 +10,6 @@ from    bokeh          import layouts
 import  numpy                   as     np
 
 from    data.views              import Beads
-from    model.plots             import PlotState
 from    view.plots              import PlotView, CACHE_TYPE
 from    view.plots.tasks        import TaskPlotCreator
 from    control                 import Controller
@@ -40,21 +39,15 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
         self._widgetobservers(ctrl)
         observetracks(self._plotmodel, ctrl)
 
-        def _reset():
-            if self.isactive():
-                self.reset(False)
-            elif self.state == PlotState.resetting:
-                self.calllater(_reset)
-
         @ctrl.display.observe(self._display)
         def _ondataframes(old = (), **_):
             if len({"dataframe", "consensus"} & set(old)):
-                _reset()
+                self.reset(False)
 
         @ctrl.theme.observe(self._theme)
         def _ondisplaytype(old = (), **_):
             if "dataformat" in old:
-                _reset()
+                self.reset(False)
 
     def _addtodoc(self, ctrl, *_):
         self.__src = [ColumnDataSource(data = i) for i in self.__data(None, None)]
@@ -73,10 +66,8 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
 
         mode    = self.defaultsizingmode(width = self._theme.widgetwidth)
         widgets = self._createwidget(ctrl)
-        left    = layouts.widgetbox((widgets["filtering"]
-                                     +widgets["status"]
-                                     +widgets["zmag"]),
-                                    **mode)
+        names   = "filtering", "status", "zmag", "bead"
+        left    = layouts.widgetbox(sum((widgets[i] for i in names), []), **mode)
         return self._keyedlayout(ctrl, fig, left = left)
 
     def _reset(self, cache: CACHE_TYPE):
@@ -97,7 +88,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
             self.setbounds(cache, self.__fig.x_range, 'x', extr("zmag"))
             self.setbounds(cache, self.__fig.y_range, 'y', extr("z"))
 
-            label = (self._theme.ylabel if not self._theme.dataformat != "norm" else
+            label = (self._theme.ylabel if self._theme.dataformat != "norm" else
                      self._theme.ylabelnormalized)
             cache[self.__fig.yaxis[0]]["axis_label"] = label
             for i, j in zip(data, self.__src):

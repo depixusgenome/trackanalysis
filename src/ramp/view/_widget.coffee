@@ -46,7 +46,7 @@ export class DpxRampView extends WidgetView
                   "</table></div>"+
                   "<div><table><tr>"
 
-        labels = ["raw data", "Z (% bead length)", "Z (µm)"]
+        labels = ["raw data", "Z (% strand size)", "Z (µm)"]
         for j in [0..2]
             html += '<td><label class="bk-bs-radio"><input'
             if j == @model.displaytype
