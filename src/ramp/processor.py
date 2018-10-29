@@ -4,7 +4,8 @@
 Create dataframe containing ramp info
 """
 from   functools         import partial
-from   typing            import NamedTuple, Callable, Union, Tuple, Dict, Any, cast
+from   typing            import (NamedTuple, Callable, Union, Tuple, Dict, Any,
+                                 Optional, Sequence, cast)
 import numpy             as np
 import pandas            as pd
 
@@ -51,19 +52,6 @@ class RampAverageZTask(Task):
             return partial(fcn, **cast(dict, arg[1]), axis = 0)
         raise AttributeError("unknown numpy action")
 
-    def consensus(self, frame, beads = None, name = "consensus", act = "median"):
-        "add a consensus bead"
-        fcn = self.getaction(act)
-        if all(isinstance(i, tuple) for i in frame.columns):
-            if beads is None:
-                beads = {i[0] for i in frame.columns if isinstance(i[0], int)}
-            for i in range(len(frame[next(iter(beads))].columns)):
-                frame[name, i] = fcn([frame[j, i].values for j in beads])
-        else:
-            if beads is None:
-                beads = {i for i in frame.columns if isinstance(i, int)}
-            frame[name] = fcn([frame[i].values for i in beads])
-
 class RampCycleTuple(NamedTuple): # pylint: disable=missing-docstring
     bead            : int
     cycle           : int
@@ -93,6 +81,32 @@ class RampDataFrameProcessor(Processor[RampDataFrameTask]):
         args.apply(self.apply(**self.config()))
 
     @classmethod
+    def status(cls, data, task: Optional[RampDataFrameTask]= None, **kwa) -> pd.DataFrame:
+        "return a frame with a new status"
+        if isinstance(task, RampDataFrameTask):
+            tsk = task
+            assert len(kwa) == 0
+        else:
+            tsk = cast(RampDataFrameTask, cast(type, cls.tasktype)(**kwa))
+
+        data.set_index(["bead", "cycle"], inplace = True)
+        frame = data[["extent", "hfsigma"]].groupby(level = 0).median().dropna()
+        good  = (frame.hfsigma > tsk.hfsigma[0]) & (frame.hfsigma < tsk.hfsigma[1])
+        frame["status"] = ["bad"] * len(frame)
+        frame.loc[(frame.extent    > tsk.extension[1])
+                  & (frame.extent  < tsk.extension[2])
+                  & good, "status"] = "ok"
+        frame.loc[(frame.extent    > tsk.extension[0])
+                  & (frame.extent  <= tsk.extension[1])
+                  & good, "status"] = "fixed"
+
+        if "status" in data.columns:
+            data.pop("status")
+        data = data.join(frame[["status"]])
+        data.reset_index(inplace = True)
+        return data
+
+    @classmethod
     def dataframe(cls, frame, **kwa) -> pd.DataFrame:
         "return all data from a frame"
         # pylint: disable=not-callable
@@ -106,21 +120,7 @@ class RampDataFrameProcessor(Processor[RampDataFrameTask]):
                 continue
         fields = getattr(RampCycleTuple, '_fields')
         data   = pd.DataFrame({j: [k[i] for k in lst] for i,j in enumerate(fields)})
-        data.set_index(["bead", "cycle"], inplace = True)
-
-        frame = data[["extent", "hfsigma"]].groupby(level = 0).median().dropna()
-
-        good  = (frame.hfsigma > task.hfsigma[0]) & (frame.hfsigma < task.hfsigma[1])
-        frame["status"] = ["bad"] * len(frame)
-        frame.loc[(frame.extent    > task.extension[1])
-                  & (frame.extent  < task.extension[2])
-                  & good, "status"] = "ok"
-        frame.loc[(frame.extent    > task.extension[0])
-                  & (frame.extent  <= task.extension[1])
-                  & good, "status"] = "fixed"
-        data = data.join(frame[["status"]])
-        data.reset_index(inplace = True)
-        return data
+        return cls.status(data, task)
 
     @classmethod
     def _row(cls, task, frame, info):
@@ -176,6 +176,40 @@ class RampAverageZProcessor(Processor[RampAverageZTask]):
         zmag          = next(iter(data.values()))[0]
         frame["zmag"] = zmag[shape[0]//2,:] if len(shape) > 1 else zmag
         return frame
+
+    @classmethod
+    def consensus(cls, frame, normalize, # pylint: disable=too-many-arguments
+                  beads: Optional[Sequence[int]] = None,
+                  name                           = "consensus",
+                  action                         = "median"):
+        "add a consensus bead"
+        if not any(isinstance(i, int) or (isinstance(i, tuple) and isinstance(i[0], int))
+                   for i in frame.columns):
+            return
+
+        fcn   = RampAverageZTask().getaction(action)
+        if all(isinstance(i, tuple) for i in frame.columns):
+            if normalize:
+                norm1 = lambda *i: frame[i].values *(100./np.nanmax(frame[i[0],1]))
+            else:
+                norm1 = lambda *i: frame[i]
+
+            if beads is None:
+                beads = list({i[0] for i in frame.columns if isinstance(i[0], int)})
+
+            ind   = next(i[0] for i in frame.columns if isinstance(i[0], int))
+            shape = len(frame[ind].columns)
+            for i in range(shape):
+                frame[name, i] = (np.NaN if len(beads) == 0 else
+                                  fcn([norm1(j, i) for j in beads]))
+        else:
+            if normalize:
+                norm = lambda i: frame[i].values *(100./np.nanmax(frame[i]))
+            else:
+                norm = lambda i: frame[i]
+            if beads is None:
+                beads = list({i for i in frame.columns if isinstance(i, int)})
+            frame[name] = np.NaN if len(beads) == 0 else fcn([norm(i) for i in beads])
 
     @classmethod
     def _apply(cls, task, frame):

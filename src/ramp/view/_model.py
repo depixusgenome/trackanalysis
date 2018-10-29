@@ -44,16 +44,18 @@ class RampPlotTheme(PlotTheme):
     ramp plot theme
     """
     name             = "ramp.theme"
-    consensusarea    = PlotAttrs('lightgreen',  'patch', 1, alpha = .2)
-    consensusline    = PlotAttrs('lightgreen',  'line',  1, alpha = .2)
-    beadarea         = PlotAttrs('gray',        'patch', 1, alpha = .2)
-    beadline         = PlotAttrs('gray',        'line',  1, alpha = .2)
-    beadcycles       = PlotAttrs('blue',        'line',  1, alpha = .2)
-    ylabelnormalized = "Z (% bead size)"
+    consensusarea    = PlotAttrs({"dark": 'darkgray', "basic": "gray"},
+                                 'patch', 1, alpha = .5)
+    consensusline    = PlotAttrs(consensusarea.color, 'line',  1, alpha = .5)
+    beadarea         = PlotAttrs({"dark": 'darkcyan', "basic": "blue"},
+                                 'patch', 1, alpha = .5)
+    beadline         = PlotAttrs(beadarea.color, 'line',  1, alpha = .5)
+    beadcycles       = PlotAttrs(beadarea.color, 'line',  1, alpha = .2)
+    ylabelnormalized = "Z (% strand size)"
     xlabel           = 'Z magnet (mm)'
     figsize          = 500, 800, 'fixed'
     widgetwidth      = 500
-    showraw          = True
+    dataformat       = "raw"
     toolbar          = dict(PlotTheme.toolbar)
     toolbar['items'] = 'ypan,ybox_zoom,reset,save'
     @initdefaults(frozenset(locals()))
@@ -96,6 +98,15 @@ def observetracks(self: RampPlotModel, ctrl):
     proctype                           = {"dataframe": RampDataFrameProcessor,
                                           "consensus": RampAverageZProcessor}
     status: List[Optional[RampConfig]] = [None]
+    def _consensus(info, root):
+        if "consensus" in info:
+            frame = info.get("dataframe", self.display.dataframe).get(root, None)
+            assert frame is not None
+            beads = frame[frame.status == "ok"].bead.unique()
+            cons  = info["consensus"][root]
+            RampAverageZProcessor.consensus(cons, True, beads, "normalized")
+            RampAverageZProcessor.consensus(cons, False, beads, "consensus")
+
     def _poolcompute(iargs, **_):
         root  = self.tasks.roottask
         if root is None:
@@ -121,12 +132,7 @@ def observetracks(self: RampPlotModel, ctrl):
                 subm             = POOL.submit(_run, cache, proctype[name](task = task))
                 info[name][root] = await wrap_future(subm)
 
-            if "consensus" in info:
-                frame = info.get("dataframe", self.display.dataframe).get(root, None)
-                assert frame is not None
-                beads = frame[frame.status == "ok"].bead.unique()
-                self.config.consensus.consensus(info["consensus"][root], beads)
-
+            _consensus(info, root)
             if stat is status[0]:
                 status[0] = None
                 ctrl.display.update(self.display, **info)
@@ -138,9 +144,19 @@ def observetracks(self: RampPlotModel, ctrl):
         for name in proctype:
             getattr(self.display, name).pop(task, None)
 
-    def _onchangetrack(old = (), **_):
-        if "roottask" in old:
-            _poolcompute({i for i in proctype if self.getdisplay(i) is None})
+    @ctrl.display.observe(self.tasks)
+    def _onchangetrack(**_):
+        _poolcompute({i for i in proctype if self.getdisplay(i) is None})
 
-    ctrl.display.observe(self.tasks, _onchangetrack)
-    ctrl.theme.observe(self.config, lambda old = (), **_: _poolcompute(old))
+    @ctrl.theme.observe(self.config)
+    def _onchangeconfig(old = (), **_):
+        data = self.getdisplay("dataframe")
+        if "consensus" in old or data is None:
+            _poolcompute(old)
+            return
+
+        info = {i: dict(getattr(self.display, i)) for i in proctype}
+        data = RampDataFrameProcessor.status(data, self.config.dataframe)
+        info["dataframe"][self.tasks.roottask] = data
+        _consensus(info, self.tasks.roottask)
+        ctrl.display.update(self.display, **info)

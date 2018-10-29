@@ -4,13 +4,13 @@
 from    typing         import Dict, Tuple, cast
 
 from    bokeh.models   import ColumnDataSource, Range1d
-from    bokeh.layouts  import column
 from    bokeh.plotting import Figure
 from    bokeh          import layouts
 
 import  numpy                   as     np
 
 from    data.views              import Beads
+from    model.plots             import PlotState
 from    view.plots              import PlotView, CACHE_TYPE
 from    view.plots.tasks        import TaskPlotCreator
 from    control                 import Controller
@@ -40,14 +40,25 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
         self._widgetobservers(ctrl)
         observetracks(self._plotmodel, ctrl)
 
-        def _ondataframes(old = (), **_):
-            if len({"dataframe", "consensus"} & set(old)) and self.isactive():
+        def _reset():
+            if self.isactive():
                 self.reset(False)
-        ctrl.display.observe(self._display, _ondataframes)
+            elif self.state == PlotState.resetting:
+                self.calllater(_reset)
+
+        @ctrl.display.observe(self._display)
+        def _ondataframes(old = (), **_):
+            if len({"dataframe", "consensus"} & set(old)):
+                _reset()
+
+        @ctrl.theme.observe(self._theme)
+        def _ondisplaytype(old = (), **_):
+            if "dataformat" in old:
+                _reset()
 
     def _addtodoc(self, ctrl, *_):
         self.__src = [ColumnDataSource(data = i) for i in self.__data(None, None)]
-        label      = (self._theme.ylabel if not self._config.consensus.normalize else
+        label      = (self._theme.ylabel if self._theme.dataformat != "norm" else
                       self._theme.ylabelnormalized)
         self.__fig = fig = self.figure(y_range      = Range1d,
                                        x_range      = Range1d,
@@ -62,9 +73,11 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
 
         mode    = self.defaultsizingmode(width = self._theme.widgetwidth)
         widgets = self._createwidget(ctrl)
-        left    = layouts.widgetbox(widgets["filtering"], **mode)
-        bottom  = self._keyedlayout(ctrl, fig, left = left)
-        return column(widgets["status"] + [bottom])
+        left    = layouts.widgetbox((widgets["filtering"]
+                                     +widgets["status"]
+                                     +widgets["zmag"]),
+                                    **mode)
+        return self._keyedlayout(ctrl, fig, left = left)
 
     def _reset(self, cache: CACHE_TYPE):
         cycles, zmag, disable = None, None, True
@@ -84,7 +97,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
             self.setbounds(cache, self.__fig.x_range, 'x', extr("zmag"))
             self.setbounds(cache, self.__fig.y_range, 'y', extr("z"))
 
-            label = (self._theme.ylabel if not self._config.consensus.normalize else
+            label = (self._theme.ylabel if not self._theme.dataformat != "norm" else
                      self._theme.ylabelnormalized)
             cache[self.__fig.yaxis[0]]["axis_label"] = label
             for i, j in zip(data, self.__src):
@@ -100,20 +113,28 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
             return outp
 
         conc = lambda x: np.concatenate(list(x))
-        if self._theme.showraw:
+        if self._theme.dataformat == "raw":
             get2 = lambda x: conc([np.NaN] if j else i for i in x for j in (0, 1))
             outp[2].update(z = get2(cycles), zmag  = get2(zmag))
 
         else:
             cons = self._plotmodel.getdisplay("consensus")
             if cons is not None:
+                bead = self._model.bead
+                if self._theme.dataformat == "norm":
+                    name   = "normalized"
+                    factor = 100. / np.nanmax(cons[bead, 1])
+                else:
+                    name   = "consensus"
+                    factor = 1.
+
                 get0 = lambda i, j, k: conc([cons[i, j], cons[i, k][::-1]])
-                outp[0].update(z     = get0("consensus", 0, 2),
+                outp[0].update(z     = get0(name, 0, 2),
                                zmag  = get0("zmag", "", ""),
-                               zbead = get0(self._model.bead, 0, 2))
-                outp[1].update(z     = cons["consensus", 1],
+                               zbead = get0(bead, 0, 2)*factor)
+                outp[1].update(z     = cons[name, 1],
                                zmag  = cons["zmag", ""],
-                               zbead = cons[self._model.bead, 1])
+                               zbead = cons[bead, 1]*factor)
         return outp
 
 class RampView(PlotView[RampPlotCreator]):

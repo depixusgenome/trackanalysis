@@ -7,7 +7,8 @@ import numpy             as     np
 
 from   utils.holoviewing import hv, BasicDisplay
 from   data.track        import Track, isellipsis # pylint: disable=unused-import
-from   ..analysis        import RampAnalysis, RampAverageZTask, RampDataFrameTask
+from   ..analysis        import (RampAnalysis, RampAverageZTask,
+                                 RampDataFrameTask, RampAverageZProcessor)
 
 class RampDisplay(BasicDisplay, ramp = Track):
     """
@@ -93,16 +94,17 @@ class RampDisplay(BasicDisplay, ramp = Track):
 
     def average(self, opts = None, hmap = True, **kwa):
         "return average bead"
-        kwa["consensus"] = True
         ana          = RampAnalysis(averagetask = RampAverageZTask(**kwa))
         data         = ana.average(self._items, self._beads)
+        RampAverageZProcessor.consensus(data, self.beads("ok"))
+
         data.columns = [self._name(i) for i in data.columns]
         cols         = [i for i in data.columns
                         if not any(j in i for j in ("zmag", "@low", "@high", "consensus"))]
         _crv = partial(self._crv, data,
                        (dict(style = dict(color = "gray", alpha = .25))
                         if opts is None else opts),
-                       "bead length(%)" if ana.averagetask.normalize else "z")
+                       "Z (% bead length)" if ana.averagetask.normalize else "Z (µm)")
         if hmap:
             crvs = {int(i.split()[1]): _crv(i) for i in cols}
             mean = _crv("consensus")

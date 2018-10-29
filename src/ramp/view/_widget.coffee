@@ -44,16 +44,16 @@ export class DpxRampView extends WidgetView
                         "<td #{ttips[0]}>Δz fixed ≤</td>"+
                         "<td>#{@mk_inp("fixedextension")}</td></tr>"+
                   "</table></div>"+
-                  "<div><table>"
+                  "<div><table><tr>"
 
         labels = ["raw data", "Z (% bead length)", "Z (µm)"]
         for j in [0..2]
-            html += '<tr><td><label class="bk-bs-radio"><input'
+            html += '<td><label class="bk-bs-radio"><input'
             if j == @model.displaytype
                 html += ' checked=true'
             html += " type='radio' id='dpx-rp-displaytype-#{j}' class='dpx-rp-displaytype-itm'/>"+
-                    "#{labels[j]}</label></td></tr>"
-        html += "</table></div>"
+                    "#{labels[j]}</label></td>"
+        html += "</tr></table></div>"
 
         @el.innerHTML = html
         elem = $(@el)
