@@ -3,6 +3,7 @@
 u"all FoV view aspects here"
 from typing                 import Dict, List, Optional, Set
 import numpy as np
+from bokeh.layouts          import column as collayout
 from bokeh.models           import (ColumnDataSource, Range1d, TapTool, HoverTool,
                                     Selection)
 from bokeh.plotting         import Figure
@@ -37,14 +38,14 @@ class FoVPlotTheme(PlotTheme):
                             selection_text_color    = 'blue')
     image       = PlotAttrs('Greys256', 'image', x = 0, y = 0)
     radius      = 1.
-    figsize     = 700, 700, 'fixed'
+    figsize     = 160*5, 100*5, 'fixed'
+    calibfigsize= 256, 192, 'fixed'
     ylabel      = 'Y (μm)'
     xlabel      = 'X (μm)'
     colors      = dict(good = 'palegreen', fixed     = 'chocolate',
                        bad  = 'orange',    discarded = 'red')
     thumbnail   = 128
-    calibimg    = PlotAttrs('Greys256', 'image')
-    calibstart  = 1./16.
+    calibimg    = PlotAttrs('Greys256', 'image', x = 0, y = 0)
     calibsize   = 6./16
     calibtools  = 'pan,box_zoom,save'
     tooltips    = '<table>@ttips{safe}</table>'
@@ -74,6 +75,7 @@ class FoVPlotModel(PlotModel):
 class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
     "Plots a default bead and its FoV"
     _fig:         Figure
+    _calibfig:    Figure
     _theme:       FoVPlotTheme
     _beadssource: ColumnDataSource
     _imgsource:   ColumnDataSource
@@ -98,13 +100,24 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
         self.addtofig(self._fig, 'image', **{i:i for i in ('image', 'dw', 'dh')},
                       source = self._imgsource)
 
-        self._calibsource = ColumnDataSource(data = dict(image = [np.zeros((10, 10))],
-                                                         x     = [0], y  = [0],
-                                                         dw    = [1], dh = [1]))
+        self._calibfig = self.figure(name        = 'FoV:CalibFig',
+                                     x_range     = Range1d(0, 1),
+                                     y_range     = Range1d(0, 1),
+                                     plot_width  = self._theme.calibfigsize[0],
+                                     plot_height = self._theme.calibfigsize[1],
+                                     sizing_mode = self._theme.calibfigsize[2],
+                                     toolbar_location = None,
+                                     tools            = [])
+        self._calibfig.xaxis.visible     = False
+        self._calibfig.yaxis.visible     = False
+        self._calibfig.min_border        = 0
+        self._calibfig.v_symmetry        = True
 
-        vals = 'image', 'x', 'y', 'dw', 'dh'
-        self.addtofig(self._fig, 'calibimg', **{i:i for i in vals},
+        self._calibsource = ColumnDataSource(data = dict(image = [np.zeros((10, 10))],
+                                                         dw    = [1], dh = [1]))
+        self.addtofig(self._calibfig, 'calibimg', **{i:i for i in ('image', 'dw', 'dh')},
                       source = self._calibsource)
+
 
         self._beadssource  = ColumnDataSource(**self._beadsdata())
         args = dict(x = 'x', y = 'y', radius = self._theme.radius, source = self._beadssource)
@@ -128,7 +141,7 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
 
         # pylint: disable=no-member
         self._beadssource.selected.on_change("indices", _onselect_cb)
-        return self._fig
+        return collayout([self._fig, self._calibfig])
 
     def _reset(self, cache:CACHE_TYPE):
         fov = self._fov
@@ -151,26 +164,20 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
         fov   = self._fov
         ibead = self._model.bead
         img   = np.zeros((10, 10))
-        dist  = (0, 0, 0, 0)
+        dist  = (0, 0)
         if fov is not None and ibead in fov.beads:
             bead  = fov.beads[ibead]
             img   = (bead.image  if getattr(bead.image, 'size', None) else
                      bead.thumbnail(self._theme.thumbnail, fov))
-
-            pos   = bead.position
             rng   = (max(fov.size()),)*2
-            start = self._theme.calibstart
             size  = self._theme.calibsize
-            dist  = [rng[0] * (start+ (0.5 if pos[0] < rng[0]*.5 else 0.)), # type: ignore
-                     rng[1] * (start+ (0.5 if pos[1] < rng[1]*.5 else 0.)),
-                     rng[0] * size,
-                     rng[1] * size]
+            dist  = rng[0] * size, rng[1] * size
 
         cache[self._calibsource].update(data = dict(image = [img],
-                                                    x     = [dist[0]],
-                                                    y     = [dist[1]],
-                                                    dw    = [dist[2]],
-                                                    dh    = [dist[3]]))
+                                                    dw    = [dist[0]],
+                                                    dh    = [dist[1]]))
+        self.setbounds(cache, self._calibfig.x_range, 'x', [0, dist[0]])
+        self.setbounds(cache, self._calibfig.y_range, 'y', [0, dist[1]])
 
     def _imagedata(self, cache):
         fov = self._fov
@@ -185,8 +192,8 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
                                                   dw    = [dist[0]],
                                                   dh    = [dist[1]]))
 
-        self.setbounds(cache, self._fig.x_range, 'x', [0, max(dist[:2])])
-        self.setbounds(cache, self._fig.y_range, 'y', [0, max(dist[:2])])
+        self.setbounds(cache, self._fig.x_range, 'x', [0, dist[0]])
+        self.setbounds(cache, self._fig.y_range, 'y', [0, dist[1]])
 
     def _beadsdata(self):
         fov = self._fov
