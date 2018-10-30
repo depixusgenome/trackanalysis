@@ -13,6 +13,7 @@ from    bokeh.models            import (Widget, DataTable, TableColumn,
                                         ColumnDataSource, Slider, StringFormatter)
 
 from    control.beadscontrol    import TaskWidgetEnabler
+from    utils.array             import intlistsummary
 from    view.static             import ROUTE
 from    view.plots              import CACHE_TYPE, DpxNumberFormatter
 from    ._model                 import RampPlotModel
@@ -148,33 +149,11 @@ class RampBeadStatusWidget:
             data = data.groupby("status").bead.unique()
             for i, j in enumerate(self.__theme.status):
                 beads                = data.loc[j] if j in data.index else []
-                status["beads"][i]   = self.__slider(beads)
+                status["beads"][i]   = intlistsummary(beads)
                 status["count"][i]   = len(beads)
             status["percent"] = np.array(status["count"])/sum(status["count"])*100.
 
         return status
-
-    @staticmethod
-    def __slider(beads):
-        if len(beads) == 0:
-            return ""
-
-        beads = np.sort(beads)
-        txt   = ""
-        last  = 0
-        i     = 1
-        while i < len(beads)-1:
-            if beads[i] + 1 < beads[i+1]:
-                txt    += f", {beads[last]} {', ' if last == i-1 else ' → '}{beads[i]}"
-                last, i = i+1, i+2
-            else:
-                i      += 1
-
-        if last == len(beads)-1:
-            txt += ", "+str(beads[last])
-        else:
-            txt += f", {beads[last]} {', ' if last == len(beads)-2 else ' → '}{beads[-1]}"
-        return txt[2:]
 
 @dataclass
 class RampZMagHintsTheme:

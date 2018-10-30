@@ -7,6 +7,7 @@ import pathlib
 import pytest
 import numpy as np
 from   utils                import escapenans, fromstream
+from   utils.array          import intlistsummary
 from   utils.lazy           import LazyInstError, LazyInstanciator, LazyDict
 from   utils.attrdefaults   import fieldnames, changefields, initdefaults
 
@@ -240,5 +241,14 @@ def test_init():
 
     assert Agg(attr = [2]).elem.attr == [2]
 
+def test_intlist():
+    "tests intlist"
+    # pylint: disable=blacklisted-name
+    assert intlistsummary(range(5)) == "0 → 4"
+    assert intlistsummary(range(5,0, -1)) == "1 → 5"
+    assert intlistsummary([])  == ""
+    assert intlistsummary([1,2,3, 6,7, 10,11,12, 14]) == "1 → 3, 6, 7, 10 → 12, 14"
+    assert intlistsummary([1,3, 6, 2, 10,11,7,12, 14]) == "1 → 3, 6, 7, 10 → 12, 14"
+
 if __name__ == '__main__':
-    test_init()
+    test_intlist()
