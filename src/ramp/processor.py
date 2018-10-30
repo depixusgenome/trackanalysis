@@ -90,14 +90,20 @@ class RampDataFrameProcessor(Processor[RampDataFrameTask]):
             tsk = cast(RampDataFrameTask, cast(type, cls.tasktype)(**kwa))
 
         data.set_index(["bead", "cycle"], inplace = True)
-        frame = data[["extent", "hfsigma"]].groupby(level = 0).median().dropna()
+        data  = data.assign(fixed = data.zmagopen.isna())
+        frame = (data[["extent", "hfsigma", "fixed"]]
+                 .dropna()
+                 .groupby(level = 0)
+                 .agg({"extent": "median", "hfsigma": "median",
+                       "fixed": ("sum", "count")}))
+        frame.columns = [i[0] if i[1] == "median" else "".join(i) for i in frame.columns]
         good  = (frame.hfsigma > tsk.hfsigma[0]) & (frame.hfsigma < tsk.hfsigma[1])
         frame["status"] = ["bad"] * len(frame)
-        frame.loc[(frame.extent    > tsk.extension[1])
+        frame.loc[(frame.extent    > tsk.extension[0])
                   & (frame.extent  < tsk.extension[2])
                   & good, "status"] = "ok"
-        frame.loc[(frame.extent    > tsk.extension[0])
-                  & (frame.extent  <= tsk.extension[1])
+        frame.loc[(frame.extent  <= tsk.extension[1])
+                  & (frame.fixedsum == frame.fixedcount)
                   & good, "status"] = "fixed"
 
         if "status" in data.columns:
