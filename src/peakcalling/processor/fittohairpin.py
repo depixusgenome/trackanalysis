@@ -65,6 +65,7 @@ class FitToHairpinTask(Task):
     fit         : Fitters     = dict()
     constraints : Constraints = dict()
     match       : Matchers    = dict()
+    pullphaseratio: float     = .88
     DEFAULT_FIT               = PeakGridFit
     DEFAULT_MATCH             = PeakMatching
     DEFAULT_CONSTRAINTS       = dict(stretch = Range(None, 0.1,  10.),
@@ -164,7 +165,9 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
                 return {cstr[0]: hpin.optimize(bead)}
 
         if len(bead) > 0:
-            return {name: calc.optimize(bead) for name, calc in fits.items()}
+            extent = self.track.beadextension(key)*self.config.pullphaseratio
+            return {name: calc.optimizewithinrange(bead, extent)
+                    for name, calc in fits.items()}
 
         return {None: next(iter(fits.values())).optimize(bead)}
 

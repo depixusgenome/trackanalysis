@@ -62,6 +62,21 @@ class HairpinFitter(OptimizationParams):
             return ((bval-aval)/max(aval, bval)-.5)*2.
         return 1. if len(dist) == 1 else -3.
 
+    def withinrange(self, extension) -> bool:
+        "return whether the bead extension is within range of the last peak (hairpin size)"
+        get  = lambda x, y: x if y.center is None else y.center
+        mins = get(self.DEFAULT_STRETCH, self.stretch) - self.stretch.size
+        maxs = get(self.DEFAULT_STRETCH, self.stretch) + self.stretch.size
+        minb = get(0., self.bias) - self.bias.size
+        maxb = get(0., self.bias) + self.bias.size
+        return (extension-maxb)*mins < self.peaks[-1] < (extension-minb)*maxs
+
+    def optimizewithinrange(self, peaks: np.ndarray, extent:float) -> Distance:
+        "optimizes the cost function if the extension is within range"
+        if self.withinrange(extent):
+            return self.optimize(peaks)
+        return Distance(np.finfo("f4").max, self.DEFAULT_STRETCH, 0.)
+
     def optimize(self, peaks: np.ndarray) -> Distance:
         "optimizes the cost function"
         raise NotImplementedError()

@@ -409,5 +409,10 @@ def test_clone():
     assert all(i is j for i, j in zip(trk1._secondaries.values(), trk2._secondaries.values()))
     assert trk1.fov.image is trk2.fov.image
 
+def test_beadextension():
+    "test bead extension"
+    trk1 = Track(path = utpath("big_legacy"))
+    assert abs(trk1.beadextension(0) - 0.9456543) < 1e-5
+
 if __name__ == '__main__':
-    test_clone()
+    test_beadextension()

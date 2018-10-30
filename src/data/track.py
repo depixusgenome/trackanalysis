@@ -548,3 +548,13 @@ class Track:
                                  for i in ibead-set(cache))
                 val = iter((i, cache[i]) for i in ibead)
         return val
+
+    def beadextension(self, ibead):
+        """
+        Return the median bead extension (phase 3 - phase 1)
+        """
+        inds = [PHASE.initial, PHASE.initial+1, PHASE.pull, PHASE.pull+1]
+        bead = np.split(self.data[ibead],
+                        self.phases[:, inds].ravel() - self.phases[0,0])[1::2]
+        return np.nanmedian([np.nanmedian(bead[i+1]) - np.nanmedian(bead[i])
+                             for i in range(0, len(bead), 2)])

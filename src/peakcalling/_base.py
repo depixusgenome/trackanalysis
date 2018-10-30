@@ -66,8 +66,9 @@ def config(self:OptimType, **kwa) -> Dict[str, float]:
 
 class OptimizationParams:
     "Optimizing parameters"
-    stretch          = Range(1./8.8e-4, 200., 100.)
-    bias             = Range(None,       60.*8.8e-4, 60.*8.8e-4)
+    DEFAULT_STRETCH  = 1./8.8e-4
+    stretch          = Range(DEFAULT_STRETCH, 200., 100.)
+    bias             = Range(None,       60./DEFAULT_STRETCH, 60./DEFAULT_STRETCH)
     optim: OptimType = LBFGSParameters(1e-4, 1e-8, 1e-4, 1e-8, 100)
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
