@@ -40,33 +40,30 @@ export class DpxCleaningView extends WidgetView
                  dbal+'Constant or noisy cycles are deleted'+pos,
                  dbal+'Enough cycles should reach 0 or the bead is discarded'+pos]
 
-
-        empty = "<br style='margin-top: 16px;'/>"
-        html = "<div><div class='dpx-span'>"+
-                   "<p>Fixed beads:</p><p id='dpx-cl-fixedbeads'>#{@model.fixedbeads}</p>"+
-               "</div></div>"+
-               "<div><div class='dpx-span'>"+
-                   "<label #{ttips[0]}>Subtracted</label>"+
-                   "#{@mk_txt("subtracted")}"+
-                   "#{@mk_btn("add", "╋", ttips[1])}</div></div>"+
-               "<div><table><tr><td #{ttips[2]}>|z| ≤</td>"+
-                          "<td>#{@mk_inp("maxabsvalue", 10.0, 0.1)}</td>"+
-                          "<td #{ttips[4]}>|dz/dt| ≤</td>"+
-                          "<td>#{@mk_inp("maxderivate", 10.0, 0.1)}</td></tr>"+
-                      "<tr><td></td>"+
-                          "<td>#{@mk_inp("minextent", 10.0, 0.05)}</td>"+
-                          "<td #{ttips[3]}>≤ Δz ≤</td>"+
-                          "<td>#{@mk_inp("maxextent", 10.0, 0.05)}</td></tr>"+
-                      "<tr><td></td>"+
-                          "<td>#{@mk_inp("minhfsigma", 0.05, 0.0001)}</td>"+
-                          "<td #{ttips[6]}>≤ σ[HF] ≤</td>"+
-                          "<td>#{@mk_inp("maxhfsigma", 0.05,  0.001)}</td></tr>"+
-                      "<tr><td #{ttips[5]}>% good  ≥</td>"+
-                          "<td>#{@mk_inp("minpopulation", 100, 0.1)}</td>"+
-                          "<td></td><td></td></tr></table></div>"+
-               "<div><div class='dpx-span'>"+
-                   "<label #{ttips[7]} style='width: 170px;'>Non-closing cycles (%) ≤</label>"+
-                   "#{@mk_inp("maxsaturation", 100.0, 1.0)}</div></div>"
+        html = "<table><tr><td>Fixed beads</td>"+
+                       "<td id='dpx-cl-fixedbeads' style='width:350px;'>"+
+                            "#{@model.fixedbeads}</td></tr>"+
+                   "<tr><td #{ttips[0]}>Subtracted</td>"+
+                       "<td><div  class='dpx-span'>#{@mk_txt("subtracted")}"+
+                            "#{@mk_btn("add", "╋", ttips[1])}</div></td></tr>"+
+               "</table>"+
+               "<table><tr><td #{ttips[2]}>|z| ≤</td>"+
+                     "<td>#{@mk_inp("maxabsvalue", 10.0, 0.1)}</td>"+
+                     "<td #{ttips[4]}>|dz/dt| ≤</td>"+
+                     "<td>#{@mk_inp("maxderivate", 10.0, 0.1)}</td></tr>"+
+                 "<tr><td></td>"+
+                     "<td>#{@mk_inp("minextent", 10.0, 0.05)}</td>"+
+                     "<td #{ttips[3]}>≤ Δz ≤</td>"+
+                     "<td>#{@mk_inp("maxextent", 10.0, 0.05)}</td></tr>"+
+                 "<tr><td></td>"+
+                     "<td>#{@mk_inp("minhfsigma", 0.05, 0.0001)}</td>"+
+                     "<td #{ttips[6]}>≤ σ[HF] ≤</td>"+
+                     "<td>#{@mk_inp("maxhfsigma", 0.05,  0.001)}</td></tr>"+
+                 "<tr><td #{ttips[5]}>% good  ≥</td>"+
+                     "<td>#{@mk_inp("minpopulation", 100, 0.1)}</td>"+
+                     "<td #{ttips[7]}>Non-closing cycles (%)</td>"+
+                     "<td>#{@mk_inp("maxsaturation", 100.0, 1.0)}</td></tr>"+
+                 "</table>"
 
 
         @el.innerHTML = html

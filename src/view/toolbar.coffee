@@ -154,9 +154,9 @@ export class DpxToolbarView extends WidgetView
 
   get_width_height: () ->
       [width, height] = LayoutDOMView::get_width_height()
-      return [width, 50]
+      return [width, 40]
 
-  get_height: () -> 50
+  get_height: () -> 40
 
 export class DpxToolbar extends Widget
     type: 'DpxToolbar'

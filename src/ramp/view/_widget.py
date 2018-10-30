@@ -382,7 +382,7 @@ class RampHairpinSizeWidget:
 
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
-    __objects = TaskWidgetEnabler
+    __objects : TaskWidgetEnabler
     def __init__(self, ctrl, model):
         self.__widgets = dict(filtering = RampFilterWidget(model),
                               status    = RampBeadStatusWidget(ctrl, model),
@@ -404,4 +404,4 @@ class WidgetMixin(ABC):
     def _resetwidget(self, cache: CACHE_TYPE, disable: bool):
         for ite in self.__widgets.values():
             getattr(ite, 'reset')(cache)
-        self.__objects.disable(cache, disable) # type: ignore
+        self.__objects.disable(cache, disable)

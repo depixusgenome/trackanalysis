@@ -37,7 +37,7 @@ class FoVPlotTheme(PlotTheme):
                             selection_text_color    = 'blue')
     image       = PlotAttrs('Greys256', 'image', x = 0, y = 0)
     radius      = 1.
-    figsize     = 800, 800, 'fixed'
+    figsize     = 700, 700, 'fixed'
     ylabel      = 'Y (μm)'
     xlabel      = 'X (μm)'
     colors      = dict(good = 'palegreen', fixed     = 'chocolate',

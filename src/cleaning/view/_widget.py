@@ -60,11 +60,11 @@ class CyclesListTheme:
     order   = ('population', 'hfsigma', 'extent', 'aberrant',
                'pingpong', 'saturation', 'good')
     width   = 65
-    height  = 420
+    height  = 300
     columns = [['cycle',      u'Cycle',       '0'],
                ['population', u'% good',      '0.'],
                ['hfsigma',    u'σ[HF]',       '0.0000'],
-               ['extent',     u'Δz',          '0.0'],
+               ['extent',     u'Δz',          '0.00'],
                ['pingpong',   u'Σ|dz|',       '0.0'],
                ['saturation', u'Non-closing', ''],
                ['discarded',  u'Discarded',   '']]
@@ -240,7 +240,7 @@ class CleaningFilterWidget:
 
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
-    __objects = TaskWidgetEnabler
+    __objects : TaskWidgetEnabler
     def __init__(self, ctrl, model):
         self.__widgets = dict(table    = CyclesListWidget(ctrl, model.cleaning),
                               align    = AlignmentWidget(ctrl, model.alignment),

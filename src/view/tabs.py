@@ -17,7 +17,7 @@ class TabsTheme:
     name:    str            = "Tabs"
     initial: str            = ""
     width:   int            = 500
-    height:  int            = 60
+    height:  int            = 30
     titles:  Dict[str, str] = {}
 
     @initdefaults(locals())

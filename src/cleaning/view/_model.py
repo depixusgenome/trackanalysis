@@ -169,6 +169,8 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
     @property
     def availablefixedbeads(self) -> FIXED_LIST:
         "return the availablefixed beads for the current track"
+        if self.roottask is None:
+            return []
         return self.fixedbeads.current(self._ctrl, self.roottask)
 
 class CleaningPlotTheme(PlotTheme):
@@ -177,7 +179,7 @@ class CleaningPlotTheme(PlotTheme):
     """
     name             = "cleaning.theme"
     points           = PlotAttrs('color',  'circle', 1, alpha   = .5)
-    figsize          = 500, 800, 'fixed'
+    figsize          = 500, 700, 'fixed'
     widgetwidth      = 470
     order            = ('aberrant', 'hfsigma', 'extent', 'population',
                         'pingpong', 'saturation', 'good')

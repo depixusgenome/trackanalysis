@@ -40,7 +40,7 @@ class PlotTheme:
     yrightlabel   = 'Base number'
     xtoplabel     = 'Time (s)'
     xlabel        = 'Frames'
-    figsize       = 800, 600, 'fixed'
+    figsize       = 700, 600, 'fixed'
     overshoot     =.001
     toolbar       = dict(sticky   = False,
                          location = 'above',

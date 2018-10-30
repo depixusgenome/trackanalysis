@@ -40,7 +40,7 @@ class PeaksPlotTheme(PlotTheme):
     cleaning plot theme
     """
     name            = "hybridstat.peaks.plot"
-    figsize         = 500, 750, "fixed"
+    figsize         = 500, 700, "fixed"
     xtoplabel       = 'Duration (s)'
     xlabel          = 'Rate (%)'
     widgetsborder   = 10
