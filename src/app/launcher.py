@@ -96,13 +96,28 @@ class _FunctionHandler(FunctionHandler):
             return __old__(self, json, models = models)
         Seq.from_json = from_json
 
-        output = view.APPNAME.lower() + '.js'
-        if Path(output).exists() and CAN_LOAD_JS:
-            def _bundle():
-                LOGS.info('monkeypatching bokeh compiler with %s', output)
-                return ''.join(open(output, encoding = 'utf-8'))
-            import bokeh.embed.util as embed
-            embed.bundle_all_models = _bundle
+        if CAN_LOAD_JS:
+            from bokeh.util import compiler
+            cache = getattr(compiler, "_bundle_cache")
+            force = False
+            for path in Path(".").glob("*.js"):
+                with open(path, encoding = 'utf-8') as stream:
+                    out = stream.readlines()
+                key = out[0][len("/*KEY="):-len("*/\n")]
+                if key == view.APPNAME.lower():
+                    cache[compiler.calc_cache_key()] = "".join(out[1:])
+                    force                            = True
+                else:
+                    cache[key] = "".join(out[1:])
+
+            key = compiler.calc_cache_key()
+            if key not in cache or force:
+                output = view.APPNAME.lower() + '.js'
+                string = compiler.bundle_all_models()
+                string = f"/*KEY={key}*/\n"+string
+                LOGS.info('caching bokeh js to %s', output)
+                with open(output, "w", encoding = 'utf-8') as stream:
+                    print(string, file=stream)
 
         def _stop(self, wait=True, __old__ = Server.stop):
             if not getattr(self, '_stopped', False):

@@ -3,7 +3,6 @@
 "Compiles the JS code once and for all"
 import sys
 from typing     import List
-from functools  import wraps
 from pathlib    import Path
 import re
 
@@ -32,15 +31,7 @@ def compileapp(*modules) -> str:
     string = re.sub(r'//\s[^\n]*?\n', '',  string)
     string = re.sub(r'\s\s+',         ' ', string)
     string = re.sub(r'\s*([,;={}()])\s*', lambda x: x.group(1), string)
-    return string
-
-def monkeypatch(output):
-    "monkeypatches the compiler"
-    if Path(output).exists():
-        @wraps(_compiler.bundle_all_models)
-        def _bundle():
-            return ''.join(open(output, encoding = 'utf-8'))
-        _compiler.bundle_all_models = _bundle
+    return f"/*KEY={_compiler.calc_cache_key()}*/\n"+string
 
 if __name__ == '__main__':
     # pylint: disable=no-value-for-parameter
@@ -58,6 +49,7 @@ if __name__ == '__main__':
         if output is None:
             print(string)
         else:
-            print(string, file = open(output, 'w', encoding='utf-8'))
+            print(f"/*KEY={Path(output).stem}*/\n"+string,
+                  file = open(output, 'w', encoding='utf-8'))
 
     _main()
