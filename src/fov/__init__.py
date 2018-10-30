@@ -115,19 +115,19 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
                                               tooltips  = self._theme.tooltips)
 
         def _onselect_cb(attr, old, new):
-            inds = new.indices
-            if len(inds) == 0:
+            if len(new) == 0:
                 return
 
             # pylint: disable=unsubscriptable-object
-            bead = int(self._beadssource.data['text'][inds[0]])
+            bead = int(self._beadssource.data['text'][new[0]])
             if bead == self._model.bead:
                 return
 
             with Action(self._ctrl):
                 self._ctrl.display.update("tasks", bead = bead)
 
-        self._beadssource.on_change('selected', _onselect_cb)
+        # pylint: disable=no-member
+        self._beadssource.selected.on_change("indices", _onselect_cb)
         return self._fig
 
     def _reset(self, cache:CACHE_TYPE):
