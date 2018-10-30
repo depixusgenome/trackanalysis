@@ -4,7 +4,6 @@
 import sys
 from typing     import List
 from pathlib    import Path
-import re
 
 import bokeh.util.compiler as _compiler
 
@@ -28,9 +27,6 @@ def compileapp(*modules) -> str:
     for mod in modules:
         __import__(mod)
     string = _compiler.bundle_all_models()
-    string = re.sub(r'//\s[^\n]*?\n', '',  string)
-    string = re.sub(r'\s\s+',         ' ', string)
-    string = re.sub(r'\s*([,;={}()])\s*', lambda x: x.group(1), string)
     return f"/*KEY={_compiler.calc_cache_key()}*/\n"+string
 
 if __name__ == '__main__':
