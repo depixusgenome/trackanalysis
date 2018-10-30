@@ -10,7 +10,7 @@ from    scipy.interpolate       import interp1d
 from    dataclasses             import dataclass, field
 import  bokeh.core.properties   as     props
 from    bokeh.models            import (Widget, DataTable, TableColumn,
-                                        ColumnDataSource, Slider)
+                                        ColumnDataSource, Slider, StringFormatter)
 
 from    control.beadscontrol    import TaskWidgetEnabler
 from    view.static             import ROUTE
@@ -100,9 +100,10 @@ class RampBeadStatusTheme:
     name:   str             = "ramp.status"
     height: int             = 100
     status: Dict[str, str]  = dflt({i: i for i in ("ok", "fixed", "bad")})
-    columns: List[List]     = dflt([["status", "status", 40],
-                                    ["count",  "count",  40],
-                                    ["beads",  "beads",  400]])
+    columns: List[List]     = dflt([["status",  "Status", 40, ""],
+                                    ["count",   "Count",  40, "0"],
+                                    ["percent", "(%)",    40, "0"],
+                                    ["beads",   "Beads",  360, ""]])
 
 class RampBeadStatusWidget:
     "Table containing beads per status"
@@ -115,7 +116,10 @@ class RampBeadStatusWidget:
     def addtodoc(self, *_) -> List[Widget]:
         "creates the widget"
         self.__src = ColumnDataSource(self.__data())
-        cols       = [TableColumn(field = i[0], title = i[1], width = i[2])
+        fmt        = lambda x: (StringFormatter() if x == "" else
+                                DpxNumberFormatter(format = x, text_align = 'right'))
+        cols       = [TableColumn(field = i[0], title = i[1], width = i[2],
+                                  formatter = fmt(i[3]))
                       for i in self.__theme.columns]
         self.__widget = DataTable(source         = self.__src,
                                   columns        = cols,
@@ -135,16 +139,19 @@ class RampBeadStatusWidget:
 
     def __data(self):
         data    = self.__model.getdisplay("dataframe")
-        status  = {"status": list(self.__theme.status.values()),
-                   "count":  ["?", "?", "?"],
-                   "beads":  ["?", "?", "?"]}
+        status  = {"status":   list(self.__theme.status.values()),
+                   "count":   [np.NaN]*3,
+                   "percent": [np.NaN]*3,
+                   "beads":   ["?"]*3}
         if data is not None:
             data = data.groupby("bead").status.first().reset_index()
             data = data.groupby("status").bead.unique()
             for i, j in enumerate(self.__theme.status):
-                beads              = data.loc[j] if j in data.index else []
-                status["beads"][i] = self.__slider(beads)
-                status["count"][i] = len(beads)
+                beads                = data.loc[j] if j in data.index else []
+                status["beads"][i]   = self.__slider(beads)
+                status["count"][i]   = len(beads)
+            status["percent"] = np.array(status["count"])/sum(status["count"])*100.
+
         return status
 
     @staticmethod
@@ -312,7 +319,7 @@ class RampHairpinSizeTheme:
     height: int    = 125
     columns: List[List] = dflt([["z",       "Extension (µm)", 160, "0.00"],
                                 ["count",   "Count",          160, "0"],
-                                ["percent", "Percentage (%)", 160, "0"]])
+                                ["percent", "(%)",            160, "0"]])
 
 class RampHairpinSizeWidget:
     "Table containing discrete zmag values"
