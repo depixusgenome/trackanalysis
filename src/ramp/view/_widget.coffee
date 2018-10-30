@@ -31,9 +31,7 @@ export class DpxRampView extends WidgetView
                  dbal+'Constant or noisy beads are deleted'+pos,
                  dbal+'Normalize all bead sizes to 1.'+pos]
 
-
-        empty = "<br style='margin-top: 16px;'/>"
-        html  = "<div><table>"+
+        html  = "<table>"+
                     "<tr><td>#{@mk_inp("minhfsigma", 0.05, 0.0001)}</td>"+
                         "<td #{ttips[2]}>≤ σ[HF] ≤</td>"+
                         "<td>#{@mk_inp("maxhfsigma", 0.05,  0.001)}</td></tr>"+
@@ -43,17 +41,20 @@ export class DpxRampView extends WidgetView
                     "<tr><td></td>"+
                         "<td #{ttips[0]}>Δz fixed ≤</td>"+
                         "<td>#{@mk_inp("fixedextension")}</td></tr>"+
-                  "</table></div>"+
-                  "<div><table><tr>"
+                "</table><div class='dpx-span'>"+
+                    '<label class="bk-bs-radio" style="display: none !important;">'+
+                    '</label>'
 
-        labels = ["raw data", "Z (% strand size)", "Z (µm)"]
+        labels   = ["raw data", "Z (% strand size)", "Z (µm)"]
+        disabled = if @model.frozen then ' disabled=true' else ''
         for j in [0..2]
-            html += '<td><label class="bk-bs-radio"><input'
+            html += "<label class='bk-bs-radio'><input #{disabled}"
             if j == @model.displaytype
                 html += ' checked=true'
-            html += " type='radio' id='dpx-rp-displaytype-#{j}' class='dpx-rp-displaytype-itm'/>"+
-                    "#{labels[j]}</label></td>"
-        html += "</tr></table></div>"
+            html += " type='radio' id='dpx-rp-displaytype-#{j}'"+
+                    " class='dpx-rp-displaytype-itm dpx-rp-freeze'/>"+
+                    "#{labels[j]}</label>"
+        html += "</div>"
 
         @el.innerHTML = html
         elem = $(@el)
