@@ -5,7 +5,7 @@ import pickle
 from  collections       import ChainMap
 from  contextlib        import contextmanager
 from  copy              import deepcopy, copy
-from  typing            import Dict, Any
+from  typing            import Dict, Any, TypeVar
 
 import numpy            as     np
 import pandas           as     pd
@@ -83,6 +83,7 @@ def updatedict(self, model, kwa, force = False):
         model.pop(i)
     return dict(control = self, model = model,  old = old, new = new, deleted = rem)
 
+ObjType = TypeVar("ObjType")
 class DecentralizedController(Controller):
     """
     Controller to which can be added anything
@@ -103,7 +104,7 @@ class DecentralizedController(Controller):
         name = getattr(obj, 'name', None)
         return name if name else type(obj).__name__
 
-    def add(self, obj, noerase = True):
+    def add(self, obj: ObjType, noerase = True) -> ObjType:
         "add a model to be updated & observed through this controller"
         name = self._objname(obj)
         if name in self._objects:
