@@ -141,9 +141,9 @@ class RampBeadStatusWidget:
     def __data(self):
         data    = self.__model.getdisplay("dataframe")
         status  = {"status":   list(self.__theme.status.values()),
-                   "count":   [np.NaN]*3,
-                   "percent": [np.NaN]*3,
-                   "beads":   ["?"]*3}
+                   "count":   [np.NaN]*len(self.__theme.status),
+                   "percent": [np.NaN]*len(self.__theme.status),
+                   "beads":   [""]*len(self.__theme.status)}
         if data is not None:
             data = data.groupby("bead").status.first().reset_index()
             data = data.groupby("status").bead.unique()

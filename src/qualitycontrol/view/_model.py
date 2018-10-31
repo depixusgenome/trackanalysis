@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing all messages concerning discarded beads"
-from   typing                   import List, Dict, Set
+from   typing                   import List, Dict, Set, Tuple, Iterator
 
 from   data                     import BEADKEY
 from   control.modelaccess      import TaskPlotModelAccess, TaskAccess
@@ -10,7 +10,7 @@ from   cleaning.processor       import (DataCleaningTask, # pylint: disable=unus
                                         DataCleaningProcessor)
 from   model.level              import PHASE
 from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
-from   utils                    import initdefaults
+from   utils                    import dataclass, dflt, field, initdefaults
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
@@ -26,13 +26,24 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
 class DataCleaningTaskAccess(TaskAccess, tasktype = DataCleaningTask):
     "access to the DataCleaningTask"
 
+@dataclass
+class MissinBeadDetectionConfig:
+    "filters on messages to reinterpret these as missing beads"
+    hfsigma    = 90
+    population = 90
+    pingpong   = 10
+    def filter(self, ncycles, msgs) -> Iterator[int]:
+        "filter messages to return missing beads"
+        vals = {i: getattr(self, i) * ncycles*1e-2
+                for i in ("hfsigma", "population", "pingpong")}
+        return (i for i, j, k in zip(msgs["bead"], msgs["type"], msgs["cycles"])
+                if vals.get(j, ncycles+1) <= k)
+
+@dataclass
 class QualityControlDisplay:
     "QualityControlDisplay"
-    name                      = "qc"
-    messages: Dict[str, list] = {}
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
+    name:     str             = "qc"
+    messages: Dict[str, list] = field(default_factory = dict)
 
 class QualityControlModelAccess(TaskPlotModelAccess):
     "access to data cleaning"
@@ -40,6 +51,7 @@ class QualityControlModelAccess(TaskPlotModelAccess):
         super().__init__(ctrl)
         self.cleaning  = DataCleaningTaskAccess(self)
         self.__config  = FixedBeadDetectionModel(ctrl)
+        self.__missing = ctrl.theme.add(MissinBeadDetectionConfig(), False)
         self.__display = ctrl.display.add(QualityControlDisplay(), False)
 
     def addto(self, ctrl, name = "tasks", noerase = False):
@@ -74,6 +86,8 @@ class QualityControlModelAccess(TaskPlotModelAccess):
 
     def availablefixedbeads(self) -> FIXED_LIST:
         "returns bead ids with extent == all cycles"
+        if self.roottask is None:
+            return []
         return self.__config.current(self._ctrl, self.roottask)
 
     def messages(self) -> Dict[str, List]:
@@ -82,6 +96,24 @@ class QualityControlModelAccess(TaskPlotModelAccess):
         if not msg:
             self.buildmessages()
         return self.__display.messages
+
+    def status(self) -> Dict[str, Set[int]]:
+        "returns beads and warnings where applicable"
+        if self.track is None:
+            return {i: set() for i in ('bad', 'ok', 'fixed', 'missing')}
+
+        msg  = self.messages()
+        data = {'bad':     set(msg["bead"]),
+                'fixed':   set(i[-1] for i in self.availablefixedbeads()),
+                'ok':      set(self.track.beads.keys()),
+                'missing': set(self.__missing.filter(self.track.ncycles, msg))}
+
+        for i, j in data.items():
+            if i != "ok":
+                data['ok'].symmetric_difference_update(j)
+                if i != "bad":
+                    data['bad'].symmetric_difference_update(j)
+        return data
 
     def clear(self):
         "clears the model's cache"
@@ -115,34 +147,30 @@ class DriftControlPlotTheme(PlotTheme):
     def __init__(self, **_):
         super().__init__(**_)
 
+@dataclass
 class DriftControlPlotConfig:
     "allows configuring the drift control plots"
-    name              = "qc.driftcontrol"
-    percentiles       = [10, 50, 90]
-    yspan             = [5, 95], 0.3
-    phases            = PHASE.initial, PHASE.pull
-    warningthreshold  = 0.3
-
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
+    name             : str                     = "qc.driftcontrol"
+    percentiles      : List[int]               = dflt([10, 50, 90])
+    yspan            : Tuple[List[int], float] = dflt(([5, 95], 0.3))
+    phases           : Tuple[int, int]         = (PHASE.initial, PHASE.pull)
+    warningthreshold : float                   = 0.3
 
 class DriftControlPlotModel(PlotModel):
     "qc plot model"
     theme   = DriftControlPlotTheme()
     config  = DriftControlPlotConfig()
     display = PlotDisplay(name = "qc")
-
-class ExtensionPlotConfig(DriftControlPlotConfig):
-    "allows configuring the drift control plots"
-    name              = "qc.extension"
-    ybarspercentiles  = [25, 75]
-    yspan             = [5, 95], 0.3
-    phases            = PHASE.initial, PHASE.pull
-    warningthreshold  = 1.5e-2
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
-        super().__init__(**_)
+        super().__init__()
+
+@dataclass
+class ExtensionPlotConfig(DriftControlPlotConfig):
+    "allows configuring the drift control plots"
+    name             : str       = "qc.extension"
+    ybarspercentiles : List[int] = dflt([25, 75])
+    warningthreshold : float     = 1.5e-2
 
 class ExtensionPlotTheme(DriftControlPlotTheme):
     "drift control plot theme"
