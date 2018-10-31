@@ -11,7 +11,8 @@ class BeadController:
     "Deals with bead selection"
     def __init__(self, ctrl, mdl: TasksDisplay = None) -> None:
         self._ctrl   = ctrl
-        self.__tasks = cast(TasksDisplay, mdl if mdl else self._ctrl.display.model("tasks"))
+        self.__tasks = self._ctrl.display.add(TasksDisplay() if mdl is None else mdl,
+                                              False)
 
     @property
     def roottask(self) -> Optional[RootTask]:
@@ -108,6 +109,8 @@ class DataSelectionBeadController(BeadController):
     def discarded(self, vals: Iterable[int]):
         "sets beads discarded by the DataSelectionTask"
         root = self.roottask
+        if root is None:
+            return
         tsk  = self.task
         vals = frozenset(vals)
         if (root is None
