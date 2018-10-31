@@ -1,3 +1,55 @@
+# tag ramps_v2.0
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+Refactored completely the gui. The latter is as follows:
+
+|-------------------------------|---------------------------------------------|
+| Filters on bead quality       |                                             |
+|-------------------------------| Displays one of the following:              |
+| Choice: which display         |                                             |
+|-------------------------------| * Raw data for a single bead.               |
+| Table: status summary         | * Average behavior for the current bead and |
+|-------------------------------| an average behavior of all *good* beads, with |
+| Table: hairpin size summary   | their length renormalized to 100.           |
+|-------------------------------| * Average behavior for the current bead and |
+| Slider: providing the average | an average behavior of all *good* beads, both |
+| amount of opened hairpins per | without length renormalization.             |
+| choice of Z magnet            |                                             |
+|-------------------------------|                                             |
+| Table: bead opening amount    |                                             |
+| per Z magnet                  |                                             |
+|-------------------------------|---------------------------------------------|
+
+In particular the amount of opening is very different from the previous
+version. Instead of a number of closed beads, it's the median amount of DNA
+bases which remain unaccessible because the of beads still being partially
+opened. This median amount is over all cycles, irrespective of the beads it
+belongs to. Such a computation is hoped to be more robust than the previous one,
+especially given the usually low number of cycles available.
+
+Average behaviors are computed for each bead by:
+
+1. subtracting closing hysteresis (phases ... → 3) from the opening hysteresis
+   (phases 3 → ...)
+2. considering the 25th and 75th percentiles at every available Zmag.
+
+The average behavior for all beads is the median across *good* beads of the
+25th and 75th percentile.
+
+# tag cycles_v6.0
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+The gui has been revamped, in particular in tabs *FoV* and *QC*. The later now
+contains better summaries, also available in *RampApp*:
+
+1. Status of beads
+2. Sizes of beads
+
+When multiple hairpin sequences are provided in a fasta file, we now use a
+median bead extension to select only meaningful sequences. Thus a 5kb bead will
+discard sequences < 5kb and only consider those extending to ~5kb. When only
+one hairpin sequence is provided, the behaviour is unchanged.
+
 # tag cycles_v5.3
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
