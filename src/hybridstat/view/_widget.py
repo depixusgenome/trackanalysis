@@ -3,43 +3,39 @@
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
 import os
 from pathlib               import Path
-from typing                import Any, Dict, List
+from typing                import Any, Dict, List, Optional
 
 import numpy                 as np
 import bokeh.core.properties as props
 from bokeh.models               import (DataTable, TableColumn, CustomJS,
-                                        Widget, Div, StringFormatter, Paragraph,
-                                        Dropdown)
+                                        Widget, Div, StringFormatter, Dropdown)
 
-from signalfilter               import rawprecision
 
+from cleaning.view              import BeadSubtractionModalDescriptor
+from cyclesplot                 import ThemeNameDescriptor, FigureSizeDescriptor
+from eventdetection.view        import AlignmentModalDescriptor
+from excelreports.creation      import writecolumns
+from modaldialog.view           import AdvancedTaskMixin, T_BODY
 from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
 from peakfinding.groupby        import FullEm, ByHistogram
-from utils                      import initdefaults
+from sequences.view             import (SequenceTicker, SequenceHoverMixin,
+                                        OligoListWidget, SequencePathWidget)
+from signalfilter               import rawprecision
+from utils                      import dflt, dataclass
 from utils.gui                  import startfile
-from excelreports.creation      import writecolumns
-from eventdetection.view        import AlignmentModalDescriptor
-from cleaning.view              import BeadSubtractionModalDescriptor
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
 from view.plots                 import DpxNumberFormatter
 from view.toolbar               import FileList
-from cyclesplot                 import ThemeNameDescriptor, FigureSizeDescriptor
-from sequences.view             import (SequenceTicker, SequenceHoverMixin,
-                                        OligoListWidget, SequencePathWidget)
-from modaldialog.view           import AdvancedTaskMixin, T_BODY
 from ._model                    import (PeaksPlotModelAccess, FitToReferenceStore,
                                         PeaksPlotTheme)
 
+@dataclass
 class ReferenceWidgetTheme:
     "ref widget theme"
-    name  = "hybridstat.fittoreference.widget"
-    title = 'Reference Track'
-    none  = 'None'
-    width = 280
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
+    name  : str = "hybridstat.fittoreference.widget"
+    title : str = 'Select a reference track'
+    width : int = 280
 
 class ReferenceWidget:
     "Dropdown for choosing the reference"
@@ -72,7 +68,7 @@ class ReferenceWidget:
         ctrl.display.observe(FitToReferenceStore.name, _observe)
 
         self.__widget.on_click(_py_cb)
-        return [Paragraph(text = self.__theme.title), self.__widget]
+        return [self.__widget]
 
     def reset(self, resets):
         "updates the widget"
@@ -86,7 +82,7 @@ class ReferenceWidget:
     def __data(self) -> dict:
         lst        = list(self.__files())
         menu: list = [(j, str(i)) for i, j in enumerate(i for i, _ in lst)]
-        menu      += [None, (self.__theme.none, '-1')]
+        menu      += [None, (self.__theme.title, '-1')]
 
         key   = self.__model.fittoreference.reference
         index = -1 if key is None else [i for _, i in lst].index(key)
@@ -131,28 +127,26 @@ _LINE = """
     </div>
     """.strip().replace("    ", "").replace("\n", "")
 
+@dataclass
 class PeaksStatsWidgetTheme:
     "PeaksStatsWidgetTheme"
-    name        = "hybridstat.peaks.stats"
-    line        = _LINE
-    openhairpin =  ' & open hairpin'
-    orientation = u'-+ '
-    style       = {'padding-top': '40px'}
-    lines       = [['cycles',            '.0f'],
-                   ['Stretch (base/µm)', '.3f'],
-                   ['Bias (µm)',         '.4f'],
-                   ['σ[HF] (µm)',        '.4f'],
-                   ['σ[Peaks] (µm)',     '.4f'],
-                   ['Average Skew ',     '.2f'],
-                   ['Peak count',        '.0f'],
-                   ['Events per Cycle',  '.1f'],
-                   ['Down Time Φ₅ (s)',  '.1f'],
-                   ['Sites found',       ''],
-                   ['Silhouette',        '.1f'],
-                   ['reduced χ²',        '.1f']]
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
+    name        : str = "hybridstat.peaks.stats"
+    line        : str = _LINE
+    openhairpin : str =  ' & open hairpin'
+    orientation : str = '-+ '
+    style       : Dict[str, Any]  = dflt({})
+    lines       : List[List[str]] = dflt([['cycles',            '.0f'],
+                                          ['Stretch (base/µm)', '.3f'],
+                                          ['Bias (µm)',         '.4f'],
+                                          ['σ[HF] (µm)',        '.4f'],
+                                          ['σ[Peaks] (µm)',     '.4f'],
+                                          ['Average Skew ',     '.2f'],
+                                          ['Peak count',        '.0f'],
+                                          ['Events per Cycle',  '.1f'],
+                                          ['Down Time Φ₅ (s)',  '.1f'],
+                                          ['Sites found',       ''],
+                                          ['Silhouette',        '.1f'],
+                                          ['reduced χ²',        '.1f']])
 
 class PeaksStatsWidget:
     "Table containing stats per peaks"
@@ -271,24 +265,22 @@ class PeaksStatsWidget:
             ret[''] = tab()
         return ret
 
+@dataclass
 class PeakListTheme:
     "PeakListTheme"
-    name       = "hybridstat.peaks.list"
-    height     = 400
-    colwidth   = 60
-    refid      = '0.0000'
-    columns    = [['z',        'Z (µm)',                 '0.0000'],
-                  ['bases',    'Z (base)',               '0.0'],
-                  ['id',       'Id',                     '0'],
-                  ['orient',   'Strand',                 ''],
-                  ['distance', 'Distance',               '0.0'],
-                  ['count',    PeaksPlotTheme.xlabel,    '0.0'],
-                  ['duration', PeaksPlotTheme.xtoplabel, '0.000'],
-                  ['sigma',    'σ (µm)',                 '0.0000'],
-                  ['skew',     'skew',                   '0.00']]
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
+    name     : str             = "hybridstat.peaks.list"
+    height   : int             = 400
+    colwidth : int             = 60
+    refid    : str             = '0.0000'
+    columns  : List[List[str]] = dflt([['z',        'Z (µm)',                 '0.0000'],
+                                       ['bases',    'Z (base)',               '0.0'],
+                                       ['id',       'Id',                     '0'],
+                                       ['orient',   'Strand',                 ''],
+                                       ['distance', 'Distance',               '0.0'],
+                                       ['count',    PeaksPlotTheme.xlabel,    '0.0'],
+                                       ['duration', PeaksPlotTheme.xtoplabel, '0.000'],
+                                       ['sigma',    'σ (µm)',                 '0.0000'],
+                                       ['skew',     'skew',                   '0.00']])
 
 class PeakListWidget:
     "Table containing stats per peaks"
@@ -331,16 +323,15 @@ class PeakListWidget:
         "resets the wiget when a new file is opened"
         resets[self.__widget].update(columns = self.__cols())
 
+@dataclass
 class PeakIDPathTheme:
     "PeakIDPathTheme"
-    name       = "hybridstat.peaks.idpath"
-    title      = 'Id file path'
-    filechecks = 500
-    width      = 225
-    tableerror = ('File extension must be .xlsx', 'warning')
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
+    name       : str           = "hybridstat.peaks.idpath"
+    title      : Optional[str] = None
+    placeholder: str           = 'Id file path'
+    filechecks : int           = 500
+    width      : int           = 225
+    tableerror : List[str]     = dflt(['File extension must be .xlsx', 'warning'])
 
 class PeakIDPathWidget:
     "Selects an id file"
@@ -392,9 +383,10 @@ class PeakIDPathWidget:
     def addtodoc(self, mainview, ctrl, # type: ignore # pylint: disable=arguments-differ
                  _) -> List[Widget]:
         "creates the widget"
-        self.__widget = PathInput(width = self.__theme.width, title = self.__theme.title,
-                                  placeholder = "", value = "",
-                                  name = 'Peaks:IDPath')
+        self.__widget = PathInput(width       = self.__theme.width,
+                                  placeholder = self.__theme.placeholder,
+                                  title       = self.__theme.title,
+                                  name        = 'Peaks:IDPath')
 
         @mainview.actionifactive(ctrl)
         def _onclick_cb(attr, old, new):

@@ -13,7 +13,6 @@ require(python = {'python': '3.6.4', 'numpy': '1.14.2', 'pandas': '0.21.0'},
 require(python = {'pybind11'    : '2.2.1',
                   'pylint'      : '2.1.1',
                   'astroid'     : '2.0.3',
-                  'dataclasses' : '0.6',
                   'mypy'        : '0.630'},
         rtime  = False)
 

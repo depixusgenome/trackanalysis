@@ -11,18 +11,18 @@ export class PathInputView extends InputWidgetView
 
   render: () ->
     super()
-    mdl   = @model
-    label = "<label for=#{mdl.id}> #{mdl.title} </label>"
-    txt   = "<input class='bk-widget-form-input' type='text' "    +
-            "id=#{mdl.id} name=#{mdl.name} value='#{mdl.value}' " +
-            "placeholder='#{mdl.placeholder}' />"
+    if @model.title
+        label = "<label for=#{@model.id}> #{@model.title} </label>"
+    else
+        label = ""
+    txt   = "<input class='bk-widget-form-input' type='text' "             +
+            "id=#{@model.id} name=#{@model.name} value='#{@model.value}' " +
+            "placeholder='#{@model.placeholder}' />"
 
     btn   = "<button type='button' "                            +
             "class='bk-bs-btn bk-bs-btn-default' "              +
             "style='margin-left:5px'>+</button>"
-    $(@el).html("<fragment>#{label}<table><tr>"                 +
-              "<td>#{txt}</td><td>#{btn}</td>"                  +
-              "</tr></table></fragment>")
+    $(@el).html("<div class='dpx-span'>#{label}#{txt}#{btn}</div>")
 
     elem = $(@el)
 
@@ -31,7 +31,7 @@ export class PathInputView extends InputWidgetView
       # TODO - This 35 is a hack we should be able to compute it
       inp.height(@model.height - 35)
     if @model.width
-      inp.width(@model.width-25)
+      inp.width(@model.width-50)
     inp.prop("disabled", @model.disabled)
     inp.change(() => @change_input())
 

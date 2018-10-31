@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Create a grid displaying a sequence"
-from    typing         import List, Optional, Tuple, Any
+from    typing              import List, Optional, Tuple, Any, Dict
 import  numpy   as np
-
 import  bokeh.core.properties as props
 from    bokeh.plotting      import Figure
 from    bokeh.models        import (LinearAxis, ColumnDataSource, Range1d, Widget,
                                     BasicTicker, Dropdown, CustomJS,
                                     AutocompleteInput)
 
-from   utils                import initdefaults
+from   utils                import dataclass, dflt
 from   utils.gui            import implementation
 
 from   view.dialog          import FileDialog
@@ -20,22 +19,20 @@ from   view.plots.bokehext  import DpxHoverTool
 from   .                    import marksequence
 from   .modelaccess         import SequenceModel
 
+GridType = Dict[str, Dict[str,Any]]
+@dataclass
 class SequenceTickerTheme:
     "sequence ticker theme"
-    name     = "sequence.ticker"
-    standoff = -2
-    grid     = dict(dark = dict(color = ('lightgray', 'lightgreen'),
-                                width = (1,          1),
-                                alpha = (.8,         .8),
-                                dash  = ('solid',    'solid')),
-                    basic = dict(color = ('lightgray', 'lightgreen'),
-                                 width = (1,          1),
-                                 alpha = (.8,         .8),
-                                 dash  = ('solid',    'solid')))
-
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
+    name:     str      = "sequence.ticker"
+    standoff: int      = -2
+    grid:     GridType = dflt({'dark':  {'color': ('lightgray', 'lightgreen'),
+                                         'width': (1,          1),
+                                         'alpha': (.8,         .8),
+                                         'dash' : ('solid',    'solid')},
+                               'basic': {'color': ('lightgray', 'lightgreen'),
+                                         'width': (1,          1),
+                                         'alpha': (.8,         .8),
+                                         'dash' : ('solid',    'solid')}})
 
 def estimatebias(position: np.ndarray, cnt: np.ndarray) -> float:
     "estimate the bias using the plot data"
@@ -129,17 +126,14 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
         major = {i: majors[i]+minors[i] for i in majors}
         resets[self.__axis].update(major = major, minor = minor, key = key)
 
+@dataclass
 class SequenceHoverTheme:
     "sequence hover theme"
-    name     = "sequence.hover"
-    radius   = 1.
-    policy   = 'follow_mouse'
-    tooltips = '@z{1.1111} ↔ @values: @text'
-    oligosize = 4
-
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
+    name      : str   = "sequence.hover"
+    radius    : float = 1.
+    policy    : str   = 'follow_mouse'
+    tooltips  : str   = '@z{1.1111} ↔ @values: @text'
+    oligosize : int   = 4
 
 class SequenceHoverMixin:
     "controls keypress actions"
@@ -225,17 +219,14 @@ class SequenceHoverMixin:
         data['z']    = data['values']/mdl.stretch+(0. if mdl.bias is None else mdl.bias)
         return data
 
+@dataclass
 class SequencePathTheme:
     "SequencePathWidgetTheme"
-    name        = "sequence.path"
-    name        = "sequencetheme"
-    dlgtitle    = 'Open a fasta file'
-    missingkey  = 'Select sequence'
-    missingpath = 'Find path'
-    width       = 280
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
+    name       : str           = "sequence.path"
+    dlgtitle   : str           = 'Open a fasta file'
+    missingkey : str           = 'Select a hairpin sequence'
+    missingpath: str           = 'Select a hairpin path'
+    width      : int           = 280
 
 class SequencePathWidget:
     "Dropdown for choosing a fasta file"
@@ -243,9 +234,9 @@ class SequencePathWidget:
     __widget: Dropdown
     __theme:  SequencePathTheme
     __model:  SequenceModel
-    def __init__(self, ctrl, noerase = False):
+    def __init__(self, ctrl, noerase = False, **kwa):
         self.__list: List[str] = []
-        self.__theme           = ctrl.theme.add(SequencePathTheme(), noerase = noerase)
+        self.__theme           = ctrl.theme.add(SequencePathTheme(**kwa), noerase = noerase)
         self.__model           = SequenceModel().addto(ctrl, noerase = noerase)
 
     def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
@@ -306,15 +297,10 @@ class SequencePathWidget:
         key   = self.__model.currentkey
         val   = key if key in lst else None
         menu: List[Optional[Tuple[str,str]]] = [(i, i) for i in lst]
-        if len(menu):
-            title = self.__theme.missingkey
-            menu += [None, (title, '←')]
-        else:
-            title = self.__theme.missingpath
-            menu += [('', '→'), (title, '←')]
+        menu += [None if len(menu) else ('', '→'), (self.__theme.missingpath, '←')]
         return dict(menu  = menu,
-                    label = title if val is None else key,
-                    value = '→'   if val is None else val)
+                    label = self.__theme.missingkey if val is None else key,
+                    value = '→'                     if val is None else val)
 
     def __onclick(self, ctrl, new):
         if new in self.__list:
@@ -326,15 +312,13 @@ class SequencePathWidget:
                 if path is not None:
                     raise IOError("Could not find any sequence in the file")
 
+@dataclass
 class OligoListTheme:
     "OligoListTheme"
-    name      = "sequence.probes"
-    title     = 'Oligos'
-    tooltip   = 'comma-separated list'
-    width     = 280
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
+    name   : str = "sequence.probes"
+    title  : str = ""
+    tooltip: str = 'Oligos: comma-separated list'
+    width  : int = 280
 
 class OligoListWidget:
     "Input for defining a list of oligos"
@@ -347,11 +331,13 @@ class OligoListWidget:
 
     def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
         "creates the widget"
+        css           = [] if self.__theme.title else ["dpx-no-top-margin"]
         self.__widget = AutocompleteInput(**self.__data(),
                                           placeholder = self.__theme.tooltip,
                                           title       = self.__theme.title,
                                           width       = self.__theme.width,
-                                          name        = 'Cycles:Oligos')
+                                          name        = 'Cycles:Oligos',
+                                          css_classes = css)
 
         @mainview.actionifactive(ctrl)
         def _onclick_cb(attr, old, new):
