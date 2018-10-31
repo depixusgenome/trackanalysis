@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Matching experimental peaks to hairpins: tasks and processors"
-from   typing                           import (Optional, # pylint: disable=unused-import
-                                                Iterable, Sequence, Any, Dict,
-                                                Iterator, Tuple, Union, NamedTuple,
-                                                List, Generator, cast)
+from   typing                           import (Optional, Iterable, Sequence,
+                                                Dict, Iterator, Tuple, Union,
+                                                NamedTuple, Generator, cast)
 import numpy                            as     np
 
 from   utils                            import initdefaults
@@ -153,8 +152,9 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
     def _transform_ids(cls, sel):
         return cls._transform_to_bead_ids(sel)
 
-    # pylint: disable=signature-differs
-    def _keys(self, sel:Optional[Sequence], _: bool) -> Iterable[BEADKEY]: # type: ignore
+    def _keys(self,
+              sel:Optional[Sequence[BEADKEY]],
+              _  : Optional[bool] = None) -> Iterable[BEADKEY]:
         if self.config.defaultdata is not None:
             return super()._keys(sel, _)
 

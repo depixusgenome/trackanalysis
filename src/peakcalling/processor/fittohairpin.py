@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Matching experimental peaks to hairpins: tasks and processors"
-from   typing                      import (Dict, # pylint: disable=unused-import
-                                           List, Sequence, NamedTuple, FrozenSet,
+from   typing                      import (Dict, List, Sequence, NamedTuple,
                                            Type, Iterator, Tuple, Union, Optional,
                                            Iterable, Any, cast)
 
@@ -165,6 +164,8 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
                 return {cstr[0]: hpin.optimize(bead)}
 
         if len(bead) > 0:
+            if self.track is None:
+                return {name: calc.optimize(bead) for name, calc in fits.items()}
             extent = self.track.beadextension(key)*self.config.pullphaseratio
             return {name: calc.optimizewithinrange(bead, extent)
                     for name, calc in fits.items()}
@@ -188,7 +189,7 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
         "Action applied to the frame"
         if Beads.isbead(aitem):
             bead = cast(BEADKEY, aitem)
-            inp  = cast(PeakEvents,  self.data[bead])
+            inp  = cast(PeakEvents,  cast(dict, self.data)[bead])
         else:
             bead, inp = cast(PeakEventsTuple, aitem)
 
@@ -228,7 +229,7 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
     def _run(_1, _2, res:FitBead) -> Dict[str, np.ndarray]: # type: ignore
         out: Dict[str, List[np.ndarray]] = {i: [] for i in ('cycle', 'peak', 'avg', 'start')}
         for (peak, evts) in res.events:
-            for i, evt in enumerate(evts):
+            for i, evt in enumerate(cast(Iterator[np.ndarray], evts)):
                 if len(evt):
                     out['cycle'].append(np.full(len(evt), i,    dtype = 'i4'))
                     out['peak'] .append(np.full(len(evt), peak, dtype = 'f4'))
