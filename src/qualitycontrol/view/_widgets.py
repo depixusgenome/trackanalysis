@@ -1,18 +1,37 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing all messages concerning discarded beads"
-from    typing              import List, Dict
+from    typing              import List, Dict, Tuple, Iterable, Any
 from    copy                import deepcopy
 
 from    bokeh.models        import (ColumnDataSource, DataTable, TableColumn,
-                                    Widget, StringFormatter, Div)
+                                    Widget, Slider, StringFormatter, Div)
 from    bokeh               import layouts
 import  numpy               as     np
 
-from    utils               import dataclass, dflt
-from    utils.array         import intlistsummary
-from    view.plots          import DpxNumberFormatter
-from    ._model             import QualityControlModelAccess
+from    control.beadscontrol    import TaskWidgetEnabler
+from    utils                   import dataclass, dflt
+from    utils.array             import intlistsummary
+from    view.plots              import DpxNumberFormatter
+from    ._model                 import QualityControlModelAccess
+
+def addtodoc(ctrl, theme, data) -> Tuple[Any, ColumnDataSource, DataTable]:
+    "creates the widget"
+    theme  = ctrl.theme.add(theme, False)
+    src    = ColumnDataSource(data)
+    fmt    = lambda x: (StringFormatter() if x == "" else
+                        DpxNumberFormatter(format = x, text_align = 'right'))
+    cols   = [TableColumn(field = i[0], title = i[1], width = i[2],
+                          formatter = fmt(i[3]))
+              for i in theme.columns]
+    widget = DataTable(source         = src,
+                       columns        = cols,
+                       editable       = False,
+                       index_position = None,
+                       width          = sum(i[2] for i in theme.columns),
+                       height         = theme.height,
+                       header_row     = theme.headers)
+    return theme, src, widget
 
 _TEXT = """
 <table><tr>
@@ -35,7 +54,7 @@ class SummaryWidget:
         self.__model = model
         self.__theme = ctrl.theme.add(QCSummaryTheme(), False)
 
-    def addtodoc(self, _):
+    def addtodoc(self, *_):
         "creates the widget"
         self.__widget = Div(text = self.__text(), height = self.__theme.height)
         return [self.__widget]
@@ -56,7 +75,7 @@ class SummaryWidget:
 @dataclass
 class QCBeadStatusTheme:
     "RampBeadStatusTheme"
-    name:    str            = "ramp.status"
+    name:    str            = "qc.status"
     status:  Dict[str, str] = dflt({i: i for i in ("ok", "fixed", "bad", "missing")})
     height:  int            = 120
     headers: bool           = False
@@ -64,42 +83,34 @@ class QCBeadStatusTheme:
                                     ["count",   "Count",  40, "0"],
                                     ["percent", "(%)",    40, ""],
                                     ["beads",   "Beads",  180, ""]])
+    def __post_init__(self):
+        cols = self.columns[2] # pylint: disable=unsubscriptable-object
+        if not self.headers:
+            cols[-1] = ""
+        elif cols[-1] == "":
+            cols[-1] = "0"
 
 class QCBeadStatusWidget:
     "Table containing beads per status"
     __widget: DataTable
     __src   : ColumnDataSource
-    def __init__(self, ctrl, model:QualityControlModelAccess) -> None:
-        self.__model = model
-        self.__theme = ctrl.theme.add(QCBeadStatusTheme())
+    def __init__(self, ctrl, model, **args) -> None:
+        self._model = model
+        self.__theme = ctrl.theme.add(QCBeadStatusTheme(**args), False) # type: ignore
 
-    def addtodoc(self, *_) -> List[Widget]:
+    def addtodoc(self, _, ctrl) -> List[Widget]:
         "creates the widget"
-        self.__src = ColumnDataSource(self.__data())
-        fmt        = lambda x: (StringFormatter() if x == "" else
-                                DpxNumberFormatter(format = x, text_align = 'right'))
-        cols       = [TableColumn(field = i[0], title = i[1], width = i[2],
-                                  formatter = fmt(i[3]))
-                      for i in self.__theme.columns]
-        self.__widget = DataTable(source         = self.__src,
-                                  columns        = cols,
-                                  editable       = False,
-                                  index_position = None,
-                                  width          = sum(i[2] for i in self.__theme.columns),
-                                  height         = self.__theme.height,
-                                  header_row     = self.__theme.headers,
-                                  name           = "QC:Status")
+        self.__theme, self.__src, self.__widget = addtodoc(ctrl,
+                                                           self.__theme,
+                                                           self.__data())
         return [self.__widget]
-
-    def observe(self, ctrl):
-        "observe the controller"
 
     def reset(self, resets):
         "resets the wiget when a new file is opened"
         resets[self.__src].update(data = self.__data())
 
     def __data(self):
-        data    = self.__model.status()
+        data    = self._data()
         status  = {"status":   list(self.__theme.status.values()),
                    "count":   [np.NaN]*len(self.__theme.status),
                    "percent": [np.NaN]*len(self.__theme.status),
@@ -110,24 +121,131 @@ class QCBeadStatusWidget:
             status["beads"][i] = intlistsummary(beads)
             status["count"][i] = len(beads)
 
-        cnt               = 100./max(1, sum(status["count"]))
-        status["percent"] = [f"{i*cnt:.0f} %" for i in status["count"]]
+        cnt = 100./max(1, sum(status["count"]))
+        if self.__theme.headers:
+            status["percent"] = [i*cnt for i in status["count"]]
+        else:
+            status["percent"] = [f"{i*cnt:.0f} %" for i in status["count"]]
         return status
+
+    def _data(self):
+        return self._model.status()
+
+@dataclass
+class QCHairpinSizeTheme:
+    "RampBeadStatusTheme"
+    name:     str   = "qc.hairpinsize"
+    title:    str   = "Hairpins bin size"
+    binsize:  float = .1
+    binstep:  float = .05
+    headers:  bool  = False
+    height:   int   = 125
+    columns: List[List] = dflt([["z",       "Δz (µm)", 60, ""],
+                                ["count",   "Count",   40, "0"],
+                                ["percent", "(%)",     40, ""],
+                                ["beads",   "Beads",  180, ""]])
+    def __post_init__(self):
+        # pylint: disable=unsubscriptable-object
+        cols = self.columns
+        if not self.headers:
+            cols[2][-1] = cols[0][-1] = ""
+        else:
+            if cols[2][-1] == "":
+                cols[2][-1] = "0"
+            if cols[0][-1] == "":
+                cols[2][-1] = "0.00"
+
+class QCHairpinSizeWidget:
+    "Table containing discrete bead extensions"
+    __table : DataTable
+    __slider: Slider
+    __src   : ColumnDataSource
+    def __init__(self, ctrl, model):
+        self._model = model
+        self._theme = ctrl.theme.add(QCHairpinSizeTheme(), False)
+
+    def addtodoc(self, mainview, ctrl) -> List[Widget]:
+        "creates the widget"
+        self._theme, self.__src, self.__table = addtodoc(ctrl,
+                                                         self._theme,
+                                                         self.__tabledata())
+        self.__slider = Slider(title = self._theme.title,
+                               step  = self._theme.binstep,
+                               **self.__sliderdata())
+
+        @mainview.actionifactive(ctrl)
+        def _onchange_cb(attr, old, new):
+            ctrl.theme.update(self._theme, binsize = new)
+        self.__slider.on_change("value", _onchange_cb)
+        return [self.__slider, self.__table]
+
+    def observe(self, mainview, ctrl):
+        "observe the controller"
+        @ctrl.theme.observe(self._theme)
+        def _observe(**_):
+            if mainview.isactive():
+                self.__slider.update(**self.__sliderdata())
+                self.__src.update(data = self.__tabledata())
+
+    def reset(self, resets):
+        "resets the wiget when a new file is opened"
+        resets[self.__src].update(data = self.__tabledata())
+        resets[self.__slider].update(**self.__sliderdata())
+
+    def _sliderdata(self) -> Dict[str, float]:
+        task = self._model.cleaning.task
+        if task is None:
+            task = self._model.cleaning.configtask
+        return {'start': task.minextent,
+                "end"  : task.maxextent}
+
+    def _tabledata(self) -> Iterable[Tuple[int, float]]:
+        track = self._model.track
+        if track is None:
+            return ()
+        return ((i, track.beadextension(i)) for i in  self._model.status()["ok"])
+
+    def __sliderdata(self) -> Dict[str, float]:
+        data = self._sliderdata()
+        data["value"] = self._theme.binsize
+        return data
+
+    def __tabledata(self) -> Dict[str, np.ndarray]:
+        out   = {'z': np.empty(0), 'count': np.empty(0), 'percent': np.empty(0)}
+        data  = np.array(list(self._tabledata()),
+                         dtype = [("bead", "i4"), ("extent", "f4")])
+        if len(data) == 0:
+            return out
+
+        bsize = self._theme.binsize
+        inds  = np.round(data["extent"]/bsize).astype(int)
+        izval = np.sort(np.unique(inds))
+        if len(izval):
+            cnt = np.array([np.sum(inds == i) for i in izval])
+            out.update(z       = [data["extent"][inds == i].mean() for i in izval],
+                       count   = cnt,
+                       percent = cnt* 100./cnt.sum(),
+                       beads   = [intlistsummary(data["bead"][inds == i])
+                                  for i in izval])
+        if not self._theme.headers:
+            out["percent"] = [f"{i:.0f} %"  for i in out["percent"]]
+            out["z"]       = [f"{i:.2f} µm" for i in out["z"]]
+        return out
 
 @dataclass
 class MessagesListWidgetTheme:
     "MessagesListWidgetTheme"
     name     : str = "qc.messages"
-    height   : int = 400
+    height   : int = 150
     labels   : Dict[str, str] = dflt({'extent'     : 'Δz',
                                       'pingpong'   : 'Σ|dz|',
                                       'hfsigma'    : 'σ[HF]',
                                       'population' : '% good',
                                       'saturation' : 'non-closing'})
     columns : List[List]      = dflt([['bead',    u'Bead',    '0', 65],
-                                      ['type',    u'Type',    '',  78],
-                                      ['cycles',  u'Cycles',  '0', 78],
-                                      ['message', u'Message', '',  78]])
+                                      ['type',    u'Type',    '',  (320-65)//3],
+                                      ['cycles',  u'Cycles',  '0', (320-65)//3],
+                                      ['message', u'Message', '',  (320-65)//3]])
 
 class MessagesListWidget:
     "Table containing stats per peaks"
@@ -137,7 +255,7 @@ class MessagesListWidget:
         self.__model = model
         self.__theme = ctrl.theme.add(MessagesListWidgetTheme())
 
-    def addtodoc(self, _) -> List[Widget]:
+    def addtodoc(self, *_) -> List[Widget]:
         "creates the widget"
         fmt   = lambda i: (StringFormatter() if i == '' else
                            DpxNumberFormatter(format = i, text_align = 'right'))
@@ -161,6 +279,10 @@ class MessagesListWidget:
         itm  = self.__widget.source if resets is None else resets[self.__widget.source]
         itm.update(data = self.__data())
 
+    def shoulddisable(self) -> bool:
+        "whether one can enable the widget"
+        return self.__model.track is None
+
     def __data(self) -> Dict[str, List]:
         msgs = deepcopy(self.__model.messages())
         if len(msgs['bead']):
@@ -172,18 +294,30 @@ class MessagesListWidget:
 
 class QualityControlWidgets:
     "All widgets"
+    __objects : TaskWidgetEnabler
     def __init__(self, ctrl, mdl):
-        self.messages = MessagesListWidget(ctrl, mdl)
         self.summary  = SummaryWidget(ctrl, mdl)
         self.status   = QCBeadStatusWidget(ctrl, mdl)
+        self.extent   = QCHairpinSizeWidget(ctrl, mdl)
+        self.messages = MessagesListWidget(ctrl, mdl)
 
     def reset(self, bkmodels):
         "resets the widgets"
-        for widget in self.__dict__.values():
-            widget.reset(bkmodels)
+        for name, widget in self.__dict__.items():
+            if name[0] != "_":
+                widget.reset(bkmodels)
+        self.__objects.disable(bkmodels, self.messages.shoulddisable())
 
-    def addtodoc(self, ctrl, mode):
+    def observe(self, mainview, ctrl):
+        "observe the controller"
+        for name, widget in self.__dict__.items():
+            if name[0] != "_":
+                getattr(widget, "observe", lambda *x: None)(mainview, ctrl)
+
+    def addtodoc(self, mainview, ctrl, mode):
         "returns all created widgets"
-        get   = lambda i: getattr(self, i).addtodoc(ctrl)
-        order = "summary", "status", "messages"
-        return layouts.widgetbox(sum((get(i) for i in order), []), **mode)
+        get     = lambda i: getattr(self, i).addtodoc(mainview, ctrl)
+        order   = "summary", "status", "extent", "messages"
+        widgets = layouts.widgetbox(sum((get(i) for i in order), []), **mode)
+        self.__objects = TaskWidgetEnabler(widgets)
+        return widgets

@@ -4,10 +4,11 @@
 from   asyncio                  import wrap_future
 from   concurrent.futures       import ProcessPoolExecutor
 from   copy                     import deepcopy
-from   typing                   import Dict, Any, Optional, List
+from   typing                   import Dict, Any, Optional, List, Set
 
 import pandas                   as     pd
 
+from   control.beadscontrol     import DataSelectionBeadController
 from   control.modelaccess      import TaskAccess, TaskPlotModelAccess
 from   eventdetection.processor import ExtremumAlignmentTask # pylint: disable=unused-import
 from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
@@ -38,6 +39,23 @@ class RampPlotDisplay(PlotDisplay):
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
+
+    def status(self, root, disc) -> Dict[str, Set[int]]:
+        "return the beads per status"
+        data = self.dataframe.get(root, None)
+        if data is None:
+            return {}
+
+        out  = {i: set(j) for i, j in data.groupby("status").bead.unique().items()}
+        if isinstance(disc, (set, list)):
+            disc = set(disc)
+        else:
+            disc = set(DataSelectionBeadController(disc).discarded)
+
+        for i in out.values():
+            i.difference_update(disc)
+        out["discarded"] = disc
+        return out
 
 class RampPlotTheme(PlotTheme):
     """

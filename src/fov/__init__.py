@@ -42,8 +42,9 @@ class FoVPlotTheme(PlotTheme):
     calibfigsize= 256, 192, 'fixed'
     ylabel      = 'Y (μm)'
     xlabel      = 'X (μm)'
-    colors      = dict(good = 'palegreen', fixed     = 'chocolate',
-                       bad  = 'orange',    discarded = 'red')
+    colors      = dict(ok      = 'palegreen', fixed     = 'chocolate',
+                       bad     = 'orange',    discarded = 'red',
+                       missing = 'magenta')
     thumbnail   = 128
     calibimg    = PlotAttrs('Greys256', 'image', x = 0, y = 0)
     calibsize   = 6./16
@@ -58,9 +59,9 @@ class FoVPlotTheme(PlotTheme):
                    +'<td>{cycle}</td><td>cycle{plural} with:</td>'
                    +'<td>{type}</td><td>{message}</td>'
                    +'</tr>')
-    tooltipgood = ('<tr><td><td>'
-                   +'<td>σ[HF] =</td><td>{:.4f}</td>'
-                   +'</tr>')
+    tooltipok   = ('<tr><td><td><td>σ[HF] =</td><td>{:.4f}</td></tr>'
+                   '<tr><td><td><td>Δz    =</td><td>{:.2f}</td></tr>'
+                  )
     toolbar     = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,tap,save,hover'
     @initdefaults(frozenset(locals()))
@@ -200,40 +201,34 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
         if fov is None:
             return dict(data = dict.fromkeys(('x', 'y', 'text', 'color', 'ttips'), []))
 
-        hexes = tohex(self._theme.colors)
-        clrs  = hexes['good'], hexes['fixed'], hexes['bad'], hexes['discarded']
-        disc  = set(DataSelectionBeadController(self._ctrl).discarded)
-        fixed = self._availablefixedbeads() - disc
-        bad   = self._badbeads() - disc - fixed
-        ttips = self._tooltips()
-
-        items = fov.beads
-        data  = dict(x     = [i.position[0]  for i in items.values()],
-                     y     = [i.position[1]  for i in items.values()],
-                     text  = [f'{i}'         for i in items.keys()],
-                     color = [clrs[3 if i in disc  else
-                                   2 if i in bad   else
-                                   1 if i in fixed else
-                                   0] for i in items.keys()],
-                     ttips = [ttips[i] for i in items.keys()])
+        hexes  = tohex(self._theme.colors)
+        clrs   = {i: hexes[i] for i in ('ok', 'fixed', 'bad', 'discarded', 'missing')}
+        status = self._status()
+        ttips  = self._tooltips()
+        items  = fov.beads
+        data   = {"x"     : [i.position[0]  for i in items.values()],
+                  "y"     : [i.position[1]  for i in items.values()],
+                  "text"  : [f'{i}'         for i in items.keys()],
+                  "color" : [clrs[next((k for k, l in  status.items() if i in l),
+                                       "ok")] for i in items.keys()],
+                  "ttips" : [ttips[i] for i in items.keys()]}
         return dict(data = data)
 
-    def _goodtooltips(self, ttips):
-        row  = self._theme.tooltipgood
+    def _oktooltips(self, ttips):
+        row  = self._theme.tooltipok
         trk  = self._model.track
         for bead in DataSelectionBeadController(self._ctrl).allbeads:
             if bead not in ttips:
-                ttips[bead] = [row.format(rawprecision(trk, bead))]
+                ttips[bead] = [row.format(trk.rawprecision(bead),
+                                          trk.beadextension(bead))]
+
 
         return {i: ''.join(j) for i, j in ttips.items()}
 
     def _tooltips(self):
         raise NotImplementedError()
 
-    def _availablefixedbeads(self) -> Set[int]:
-        raise NotImplementedError()
-
-    def _badbeads(self) -> Set[int]:
+    def _status(self) -> Dict[str, Set[int]]:
         raise NotImplementedError()
 
 class FoVPlotCreator(BaseFoVPlotCreator[QualityControlModelAccess, # type: ignore
@@ -252,13 +247,10 @@ class FoVPlotCreator(BaseFoVPlotCreator[QualityControlModelAccess, # type: ignor
                              plural  = 's' if cyc > 1 else '')
             ttips.setdefault(bead, []).append(val)
 
-        return self._goodtooltips(ttips)
+        return self._oktooltips(ttips)
 
-    def _availablefixedbeads(self) -> Set[int]:
-        return {i[-1] for i in self._model.availablefixedbeads()}
-
-    def _badbeads(self) -> Set[int]:
-        return self._model.badbeads()
+    def _status(self) -> Dict[str, Set[int]]:
+        return self._model.status()
 
 class FoVPlotView(PlotView[FoVPlotCreator]):
     "FoV plot view"

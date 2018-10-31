@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "all view aspects here"
-from typing              import Set
+from typing                 import Set, Dict
 
-from fov                 import BaseFoVPlotCreator, FoVPlotModel
-from view.plots          import PlotView
-from view.tabs           import TabsView, TabsTheme, initsubclass
-from ._plot              import RampPlotView
-from ._model             import RampTaskPlotModelAccess, RampPlotDisplay
+from fov                    import BaseFoVPlotCreator, FoVPlotModel
+from view.plots             import PlotView
+from view.tabs              import TabsView, TabsTheme, initsubclass
+from ._plot                 import RampPlotView
+from ._model                import RampTaskPlotModelAccess, RampPlotDisplay
 
 class RampTabTheme(TabsTheme):
     "HybridStatTheme"
@@ -37,15 +37,10 @@ class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess, # type: ignore
         self._rampdisplay = ctrl.display.add(self._rampdisplay, noerase = noerase)
 
     def _tooltips(self):
-        return self._goodtooltips({})
+        return self._oktooltips({})
 
-    def _availablefixedbeads(self) -> Set[int]:
-        data = self._rampdisplay.dataframe.get(self._model.roottask, None)
-        return set() if data is None else set(data[data.status == "fixed"].bead.unique())
-
-    def _badbeads(self) -> Set[int]:
-        data = self._rampdisplay.dataframe.get(self._model.roottask, None)
-        return set() if data is None else set(data[data.status == "bad"].bead.unique())
+    def _status(self) -> Dict[str, Set[int]]:
+        return self._rampdisplay.status(self._model.roottask, self._ctrl)
 
 class FoVPlotView(PlotView[FoVPlotCreator]):
     "FoV plot view"
