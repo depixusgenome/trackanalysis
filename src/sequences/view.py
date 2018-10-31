@@ -7,7 +7,7 @@ import  numpy   as np
 import  bokeh.core.properties as props
 from    bokeh.plotting      import Figure
 from    bokeh.models        import (LinearAxis, ColumnDataSource, Range1d, Widget,
-                                    BasicTicker, Dropdown, Paragraph, CustomJS,
+                                    BasicTicker, Dropdown, CustomJS,
                                     AutocompleteInput)
 
 from   utils                import initdefaults
@@ -230,7 +230,6 @@ class SequencePathTheme:
     name        = "sequence.path"
     name        = "sequencetheme"
     dlgtitle    = 'Open a fasta file'
-    label       = 'Selected DNA sequence'
     missingkey  = 'Select sequence'
     missingpath = 'Find path'
     width       = 280
@@ -264,7 +263,7 @@ class SequencePathWidget:
             self.__onclick(ctrl, new)
 
         self.__widget.on_click(_onclick)
-        return [Paragraph(text = self.__theme.label), self.__widget]
+        return [self.__widget]
 
     def observe(self, ctrl):
         "sets-up config observers"
@@ -285,7 +284,7 @@ class SequencePathWidget:
     def callbacks(self, hover: SequenceHoverMixin, tick1: SequenceTicker):
         "sets-up callbacks for the tooltips and grids"
         if hover is not None:
-            jsc = CustomJS(code = ("if(src.column_names.indexOf(cb_obj.value) > -1)"
+            jsc = CustomJS(code = ("if(Object.key(src.data).indexOf(cb_obj.value) > -1)"
                                    "{ cb_obj.label     = cb_obj.value;"
                                    "  tick1.key        = cb_obj.value;"
                                    "  tick2.key        = cb_obj.value;"

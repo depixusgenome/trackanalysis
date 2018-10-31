@@ -28,7 +28,7 @@
             cnt.end = Math.max.apply(Math, src.data["count"][ix1..ix2])
 
     on_change_sequence: (src, peaks, stats, tick1, tick2, menu) ->
-        if menu.value in src.column_names
+        if menu.value in Object.keys(src.data)
             menu.label       = menu.value
             tick1.key        = menu.value
             tick2.key        = menu.value
