@@ -32,24 +32,28 @@ def test_excel():
         sequences['hp101'][i-3:i+1] = list('atgc')
     sequences['hp101'] = ''.join(sequences['hp101'])
 
-    tmp2   = np.array([(5, np.zeros(5)), (5, np.zeros(5))], dtype = EVENTS_DTYPE)
-    evts1  = [(0.,  np.array([None, None, None])),
-              (.01, np.array([None, (0, np.zeros(5)), tmp2])),
-              (.1,  np.array([None, None, (0, np.zeros(5))])),
-              (.5,  np.array([None, None, tmp2])),
-              (1.,  np.array([None, None, (0, np.zeros(5))]))]
+    pks    = lambda x: np.array(x, dtype = PEAKS_DTYPE)
+    evts   = lambda x: np.array(x, dtype = EVENTS_DTYPE)
+    empty  = evts([])
+    tmp2   = evts([(5, np.zeros(5)), (5, np.zeros(5))])
+    evts1  = [(0.,  np.array([empty, empty, empty])),
+              (.01, np.array([empty, evts([(0, np.zeros(5))]), tmp2])),
+              (.1,  np.array([empty, empty, evts([(0, np.zeros(5))])])),
+              (.5,  np.array([empty, empty, tmp2])),
+              (1.,  np.array([empty, empty, evts([(0, np.zeros(5))])]))]
     groups = [ByHairpinGroup('hp100',
                              [ByHairpinBead(100, .95, Distance(.1, 1000., 0.0),
-                                            np.array([(0., 0.),   (.01, np.iinfo('i4').min),
-                                                      (.1, 100.), (.5, 500.),
-                                                      (1., 1000.)], dtype = PEAKS_DTYPE),
+                                            pks([(0., 0.),   (.01, np.iinfo('i4').min),
+                                                 (.1, 100.), (.5, 500.), (1., 1000.)]),
                                             evts1)]),
               ByHairpinGroup(None,
                              [ByHairpinBead(101, -3, Distance(.1, 1000., 0.0),
-                                            np.array([(0., 0.)], dtype = PEAKS_DTYPE),
-                                            [(0., np.array([None, None, (0, np.zeros(5))]))]),
+                                            pks([(0., 0.)]),
+                                            [(0., np.array([empty, empty,
+                                                            evts([(0, np.zeros(5))])
+                                                           ]))]),
                               ByHairpinBead(102, -3, Distance(.1, 1000., 0.0),
-                                            np.empty((0,), dtype = PEAKS_DTYPE),
+                                            pks([]),
                                             [])])]
     dat   = {100: np.arange(10)*.1, 101: np.arange(10)*.2,
              102: np.arange(10)*.3, 104: np.arange(10)*.2}
@@ -94,7 +98,7 @@ def test_ids():
     writeparams(out, [('hp1', (1, 3, 5)), ('hp2', (10,)), ('hp3', tuple())])
     assert Path(out).exists()
     res = readparams(out)
-    assert set(res) == {(1, 'hp1'), (3, 'hp1'), (5, 'hp1'), (10, 'hp2')}
+    assert set(i[:2] for i in res) == {(1, 'hp1'), (3, 'hp1'), (5, 'hp1'), (10, 'hp2')}
 
     res = readparams(utfilepath('hybridstat_report.xlsx'))
     assert len(res) == 2
@@ -132,32 +136,29 @@ def test_excelprocessor():
         @staticmethod
         def values():
             "-"
-            tmp2   = np.array([(5, np.zeros(5)), (5, np.zeros(5))],
-                              dtype = EVENTS_DTYPE)
-            evts1  = [(0.,  np.array([None, None, None])),
-                      (.01, np.array([None, (0, np.zeros(5)), tmp2])),
-                      (.1,  np.array([None, None, (0, np.zeros(5))])),
-                      (.5,  np.array([None, None, tmp2])),
-                      (1.,  np.array([None, None, (0, np.zeros(5))]))]
+            pks    = lambda x: np.array(x, dtype = PEAKS_DTYPE)
+            evts   = lambda x: np.array(x, dtype = EVENTS_DTYPE)
+            empty  = np.empty(0)
+            tmp2   = evts([(5, np.zeros(5)), (5, np.zeros(5))])
+            evts1  = [(0.,  np.array([empty, empty, empty])),
+                      (.01, np.array([empty, evts([(0, np.zeros(5))]), tmp2])),
+                      (.1,  np.array([empty, empty, evts([(0, np.zeros(5))])])),
+                      (.5,  np.array([empty, empty, tmp2])),
+                      (1.,  np.array([empty, empty, evts([(0, np.zeros(5))])]))]
             return [ByHairpinGroup('hp100',
                                    [ByHairpinBead(100, .95, Distance(.1, 1000., 0.0),
-                                                  np.array([(0., 0.),
-                                                            (.01, np.iinfo('i4').min),
-                                                            (.1, 100.),
-                                                            (.5, 500.),
-                                                            (1., 1000.)],
-                                                           dtype = PEAKS_DTYPE),
+                                                  pks([(-1., 0.), (.01, np.iinfo('i4').min),
+                                                       (.1, 100.), (.5, 500.), (1., 1000.)]),
                                                   evts1)]),
                     ByHairpinGroup(None,
                                    [ByHairpinBead(101, -3, Distance(.1, 1000., 0.0),
-                                                  np.array([(0., 0.)],
-                                                           dtype = PEAKS_DTYPE),
-                                                  [(0., np.array([None, None,
-                                                                  (0, np.zeros(5))]))]),
+                                                  pks([(0., 0.)]),
+                                                  [(0.,
+                                                    np.array([empty, empty,
+                                                              evts([(0, np.zeros(5))])])
+                                                   )]),
                                     ByHairpinBead(102, -3, Distance(.1, 1000., 0.0),
-                                                  np.empty((0,), dtype = PEAKS_DTYPE),
-                                                  [])])]
-
+                                                  pks([]), [])])]
 
     task = HybridstatExcelTask(path      = mktemp()+"_hybridstattest2.xlsx",
                                hairpins  = {'hp100': HairpinFitter(peaks = truth[0]),
@@ -222,5 +223,8 @@ def test_reporting():
     tuple(itms)
     assert Path(out).exists()
 
+if __name__ == '__main__':
+    test_ids()
+    test_excelprocessor()
 if __name__ == '__main__':
     test_excelprocessor()
