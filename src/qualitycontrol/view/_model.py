@@ -4,6 +4,7 @@
 from   typing                   import List, Dict, Set, Tuple, Iterator
 
 from   data                     import BEADKEY
+from   control.beadscontrol     import DataSelectionBeadController
 from   control.modelaccess      import TaskPlotModelAccess, TaskAccess
 from   cleaning.view            import FixedBeadDetectionModel, FIXED_LIST
 from   cleaning.processor       import (DataCleaningTask, # pylint: disable=unused-import
@@ -50,6 +51,7 @@ class QualityControlModelAccess(TaskPlotModelAccess):
     def __init__(self, ctrl) -> None:
         super().__init__(ctrl)
         self.cleaning  = DataCleaningTaskAccess(self)
+        self.__ctrl    = ctrl
         self.__config  = FixedBeadDetectionModel(ctrl)
         self.__missing = ctrl.theme.add(MissinBeadDetectionConfig(), False)
         self.__display = ctrl.display.add(QualityControlDisplay(), False)
@@ -103,16 +105,19 @@ class QualityControlModelAccess(TaskPlotModelAccess):
             return {i: set() for i in ('bad', 'ok', 'fixed', 'missing')}
 
         msg  = self.messages()
-        data = {'bad':     set(msg["bead"]),
-                'fixed':   set(i[-1] for i in self.availablefixedbeads()),
-                'ok':      set(self.track.beads.keys()),
-                'missing': set(self.__missing.filter(self.track.ncycles, msg))}
+        data = {'bad':       set(msg["bead"]),
+                'fixed':     set(i[-1] for i in self.availablefixedbeads()),
+                'ok':        set(self.track.beads.keys()),
+                'missing':   set(self.__missing.filter(self.track.ncycles, msg)),
+                'discarded': set(DataSelectionBeadController(self.__ctrl).discarded)}
 
         for i, j in data.items():
             if i != "ok":
-                data['ok'].symmetric_difference_update(j)
+                data['ok'].difference_update(j)
                 if i != "bad":
-                    data['bad'].symmetric_difference_update(j)
+                    data['bad'].difference_update(j)
+                    if i != "discarded":
+                        j.difference_update(data['discarded'])
         return data
 
     def clear(self):
