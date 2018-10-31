@@ -391,6 +391,8 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                 cache = self._OrderedDict()
             yield cache
             for i, j in cache.items():
+                if self.state != PlotState.resetting:
+                    break
                 try:
                     upd = getattr(i, 'update', None)
                     if upd is None:
