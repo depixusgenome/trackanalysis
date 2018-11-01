@@ -123,7 +123,7 @@ class SaveFileDialog(FileDialog):
 
 class DpxToolbar(Widget):
     "Toolbar model"
-    __css__            = ROUTE+"/view.css"
+    __css__            = [ROUTE+"/view.css", ROUTE+"/icons.css"]
     __javascript__     = ROUTE+"/jquery.min.js"
     __implementation__ = 'toolbar.coffee'
     open        = props.Int(0)

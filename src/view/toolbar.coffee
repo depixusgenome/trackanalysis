@@ -77,7 +77,8 @@ export class DpxToolbarView extends WidgetView
                 itm += " type='radio' id='dpx-tb-flist-#{j}' class='dpx-tb-flist-itm'/>"+
                        "#{@model.filelist[j]}</label></td>"+
                        "<td><button type='button' class='bk-bs-btn bk-bs-btn-danger' "+
-                       "id='dpx-tb-flist-btn-#{j}' class='dpx-tb-flist-itm'>X</button></td>"+
+                       "id='dpx-tb-flist-btn-#{j}' class='dpx-tb-flist-itm'>"+
+                       @_icon('bin')+"</button></td>"+
                        "</tr>"
 
         itm += '</table></div></div>'
@@ -103,6 +104,9 @@ export class DpxToolbarView extends WidgetView
         $(@el).find("#dpx-tb-flist-#{id}").prop('checked', true)
         @model.currentfile = Number(id)
 
+    _icon: (label) ->
+        return '<i class="icon-'+label+'"></i>'
+
     render: () ->
         super()
         mdl  = @model
@@ -118,9 +122,9 @@ export class DpxToolbarView extends WidgetView
                  'Change wether to discard (=) or select (≠) specific beads',
                  'Remove the current bead']
 
-        html = @make_btn('open', 'Open', ttips[0], '')+
+        html = @make_btn('open', @_icon('folder-download'), ttips[0], '')+
                @make_filelist()+
-               @make_btn('save', 'Save', ttips[2])+
+               @make_btn('save', @_icon('folder-upload'), ttips[2])+
                "<label>Bead</label>"+
                "<input id='dpx-tb-bead'"+
                    " class='dpx-freeze bk-widget-form-input'"+
@@ -130,7 +134,7 @@ export class DpxToolbarView extends WidgetView
                "<input id='dpx-tb-discard'"+
                    " class='dpx-freeze bk-widget-form-input'"+
                    " type='text' value='#{mdl.discarded}'>"+
-               @make_btn('del', '━', ttips[4])+
+               @make_btn('del', @_icon('bin'), ttips[4])+
                "<div id='dpx-tb-message' class='bk-markup'>"+
                    "#{mdl.message}</div>"+
                "#{quit}"
