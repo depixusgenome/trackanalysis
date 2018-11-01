@@ -26,6 +26,8 @@ def build(bld, mods = None):
 @conf
 def transfer_static_html(bld):
     "transfers static files"
-    files = bld.path.ant_glob(['static/*.css', 'static/*.js', 'static/*.map',
-                               '*/static/*.css', '*/static/*.js', '*/static/*.map'])
+    files = bld.path.ant_glob([i+j
+                               for i in ('static/*.', '*/static/*.')
+                               for j in ("css", "js", "map", "svg", "eot",
+                                         "ttf", "woff")])
     wafbuilder.copyfiles(bld, 'static', files)
