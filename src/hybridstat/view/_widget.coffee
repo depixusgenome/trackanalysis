@@ -11,7 +11,15 @@ export class DpxFitParamsView extends WidgetView
     on_input: (evt) ->
         id = evt.target.id[7...]
         if id == "locksequence"
-            @model[id] = ($(@el).find("#dpx-pk-locksequence").prop("checked"))
+            elem       = $(@el)
+            @model[id] = elem.find("#dpx-pk-locksequence").prop("checked")
+
+            elem = elem.find("#dpx-pk-ls-icon")
+            elem.removeClass()
+            if @model[id]
+                elem.addClass("icon-dpx-lock")
+            else
+                elem.addClass("icon-dpx-unlocked")
         else
             @model[id] = evt.target.value
 
@@ -38,10 +46,10 @@ export class DpxFitParamsView extends WidgetView
                  dbal+'Lock the sequence to the currently selected one'+pos]
 
         html  = "<div class='dpx-span'>"+
-                    @mk_check("locksequence", "Lock sequence", ttips[2])+
-                    @mk_inp("stretch", "Stretch", ttips[0])+
+                    @mk_inp("stretch", "Stretch (base/µm)", ttips[0])+
                     @mk_inp("bias",    "Bias (µm)", ttips[1])+
-                "</div>"
+                "</div>" + @mk_check(ttips[2])
+                
 
         @el.innerHTML = html
 
@@ -58,14 +66,17 @@ export class DpxFitParamsView extends WidgetView
                     " class='dpx-pk-freeze bk-widget-form-input' type='text' "+
                     " placeholder='#{label}' value='#{@model[name]}'#{disabled}>"
 
-    mk_check: (name, label, ttip) ->
+    mk_check: (ttip) ->
         disabled = if @model.frozen then ' disabled=true' else ''
-        checked  = if @model[name] then ' checked=true' else ''
-        return "<label class='bk-bs-checkbox-inline' id='dpx-pk-ls-label'>"+
-                    "#{label}"+
-                    "<input id='dpx-pk-#{name}' #{ttip}"+
+        checked  = if @model.locksequence then ' checked=true' else ''
+        icon     = if @model.locksequence then 'lock' else 'unlocked'
+        return "<div class='bk-bs-btn-group' id='dpx-pk-ls-grp'>"+
+                "<label class='bk-bs-btn bk-bs-btn-default dpx-pk-freeze' "+
+                    "id='dpx-pk-ls-label' #{disabled}><span id='dpx-pk-ls-icon' "+
+                    "class='icon-dpx-#{icon}'></span>"+
+                    "<input id='dpx-pk-locksequence' #{ttip}"+
                         " class='dpx-pk-freeze bk-widget-form-input' type='checkbox' "+
-                        " #{checked}#{disabled}></input></label>"
+                        " #{checked}#{disabled}></input></label></div>"
 
 export class DpxFitParams extends Widget
     default_view: DpxFitParamsView

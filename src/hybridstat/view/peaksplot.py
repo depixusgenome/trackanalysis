@@ -273,7 +273,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
 
         mode     = self.defaultsizingmode()
         wbox     = lambda x: layouts.widgetbox(children = x, **mode)
-        order    = 'ref', 'seq','oligos','cstrpath', 'fitparams', 'advanced'
+        order    = 'ref', 'seq', 'fitparams', 'oligos','cstrpath', 'advanced'
         children = [[wbox(sum((wdg[i] for i in order), [])), wbox(wdg['stats'])],
                     [wbox(wdg['peaks'])]]
         return layouts.layout(children = children, **mode)
