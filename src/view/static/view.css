@@ -383,7 +383,7 @@ width: 100%; }
 
 /* the toolbar */
 .dpx-tb { float: left; height:30px; }
-.dpx-tb  button { width: 60px; min-width: unset !important; }
+.dpx-tb  button { width: 30px; min-width: unset !important; }
 #dpx-tb-bead    { width: 50px; height: 28px; }
 #dpx-tb-discard { width: 120px; height: 28px; min-width: unset; }
 #dpx-tb-selection { width: 30px; }
@@ -394,9 +394,7 @@ width: 100%; }
     width:auto; 
     height:28px;
 }
-#dpx-tb-del  { width: 30px; }
 #dpx-tb-quit { float: right; }
-#dpx-tb-flist-btn  { width: 30px; }
 
 #dpx-tb-flist {
     overflow: hidden;

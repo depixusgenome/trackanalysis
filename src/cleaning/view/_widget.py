@@ -163,7 +163,7 @@ class DownsamplingWidget:
 
 class DpxCleaning(Widget):
     "Interface to filters needed for cleaning"
-    __css__            = ROUTE+"/cleaning.css"
+    __css__            = ROUTE+"/cleaning.css?v=gittag"
     __javascript__     = [ROUTE+"/jquery.min.js", ROUTE+"/jquery-ui.min.js"]
     __implementation__ = "_widget.coffee"
     frozen             = props.Bool(True)

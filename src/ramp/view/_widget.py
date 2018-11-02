@@ -26,7 +26,7 @@ def dflt(default: Type, **kwa) -> Type:
 
 class DpxRamp(Widget):
     "Interface to filters needed for cleaning"
-    __css__            = ROUTE+"/ramp.css"
+    __css__            = ROUTE+"/ramp.css?v=gittag"
     __javascript__     = [ROUTE+"/jquery.min.js", ROUTE+"/jquery-ui.min.js"]
     __implementation__ = "_widget.coffee"
     frozen             = props.Bool(True)

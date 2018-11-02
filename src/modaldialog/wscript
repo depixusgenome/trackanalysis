@@ -3,7 +3,3 @@ import wafbuilder
 require(python = dict(bokeh = '1.0'), rtime = True)
 require(coffee = '1.10.0', rtime = False)
 make(builders = ['python', 'coffee'])
-
-@patch
-def postfix_build(bld):
-    bld.transfer_static_html()
