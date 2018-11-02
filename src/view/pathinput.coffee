@@ -21,7 +21,8 @@ export class PathInputView extends InputWidgetView
 
     btn   = "<button type='button' "                            +
             "class='bk-bs-btn bk-bs-btn-default' "              +
-            "style='margin-left:5px'>+</button>"
+            "style='margin-left:5px'><span class='icon-dpx-folder-plus'></span>"+
+            "</button>"
     $(@el).html("<div class='dpx-span'>#{label}#{txt}#{btn}</div>")
 
     elem = $(@el)

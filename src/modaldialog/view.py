@@ -8,6 +8,7 @@ from abc                import ABC, abstractmethod
 from copy               import deepcopy
 from bokeh.document     import Document
 from bokeh.models       import Widget, Button
+from view.fonticon      import FontIcon
 from utils              import initdefaults
 from utils.logconfig    import getLogger
 from .                  import dialog
@@ -19,7 +20,8 @@ class AdvancedWidgetTheme:
     name   = "advancedwidget"
     width  = 280
     height = 20
-    label  = "advanced"
+    label  = ""
+    icon   = "cog"
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -99,7 +101,9 @@ class AdvancedWidgetMixin(ABC):
         "creates the widget"
         self.__widget = Button(width  = self._theme.width,
                                height = self._theme.height,
-                               label  = self._theme.label)
+                               label  = self._theme.label,
+                               icon   = (None if self._theme.icon is None else
+                                         FontIcon(iconname = self._theme.icon)))
         self.__widget.on_click(self.on_click)
         self.__action = ctrl.action.withcalls(self._title())
         return [self.__widget]

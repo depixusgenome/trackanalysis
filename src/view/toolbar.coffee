@@ -105,7 +105,7 @@ export class DpxToolbarView extends WidgetView
         @model.currentfile = Number(id)
 
     _icon: (label) ->
-        return '<i class="icon-'+label+'"></i>'
+        return '<i class="icon-dpx-'+label+'"></i>'
 
     render: () ->
         super()
