@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 "Sets things up for the taskcontroller"
 
-from tempfile        import mkstemp
-from pathlib         import Path
 from typing          import Tuple, Union
 
 from control.taskio  import TaskIO
@@ -65,31 +63,8 @@ class ConfigAnaIO(AnaIO):
         if not out:
             return None
 
-        if isinstance(out, list) and len(out) == 1 and isinstance(out[0], dict):
-            out = out[0]
-            seq = out.pop('sequence', {})
-            if 'path' in seq and not Path(seq['path']).exists():
-                seq.pop("path")
-
-            if 'sequences' in seq and 'path' not in seq:
-                seq['path'] = mkstemp()[1]
-                with open(seq['path'], "w") as stream:
-                    for i, j in seq['sequences'].items():
-                        print(f"> {i}", file = stream)
-                        print(j, file = stream)
-
-            elif 'path' in seq and 'sequences' not in seq:
-                try:
-                    import sequences
-                    seq['sequences'] = dict(sequences.read(seq['path']))
-                except: # pylint: disable=bare-except
-                    seq.pop('path')
-
-            if seq:
-                def _fcn(model = None,  **_2):
-                    if model[0] is out['tasks'][0][0]:
-                        self._ctrl.theme.update("sequence", **seq)
-                self._ctrl.tasks.oneshot("opentrack", _fcn)
+        self._ctrl.display.handle("openanafile",
+                                  args = {"model": out, 'controller': self._ctrl})
         return out['tasks']
 
     def save(self, path:str, models):
@@ -98,9 +73,11 @@ class ConfigAnaIO(AnaIO):
         models = [i for i in models if curr is i[0]]
 
         if len(models):
-            cnf = self._ctrl.theme.getconfig("sequence").maps[0]
-            cnf.pop('history', None)
-            dump(dict(tasks = models, sequence = cnf), path, **self._model.__dict__)
+            info = {'tasks': models}
+            self._ctrl.display.handle("saveanafile",
+                                      args = {"model":      info,
+                                              'controller': self._ctrl})
+            dump(info, path, **self._model.__dict__)
         else:
             raise IOError("Nothing to save", "warning")
         return True

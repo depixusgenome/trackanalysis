@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Create a grid displaying a sequence"
 from    typing              import List, Optional, Tuple, Any, Dict
-import  numpy   as np
+import  numpy               as np
 import  bokeh.core.properties as props
 from    bokeh.plotting      import Figure
 from    bokeh.models        import (LinearAxis, ColumnDataSource, Range1d, Widget,

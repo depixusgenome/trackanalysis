@@ -12,11 +12,12 @@ from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
 import numpy                    as     np
 
 from control.beadscontrol       import TaskWidgetEnabler
+from peakfinding.histogram      import interpolator
+from sequences.modelaccess      import SequenceAnaIO
+from sequences.view             import SequenceTicker, SequenceHoverMixin
 from view.colors                import tohex
 from view.plots                 import PlotView, CACHE_TYPE
 from view.plots.tasks           import TaskPlotCreator
-from sequences.view             import SequenceTicker, SequenceHoverMixin
-from peakfinding.histogram      import interpolator
 
 from ._model                    import PeaksPlotModelAccess, PeaksPlotTheme, PeaksPlotModel
 from ._widget                   import createwidgets
@@ -172,6 +173,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                     self.calllater(lambda: setattr(root, 'resizedfig', None))
 
         ctrl.theme.observe(self._theme, _onchangefig)
+        SequenceAnaIO.observe(ctrl)
 
     def ismain(self, _):
         "specific setup for when this view is the main one"
@@ -271,8 +273,9 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
 
         mode     = self.defaultsizingmode()
         wbox     = lambda x: layouts.widgetbox(children = x, **mode)
-        left     = sum((wdg[i] for i in ('ref', 'seq','oligos','cstrpath', 'advanced')), [])
-        children = [[wbox(left), wbox(wdg['stats'])], [wbox(wdg['peaks'])]]
+        order    = 'ref', 'seq','oligos','cstrpath', 'fitparams', 'advanced'
+        children = [[wbox(sum((wdg[i] for i in order), [])), wbox(wdg['stats'])],
+                    [wbox(wdg['peaks'])]]
         return layouts.layout(children = children, **mode)
 
     def advanced(self):

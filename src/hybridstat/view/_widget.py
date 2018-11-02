@@ -25,7 +25,8 @@ from utils                      import dflt, dataclass
 from utils.gui                  import startfile
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
-from view.plots                 import DpxNumberFormatter
+from view.plots                 import DpxNumberFormatter, CACHE_TYPE
+from view.static                import ROUTE
 from view.toolbar               import FileList
 from ._model                    import (PeaksPlotModelAccess, FitToReferenceStore,
                                         PeaksPlotTheme)
@@ -429,21 +430,74 @@ class PeakIDPathWidget:
             txt = str(Path(path).resolve())
         (self.__widget if resets is None else resets[self.__widget]).update(value = txt)
 
+class DpxFitParams(Widget):
+    "Interface to filters needed for cleaning"
+    __css__            = ROUTE+"/peaksplot.css?v=gittag"
+    __javascript__     = [ROUTE+"/jquery.min.js", ROUTE+"/jquery-ui.min.js"]
+    __implementation__ = "_widget.coffee"
+    frozen             = props.Bool(True)
+    stretch            = props.String("")
+    bias               = props.String("")
+    locksequence       = props.Bool(False)
+
+class FitParamsWidget:
+    "All inputs for cleaning"
+    RND = dict(stretch = 1, bias   = 4)
+    __widget: DpxFitParams
+    def __init__(self, _, model:PeaksPlotModelAccess) -> None:
+        self.__model = model
+
+    def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
+        "creates the widget"
+        self.__widget = DpxFitParams()
+
+        @mainview.actionifactive(ctrl)
+        def _on_cb(attr, old, new):
+            vals = [self.__widget.locksequence,
+                    self.__widget.stretch,
+                    self.__widget.bias]
+            vals[2 if attr == 'bias' else 1 if attr == 'stretch' else 0] = new
+            print(vals)
+            try:
+                status = (self.__model.sequencekey if vals[0] else None,
+                          float(vals[1])           if vals[1] else None,
+                          float(vals[2])           if vals[2] else None)
+            except ValueError:
+                print("err", attr, old)
+                self.__widget.update(**{attr: old})
+            else:
+                fcn    = lambda x, y: np.around(x, self.RND[y]) if x else None
+                status = status[0], fcn(status[1], "stretch"), fcn(status[2], "bias")
+                self.__model.identification.newconstraint(*status)
+
+        for name in ("stretch", "bias", "locksequence"):
+            self.__widget.on_change(name, _on_cb)
+
+        return [self.__widget]
+
+    def reset(self, resets:CACHE_TYPE):
+        "resets the widget when opening a new file, ..."
+        ctrl  = self.__model.identification
+        cstrs = ctrl.constraints()
+        print(cstrs)
+        resets[self.__widget].update(locksequence = cstrs[0] is not None,
+                                     stretch      = str(cstrs[1]) if cstrs[1] else "",
+                                     bias         = str(cstrs[2]) if cstrs[2] else "",
+                                     frozen       = ctrl.task is None)
+
 class _IdAccessor:
     def __init__(self, name, getter, setter):
         self._name = name
         self._fget = getter
         self._fset = setter
 
-    def getdefault(self, inst):
+    def getdefault(self, inst, usr = False):
         "returns the default value"
-        return self._fget(getattr(inst, '_model').identification.default(self._name, False))
+        ident = getattr(inst, '_model').identification
+        return self._fget(ident.defaultattribute(self._name, usr))
 
     def __get__(self, inst, owner):
-        if inst is None:
-            return self
-
-        return self._fget(getattr(inst, '_model').identification.default(self._name))
+        return self if inst is None else self.getdefault(inst, True)
 
     def __set__(self, inst, value):
         if value == self.__get__(inst, inst.__class__):
@@ -538,10 +592,11 @@ class AdvancedWidget(AdvancedTaskMixin):
 
 def createwidgets(ctrl, mdl: PeaksPlotModelAccess) -> Dict[str, Any]:
     "returns a dictionnary of widgets"
-    return dict(seq      = PeaksSequencePathWidget(ctrl, mdl),
-                ref      = ReferenceWidget(ctrl, mdl),
-                oligos   = OligoListWidget(ctrl, ),
-                stats    = PeaksStatsWidget(ctrl, mdl),
-                peaks    = PeakListWidget(ctrl, mdl),
-                cstrpath = PeakIDPathWidget(ctrl, mdl),
-                advanced = AdvancedWidget(ctrl, mdl))
+    return dict(seq       = PeaksSequencePathWidget(ctrl, mdl),
+                ref       = ReferenceWidget(ctrl, mdl),
+                oligos    = OligoListWidget(ctrl, ),
+                stats     = PeaksStatsWidget(ctrl, mdl),
+                peaks     = PeakListWidget(ctrl, mdl),
+                cstrpath  = PeakIDPathWidget(ctrl, mdl),
+                fitparams = FitParamsWidget(ctrl, mdl),
+                advanced  = AdvancedWidget(ctrl, mdl))

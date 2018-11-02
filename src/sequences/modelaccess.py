@@ -1,50 +1,41 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Access to oligos and sequences"
-from typing                 import Any, Sequence, List, Optional, Dict, Union
 from pathlib                import Path
+from tempfile               import mkstemp
+from typing                 import Any, Sequence, List, Optional, Dict, Union, cast
 
-from utils                  import initdefaults
+from utils                  import dataclass, field
 from control.modelaccess    import TaskPlotModelAccess
 from model.task.application import TasksDisplay
 from .                      import (read as _readsequence, peaks as _sequencepeaks,
                                     splitoligos)
 
+@dataclass
 class SequenceConfig:
     "data for a DNA sequence"
-    name                                       = "sequence"
-    path:      Optional[str]                   = None
-    sequences: Dict[str, str]                  = {}
-    probes:    Sequence[str]                   = []
-    history  : List[Union[str, Sequence[str]]] = []
-    maxlength                                  = 10
+    name     : str                             = "sequence"
+    path     : Optional[str]                   = None
+    sequences: Dict[str, str]                  = field(default_factory = dict)
+    probes   : List[str]                       = field(default_factory = list)
+    history  : List[Union[str, Sequence[str]]] = field(default_factory = list)
+    maxlength: int                             = 10
 
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
-
+@dataclass
 class SequenceDisplay:
     """
     configuration for probrs
     """
-    name                                     = "sequence"
-    hpins:  Dict[int, str]                   = {}
-    probes: Dict[Any, Union[str, List[str]]] = {}
+    name  : str                              = "sequence"
+    hpins : Dict[int, str]                   = field(default_factory = dict)
+    probes: Dict[Any, Union[str, List[str]]] = field(default_factory = dict)
 
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
-
+@dataclass
 class SequenceModel:
     "everything sequence"
-    config  = SequenceConfig()
-    display = SequenceDisplay()
-    tasks   = TasksDisplay()
-
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
-
+    config  : SequenceConfig  = field(default_factory = SequenceConfig)
+    display : SequenceDisplay = field(default_factory = SequenceDisplay)
+    tasks   : TasksDisplay    = field(default_factory = TasksDisplay)
     def addto(self, ctrl, noerase = False):
         "add to the controller"
         self.config  = ctrl.theme.  add(self.config,  noerase)
@@ -94,12 +85,57 @@ class SequenceModel:
     @property
     def currentkey(self) -> Optional[str]:
         "get current sequence key"
-        return self.display.hpins.get(self.tasks.bead, self._defaultkey)
+        return self.display.hpins.get(cast(int, self.tasks.bead), self._defaultkey)
 
     @property
     def currentprobes(self) -> Sequence[str]:
         "get current probe"
         return self.display.probes.get(self.tasks.roottask, self.config.probes)
+
+class SequenceAnaIO:
+    "stuff for loading/saving ana files"
+    @staticmethod
+    def onopenanafile(controller = None, model = None):
+        "action to be performed on opening a file"
+        if not (isinstance(model, list) and len(model) == 1 and isinstance(model[0], dict)):
+            return
+
+        seq  = model[0].pop('sequence', {})
+        root = model[0]['tasks'][0][0]
+        if 'path' in seq and not Path(seq['path']).exists():
+            seq.pop("path")
+
+        if 'sequences' in seq and 'path' not in seq:
+            seq['path'] = mkstemp()[1]
+            with open(seq['path'], "w") as stream:
+                for i, j in seq['sequences'].items():
+                    print(f"> {i}", file = stream)
+                    print(j, file = stream)
+
+        elif 'path' in seq and 'sequences' not in seq:
+            try:
+                seq['sequences'] = dict(_readsequence(seq['path']))
+            except: # pylint: disable=bare-except
+                seq.pop('path')
+
+        if seq:
+            def _fcn(model = None,  **_2):
+                if model[0] is root:
+                    controller.theme.update("sequence", **seq)
+            controller.tasks.oneshot("opentrack", _fcn)
+
+    @staticmethod
+    def onsaveanafile(controller = None, model = None):
+        "action to be performed on saving a file"
+        cnf = controller.theme.getconfig("sequence").maps[0]
+        cnf.pop('history', None)
+        model["sequence"] = cnf
+
+    @classmethod
+    def observe(cls, controller):
+        "observe io events"
+        controller.display.observe("openanafile", cls.onopenanafile)
+        controller.display.observe("saveanafile", cls.onsaveanafile)
 
 class SequencePlotModelAccess(TaskPlotModelAccess):
     "access to the sequence path and the oligo"

@@ -20,8 +20,8 @@ from   ..tohairpin                 import (HairpinFitter, PeakGridFit, Distance,
 from   .._base                     import Range
 
 class DistanceConstraint(NamedTuple): # pylint: disable=missing-docstring
-    hairpin     : str
-    constraints : dict
+    hairpin     : Optional[str]
+    constraints : Dict[str, Range]
 
 Fitters     = Dict[str,     HairpinFitter]
 Constraints = Dict[BEADKEY, DistanceConstraint]
@@ -158,10 +158,12 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
         constraints = self.config.constraints
         cstr        = constraints.get(key, None)
         if cstr is not None:
-            hpin = fits.get(cstr[0], None)
+            hpin = fits.get(cast(str, cstr[0]), None)
             if hpin is not None:
                 hpin = updatecopy(hpin, **cstr[1])
                 return {cstr[0]: hpin.optimize(bead)}
+
+            fits = {i: updatecopy(j, **cstr[1]) for i, j in fits.items()}
 
         if len(bead) > 0:
             if self.track is None:
