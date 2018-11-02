@@ -457,13 +457,11 @@ class FitParamsWidget:
                     self.__widget.stretch,
                     self.__widget.bias]
             vals[2 if attr == 'bias' else 1 if attr == 'stretch' else 0] = new
-            print(vals)
             try:
                 status = (self.__model.sequencekey if vals[0] else None,
                           float(vals[1])           if vals[1] else None,
                           float(vals[2])           if vals[2] else None)
             except ValueError:
-                print("err", attr, old)
                 self.__widget.update(**{attr: old})
             else:
                 fcn    = lambda x, y: np.around(x, self.RND[y]) if x else None
@@ -479,7 +477,6 @@ class FitParamsWidget:
         "resets the widget when opening a new file, ..."
         ctrl  = self.__model.identification
         cstrs = ctrl.constraints()
-        print(cstrs)
         resets[self.__widget].update(locksequence = cstrs[0] is not None,
                                      stretch      = str(cstrs[1]) if cstrs[1] else "",
                                      bias         = str(cstrs[2]) if cstrs[2] else "",

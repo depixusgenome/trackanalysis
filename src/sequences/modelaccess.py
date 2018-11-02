@@ -97,11 +97,10 @@ class SequenceAnaIO:
     @staticmethod
     def onopenanafile(controller = None, model = None):
         "action to be performed on opening a file"
-        if not (isinstance(model, list) and len(model) == 1 and isinstance(model[0], dict)):
+        root = model.get('tasks', [[None]])[0][0]
+        if root is None:
             return
-
-        seq  = model[0].pop('sequence', {})
-        root = model[0]['tasks'][0][0]
+        seq  = model.get('sequence', {})
         if 'path' in seq and not Path(seq['path']).exists():
             seq.pop("path")
 

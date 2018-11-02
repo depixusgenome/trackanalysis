@@ -320,7 +320,6 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
                       stretch : Optional[float],
                       bias    : Optional[float]):
         "update the constraints"
-        print("cstr", self.constraints())
         if self.constraints() == (hairpin, stretch, bias):
             return
 
@@ -339,9 +338,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
             cstrs[root][bead] = DistanceConstraint(hairpin, params)
 
         self._ctrl.display.update(self.__defaults, constraints = cstrs)
-        print("updated", self.constraints(), self.task is not None)
         if  self.task is not None:
-            print("updated")
             self.update(constraints = {i: dict(j) for i, j in cstrs.items()})
 
     def constraints(self) -> Tuple[Optional[str], Optional[float], Optional[float]]:
@@ -371,23 +368,20 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         ctrl.display.observe(mdl.peaksmodel.display,   _observe)
 
         @ctrl.display.observe
-        def _onopenanafile(model = None):
-            if not (isinstance(model, list)
-                    and len(model) == 1
-                    and isinstance(model[0], dict)):
-                return
-
-            task = next((i for i in model[0]['tasks'][0] if isinstance(i, FitToHairpinTask)),
-                        None)
-            if task is None:
-                return
-
-            cstrs = dict(task.constraints)
-            root  = model[0]['tasks'][0][0]
-            def _fcn(model = None,  **_2):
-                if model[0] is root:
-                    ctrl.display.update(self.__display, constraints = cstrs)
-            ctrl.tasks.oneshot("opentrack", _fcn)
+        def _onopenanafile(model = None, **_):
+            tasklist = model.get('tasks', [[None]])[0]
+            task     = next((i for i in tasklist if isinstance(i, FitToHairpinTask)),
+                            None)
+            if task is not None:
+                root  = tasklist[0]
+                cstrs = dict(task.constraints)
+                def _fcn(model = None,  **_):
+                    if model[0] is not root:
+                        return
+                    cur       = dict(self.__display.constraints)
+                    cur[root] = cstrs
+                    ctrl.display.update(self.__display, constraints = cur)
+                ctrl.tasks.oneshot("opentrack", _fcn)
 
     @staticmethod
     def _configattributes(kwa):

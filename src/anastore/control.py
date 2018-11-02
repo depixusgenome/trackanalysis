@@ -63,9 +63,14 @@ class ConfigAnaIO(AnaIO):
         if not out:
             return None
 
+        if not (isinstance(out, list)
+                and len(out) == 1
+                and isinstance(out[0], dict)
+                and "tasks" in out[0]):
+            return None
         self._ctrl.display.handle("openanafile",
-                                  args = {"model": out, 'controller': self._ctrl})
-        return out['tasks']
+                                  args = {"model": out[0], 'controller': self._ctrl})
+        return out[0]['tasks']
 
     def save(self, path:str, models):
         "closes an ana file"
