@@ -4,12 +4,12 @@
 import bokeh.core.properties   as props
 from   bokeh.models         import Widget
 
-from   view.static          import ROUTE
+from   view.static          import route
 
 class DpxDAQToolbar(Widget):
     "Toolbar model"
-    __css__            = ROUTE+"/view.css?v=gittag"
-    __javascript__     = ROUTE+"/jquery.min.js"
+    __css__            = route("view.css")
+    __javascript__     = route()
     __implementation__ = '_daqtoolbar.coffee'
     protocol    = props.String("manual")
     recording   = props.Bool(False)

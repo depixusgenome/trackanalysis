@@ -15,7 +15,7 @@ from    control.beadscontrol    import TaskWidgetEnabler
 from    utils                   import initdefaults
 from    utils.array             import intlistsummary
 from    utils.gui               import parseints
-from    view.static             import ROUTE
+from    view.static             import route
 from    view.plots              import DpxNumberFormatter, CACHE_TYPE
 from    eventdetection.view     import AlignmentWidget
 from    ._model                 import DataCleaningModelAccess, DataCleaningTask
@@ -163,8 +163,8 @@ class DownsamplingWidget:
 
 class DpxCleaning(Widget):
     "Interface to filters needed for cleaning"
-    __css__            = ROUTE+"/cleaning.css?v=gittag"
-    __javascript__     = [ROUTE+"/jquery.min.js", ROUTE+"/jquery-ui.min.js"]
+    __css__            = route("cleaning.css")
+    __javascript__     = route()
     __implementation__ = "_widget.coffee"
     frozen             = props.Bool(True)
     framerate          = props.Float(30.)

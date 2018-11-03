@@ -394,7 +394,7 @@ width: 100%; }
     width:auto; 
     height:28px;
 }
-#dpx-tb-quit { float: right; }
+#dpx-tb-quit { float: right; width: 60px; }
 
 #dpx-tb-flist {
     overflow: hidden;

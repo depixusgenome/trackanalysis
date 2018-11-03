@@ -26,7 +26,7 @@ from utils.gui                  import startfile
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
 from view.plots                 import DpxNumberFormatter, CACHE_TYPE
-from view.static                import ROUTE
+from view.static                import ROUTE, route
 from view.toolbar               import FileList
 from ._model                    import (PeaksPlotModelAccess, FitToReferenceStore,
                                         PeaksPlotTheme)
@@ -432,7 +432,7 @@ class PeakIDPathWidget:
 
 class DpxFitParams(Widget):
     "Interface to filters needed for cleaning"
-    __css__            = ROUTE+"/peaksplot.css?v=gittag"
+    __css__            = route("peaksplot.css")
     __javascript__     = [ROUTE+"/jquery.min.js", ROUTE+"/jquery-ui.min.js"]
     __implementation__ = "_widget.coffee"
     frozen             = props.Bool(True)

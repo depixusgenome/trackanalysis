@@ -13,7 +13,7 @@ from    bokeh.models            import (Widget, DataTable, TableColumn,
                                         ColumnDataSource, Slider)
 
 from    control.beadscontrol    import TaskWidgetEnabler
-from    view.static             import ROUTE
+from    view.static             import route
 from    view.plots              import CACHE_TYPE, DpxNumberFormatter
 from    qualitycontrol.view     import QCBeadStatusWidget, QCHairpinSizeWidget
 from    ._model                 import RampPlotModel
@@ -26,8 +26,8 @@ def dflt(default: Type, **kwa) -> Type:
 
 class DpxRamp(Widget):
     "Interface to filters needed for cleaning"
-    __css__            = ROUTE+"/ramp.css?v=gittag"
-    __javascript__     = [ROUTE+"/jquery.min.js", ROUTE+"/jquery-ui.min.js"]
+    __css__            = route("ramp.css")
+    __javascript__     = route()
     __implementation__ = "_widget.coffee"
     frozen             = props.Bool(True)
     minhfsigma         = props.Float(RampDataFrameTask.hfsigma[0])

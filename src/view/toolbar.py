@@ -21,7 +21,7 @@ from control.taskio       import TaskIO
 from control.beadscontrol import DataSelectionBeadController
 from .dialog              import FileDialog, FileDialogTheme
 from .base                import BokehView, threadmethod, spawn
-from .static              import ROUTE
+from .static              import route
 LOGS  = getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -123,9 +123,9 @@ class SaveFileDialog(FileDialog):
 
 class DpxToolbar(Widget):
     "Toolbar model"
-    __css__            = [ROUTE+"/view.css?v=gittag", ROUTE+"/icons.css?v=gittag"]
-    __javascript__     = ROUTE+"/jquery.min.js"
+    __css__            = route("view.css", "icons.css")
     __implementation__ = 'toolbar.coffee'
+    __javascript__     = route()
     open        = props.Int(0)
     save        = props.Int(0)
     quit        = props.Int(0)
