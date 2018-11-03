@@ -8,20 +8,20 @@ export class DpxFitParamsView extends WidgetView
     on_change_frozen: () ->
         $(@el).find('.dpx-pk-freeze').prop('disabled', @model.frozen)
 
+    on_lock: (evt) ->
+        @model.locksequence = !@model.locksequence
+
+        elem = $(@el)
+        elem = elem.find("#dpx-pk-ls-icon")
+        elem.removeClass()
+        if @model.locksequence
+            elem.addClass("icon-dpx-lock")
+        else
+            elem.addClass("icon-dpx-unlocked")
+
     on_input: (evt) ->
         id = evt.target.id[7...]
-        if id == "locksequence"
-            elem       = $(@el)
-            @model[id] = elem.find("#dpx-pk-locksequence").prop("checked")
-
-            elem = elem.find("#dpx-pk-ls-icon")
-            elem.removeClass()
-            if @model[id]
-                elem.addClass("icon-dpx-lock")
-            else
-                elem.addClass("icon-dpx-unlocked")
-        else
-            @model[id] = evt.target.value
+        @model[id] = evt.target.value
 
     on_change_input: (evt) ->
         itm = $(@el).find("#dpx-pk-#{evt}")
@@ -41,21 +41,23 @@ export class DpxFitParamsView extends WidgetView
         super()
         dbal  = 'data-balloon="'
         pos   = '" data-balloon-length="medium" data-balloon-pos="right"'
-        ttips = [dbal+'Force a stretch value'+pos,
-                 dbal+'Force a bias value'+pos,
+        ttips = [dbal+'Force a stretch value (base/µm)'+pos,
+                 dbal+'Force a bias value (µm)'+pos,
                  dbal+'Lock the sequence to the currently selected one'+pos]
 
         html  = "<div class='dpx-span'>"+
-                    @mk_inp("stretch", "Stretch (base/µm)", ttips[0])+
+                    @mk_inp("stretch", "Stretch", ttips[0])+
                     @mk_inp("bias",    "Bias (µm)", ttips[1])+
-                "</div>" + @mk_check(ttips[2])
+                    @mk_check(ttips[2])+
+                "</div>"
                 
 
         @el.innerHTML = html
 
         elem = $(@el)
-        for evt in @cl_inputs
+        for evt in ["stretch", "bias"]
             elem.find("#dpx-pk-#{evt}").change((e) => @on_input(e))
+        elem.find("#dpx-pk-locksequence").click(() => @on_lock())
         return @
 
     cl_inputs: ["stretch", "bias", "locksequence"]
@@ -68,15 +70,10 @@ export class DpxFitParamsView extends WidgetView
 
     mk_check: (ttip) ->
         disabled = if @model.frozen then ' disabled=true' else ''
-        checked  = if @model.locksequence then ' checked=true' else ''
         icon     = if @model.locksequence then 'lock' else 'unlocked'
-        return "<div class='bk-bs-btn-group' id='dpx-pk-ls-grp'>"+
-                "<label class='bk-bs-btn bk-bs-btn-default dpx-pk-freeze' "+
-                    "id='dpx-pk-ls-label' #{disabled}><span id='dpx-pk-ls-icon' "+
-                    "class='icon-dpx-#{icon}'></span>"+
-                    "<input id='dpx-pk-locksequence' #{ttip}"+
-                        " class='dpx-pk-freeze bk-widget-form-input' type='checkbox' "+
-                        " #{checked}#{disabled}></input></label></div>"
+        return "<button type='button' id='dpx-pk-locksequence' #{ttip} "+
+              "class='dpx-cl-freeze bk-bs-btn bk-bs-btn-default'#{disabled}>"+
+              "<span class='icon-dpx-#{icon}' id='dpx-pk-ls-icon'>Hairpin</span></button>"
 
 export class DpxFitParams extends Widget
     default_view: DpxFitParamsView
