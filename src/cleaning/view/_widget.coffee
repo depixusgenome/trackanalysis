@@ -94,8 +94,10 @@ export class DpxCleaningView extends WidgetView
                     " placeholder='#{placeholder}'>"
 
     mk_btn: (name, label, ttip) ->
+        disabled = if @model.frozen then ' disabled=true' else ''
         str = "<button type='button' id='dpx-cl-#{name}' #{ttip} "+
-              "class='dpx-cl-freeze bk-bs-btn bk-bs-btn-default'>#{label}</button>"
+              "class='dpx-cl-freeze bk-bs-btn bk-bs-btn-default'#{disabled}>"+
+              "#{label}</button>"
         return str
 
 export class DpxCleaning extends Widget
