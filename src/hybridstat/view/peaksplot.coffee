@@ -1,9 +1,6 @@
     on_change_bounds: (fig, src) ->
-        yrng         = fig.y_range
-        bases        = fig.extra_y_ranges['bases']
-        bases.start  = (yrng.start - @bias)*@stretch
-        bases.end    = (yrng.end   - @bias)*@stretch
-
+        @on_change_bases(fig)
+        yrng = fig.y_range
         zval = src.data["z"]
         ix1  = 0
         ix2  = zval.length
@@ -24,8 +21,16 @@
             dur.end = 0
             cnt.end = 0
         else
-            dur.end = Math.max.apply(Math, src.data["duration"][ix1..ix2])
-            cnt.end = Math.max.apply(Math, src.data["count"][ix1..ix2])
+            dur.end = Math.max.apply(Math, src.data["duration"][ix1..ix2])*1.05
+            cnt.end = Math.max.apply(Math, src.data["count"][ix1..ix2])*1.05
+
+    on_change_bases: (fig) ->
+        yrng               = fig.y_range
+        bases              = fig.extra_y_ranges['bases']
+        bases.start        = (yrng.start - @bias)*@stretch
+        bases.end          = (yrng.end   - @bias)*@stretch
+        bases.reset_start  = (yrng.reset_start - @bias)*@stretch
+        bases.reset_end    = (yrng.reset_end   - @bias)*@stretch
 
     on_change_sequence: (src, peaks, stats, tick1, tick2, menu) ->
         if menu.value in Object.keys(src.data)

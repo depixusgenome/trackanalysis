@@ -46,6 +46,8 @@
         bases        = fig.extra_y_ranges['bases']
         bases.start  = (yrng.start - @bias)*@stretch
         bases.end    = (yrng.end   - @bias)*@stretch
+        bases.reset_start  = (yrng.reset_start - @bias)*@stretch
+        bases.reset_end    = (yrng.reset_end   - @bias)*@stretch
 
         bottom       = src.data['bottom']
         if bottom.length < 2

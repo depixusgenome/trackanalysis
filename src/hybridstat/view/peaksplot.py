@@ -52,32 +52,14 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
                       biases    = {i: j.bias    for i, j in dist.items()},
                       stretches = {i: j.stretch for i, j in dist.items()})
 
-    def pyslaveaxes(self, fig, src, resets): # pylint: disable=arguments-differ
-        "slaves a histogram's axes to its y-axis"
-        yrng         = fig.y_range
-        bases        = fig.extra_y_ranges['bases']
-        resets[bases].update(start  = (yrng.start - self._model.bias)*self._model.stretch,
-                             end    = (yrng.end   - self._model.bias)*self._model.stretch)
-
-        zval = src["z"]
-        ix1  = 0
-        ix2  = len(zval)
-        for i in range(ix2):
-            if zval[i] < yrng.start:
-                ix1 = i+1
-                continue
-            if zval[i] > yrng.end:
-                ix2 = i
-                break
-
-        end = lambda x: (0. if len(zval) < 2 or ix1 >= ix2 else max(src[x][ix1:ix2])+1)
-        resets[fig.extra_x_ranges['duration']].update(start = 0., end = end('duration'))
-        resets[fig.x_range]                   .update(start = 0., end = end('count'))
-
     def jsslaveaxes(self, fig, src): # pylint: disable=arguments-differ
         "slaves a histogram's axes to its y-axis"
-        fig.y_range.callback = CustomJS(code = "hvr.on_change_bounds(fig, src)",
-                                        args = dict(fig = fig, src = src, hvr = self))
+        rng = fig.y_range
+        rng.callback = CustomJS(code = "hvr.on_change_bounds(fig, src)",
+                                args = dict(fig = fig, src = src, hvr = self))
+        rng = fig.extra_y_ranges["bases"]
+        rng.callback = CustomJS(code = "hvr.on_change_bases(fig)",
+                                args = dict(fig = fig, hvr = self))
 
 class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     "Creates plots for peaks"
