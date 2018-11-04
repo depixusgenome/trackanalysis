@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"Selecting beads"
-from    typing                  import Optional, Dict, Any, List, Tuple, Type
-from    itertools               import repeat
-from    functools               import partial
+"cleaning the raw data after bead subraction"
+from    typing            import Optional, Dict, Any, List, Tuple, Type
+from    itertools         import repeat
+from    functools         import partial
 
-import  numpy                   as     np
+import  numpy             as     np
 
-from    utils                   import initdefaults
-from    model                   import Task, Level, PHASE
-from    data.views              import BEADKEY
-from    control.processor       import Processor, ProcessorException
-from    .datacleaning           import DataCleaning
+from    utils             import initdefaults
+from    model             import Task, Level, PHASE
+from    data.views        import BEADKEY
+from    control.processor import Processor, ProcessorException
+from    ..datacleaning    import DataCleaning
 
 class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
     "Task for removing incorrect points or cycles or even the whole bead"

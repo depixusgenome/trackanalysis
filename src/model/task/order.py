@@ -6,10 +6,11 @@ from .base  import Task
 
 TASK_ORDER = ['model.task.RootTask',
               'model.task.track.CycleSamplingTask',
-              'cleaning.beadsubtraction.BeadSubtractionTask',
+              'cleaning.processor.BeadSubtractionTask',
               'model.task.DataSelectionTask',
               'cleaning.processor.DataCleaningTask',
               'eventdetection.processor.ExtremumAlignmentTask',
+              'cleaning.processor.ClippingTask',
               'cordrift.processor.DriftTask',
               'eventdetection.processor.EventDetectionTask',
               'peakfinding.processor.PeakSelectorTask',

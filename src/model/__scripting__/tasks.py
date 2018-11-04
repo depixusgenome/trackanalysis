@@ -20,8 +20,7 @@ from data.track               import Track
 from control.taskcontrol      import create as _create, ProcessorController
 from control.processor.base   import Processor, register
 from control.processor.utils  import ActionTask
-from cleaning.processor       import DataCleaningTask
-from cleaning.beadsubtraction import BeadSubtractionTask
+from cleaning.processor       import DataCleaningTask, ClippingTask, BeadSubtractionTask
 from cordrift.processor       import DriftTask
 from eventdetection.processor import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor    import (PeakSelectorTask, PeakCorrelationAlignmentTask,
@@ -53,6 +52,9 @@ class _DOCHelper(Enum):
     alignment      = (
         "the cycles are aligned using the algorithm defined",
         "in the `eventdetection.processor.alignment.ExtremumAlignmentTask` task.")
+    clipping       = (
+        "PHASE.measure data above PHASE.pull and below PHASE.initial is clipped",
+        "as found in `cleaning.processor.ClippingTask` task.")
     driftperbead   = (
         "recomputes an *average fixed bead* cycle from all cycles in a bead",
         "and subtracts it from all cycles in the bead"
@@ -192,6 +194,7 @@ class Tasks(Enum):
     cleaning         = 'cleaning'
     selection        = 'selection'
     alignment        = 'alignment'
+    clipping         = 'clipping'
     driftperbead     = 'driftperbead'
     driftpercycle    = 'driftpercycle'
     cycles           = 'cycles'
@@ -214,6 +217,7 @@ class Tasks(Enum):
                     subtraction      = BeadSubtractionTask(),
                     selection        = DataSelectionTask(),
                     alignment        = ExtremumAlignmentTask(),
+                    clipping         = ClippingTask(),
                     driftperbead     = DriftTask(onbeads = True),
                     driftpercycle    = DriftTask(onbeads = False),
                     cycles           = CycleCreatorTask(),
@@ -450,10 +454,10 @@ class Tasks(Enum):
 
     @classmethod
     def __base_cleaning__(cls):
-        return cls.subtraction, cls.cleaning, cls.alignment
+        return cls.subtraction, cls.cleaning, cls.alignment, cls.clipping
 
     @classmethod
-    @_DOCHelper.add('subtraction', 'cleaning', 'alignment',
+    @_DOCHelper.add('subtraction', 'cleaning', 'alignment', "clipping",
                     header = "Cleaning consists in the following tasks:")
     def __cleaning__(cls):
         return cls.__base_cleaning__()
@@ -462,7 +466,8 @@ class Tasks(Enum):
     def __tasklist__(cls):
         cleaning = cls.__cleaning__()
         assert cleaning[0] is cls.subtraction
-        return (cls.cyclesampling, cleaning[0], cls.selection) + cleaning[1:] + cls.__taskorder__()
+        return ((cls.cyclesampling, cleaning[0], cls.selection)
+                + cleaning[1:] + cls.__taskorder__())
 
     @classmethod
     def __nodefault__(cls):

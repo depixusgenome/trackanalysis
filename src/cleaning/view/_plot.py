@@ -18,7 +18,8 @@ from    control                 import Controller
 from    ._model                 import (DataCleaningModelAccess, CleaningPlotModel,
                                         CleaningPlotTheme)
 from    ._widget                import WidgetMixin
-from    ..processor             import DataCleaningProcessor, DataCleaning
+from    ..datacleaning          import DataCleaning
+from    ..processor             import DataCleaningProcessor
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"

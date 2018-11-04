@@ -10,8 +10,8 @@ from model.plots                import PlotAttrs, PlotTheme, PlotModel, PlotDisp
 # pylint: disable=unused-import
 from control.modelaccess        import TaskPlotModelAccess, TaskAccess
 from eventdetection.processor   import ExtremumAlignmentTask
-from ..beadsubtraction          import BeadSubtractionTask, FixedBeadDetection, FIXED_LIST
-from ..processor                import DataCleaningTask
+from ..beadsubtraction          import FixedBeadDetection, FIXED_LIST
+from ..processor                import DataCleaningTask, BeadSubtractionTask
 
 class DataCleaningAccess(TaskAccess, tasktype = DataCleaningTask):
     "access to data cleaning"

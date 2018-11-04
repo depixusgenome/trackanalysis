@@ -21,10 +21,10 @@ from   data.trackops                    import dropbeads
 from   data.__scripting__.track         import Track
 from   data.__scripting__.tracksdict    import TracksDict
 from   ..processor                      import (DataCleaningProcessor,
-                                                DataCleaningErrorMessage)
-from   ..beadsubtraction                import (BeadSubtractionTask,
-                                                BeadSubtractionProcessor,
-                                                FixedBeadDetection)
+                                                DataCleaningErrorMessage,
+                                                BeadSubtractionTask,
+                                                BeadSubtractionProcessor)
+from   ..beadsubtraction                import  FixedBeadDetection
 
 @addto(BeadSubtractionTask, staticmethod)
 def __scripting_save__() -> bool:

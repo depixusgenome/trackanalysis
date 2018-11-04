@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
-from typing                     import (Optional, Dict, Tuple, Any,
-                                        Sequence, cast)
+from typing                     import Optional, Dict, Tuple, Any, Sequence, cast
 from   copy                     import copy
 import pickle
 
@@ -12,6 +11,7 @@ from sequences.modelaccess      import SequencePlotModelAccess
 
 from control.modelaccess        import TaskAccess
 
+from cleaning.processor         import ClippingTask         # pylint: disable=unused-import
 from cleaning.view              import (BeadSubtractionAccess,
                                         FixedBeadDetectionModel,
                                         FIXED_LIST)
@@ -20,13 +20,13 @@ from eventdetection.processor   import (EventDetectionTask, # pylint: disable=un
 from model.task                 import RootTask
 from model.plots                import PlotModel, PlotTheme, PlotAttrs, PlotDisplay
 from peakfinding.histogram      import interpolator
-from peakfinding.processor      import (PeakSelectorTask, # pylint: disable=unused-import
+from peakfinding.processor      import (PeakSelectorTask,   # pylint: disable=unused-import
                                         SingleStrandTask)
 from peakfinding.selector       import PeakSelectorDetails
 from peakcalling                import match
 from peakcalling.toreference    import ChiSquareHistogramFit
 from peakcalling.tohairpin      import Distance
-from peakcalling.processor      import (FitToHairpinTask, # pylint: disable=unused-import
+from peakcalling.processor      import (FitToHairpinTask,   # pylint: disable=unused-import
                                         FitToReferenceTask)
 from peakcalling.processor.fittoreference   import FitData
 from peakcalling.processor.fittohairpin     import (Constraints, HairpinFitter,
@@ -428,6 +428,9 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
 class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
     "access to the ExtremumAlignmentTask"
 
+class ClippingTaskAccess(TaskAccess, tasktype = ClippingTask):
+    "access to the ClippingTask"
+
 class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
     "access to the EventDetectionTask"
 
@@ -448,6 +451,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         self.subtracted      = BeadSubtractionAccess(self)
         self.fixedbeads      = FixedBeadDetectionModel(ctrl)
         self.alignment       = ExtremumAlignmentTaskAccess(self)
+        self.clipping        = ClippingTaskAccess(self)
         self.eventdetection  = EventDetectionTaskAccess(self)
         self.peakselection   = PeakSelectorTaskAccess(self)
         self.singlestrand    = SingleStrandTaskAccess(self)

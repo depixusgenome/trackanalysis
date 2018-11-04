@@ -7,14 +7,14 @@ from   typing                      import (Dict, List, Sequence, NamedTuple,
 
 import numpy                       as     np
 
-from   utils                       import (StreamUnion, initdefaults, updatecopy,
-                                           asobjarray, DefaultValue)
-from   model                       import Task, Level
 from   control.processor.taskview  import TaskViewProcessor
 from   control.processor.dataframe import DataFrameFactory
 from   data.views                  import BEADKEY, Beads, TaskView
+from   model                       import Task, Level
 from   peakfinding.peaksarray      import Output as PeakFindingOutput, PeaksArray
 from   peakfinding.processor       import PeaksDict
+from   utils                       import (StreamUnion, initdefaults, updatecopy,
+                                           asobjarray, DefaultValue)
 from   ..tohairpin                 import (HairpinFitter, PeakGridFit, Distance,
                                            PeakMatching, PEAKS_TYPE)
 from   .._base                     import Range
@@ -131,6 +131,18 @@ class FitBead(NamedTuple): # pylint: disable=missing-docstring
 class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=too-many-ancestors
     "iterator over peaks grouped by beads"
     level  = Level.bead
+    def beadextension(self, ibead) -> Optional[float]:
+        """
+        Return the median bead extension (phase 3 - phase 1)
+        """
+        return getattr(self.data, 'beadextension', lambda *_: None)(ibead)
+
+    def phaseposition(self, phase: int, ibead:BEADKEY) -> Optional[float]:
+        """
+        Return the median position for a given phase
+        """
+        return getattr(self.data, 'phaseposition', lambda *_: None)(phase, ibead)
+
     @staticmethod
     def __topeaks(aevts:PeakEvents) -> _PEAKS:
         "Regroups the beads from a frame by hairpin"
@@ -166,9 +178,10 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
             fits = {i: updatecopy(j, **cstr[1]) for i, j in fits.items()}
 
         if len(bead) > 0:
-            if self.track is None:
+            extent  = self.beadextension(key)
+            if extent is None:
                 return {name: calc.optimize(bead) for name, calc in fits.items()}
-            extent = self.track.beadextension(key)*self.config.pullphaseratio
+            extent *= self.config.pullphaseratio
             return {name: calc.optimizewithinrange(bead, extent)
                     for name, calc in fits.items()}
 

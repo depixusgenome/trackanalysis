@@ -9,12 +9,12 @@ from testingcore                import path as utpath
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 
 from   cleaning.processor       import (DataCleaningTask, DataCleaningException,
-                                        DataCleaningProcessor)
+                                        DataCleaningProcessor, BeadSubtractionTask,
+                                        BeadSubtractionProcessor, ClippingTask)
 import cleaning.datacleaning    as     _datacleaning
 from   cleaning.datacleaning    import (DataCleaning, LocalNaNPopulation,
                                         DerivateIslands)
 from   cleaning.beadsubtraction import (SubtractAverageSignal, SubtractMedianSignal,
-                                        BeadSubtractionTask, BeadSubtractionProcessor,
                                         FixedBeadDetection)
 import cleaning._core           as     cleaningcore # pylint:disable=no-name-in-module,import-error
 from   control.taskcontrol        import create
@@ -395,5 +395,32 @@ def test_fixedbeadsorting():
     assert frames.shape == (4, 11)
     assert list(frames[frames.good].bead.values) == [4]
 
+def test_clippingtask():
+    "tests clipping task"
+    track = Track(**(Experiment(baseline = None, thermaldrift = None)
+                     .track(1, 5, seed = 0)))
+    arr   = np.copy(track.data[0])
+    assert np.all(np.isfinite(arr))
+    ClippingTask()(track, 0, arr)
+    assert_equal(arr, track.data[0])
+
+    extr = np.min(arr), np.max(arr)
+    cyc  = track.cycles.withphases(5)
+
+    cyc[0,0][10] = extr[0]-.1
+    cyc[0,0][12] = extr[1]+.001
+    cyc[0,1][10] = extr[0]-.1
+    cyc[0,1][12] = extr[1]+.001
+    cyc[0,2][12] = np.NaN
+
+    arr = np.copy(track.data[0])
+    ClippingTask()(track, 0, arr)
+    cyc = cyc.withdata({0: arr})
+    assert_equal(np.nonzero(np.isnan(cyc[0,0]))[0], [10, 12])
+    assert_equal(np.nonzero(np.isnan(cyc[0,1]))[0], [10, 12])
+    nzer = np.nonzero(arr-track.data[0])[0]
+    assert len(nzer) == 5
+    assert np.all(np.isnan(arr[nzer]))
+
 if __name__ == '__main__':
-    test_subtract_med()
+    test_clippingtask()

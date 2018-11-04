@@ -2,16 +2,18 @@
 # -*- coding: utf-8 -*-
 "access to the model"
 
-from    typing                      import Optional, Dict, cast
-from    utils                       import NoArgs, initdefaults
-from    cordrift.processor          import DriftTask            # pylint: disable=unused-import
-from    eventdetection.processor    import (EventDetectionTask, # pylint: disable=unused-import
-                                            ExtremumAlignmentTask)
-from    model.task                  import RootTask
-from    model.task.application      import TasksDisplay
-from    model.plots                 import PlotTheme, PlotModel, PlotAttrs, PlotDisplay
-from    control.modelaccess         import TaskAccess
-from    sequences.modelaccess       import SequencePlotModelAccess
+from typing                   import Optional, Dict, cast
+from utils                    import NoArgs, initdefaults
+from model.task               import RootTask
+from model.task.application   import TasksDisplay
+from model.plots              import PlotTheme, PlotModel, PlotAttrs, PlotDisplay
+from control.modelaccess      import TaskAccess
+from sequences.modelaccess    import SequencePlotModelAccess
+
+# pylint: disable=unused-import
+from cordrift.processor       import DriftTask
+from cleaning.processor       import ClippingTask
+from eventdetection.processor import EventDetectionTask, ExtremumAlignmentTask
 
 class CyclesModelConfig:
     """
@@ -124,6 +126,9 @@ class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
 class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
     "access to ExtremumAlignmentTask"
 
+class ClippingTaskAccess(TaskAccess, tasktype = ClippingTask):
+    "access to the ClippingTask"
+
 class BeadsDriftTaskAccess(TaskAccess,
                            tasktype   = DriftTask,
                            onbeads    = True,
@@ -144,6 +149,7 @@ class CyclesModelAccess(SequencePlotModelAccess):
         super().__init__(ctrl)
         self.cycles         = CyclesPlotModel.create(ctrl)
         self.alignment      = ExtremumAlignmentTaskAccess(self)
+        self.clipping       = ClippingTaskAccess(self)
         self.driftperbead   = BeadsDriftTaskAccess(self)
         self.driftpercycle  = CyclesDriftTaskAccess(self)
         self.eventdetection = EventDetectionTaskAccess(self)

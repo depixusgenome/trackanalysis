@@ -4,12 +4,13 @@
 from copy             import deepcopy
 from functools        import wraps
 from itertools        import chain
-from typing           import Iterator, Tuple, Union, Sequence, cast, TYPE_CHECKING
+from typing           import (Iterator, Tuple, Union, Sequence, cast,
+                              Optional, TYPE_CHECKING)
 
 import numpy          as     np
 
 from model            import PHASE, Level
-from data.views       import ITrackView, Cycles, CYCLEKEY, Beads
+from data.views       import ITrackView, Cycles, CYCLEKEY, Beads, BEADKEY
 from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview, EventsArray
 from .                import EventDetectionConfig
 
@@ -55,6 +56,18 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
                         self.__filterediter(itrs, tmp) if self.filter else
                         self.__simpleiter(itrs, tmp))
             break
+
+    def beadextension(self, ibead) -> Optional[float]:
+        """
+        Return the median bead extension (phase 3 - phase 1)
+        """
+        return getattr(self.data, 'beadextension', lambda *_: None)(ibead)
+
+    def phaseposition(self, phase: int, ibead:BEADKEY) -> Optional[float]:
+        """
+        Return the median position for a given phase
+        """
+        return getattr(self.data, 'phaseposition', lambda *_: None)(phase, ibead)
 
     def bead(self, ibead):
         "return the data for a full bead"

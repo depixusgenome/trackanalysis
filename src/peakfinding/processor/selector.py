@@ -101,6 +101,18 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
                 self.data[ibead,...].values())                           # type: ignore
         return self.config(vals, self._precision(ibead, precision))
 
+    def beadextension(self, ibead) -> Optional[float]:
+        """
+        Return the median bead extension (phase 3 - phase 1)
+        """
+        return getattr(self.data, 'beadextension', lambda *_: None)(ibead)
+
+    def phaseposition(self, phase: int, ibead:BEADKEY) -> Optional[float]:
+        """
+        Return the median position for a given phase
+        """
+        return getattr(self.data, 'phaseposition', lambda *_: None)(phase, ibead)
+
     @classmethod
     def _transform_ids(cls, sel):
         return cls._transform_to_bead_ids(sel)

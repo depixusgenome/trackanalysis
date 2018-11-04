@@ -79,6 +79,26 @@ class Cycles(TrackView, ITrackView):
         "whether the data keys are directly cycle keys"
         self._direct = i
 
+    def beadextension(self, ibead:BEADKEY) -> Optional[float]:
+        """
+        Return the median bead extension (phase 3 - phase 1)
+        """
+        if self.direct:
+            return None
+        data = cast(dict, self.data)
+        arr  = data[ibead] if ibead in data else None
+        return None if arr is None else self.track.beadextension(arr) # type: ignore
+
+    def phaseposition(self, phase: int, ibead:BEADKEY) -> Optional[float]:
+        """
+        Return the median position for a given phase
+        """
+        if self.direct:
+            return None
+        data = cast(dict, self.data)
+        arr  = data[ibead] if ibead in data else None
+        return None if arr is None else self.track.phaseposition(phase, arr) # type: ignore
+
     def __keysfrombeads(self, sel):
         beads     = tuple(self.track.beads.new(data = self.data).keys(None))
         if hasattr(self.data, 'cyclerange'):
