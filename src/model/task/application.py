@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Deals with global information"
 from typing             import (Dict, Optional, List, Iterator, Type, Iterable,
-                                Callable, Any, TYPE_CHECKING)
+                                Callable, Any, TYPE_CHECKING, cast)
 from copy               import deepcopy
 from utils              import initdefaults
 from utils.configobject import ConfigObject
@@ -15,12 +15,23 @@ if TYPE_CHECKING:
 
 DEFAULT_TASKS: Dict[str, Task] = {}
 
+class TasksDescriptor:
+    """ tasks """
+    def __get__(self, inst, owner):
+        return inst.__dict__.get("tasks", {}) if inst is not None else DEFAULT_TASKS
+
+    def __set__(self, inst, val):
+        good = deepcopy(DEFAULT_TASKS)
+        good.update(val)
+        inst.__dict__['tasks'] = good
+        return good
+
 class TasksConfig(ConfigObject):
     """
     permanent globals on tasks
     """
     name                   = "tasks"
-    tasks: Dict[str, Task] = DEFAULT_TASKS
+    tasks: Dict[str, Task] = cast(Dict[str, Task], TasksDescriptor())
     order: List[str]       = list(TASK_ORDER)
 
     @initdefaults(frozenset(locals()))

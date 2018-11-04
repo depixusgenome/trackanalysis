@@ -508,6 +508,32 @@ class _IdAccessor:
             mdl.identification.updatedefault(self._name, *val)
         mdl.identification.resetmodel(mdl)
 
+class _ClippingDescriptor:
+    def getdefault(self,inst):
+        "returns default single strand suppression"
+        if inst is None:
+            return self
+        tsk = getattr(inst,'_model').clipping.configtask
+        return None if tsk is None or tsk.disabled else tsk.lowfactor
+
+    def __get__(self, inst, owner):
+        if inst is None:
+            return self
+        tsk = getattr(inst,'_model').clipping.task
+        return None if tsk is None or tsk.disabled else tsk.lowfactor
+
+    def __set__(self,inst, value):
+        cnf = getattr(inst,'_model').clipping
+        if value is None:
+            cnf.update(disabled = True)
+        else:
+            cnf.update(disabled  = False, lowfactor = value)
+
+    @staticmethod
+    def line():
+        "the gui line"
+        return ('Discard z(∈ φ5) < z(φ1)-σ[HF]‥α, α =',  ' %(_clipping)of')
+
 class _SingleStrandDescriptor:
     def getdefault(self,inst):
         "returns default single strand suppression"
@@ -519,6 +545,11 @@ class _SingleStrandDescriptor:
 
     def __set__(self,inst, value):
         getattr(inst,'_model').singlestrand.update(disabled = not value)
+
+    @staticmethod
+    def line():
+        "the gui line"
+        return ('Discard the single strand peak',     ' %(_singlestrand)b')
 
 class _PeakDescriptor:
     def getdefault(self,inst):
@@ -554,15 +585,16 @@ class AdvancedWidget(AdvancedTaskMixin):
         cls = type(self)
         return (getattr(cls, '_subtracted').line(),
                 getattr(cls, '_alignment').line(),
-                ('Minimum frame count per event',    ' %(_framecount)d'),
-                ('Minimum event count per peak',     ' %(_eventcount)d'),
-                ('Align cycles using peaks',         ' %(_align5)b'),
-                ('Peak kernel size (blank ⇒ auto)',  ' %(_precision)of'),
-                #('Use EM to find peaks',     '         %(_useem)b'),
-                ('Discard the single strand peak',   ' %(_singlestrand)b'),
-                ('Use a theoretical peak 0 in fits', ' %(_peak0)b'),
-                ('Exhaustive fit algorithm',         ' %(_fittype)b'),
-                ('Max distance to theoretical peak', ' %(_dist2theo)d'),
+                getattr(cls, '_clipping').line(),
+                ('Minimum frame count per event',      ' %(_framecount)d'),
+                ('Minimum event count per peak',       ' %(_eventcount)d'),
+                ('Align cycles using peaks',           ' %(_align5)b'),
+                ('Peak kernel size (blank ⇒ auto)',    ' %(_precision)of'),
+                #('Use EM to find peaks',     '           %(_useem)b'),
+                getattr(cls, '_singlestrand').line(),
+                ('Use a theoretical peak 0 in fits',   ' %(_peak0)b'),
+                ('Exhaustive fit algorithm',           ' %(_fittype)b'),
+                ('Max distance to theoretical peak',   ' %(_dist2theo)d'),
                 *(getattr(cls, i).line for i in ('_themename', '_figwidth', '_figheight'))
                )
 
@@ -570,6 +602,7 @@ class AdvancedWidget(AdvancedTaskMixin):
         "resets the widget when a new file is opened, ..."
         AdvancedTaskMixin.reset(resets)
 
+    _clipping   = _ClippingDescriptor()
     _subtracted = BeadSubtractionModalDescriptor()
     _alignment  = AlignmentModalDescriptor()
     _framecount = AdvancedTaskMixin.attr('eventdetection.events.select.minlength')

@@ -428,7 +428,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
 class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
     "access to the ExtremumAlignmentTask"
 
-class ClippingTaskAccess(TaskAccess, tasktype = ClippingTask):
+class ClippingTaskAccess(TaskAccess, tasktype = ClippingTask, disabled = True):
     "access to the ClippingTask"
 
 class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
