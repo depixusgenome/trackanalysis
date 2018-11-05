@@ -72,8 +72,9 @@ class ConfigTrackIO(TrackIO):
 
         items = [tmp[0][0]]
         instr = instrumenttype(items[0])
-        cnf   = self._ctrl.theme.get("tasks", "configurations")
-        cnf   = cnf.get(instr, self._ctrl.theme.get("tasks", "instrument"))
+        if instr is None:
+            instr = self._ctrl.theme.get("tasks", "instrument")
+        cnf = self._ctrl.theme.get("tasks", instr)
         for name in self._ctrl.theme.get("tasks.io", "tasks"):
             task  = cnf.get(name, None)
             if not getattr(task, 'disabled', True):

@@ -91,13 +91,14 @@ def save(cls, task: Task):
     "saves the task to the default config"
     cpy = deepcopy(task)
     if getattr(cpy, '__scripting_save__', lambda: True)():
-        mdl  = cls.tasksmodel()
-        out  = dict(mdl.configurations)
         name = cls(task).name
         # pylint: disable=protected-access
         name = next(j for i, j in cls._cnv().items() if i == name)
-        out[mdl.instrument][name] = cpy
-        cls.tasksmodel(configurations = out)
+
+        mdl  = cls.tasksmodel()
+        out  = dict(mdl.tasks)
+        out[name] = cpy
+        cls.tasksmodel(**{mdl.instrument: out})
         scriptapp.writeuserconfig()
 
 @addto(Tasks)
@@ -116,7 +117,7 @@ def __call__(self, *resets, __old__ = Tasks.__call__, **kwa) -> Task:
     else:
         mdl = self.tasksmodel()
         # pylint: disable=protected-access
-        cnf = mdl.configurations[mdl.instrument].get(self._cnv(self.name), None)
+        cnf = mdl.tasks.get(self._cnv(self.name), None)
     if cnf is None:
         return __old__(self, *resets, **kwa)
     res = __old__(self, *resets, current = cnf, **kwa)

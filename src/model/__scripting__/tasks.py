@@ -40,7 +40,7 @@ _CNV = dict([('cleaning', 'datacleaning'), ('alignment', 'extremumalignment'),
              ('subtraction', 'beadsubtraction'), ('selection', 'dataselection'),
              ('peakalignment', 'peakcorrelationalignment')])
 
-_CNF           = {i: type(j) for i, j in TasksConfig.configurations['picotwist'].items()}
+_CNF           = {i: type(j) for i, j in TasksConfig.picotwist.items()}
 _CNF['action'] = ActionTask
 for _i in _CNV.items():
     _CNF[_i[0]] = _CNF.pop(_i[1])
@@ -208,11 +208,8 @@ class Tasks(Enum):
 
     def default(self, mdl = None) -> Task:
         "returns default tasks"
-        if mdl is None:
-            cnf = TasksConfig.configurations['picotwist']
-        else:
-            cnf = TasksConfig.configurations[mdl.instrument]
-        return cnf[self._cnv(self.name)]
+        return (TasksConfig.picotwist if mdl is None else
+                getattr(TasksConfig, mdl.instrument))[self._cnv(self.name)]
 
     @staticmethod
     def _cnv(key: Optional[str]):
@@ -454,8 +451,8 @@ class Tasks(Enum):
         return cls.cyclesampling, cls.selection, cls.subtraction
 
     @classmethod
-    def _missing_(cls: Any, value) -> 'Tasks':
-        drift = cls.driftperbead.tasktype()
+    def _missing_(cls, value) -> 'Tasks':
+        drift = cls('driftperbead').tasktype()
         if isinstance(value, Task) and not isinstance(value, drift):
             value = type(value)
 
@@ -468,7 +465,7 @@ class Tasks(Enum):
                 return cls(tsk)
 
         if isinstance(value, drift):
-            return cls.driftperbead if value.onbeads else cls.driftpercycle
+            return cls('driftper'+('bead' if getattr(value, 'onbeads') else 'cycle'))
 
         return super()._missing_(value) # type: ignore
 
@@ -498,7 +495,7 @@ class Tasks(Enum):
                     and isinstance(i, (Path, str)) for i in arg)):
             info = dict(kwa)
             info.setdefault('path', arg)
-            return cls.trackreader.tasktype()(**info)
+            return cls('trackreader').tasktype()(**info)
 
         if isinstance(arg, (tuple, list)) and len(arg) == 2:
             return cls(arg[0])(**arg[1], **kwa)

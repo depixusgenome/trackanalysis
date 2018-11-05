@@ -87,18 +87,17 @@ class LocalTasks:
         ctrl = getattr(ctrl, 'theme', ctrl)
         changes: Dict[str, Dict[str, Any]] = {}
         if self.tasks:
-            cpy = dict(ctrl.get("tasks", "configurations")[name])
+            cpy = dict(ctrl.get("tasks", name))
             cpy.update(self.tasks)
-            changes['tasks'] = {'configurations': {name: {"tasks": cpy}},
-                                'instrument':     name}
+            changes['tasks'] = {name: cpy, 'instrument': name}
         else:
             changes['tasks'] = {'instrument': name}
 
         cleaning = []
         if self.driftpercycle:
-            cleaning.append(Tasks.driftpercycle)
+            cleaning.append(Tasks('driftpercycle'))
         if self.driftperbead:
-            cleaning.append(Tasks.driftperbead)
+            cleaning.append(Tasks('driftperbead'))
         if len(cleaning):
             old      = tuple(Tasks.__base_cleaning__())
             cleaning = old[:1] + tuple(cleaning) + old[1:] #type: ignore

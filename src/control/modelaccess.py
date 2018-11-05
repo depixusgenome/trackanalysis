@@ -6,7 +6,7 @@ from typing                 import (Tuple, Optional, Iterator, Union, Any,
 from copy                   import copy as shallowcopy
 
 from model.task             import RootTask, Task
-from model.task.application import ConfigurationsDescriptor, TasksModel
+from model.task.application import ConfigurationDescriptor, TasksModel
 from data.track             import Track
 from data.views             import TrackView
 from data.views             import BEADKEY
@@ -162,7 +162,7 @@ class TaskAccess(TaskPlotModelAccess):
         cls.attrs      = () if attrs is None else tuple(attrs.items()) # type: ignore
         cls.side       = 0 if side == 'LEFT' else 1
         cls.tasktype   = tasktype
-        cls.configname = ConfigurationsDescriptor.defaulttaskname(configname, tasktype)
+        cls.configname = ConfigurationDescriptor.defaulttaskname(configname, tasktype)
 
     @staticmethod
     def __deepcopy(task, kwa):
@@ -182,28 +182,27 @@ class TaskAccess(TaskPlotModelAccess):
     @property
     def defaultconfigtask(self) -> Task:
         "returns the config task"
-        return (self._ctrl.theme.get("tasks", "configurations", {}, True)
-                .get(self.instrument, {})
+        return (self._ctrl.theme.get("tasks", self.instrument, {}, True)
                 .get(self.configname, None))
 
     @property
     def configtask(self) -> Task:
         "returns the config task"
-        return self._tasksmodel.config.configurations[self.instrument][self.configname]
+        return self._tasksmodel.config[self.instrument][self.configname]
 
     @configtask.setter
     def configtask(self, values: Union[Task, Dict[str,Task]]):
         "returns the config task"
         instr = self.instrument
-        task  = self._tasksmodel.config.configurations[instr][self.configname]
 
+        task  = self._tasksmodel.config[instr][self.configname]
         kwa   = diffobj(task, values) if isinstance(values, Task) else values
         kwa   = self._configattributes(kwa)
         if not kwa:
             return
 
-        cnf = dict(self._ctrl.theme.get("tasks", "configurations", {}))
-        cnf[instr][self.configname] = self.__deepcopy(cnf[instr][self.configname], kwa)
+        cnf = dict(self._ctrl.theme.get("tasks", instr, {}))
+        cnf[self.configname] = self.__deepcopy(cnf[instr][self.configname], kwa)
         self._ctrl.theme.update("tasks", configurations = cnf)
 
     @property

@@ -20,19 +20,21 @@ if TYPE_CHECKING:
 Configuration  = Dict[str, Task]
 Configurations = Dict[str, Configuration]
 
-class ConfigurationsDescriptor:
+class ConfigurationDescriptor:
     """ configurations """
     defaults: ClassVar[Configurations] = {i: {} for i in InstrumentType.__members__}
+    _name: str
+    def __set_name__(self, _, name):
+        self._name = InstrumentType(name).name
+
     def __get__(self, inst, owner):
-        return self.defaults if inst is None else inst.__dict__["configurations"]
+        return (self.defaults if inst is None else inst.__dict__)[self._name]
 
     def __set__(self, inst, val):
-        good = deepcopy(self.defaults)
-        for i in set(good) & set(val):
-            good[i].update(val[i])
-        for i in set(val) - set(good):
-            good[i] = val
-        inst.__dict__['configurations'] = good
+        good = {i: deepcopy(val[i] if i in val else j)
+                for i, j in self.defaults[self._name].items()}
+        good.update({i: j for i, j in val.items() if i not in good})
+        inst.__dict__[self._name] = good
         return good
 
     @classmethod
@@ -72,14 +74,25 @@ class TasksConfig(ConfigObject):
     """
     permanent globals on tasks
     """
-    name                           = "tasks"
-    instrument:     str            = InstrumentType.picotwist.name
-    configurations: Configurations = cast(Configurations, ConfigurationsDescriptor())
-    order:          List[str]      = list(TASK_ORDER)
+    name                       = "tasks"
+    instrument: str            = InstrumentType.picotwist.name
+    picotwist:  Configuration  = cast(Configuration, ConfigurationDescriptor())
+    sdi:        Configuration  = cast(Configuration, ConfigurationDescriptor())
+    order:      List[str]      = list(TASK_ORDER)
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
+
+    @property
+    def tasks(self) -> Configuration:
+        "return the current task list"
+        return getattr(self, self.instrument)
+
+    @tasks.setter
+    def tasks(self, values):
+        "return the current task list"
+        return setattr(self, self.instrument, values)
 
     @property
     def taskorder(self) -> Iterator[Type[Task]]:
@@ -200,7 +213,7 @@ class TasksModel:
 
 def setupdefaulttask(tasktype: Type[Task], name :str = '', **kwa) -> str:
     "add task to the instruments"
-    return ConfigurationsDescriptor.setupdefaulttask(tasktype, name, **kwa)
+    return ConfigurationDescriptor.setupdefaulttask(tasktype, name, **kwa)
 
 setupdefaulttask(CycleSamplingTask)
 setupdefaulttask(TrackReaderTask)
