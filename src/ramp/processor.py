@@ -14,7 +14,7 @@ from   model             import Task, Level
 from   signalfilter      import nanhfsigma
 from   utils             import initdefaults
 
-class RampDataFrameTask(Task):
+class RampStatsTask(Task):
     """
     Extract open/close information from each cycle and return a pd.DataFrame
     """
@@ -28,7 +28,7 @@ class RampDataFrameTask(Task):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-class RampAverageZTask(Task):
+class RampConsensusBeadTask(Task):
     """
     Creates an average bead
     """
@@ -63,7 +63,7 @@ class RampCycleTuple(NamedTuple): # pylint: disable=missing-docstring
     zmagclose       : float
     hfsigma         : float
 
-class RampDataFrameProcessor(Processor[RampDataFrameTask]):
+class RampDataFrameProcessor(Processor[RampStatsTask]):
     """
     Generates pd.DataFrames
 
@@ -81,13 +81,13 @@ class RampDataFrameProcessor(Processor[RampDataFrameTask]):
         args.apply(self.apply(**self.config()))
 
     @classmethod
-    def status(cls, data, task: Optional[RampDataFrameTask]= None, **kwa) -> pd.DataFrame:
+    def status(cls, data, task: Optional[RampStatsTask]= None, **kwa) -> pd.DataFrame:
         "return a frame with a new status"
-        if isinstance(task, RampDataFrameTask):
+        if isinstance(task, RampStatsTask):
             tsk = task
             assert len(kwa) == 0
         else:
-            tsk = cast(RampDataFrameTask, cast(type, cls.tasktype)(**kwa))
+            tsk = cast(RampStatsTask, cast(type, cls.tasktype)(**kwa))
 
         data.set_index(["bead", "cycle"], inplace = True)
         data  = data.assign(fixed = data.zmagopen.isna())
@@ -116,7 +116,7 @@ class RampDataFrameProcessor(Processor[RampDataFrameTask]):
     def dataframe(cls, frame, **kwa) -> pd.DataFrame:
         "return all data from a frame"
         # pylint: disable=not-callable
-        task  = cast(RampDataFrameTask, cast(type, cls.tasktype)(**kwa))
+        task  = cast(RampStatsTask, cast(type, cls.tasktype)(**kwa))
         lst   = []
         frame = frame[...,...]
         for i in frame.keys():
@@ -151,14 +151,14 @@ class RampDataFrameProcessor(Processor[RampDataFrameTask]):
                               iclose, zclose,
                               nanhfsigma(info[1]))
 
-class RampAverageZProcessor(Processor[RampAverageZTask]):
+class RampConsensusBeadProcessor(Processor[RampConsensusBeadTask]):
     """
     Creates an average bead
     """
     @classmethod
     def apply(cls, toframe = None, **kwa):
         "applies the task to a frame or returns a function that does so"
-        task = cast(RampAverageZTask, cast(type, cls.tasktype)(**kwa))
+        task = cast(RampConsensusBeadTask, cast(type, cls.tasktype)(**kwa))
         fcn  = partial(cls._apply, task)
         return fcn if toframe is None else fcn(toframe)
 
@@ -169,7 +169,7 @@ class RampAverageZProcessor(Processor[RampAverageZTask]):
     @classmethod
     def dataframe(cls, frame, **kwa) -> pd.DataFrame:
         "return all data from a frame"
-        task  = cast(RampAverageZTask, cast(type, cls.tasktype)(**kwa))
+        task  = cast(RampConsensusBeadTask, cast(type, cls.tasktype)(**kwa))
         data  = dict(cls._apply(task, frame))
         shape = next(iter(data.values()))[1].shape
 
@@ -193,7 +193,7 @@ class RampAverageZProcessor(Processor[RampAverageZTask]):
                    for i in frame.columns):
             return
 
-        fcn   = RampAverageZTask().getaction(action)
+        fcn   = RampConsensusBeadTask().getaction(action)
         if all(isinstance(i, tuple) for i in frame.columns):
             if normalize:
                 norm1 = lambda *i: frame[i].values *(100./np.nanmax(frame[i[0],1]))

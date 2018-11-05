@@ -14,20 +14,20 @@ from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisp
 from   model.task.application   import TasksDisplay
 from   utils                    import initdefaults
 from   view.base                import spawn
-from   ..processor              import RampAverageZProcessor, RampDataFrameProcessor
+from   ..processor              import RampConsensusBeadProcessor, RampDataFrameProcessor
 
 
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from   eventdetection.processor.__config__ import ExtremumAlignmentTask
-from   ..__config__                        import RampAverageZTask, RampDataFrameTask
+from   ..__config__                        import RampConsensusBeadTask, RampStatsTask
 
 
 class RampConfig:
     "ramp analysis with name"
     name      = "ramp.config"
-    consensus = RampAverageZTask(action    = ("percentile", dict(q = [25, 50, 75])),
-                                 normalize = False)
-    dataframe = RampDataFrameTask()
+    consensus = RampConsensusBeadTask(action    = ("percentile", dict(q = [25, 50, 75])),
+                                      normalize = False)
+    dataframe = RampStatsTask()
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -117,7 +117,7 @@ def observetracks(self: RampPlotModel, ctrl):
     "sets-up model observers"
 
     proctype                           = {"dataframe": RampDataFrameProcessor,
-                                          "consensus": RampAverageZProcessor}
+                                          "consensus": RampConsensusBeadProcessor}
     status: List[Optional[RampConfig]] = [None]
     def _consensus(info, root):
         if "consensus" in info:
@@ -125,8 +125,8 @@ def observetracks(self: RampPlotModel, ctrl):
             assert frame is not None
             beads = frame[frame.status == "ok"].bead.unique()
             cons  = info["consensus"][root]
-            RampAverageZProcessor.consensus(cons, True, beads, "normalized")
-            RampAverageZProcessor.consensus(cons, False, beads, "consensus")
+            RampConsensusBeadProcessor.consensus(cons, True, beads, "normalized")
+            RampConsensusBeadProcessor.consensus(cons, False, beads, "consensus")
 
     def _poolcompute(iargs, **_):
         root  = self.tasks.roottask

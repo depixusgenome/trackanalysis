@@ -8,22 +8,22 @@ import numpy             as     np
 
 from   data.track        import Track, isellipsis
 from   data.views        import Beads
-from   .processor        import (RampDataFrameTask, RampAverageZTask,
-                                 RampDataFrameProcessor, RampAverageZProcessor)
+from   .processor        import (RampStatsTask, RampConsensusBeadTask,
+                                 RampDataFrameProcessor, RampConsensusBeadProcessor)
 
 @dataclass
 class RampAnalysis:
     """
     Analyze ramps
     """
-    dataframetask: RampDataFrameTask          = RampDataFrameTask()
-    averagetask:   RampAverageZTask           = RampAverageZTask()
+    dataframetask: RampStatsTask     = RampStatsTask()
+    consensustask:   RampConsensusBeadTask = RampConsensusBeadTask()
     def __post_init__(self):
         # pylint: disable=not-a-mapping
         if isinstance(self.dataframetask, dict):
-            self.dataframetask = RampDataFrameTask(**cast(dict, self.dataframetask))
-        if isinstance(self.averagetask, dict):
-            self.averagetask = RampAverageZTask(**cast(dict, self.averagetask))
+            self.dataframetask = RampStatsTask(**cast(dict, self.dataframetask))
+        if isinstance(self.consensustask, dict):
+            self.consensustask = RampConsensusBeadTask(**cast(dict, self.consensustask))
 
     def __beads(self,
                 track:  Union[Track, Beads],
@@ -53,11 +53,13 @@ class RampAnalysis:
         beads = self.__beads(track, beadlist)
         return RampDataFrameProcessor.dataframe(beads, **self.dataframetask.config())
 
-    def average(self,
-                track:    Union[Track, Beads],
-                beadlist: Optional[List[int]] = None) -> pd.DataFrame:
+    def consensus(self,
+                  track:     Union[Track, Beads],
+                  beadlist:  Optional[List[int]] = None,
+                  normalize: bool                = True) -> pd.DataFrame:
         "return average bead"
         beads = self.__beads(track, beadlist, "ok")
-        frame = RampAverageZProcessor.dataframe(beads, **self.averagetask.config())
-        self.averagetask.consensus(frame)
+        frame = RampConsensusBeadProcessor.dataframe(beads, **self.consensustask.config())
+        proc  = RampConsensusBeadProcessor(task = self.consensustask)
+        proc.consensus(frame, normalize)
         return frame

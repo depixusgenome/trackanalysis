@@ -7,8 +7,8 @@ import numpy             as     np
 
 from   utils.holoviewing import hv, BasicDisplay
 from   data.track        import Track, isellipsis # pylint: disable=unused-import
-from   ..analysis        import (RampAnalysis, RampAverageZTask,
-                                 RampDataFrameTask, RampAverageZProcessor)
+from   ..analysis        import (RampAnalysis, RampConsensusBeadTask,
+                                 RampStatsTask, RampConsensusBeadProcessor)
 
 class RampDisplay(BasicDisplay, ramp = Track):
     """
@@ -41,10 +41,10 @@ class RampDisplay(BasicDisplay, ramp = Track):
         return a dataframe containing all info
         """
         if percycle:
-            ana = RampAnalysis(dataframetask = RampDataFrameTask(**kwa))
+            ana = RampAnalysis(dataframetask = RampStatsTask(**kwa))
             return ana.dataframe(self._items, self._beads)
-        ana = RampAnalysis(averagetask = RampAverageZTask(**kwa))
-        return ana.average(self._items, self._beads)
+        ana = RampAnalysis(consensustask = RampConsensusBeadTask(**kwa))
+        return ana.consensus(self._items, self._beads)
 
     def status(self, **kwa) -> hv.Table:
         "return the status of the beads"
@@ -58,7 +58,7 @@ class RampDisplay(BasicDisplay, ramp = Track):
 
     def beads(self, status = "ok", **kwa):
         "return beads which make it through a few filters"
-        ana = RampAnalysis(dataframetask = RampDataFrameTask(**kwa))
+        ana = RampAnalysis(dataframetask = RampStatsTask(**kwa))
         return ana.beads(self._items, status, self._beads)
 
     @staticmethod
@@ -92,11 +92,11 @@ class RampDisplay(BasicDisplay, ramp = Track):
             return hv.Area(data, "zmag", cols[1:], label = ind.name)(**tmp)*crv
         assert False
 
-    def average(self, opts = None, hmap = True, **kwa):
+    def consensus(self, opts = None, hmap = True, normalize: bool = True, **kwa):
         "return average bead"
-        ana          = RampAnalysis(averagetask = RampAverageZTask(**kwa))
-        data         = ana.average(self._items, self._beads)
-        RampAverageZProcessor.consensus(data, self.beads("ok"))
+        ana          = RampAnalysis(consensustask = RampConsensusBeadTask(**kwa))
+        data         = ana.consensus(self._items, self._beads, normalize)
+        RampConsensusBeadProcessor.consensus(data, self.beads("ok"))
 
         data.columns = [self._name(i) for i in data.columns]
         cols         = [i for i in data.columns
@@ -104,7 +104,7 @@ class RampDisplay(BasicDisplay, ramp = Track):
         _crv = partial(self._crv, data,
                        (dict(style = dict(color = "gray", alpha = .25))
                         if opts is None else opts),
-                       "Z (% bead length)" if ana.averagetask.normalize else "Z (µm)")
+                       "Z (% bead length)" if normalize else "Z (µm)")
         if hmap:
             crvs = {int(i.split()[1]): _crv(i) for i in cols}
             mean = _crv("consensus")

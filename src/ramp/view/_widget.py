@@ -17,7 +17,7 @@ from    view.static             import route
 from    view.plots              import CACHE_TYPE, DpxNumberFormatter
 from    qualitycontrol.view     import QCBeadStatusWidget, QCHairpinSizeWidget
 from    ._model                 import RampPlotModel
-from    ..processor             import RampDataFrameTask
+from    ..processor             import RampStatsTask
 
 Type = TypeVar("Type")
 def dflt(default: Type, **kwa) -> Type:
@@ -30,11 +30,11 @@ class DpxRamp(Widget):
     __javascript__     = route()
     __implementation__ = "_widget.coffee"
     frozen             = props.Bool(True)
-    minhfsigma         = props.Float(RampDataFrameTask.hfsigma[0])
-    maxhfsigma         = props.Float(RampDataFrameTask.hfsigma[1])
-    minextension       = props.Float(RampDataFrameTask.extension[0])
-    fixedextension     = props.Float(RampDataFrameTask.extension[1])
-    maxextension       = props.Float(RampDataFrameTask.extension[2])
+    minhfsigma         = props.Float(RampStatsTask.hfsigma[0])
+    maxhfsigma         = props.Float(RampStatsTask.hfsigma[1])
+    minextension       = props.Float(RampStatsTask.extension[0])
+    fixedextension     = props.Float(RampStatsTask.extension[1])
+    maxextension       = props.Float(RampStatsTask.extension[2])
     displaytype        = props.Int(0)
 
 class RampFilterWidget:
