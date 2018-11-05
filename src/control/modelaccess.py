@@ -6,7 +6,7 @@ from typing                 import (Tuple, Optional, Iterator, Union, Any,
 from copy                   import copy as shallowcopy
 
 from model.task             import RootTask, Task
-from model.task.application import TasksModel
+from model.task.application import ConfigurationsDescriptor, TasksModel
 from data.track             import Track
 from data.views             import TrackView
 from data.views             import BEADKEY
@@ -153,16 +153,16 @@ class TaskAccess(TaskPlotModelAccess):
     side:       ClassVar[int]
     configname: ClassVar[str]
     def __init_subclass__(cls,
-                          tasktype: Type[Task]               = Task,
-                          attrs:    Optional[Dict[str, Any]] = None,
-                          side:     str                      = 'LEFT',
-                          **kwa):
+                          tasktype:   Type[Task]               = Task,
+                          attrs:      Optional[Dict[str, Any]] = None,
+                          side:       str                      = 'LEFT',
+                          configname: str                      = ''):
         if tasktype is Task:
             raise KeyError(f"missing tasktype in class signature: {cls}")
         cls.attrs      = () if attrs is None else tuple(attrs.items()) # type: ignore
         cls.side       = 0 if side == 'LEFT' else 1
         cls.tasktype   = tasktype
-        cls.configname = TasksModel.setupdefaulttask(tasktype, **kwa)
+        cls.configname = ConfigurationsDescriptor.defaulttaskname(configname, tasktype)
 
     @staticmethod
     def __deepcopy(task, kwa):

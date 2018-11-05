@@ -9,7 +9,7 @@ from   pathlib            import Path
 
 import anastore
 from   utils.attrdefaults import addattributes
-from   data.track         import Track, LazyProperty
+from   data.track         import Track, LazyProperty, InstrumentType
 from   .tasks             import Tasks, Task
 
 class TaskDescriptor:
@@ -83,6 +83,7 @@ class LocalTasks:
 
     def context(self, name:str, ctrl):
         "return a context"
+        name = InstrumentType(name).name
         ctrl = getattr(ctrl, 'theme', ctrl)
         changes: Dict[str, Dict[str, Any]] = {}
         if self.tasks:

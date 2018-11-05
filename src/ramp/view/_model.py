@@ -10,13 +10,17 @@ import pandas                   as     pd
 
 from   control.beadscontrol     import DataSelectionBeadController
 from   control.modelaccess      import TaskAccess, TaskPlotModelAccess
-from   eventdetection.processor import ExtremumAlignmentTask # pylint: disable=unused-import
 from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from   model.task.application   import TasksDisplay
 from   utils                    import initdefaults
 from   view.base                import spawn
-from   ..processor              import (RampAverageZTask, RampAverageZProcessor,
-                                        RampDataFrameTask, RampDataFrameProcessor)
+from   ..processor              import RampAverageZProcessor, RampDataFrameProcessor
+
+
+# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
+from   eventdetection.processor.__config__ import ExtremumAlignmentTask
+from   ..__config__                        import RampAverageZTask, RampDataFrameTask
+
 
 class RampConfig:
     "ramp analysis with name"

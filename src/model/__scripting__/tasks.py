@@ -5,11 +5,12 @@ Monkeypatches tasks and provides a simpler access to usual tasks
 """
 from pathlib                  import Path
 from functools                import partial
-from typing                   import Type, Tuple, List, Callable, Dict, Any, cast
+from typing                   import (Type, Tuple, List, Callable, Dict, Any,
+                                      Optional, cast)
 from concurrent.futures       import ProcessPoolExecutor
 
 from copy                     import deepcopy
-from enum                     import Enum
+from enum                     import Enum, _EnumDict # type: ignore
 
 import anastore
 from utils                    import update
@@ -20,18 +21,29 @@ from data.track               import Track
 from control.taskcontrol      import create as _create, ProcessorController
 from control.processor.base   import Processor, register
 from control.processor.utils  import ActionTask
-from cleaning.processor       import DataCleaningTask, ClippingTask, BeadSubtractionTask
-from cordrift.processor       import DriftTask
-from eventdetection.processor import ExtremumAlignmentTask, EventDetectionTask
-from peakfinding.processor    import (PeakSelectorTask, PeakCorrelationAlignmentTask,
-                                      SingleStrandTask, MinBiasPeakAlignmentTask)
-from peakcalling.processor    import (FitToReferenceTask, FitToHairpinTask,
-                                      BeadsByHairpinTask)
 from ..level                  import Level
 from ..task                   import Task
-from ..task.track             import (CycleSamplingTask, TrackReaderTask,
-                                      DataSelectionTask, CycleCreatorTask)
-from ..task.dataframe         import DataFrameTask
+from ..task.application       import TasksConfig
+
+def _update(self, *args, **kwa):
+    info = dict(*args, **kwa)
+    for i, j in info.items():
+        self[i] = j
+_EnumDict.update = _update # correcting a python bug
+
+for name in ('cleaning.processor', 'cordrift', 'eventdetection.processor',
+             'peakfinding.processor', 'peakcalling.processor'):
+    __import__(name+'.__config__')
+
+_CNV = dict([('cleaning', 'datacleaning'), ('alignment', 'extremumalignment'),
+             ('minbiasalignment', 'minbiaspeakalignment'), ('cycles', 'cyclecreator'),
+             ('subtraction', 'beadsubtraction'), ('selection', 'dataselection'),
+             ('peakalignment', 'peakcorrelationalignment')])
+
+_CNF           = {i: type(j) for i, j in TasksConfig.configurations['picotwist'].items()}
+_CNF['action'] = ActionTask
+for _i in _CNV.items():
+    _CNF[_i[0]] = _CNF.pop(_i[1])
 
 class _DOCHelper(Enum):
     # pylint: disable=bad-continuation
@@ -187,66 +199,34 @@ class Tasks(Enum):
     The keyword `pool` allows providing a specific `ProcessPoolExecutor`. If provided with
     `pool == True`, the `ProcessPoolExecutor` instance is created and used.
     """
-    trackreader      = 'trackreader'
-    cyclesampling    = 'cyclesampling'
-    action           = 'action'
-    subtraction      = 'subtraction'
-    cleaning         = 'cleaning'
-    selection        = 'selection'
-    alignment        = 'alignment'
-    clipping         = 'clipping'
-    driftperbead     = 'driftperbead'
-    driftpercycle    = 'driftpercycle'
-    cycles           = 'cycles'
-    eventdetection   = 'eventdetection'
-    peakalignment    = 'peakalignment'
-    peakselector     = 'peakselector'
-    minbiasalignment = 'minbiasalignment'
-    singlestrand     = 'singlestrand'
-    fittohairpin     = 'fittohairpin'
-    fittoreference   = 'fittoreference'
-    beadsbyhairpin   = 'beadsbyhairpin'
-    dataframe        = 'dataframe'
+    locals().update({i:i for i in _CNF})
 
     @staticmethod
-    def defaults():
+    def classes() -> Dict[str, Type[Task]]:
         "returns default tasks"
-        return dict(trackreader      = TrackReaderTask(),
-                    cleaning         = DataCleaningTask(),
-                    cyclesampling    = CycleSamplingTask(),
-                    subtraction      = BeadSubtractionTask(),
-                    selection        = DataSelectionTask(),
-                    alignment        = ExtremumAlignmentTask(),
-                    clipping         = ClippingTask(),
-                    driftperbead     = DriftTask(onbeads = True),
-                    driftpercycle    = DriftTask(onbeads = False),
-                    cycles           = CycleCreatorTask(),
-                    eventdetection   = EventDetectionTask(),
-                    peakalignment    = PeakCorrelationAlignmentTask(),
-                    peakselector     = PeakSelectorTask(),
-                    minbiasalignment = MinBiasPeakAlignmentTask(),
-                    singlestrand     = SingleStrandTask(),
-                    fittoreference   = FitToReferenceTask(),
-                    fittohairpin     = FitToHairpinTask(),
-                    beadsbyhairpin   = BeadsByHairpinTask(),
-                    dataframe        = DataFrameTask())
+        return _CNF
 
-    def default(self) -> Task:
+    def default(self, mdl = None) -> Task:
         "returns default tasks"
-        return self.defaults()[self.name]
+        if mdl is None:
+            cnf = TasksConfig.configurations['picotwist']
+        else:
+            cnf = TasksConfig.configurations[mdl.instrument]
+        return cnf[self._cnv(self.name)]
+
+    @staticmethod
+    def _cnv(key: Optional[str]):
+        return _CNV if key is None else _CNV.get(key, key)
 
     def tasktype(self) -> Type[Task]:
         "returns the task type"
-        if self.name == 'action': # pylint: disable=comparison-with-callable
-            return ActionTask
-        return type(self.default())
+        return self.classes()[self.name]
 
     @classmethod
     def create(cls, *args, **kwa):
         "returns the task associated to the argument"
-        if len(args) == 1:
-            return cls.__create(args[0], kwa)
-        return [cls.__create(i, kwa) for i in args]
+        return (cls.__create(args[0], kwa) if len(args) == 1 else
+                [cls.__create(i, kwa) for i in args])
 
     @classmethod
     def defaulttaskorder(cls, order = None) -> Tuple[Type[Task],...]:
@@ -474,27 +454,27 @@ class Tasks(Enum):
         return cls.cyclesampling, cls.selection, cls.subtraction
 
     @classmethod
-    def _missing_(cls, value) -> 'Tasks':
-        if isinstance(value, Task) and not isinstance(value, DriftTask):
+    def _missing_(cls: Any, value) -> 'Tasks':
+        drift = cls.driftperbead.tasktype()
+        if isinstance(value, Task) and not isinstance(value, drift):
             value = type(value)
 
         if isinstance(value, type):
-            if issubclass(value, DriftTask):
+            if issubclass(value, drift):
                 raise ValueError("DriftTask must be instantiated to be found be Tasks")
 
-            tsk = next((i for i, j in cls.defaults().items() if j.__class__ is value), None)
+            tsk = next((i for i, j in cls.classes().items() if j is value), None)
             if tsk:
                 return cls(tsk)
 
-        if isinstance(value, DriftTask):
-            return (Tasks.driftperbead if cast(DriftTask, value).onbeads else
-                    Tasks.driftpercycle)
+        if isinstance(value, drift):
+            return cls.driftperbead if value.onbeads else cls.driftpercycle
 
         return super()._missing_(value) # type: ignore
 
 
     @classmethod
-    def __create(cls, arg, kwa): # pylint: disable=too-many-return-statements
+    def __create(cls: Any, arg, kwa): # pylint: disable=too-many-return-statements
         if isinstance(arg, cls):
             return arg(**kwa)
 
@@ -518,7 +498,7 @@ class Tasks(Enum):
                     and isinstance(i, (Path, str)) for i in arg)):
             info = dict(kwa)
             info.setdefault('path', arg)
-            return TrackReaderTask(**info)
+            return cls.trackreader.tasktype()(**info)
 
         if isinstance(arg, (tuple, list)) and len(arg) == 2:
             return cls(arg[0])(**arg[1], **kwa)

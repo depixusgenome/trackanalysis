@@ -7,7 +7,10 @@ from copy               import deepcopy
 from utils              import initdefaults
 from utils.configobject import ConfigObject
 from .base              import Task, RootTask
+from .dataframe         import DataFrameTask
 from .order             import TASK_ORDER, taskorder
+from .track             import (CycleSamplingTask, TrackReaderTask,
+                                DataSelectionTask, CycleCreatorTask)
 from ..                 import InstrumentType
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -45,6 +48,14 @@ class ConfigurationsDescriptor:
             itm = tasktype(**cur)
             assert itm == cnf.get(name, itm)
             cnf[name] = itm
+        return name
+
+    @classmethod
+    def defaulttaskname(cls, name:str, tasktype: Type[Task]):
+        "verify that a task default has been defined"
+        name = name if name else tasktype.__name__.lower()[:-len('Task')]
+        for i in cls.defaults.values():
+            assert isinstance(i.get(name, None), tasktype)
         return name
 
 class InstrumentDescriptor:
@@ -187,7 +198,12 @@ class TasksModel:
         self.config  = ctrl.theme  .add(self.config,  noerase)
         self.display = ctrl.display.add(self.display, noerase)
 
-    @staticmethod
-    def setupdefaulttask(tasktype: Type[Task], name: str = '', **kwa) -> str:
-        "add task to the instruments"
-        return ConfigurationsDescriptor.setupdefaulttask(tasktype, name, **kwa)
+def setupdefaulttask(tasktype: Type[Task], name :str = '', **kwa) -> str:
+    "add task to the instruments"
+    return ConfigurationsDescriptor.setupdefaulttask(tasktype, name, **kwa)
+
+setupdefaulttask(CycleSamplingTask)
+setupdefaulttask(TrackReaderTask)
+setupdefaulttask(DataSelectionTask)
+setupdefaulttask(CycleCreatorTask)
+setupdefaulttask(DataFrameTask)

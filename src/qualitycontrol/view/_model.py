@@ -7,11 +7,13 @@ from   data                     import BEADKEY
 from   control.beadscontrol     import DataSelectionBeadController
 from   control.modelaccess      import TaskPlotModelAccess, TaskAccess
 from   cleaning.view            import FixedBeadDetectionModel, FIXED_LIST
-from   cleaning.processor       import (DataCleaningTask, # pylint: disable=unused-import
-                                        DataCleaningProcessor)
+from   cleaning.processor       import DataCleaningProcessor
 from   model.level              import PHASE
 from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from   utils                    import dataclass, dflt, field, initdefaults
+
+# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
+from   cleaning.processor.__config__ import DataCleaningTask
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"

@@ -7,37 +7,34 @@ import pickle
 
 import numpy                    as     np
 
-from sequences.modelaccess      import SequencePlotModelAccess
-
 from control.modelaccess        import TaskAccess
-
-from cleaning.processor         import ClippingTask         # pylint: disable=unused-import
 from cleaning.view              import (BeadSubtractionAccess,
                                         FixedBeadDetectionModel,
                                         FIXED_LIST)
-from eventdetection.processor   import (EventDetectionTask, # pylint: disable=unused-import
-                                        ExtremumAlignmentTask)
 from model.task                 import RootTask
 from model.plots                import PlotModel, PlotTheme, PlotAttrs, PlotDisplay
 from peakfinding.histogram      import interpolator
-from peakfinding.processor      import (PeakSelectorTask,   # pylint: disable=unused-import
-                                        SingleStrandTask)
 from peakfinding.selector       import PeakSelectorDetails
 from peakcalling                import match
 from peakcalling.toreference    import ChiSquareHistogramFit
 from peakcalling.tohairpin      import Distance
-from peakcalling.processor      import (FitToHairpinTask,   # pylint: disable=unused-import
-                                        FitToReferenceTask)
 from peakcalling.processor.fittoreference   import FitData
 from peakcalling.processor.fittohairpin     import (Constraints, HairpinFitter,
                                                     PeakMatching, Range,
                                                     DistanceConstraint)
+from sequences.modelaccess      import SequencePlotModelAccess
 from utils                                  import (dataclass, dflt, updatecopy,
                                                     initdefaults)
 
 from ..reporting.batch          import fittohairpintask
 from ._processors               import runbead, runrefbead
 from ._peakinfo                 import createpeaks
+
+# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
+from cleaning.processor.__config__       import ClippingTask
+from eventdetection.processor.__config__ import EventDetectionTask, ExtremumAlignmentTask
+from peakfinding.processor.__config__    import PeakSelectorTask, SingleStrandTask
+from peakcalling.processor.__config__    import FitToHairpinTask, FitToReferenceTask
 
 class PeaksPlotTheme(PlotTheme):
     """
@@ -428,7 +425,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
 class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
     "access to the ExtremumAlignmentTask"
 
-class ClippingTaskAccess(TaskAccess, tasktype = ClippingTask, disabled = True):
+class ClippingTaskAccess(TaskAccess, tasktype = ClippingTask):
     "access to the ClippingTask"
 
 class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
@@ -437,9 +434,7 @@ class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
 class PeakSelectorTaskAccess(TaskAccess, tasktype = PeakSelectorTask):
     "access to the PeakSelectorTask"
 
-class SingleStrandTaskAccess(TaskAccess,
-                             tasktype = SingleStrandTask,
-                             disabled = True):
+class SingleStrandTaskAccess(TaskAccess, tasktype = SingleStrandTask):
     "access to the SingleStrandTask"
 
 # pylint: disable=too-many-instance-attributes

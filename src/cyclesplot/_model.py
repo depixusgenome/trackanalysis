@@ -11,9 +11,9 @@ from control.modelaccess      import TaskAccess
 from sequences.modelaccess    import SequencePlotModelAccess
 
 # pylint: disable=unused-import
-from cordrift.processor       import DriftTask
-from cleaning.processor       import ClippingTask
-from eventdetection.processor import EventDetectionTask, ExtremumAlignmentTask
+from cordrift.__config__                 import DriftTask
+from cleaning.processor.__config__       import ClippingTask
+from eventdetection.processor.__config__ import EventDetectionTask, ExtremumAlignmentTask
 
 class CyclesModelConfig:
     """
@@ -132,7 +132,7 @@ class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
 class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
     "access to ExtremumAlignmentTask"
 
-class ClippingTaskAccess(TaskAccess, tasktype = ClippingTask, disabled = True):
+class ClippingTaskAccess(TaskAccess, tasktype = ClippingTask):
     "access to the ClippingTask"
 
 class BeadsDriftTaskAccess(TaskAccess,

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "access to the model"
-from typing                     import Optional, List, Dict, cast
+from typing                         import Optional, List, Dict, cast
 import numpy as np
 
-from utils                      import NoArgs, initdefaults
-from model.task                 import RootTask
-from model.plots                import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
+from utils                          import NoArgs, initdefaults
+from model.task                     import RootTask
+from model.plots                    import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 # pylint: disable=unused-import
-from control.modelaccess        import TaskPlotModelAccess, TaskAccess
-from eventdetection.processor   import ExtremumAlignmentTask
-from ..beadsubtraction          import FixedBeadDetection, FIXED_LIST
-from ..processor                import DataCleaningTask, BeadSubtractionTask
+from control.modelaccess                 import TaskPlotModelAccess, TaskAccess
+from eventdetection.processor.__config__ import ExtremumAlignmentTask
+from ..beadsubtraction                   import FixedBeadDetection, FIXED_LIST
+from ..processor.__config__              import DataCleaningTask, BeadSubtractionTask
 
 class DataCleaningAccess(TaskAccess, tasktype = DataCleaningTask):
     "access to data cleaning"

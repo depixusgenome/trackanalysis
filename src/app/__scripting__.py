@@ -8,10 +8,10 @@ from   copy                    import deepcopy
 
 from   utils                   import initdefaults
 from   utils.decoration        import addto
-from   data.__scripting__      import Track
-from   model.__scripting__     import Tasks, Task
 from   model.task.application  import TasksConfig
-from   .                       import default
+from   model.__scripting__     import Tasks, Task
+from   data.__scripting__      import Track
+from   .                       import default as _default
 
 class ScriptingTheme:
     """
@@ -91,9 +91,13 @@ def save(cls, task: Task):
     "saves the task to the default config"
     cpy = deepcopy(task)
     if getattr(cpy, '__scripting_save__', lambda: True)():
-        out                 = dict(cls.tasksmodel().tasks)
-        out[cls(task).name] = cpy
-        cls.tasksmodel(tasks = out)
+        mdl  = cls.tasksmodel()
+        out  = dict(mdl.configurations)
+        name = cls(task).name
+        # pylint: disable=protected-access
+        name = next(j for i, j in cls._cnv().items() if i == name)
+        out[mdl.instrument][name] = cpy
+        cls.tasksmodel(configurations = out)
         scriptapp.writeuserconfig()
 
 @addto(Tasks)
@@ -110,7 +114,9 @@ def __call__(self, *resets, __old__ = Tasks.__call__, **kwa) -> Task:
     if Ellipsis in resets:
         cnf = self.default()
     else:
-        cnf = self.tasksmodel("tasks").get(self.name, None)
+        mdl = self.tasksmodel()
+        # pylint: disable=protected-access
+        cnf = mdl.configurations[mdl.instrument].get(self._cnv(self.name), None)
     if cnf is None:
         return __old__(self, *resets, **kwa)
     res = __old__(self, *resets, current = cnf, **kwa)
@@ -148,6 +154,11 @@ def defaulttasklist(obj, upto, cleaned:bool = None, __old__ = Tasks.defaulttaskl
     with cnf.context(obj.instrument['type'],  scriptapp.control):
         return __old__(obj, upto, cleaned)
 
+@addto(Tasks)
+def default(self, __old__ = Tasks.default) -> Task:
+    "returns default tasks"
+    return Tasks.defaults(self, self.tasksmodel())
+
 @addto(Track)
 def grfiles(self):
     "access to gr files"
@@ -160,7 +171,7 @@ def grfiles(self):
     self.__init__(path = ((old,) if isinstance(old, str) else old)+paths)
 
 # pylint: disable=no-member,invalid-name
-scriptapp = default.application(ScriptingView).open(None).topview.views[0] # type: ignore
+scriptapp = _default.application(ScriptingView).open(None).topview.views[0] # type: ignore
 def localcontext(**kwa):
     "allows changing the context locally. This is **not** thread safe."
     return scriptapp.control.theme.localcontext(**kwa)
