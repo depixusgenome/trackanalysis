@@ -73,12 +73,12 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
         ctrl.theme.observe(self._model, lambda **_: self.reset(ctrl))
 
         @ctrl.daq.observe
-        def _onupdatefov(old = None, **_): # pylint: disable=unused-variable
+        def _onupdatefov(old = None, **_):
             if 'fov' in old:
                 self.reset(ctrl)
 
         @ctrl.daq.observe
-        def _onlisten(old = None, **_): # pylint: disable=unused-variable
+        def _onlisten(old = None, **_):
             if 'fovstarted' in old:
                 self.reset(ctrl)
 

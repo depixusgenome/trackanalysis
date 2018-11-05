@@ -31,7 +31,7 @@ class UndoView(View):
 
         # pylint: disable=unused-variable
         @ctrl.display.observe
-        def _onstartaction(recursive = None):
+        def _onstartaction(recursive = None, **_):
             assert (self.__curr[0] is not None) is recursive
             if not recursive:
                 self.__curr[0] = []
@@ -44,5 +44,5 @@ class UndoView(View):
                 self.__curr[0] = None
 
         @ctrl.undos.observe
-        def _onundoaction(fcn):
+        def _onundoaction(fcn, **_):
             self.__curr[0].append(fcn)

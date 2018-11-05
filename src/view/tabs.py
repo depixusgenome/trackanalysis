@@ -115,7 +115,7 @@ class TabsView(BokehView, Generic[TThemeType]):
                     height = self.__theme.height)
 
         @ctrl.display.observe
-        def _onapplicationstarted():
+        def _onapplicationstarted(**_):
             doc.add_root(self._roots[ind])
 
         @ctrl.action

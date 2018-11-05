@@ -55,11 +55,11 @@ class BeadsTableView(ThreadedDisplay[BeadsTableTheme]):
         ctrl.theme.observe(self._model, lambda **_: self.reset(ctrl))
 
         @ctrl.daq.observe("addbeads", "removebeads", "updatebeads")
-        def _onbeads(**_): # pylint: disable=unused-variable
+        def _onbeads(**_):
             self.reset(ctrl)
 
         @ctrl.daq.observe
-        def _onlisten(**_): # pylint: disable=unused-variable
+        def _onlisten(**_):
             if len(next(iter(self._source.data.values()))):
                 def _run():
                     self._source.data = {i: [] for i in self._source.data}

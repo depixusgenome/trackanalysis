@@ -108,7 +108,7 @@ class BaseSuperController:
         self._config_counts = [False]
 
         @self.display.observe
-        def _onstartaction(recursive = None): # pylint: disable=unused-variable
+        def _onstartaction(recursive = None, **_):
             if recursive is False:
                 self._config_counts[0]  = False
 
@@ -124,7 +124,7 @@ class BaseSuperController:
             self.theme.observe(i, _onconfig)
 
         @self.display.observe
-        def _onstopaction(recursive = None, **_): # pylint: disable=unused-variable
+        def _onstopaction(recursive = None, **_):
             if recursive is False:
                 self._config_counts, val = [False], self._config_counts[0]
                 if val:

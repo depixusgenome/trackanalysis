@@ -40,7 +40,7 @@ class DpxKeyEvent(Model):
     def _setkeys(self):
         self.keys = [self._bindings[name] for name in self._keys]
 
-    def _onkeypress(self, ctrl):
+    def _onkeypress(self, ctrl, **_):
         "Method to be connected to the gui"
         name, fcn = tuple(self._keys.items())[self.keys.index(self.value)]
         with Action(ctrl, calls = name):

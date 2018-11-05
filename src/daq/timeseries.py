@@ -148,7 +148,7 @@ class TimeSeriesViewMixin(ABC):
     def _onmodel(self, ctrl, **_):
         self.reset(ctrl)
 
-    def _onupdatenetwork(self, ctrl, old = None, **_): # pylint: disable=unused-variable
+    def _onupdatenetwork(self, ctrl, old = None, **_):
         names = ['fov'] + ['beads'] if hasattr(self, '_onbeadsdata') else []
         if any(i in old for i in names) and not self._waitfornextreset():
             self._onmodel(ctrl)
@@ -161,7 +161,7 @@ class TimeSeriesViewMixin(ABC):
         pass
 
     @abstractmethod
-    def _onupdatelines(self, ctrl):
+    def _onupdatelines(self, ctrl, **_):
         pass
 
 class BeadTimeSeriesDisplay:
@@ -200,7 +200,7 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
         super().observe(ctrl)
 
         @ctrl.daq.observe
-        def _oncurrentbead(bead = None, **_): # pylint: disable=unused-variable
+        def _oncurrentbead(bead = None, **_):
             mdl = self._model.display
             if self.isbeads():
                 name = mdl.leftvar[:1]+('' if bead is None else str(bead))
@@ -240,7 +240,7 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
         except ValueError:
             return {self.XLEFT: [], self.YLEFT: []}
 
-    def _onupdatelines(self, ctrl):
+    def _onupdatelines(self, ctrl, **_):
         first, self._first = self._first, False
         temps              = ctrl.daq.config.network.fov.temperatures
         for name, tpe in (('left', 'beads' if self.isbeads() else 'fov'),
@@ -340,7 +340,7 @@ class FoVTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[FoVTimeSeriesModel]
         return (data.fovstarted
                 and not {disp.xvar, disp.rightvar, disp.leftvar}.difference(names))
 
-    def _onupdatelines(self, ctrl):
+    def _onupdatelines(self, ctrl, **_):
         first, self._first = self._first, False
         if first:
             self._index = slice(0, 0)

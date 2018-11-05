@@ -59,12 +59,12 @@ class DAQMessagesView:
         busy  = self._theme.busy, 'normal'
 
         @ctrl.display.observe
-        def _onstartaction(recursive = None):      # pylint: disable=unused-variable
+        def _onstartaction(recursive = None, **_):
             if not recursive:
                 self._settext(busy)
 
         @ctrl.display.observe
-        def _onstartcomputation(recursive = None): # pylint: disable=unused-variable
+        def _onstartcomputation(recursive = None, **_):
             if recursive:
                 return
             val = self._display.message
@@ -72,7 +72,7 @@ class DAQMessagesView:
                 self._settext(busy)
 
         @ctrl.display.observe("stopaction", "stopcomputation")
-        def _observer(recursive  = None,           # pylint: disable=unused-variable
+        def _observer(recursive  = None,
                       value      = None,
                       catcherror = None, **_):
             if not recursive and value is not None:
@@ -81,7 +81,7 @@ class DAQMessagesView:
                 catcherror[0] = getattr(ctrl, 'CATCHERROR', True)
 
         @ctrl.display.observe
-        def _onmessage(old = None, **_): # pylint: disable=unused-variable
+        def _onmessage(old = None, **_):
             if 'message' in old:
                 self._settext(self._display.message)
 

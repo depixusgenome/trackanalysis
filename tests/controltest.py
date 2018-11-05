@@ -63,7 +63,7 @@ def test_evt():
 
         @events.observe('event3')
         @staticmethod
-        def onevent3(arg):
+        def onevent3(arg, **_):
             assert arg == 'e3'
 
     got = []

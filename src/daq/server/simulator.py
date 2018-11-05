@@ -128,7 +128,7 @@ class BaseServerSimulatorView(ABC):
                 self._start(ctrl)
 
         @ctrl.display.observe
-        def _onguiloaded():
+        def _onguiloaded(**_):
             ctrl.daq.listen(**{self._NAME: self._nbeads(ctrl) != 0})
         return False
 

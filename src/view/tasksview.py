@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Deals with global information"
 from functools              import partial
+from model.task             import Task
 from model.task.application import TasksModel, TaskIOTheme
 
 class TasksView:
@@ -17,8 +18,11 @@ class TasksView:
             inst = next(iter(inst), None)
         ctrl.display.update(self._model.display, roottask = inst)
 
-    def _onopentrack(self, ctrl, model = None, **_):
-        ctrl.display.update(self._model.display, roottask = model[0], bead = None)
+    def _onopentrack(self, ctrl, model = None, calllater = None, **_):
+        calllater.insert(0, partial(self._openedtrack, ctrl,  model[0]))
+
+    def _openedtrack(self, ctrl, root: Task):
+        ctrl.display.update(self._model.display, roottask = root, bead = None)
 
     def observe(self, ctrl):
         "observing the controller"

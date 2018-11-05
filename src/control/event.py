@@ -6,8 +6,8 @@ import re
 from itertools          import product
 from functools          import wraps, partial
 from enum               import Enum, unique
-from typing             import (Dict, Union, Sequence, # pylint: disable=unused-import
-                                Callable, Tuple, Any, Set, Optional, cast)
+from typing             import (Dict, Union, Sequence, Callable, Tuple, Any, Set,
+                                Optional, List, cast)
 
 from utils              import ismethod, isfunction, toenum
 from utils.logconfig    import getLogger
@@ -47,19 +47,22 @@ class EmitPolicy(Enum):
 
     def run(self, allfcns: Set[Callable], args):
         "runs provided observers"
+        calllater: List[Callable[[], None]] = []
         if   self is self.outasdict:
             dargs = cast(Dict, args)
             for hdl in allfcns:
-                hdl(**dargs)
+                hdl(**dargs, calllater = calllater)
         elif self is self.outastuple:
             for hdl in allfcns:
-                hdl(*args)
+                hdl(*args, calllater = calllater)
         elif self is self.nothing:
             for hdl in allfcns:
-                hdl()
+                hdl(calllater = calllater)
         else:
             for hdl in allfcns:
-                hdl(*args[0], **args[1])
+                hdl(*args[0], **args[1], calllater = calllater)
+        for i in calllater:
+            i()
 
 _CNT = 0
 _COMPLETIONS = Dict[Callable, Set[Callable]]

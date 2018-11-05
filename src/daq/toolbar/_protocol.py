@@ -234,7 +234,7 @@ class DAQManualButton(BaseProtocolButton[DAQManualConfig]):
         tbar.on_change("zmag", _on_cb)
 
         @ctrl.theme.observe
-        def _ondaqmanual(**_): # pylint: disable=unused-variable
+        def _ondaqmanual(**_):
             tbar.update(**self.addtodocargs(ctrl))
 
     def addtodocargs(self, _):
@@ -281,7 +281,7 @@ class DAQManualButton(BaseProtocolButton[DAQManualConfig]):
                           zmag      = zmag,
                           speed     = speed)
 
-    def _onkeyzmag(self, ctrl, moveup):
+    def _onkeyzmag(self, ctrl, moveup, **_):
         zmag = self._model.zmag.move(moveup)
         if zmag != self._model.zmag.value:
             ctrl.daq.updateprotocol(self._model.new(zmag = zmag))
