@@ -10,7 +10,7 @@ from    enum        import Enum
 import  numpy       as     np
 
 from    utils       import initdefaults
-from    model       import levelprop, Level, PHASE
+from    model       import levelprop, Level, PHASE, InstrumentType
 from   .views       import Beads, Cycles, BEADKEY, isellipsis, TrackView
 from   .trackio     import opentrack, PATHTYPES
 
@@ -126,11 +126,6 @@ class FoV:
 
         tpe = iter if hasattr(arr, '__next__') else type(arr)
         return tpe([(sl1*i+int1, sl2*j+int2) for i, j in arr]) # type: ignore
-
-class InstrumentType(Enum):
-    "The type of instrument"
-    picotwist = "picotwist"
-    sdi       = "sdi"
 
 class Secondaries:
     """
@@ -505,7 +500,8 @@ class Track:
 
     _framerate                   = 30.
     _fov:         Optional[FoV]  = None
-    _instrument:  Dict[str, Any] = {"type": InstrumentType.picotwist, "name": None}
+    _instrument:  Dict[str, Any] = {"type": InstrumentType.picotwist.name,
+                                    "name": None}
     _phases                      = np.empty((0,9), dtype = 'i4')
     _data:        Optional[DATA] = None # type: ignore
     _secondaries: Optional[DATA] = None

@@ -6,6 +6,11 @@ Classes defining a level of data treatment.
 from enum   import Enum, unique
 from utils  import initdefaults
 
+class InstrumentType(Enum):
+    "The type of instrument"
+    picotwist = "picotwist"
+    sdi       = "sdi"
+
 @unique
 class Level(Enum):
     """

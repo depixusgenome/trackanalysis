@@ -81,14 +81,17 @@ class LocalTasks:
         "no specialized tasks"
         return len(self.tasks) == 0
 
-    def context(self, ctrl):
+    def context(self, name:str, ctrl):
         "return a context"
         ctrl = getattr(ctrl, 'theme', ctrl)
         changes: Dict[str, Dict[str, Any]] = {}
         if self.tasks:
-            cpy = dict(ctrl.get("tasks", "tasks"))
+            cpy = dict(ctrl.get("tasks", "configurations")[name])
             cpy.update(self.tasks)
-            changes['tasks'] = {"tasks": cpy}
+            changes['tasks'] = {'configurations': {name: {"tasks": cpy}},
+                                'instrument':     name}
+        else:
+            changes['tasks'] = {'instrument': name}
 
         cleaning = []
         if self.driftpercycle:

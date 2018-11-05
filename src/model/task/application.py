@@ -2,37 +2,69 @@
 # -*- coding: utf-8 -*-
 "Deals with global information"
 from typing             import (Dict, Optional, List, Iterator, Type, Iterable,
-                                Callable, Any, TYPE_CHECKING, cast)
+                                Callable, Any, ClassVar, TYPE_CHECKING, cast)
 from copy               import deepcopy
 from utils              import initdefaults
 from utils.configobject import ConfigObject
 from .base              import Task, RootTask
 from .order             import TASK_ORDER, taskorder
+from ..                 import InstrumentType
 if TYPE_CHECKING:
     # pylint: disable=unused-import
     from data.track          import Track
     from control.taskcontrol import ProcessorController
 
-DEFAULT_TASKS: Dict[str, Task] = {}
+Configuration  = Dict[str, Task]
+Configurations = Dict[str, Configuration]
 
-class TasksDescriptor:
-    """ tasks """
+class ConfigurationsDescriptor:
+    """ configurations """
+    defaults: ClassVar[Configurations] = {i: {} for i in InstrumentType.__members__}
     def __get__(self, inst, owner):
-        return inst.__dict__.get("tasks", {}) if inst is not None else DEFAULT_TASKS
+        return self.defaults if inst is None else inst.__dict__["configurations"]
 
     def __set__(self, inst, val):
-        good = deepcopy(DEFAULT_TASKS)
-        good.update(val)
-        inst.__dict__['tasks'] = good
+        good = deepcopy(self.defaults)
+        for i in set(good) & set(val):
+            good[i].update(val[i])
+        for i in set(val) - set(good):
+            good[i] = val
+        inst.__dict__['configurations'] = good
         return good
+
+    @classmethod
+    def setupdefaulttask(cls, tasktype: Type[Task], name: str = '', **kwa) -> str:
+        "add task to the instruments"
+        instruments = {i: kwa.pop(i) for i in set(cls.defaults) & set(kwa)}
+        if not name:
+            name = tasktype.__name__.lower()[:-len('Task')]
+
+        for instr, cnf in cls.defaults.items():
+            cur = dict(kwa)
+            cur.update(instruments.get(instr, {}))
+            itm = tasktype(**cur)
+            assert itm == cnf.get(name, itm)
+            cnf[name] = itm
+        return name
+
+class InstrumentDescriptor:
+    """ tasks """
+    def __get__(self, inst, owner):
+        return (InstrumentType.picotwist.name if inst is None else
+                inst.__dict__["instrument"])
+
+    def __set__(self, inst, val):
+        inst.__dict__['instrument'] = InstrumentType(val).name
+        return inst.__dict__['instrument']
 
 class TasksConfig(ConfigObject):
     """
     permanent globals on tasks
     """
-    name                   = "tasks"
-    tasks: Dict[str, Task] = cast(Dict[str, Task], TasksDescriptor())
-    order: List[str]       = list(TASK_ORDER)
+    name                           = "tasks"
+    instrument:     str            = InstrumentType.picotwist.name
+    configurations: Configurations = cast(Configurations, ConfigurationsDescriptor())
+    order:          List[str]      = list(TASK_ORDER)
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -154,3 +186,8 @@ class TasksModel:
         """
         self.config  = ctrl.theme  .add(self.config,  noerase)
         self.display = ctrl.display.add(self.display, noerase)
+
+    @staticmethod
+    def setupdefaulttask(tasktype: Type[Task], name: str = '', **kwa) -> str:
+        "add task to the instruments"
+        return ConfigurationsDescriptor.setupdefaulttask(tasktype, name, **kwa)

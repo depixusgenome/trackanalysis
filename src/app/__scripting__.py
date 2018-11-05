@@ -143,9 +143,9 @@ def __cleaning__(cls):
 def defaulttasklist(obj, upto, cleaned:bool = None, __old__ = Tasks.defaulttasklist):
     "Returns a default task list depending on the type of raw data"
     cnf = getattr(obj, 'tasks', None)
-    if cnf is None or cnf.isempty():
+    if cnf is None:
         return __old__(obj, upto, cleaned)
-    with cnf.context(scriptapp.control):
+    with cnf.context(obj.instrument['type'],  scriptapp.control):
         return __old__(obj, upto, cleaned)
 
 @addto(Track)

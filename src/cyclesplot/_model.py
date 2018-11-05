@@ -76,11 +76,17 @@ class CyclesPlotDisplay(PlotDisplay):
         super().__init__(**kwa)
 
     def __getitem__(self, tasks: TasksDisplay) -> Optional[BeadInfo]:
-        return self.info.get(tasks.roottask, {}).get(tasks.bead, None)
+        root, bead = tasks.roottask, tasks.bead
+        if root is None or bead is None:
+            return None
+        return self.info.get(root, {}).get(bead, None)
 
     def newinfo(self, tasks: TasksDisplay, **info) -> Optional[INFO]:
         "return a dict containing the new info"
-        old = self.info.get(tasks.roottask, {}).get(tasks.bead, None)
+        root, bead = tasks.roottask, tasks.bead
+        if root is None or bead is None:
+            return None
+        old = self.info.get(root, {}).get(bead, None)
         if old and all(getattr(old, i) == j for i, j in info.items()):
             return None
 
@@ -92,7 +98,7 @@ class CyclesPlotDisplay(PlotDisplay):
             old.__dict__.update(**info)
 
         res: INFO = dict(self.info)
-        res.setdefault(tasks.roottask, {})[tasks.bead] = cast(BeadInfo, old)
+        res.setdefault(root, {})[bead] = cast(BeadInfo, old)
         return res
 
 class CyclesPlotModel(PlotModel):
@@ -126,21 +132,19 @@ class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
 class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
     "access to ExtremumAlignmentTask"
 
-class ClippingTaskAccess(TaskAccess, tasktype = ClippingTask):
+class ClippingTaskAccess(TaskAccess, tasktype = ClippingTask, disabled = True):
     "access to the ClippingTask"
 
 class BeadsDriftTaskAccess(TaskAccess,
                            tasktype   = DriftTask,
-                           onbeads    = True,
                            configname = 'driftperbead',
-                           attrs      = ...):
+                           attrs      = {'onbeads': True}):
     "access to beads drift task"
 
 class CyclesDriftTaskAccess(TaskAccess,
                             tasktype   = DriftTask,
-                            onbeads    = False,
                             configname = 'driftpercycle',
-                            attrs      = ...):
+                            attrs      = {'onbeads': False}):
     "access to beads drift task"
 
 class CyclesModelAccess(SequencePlotModelAccess):

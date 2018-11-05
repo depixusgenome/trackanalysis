@@ -6,7 +6,7 @@ from typing                 import (Tuple, Optional, Iterator, Union, Any,
 from copy                   import copy as shallowcopy
 
 from model.task             import RootTask, Task
-from model.task.application import DEFAULT_TASKS, TasksModel
+from model.task.application import TasksModel
 from data.track             import Track
 from data.views             import TrackView
 from data.views             import BEADKEY
@@ -152,22 +152,17 @@ class TaskAccess(TaskPlotModelAccess):
     attrs:      ClassVar[Tuple[Tuple[str, Any],...]]
     side:       ClassVar[int]
     configname: ClassVar[str]
-    def __init__(self, ctrl: PlotModelAccess) -> None:
-        super().__init__(ctrl)
-        assert isinstance(self.configtask, self.tasktype)
-
-    def __init_subclass__(cls, attrs = (), **kwa):
-        cls.side       = 0 if kwa.pop('side', 'LEFT') == 'LEFT' else 1
-        cls.tasktype   = cast(Type[Task], kwa.pop('tasktype'))
-        cls.configname = kwa.pop('configname',
-                                 cls.tasktype.__name__.lower()[:-len('Task')])
-        cls.attrs      = (tuple(kwa.items()) if attrs is Ellipsis else
-                          tuple((i, kwa[i]) for i in attrs))
-
-        inst = cls.tasktype(**kwa)
-        name = cls.configname
-        assert name not in DEFAULT_TASKS or inst == DEFAULT_TASKS[name]
-        DEFAULT_TASKS[name] = inst
+    def __init_subclass__(cls,
+                          tasktype: Type[Task]               = Task,
+                          attrs:    Optional[Dict[str, Any]] = None,
+                          side:     str                      = 'LEFT',
+                          **kwa):
+        if tasktype is Task:
+            raise KeyError(f"missing tasktype in class signature: {cls}")
+        cls.attrs      = () if attrs is None else tuple(attrs.items()) # type: ignore
+        cls.side       = 0 if side == 'LEFT' else 1
+        cls.tasktype   = tasktype
+        cls.configname = TasksModel.setupdefaulttask(tasktype, **kwa)
 
     @staticmethod
     def __deepcopy(task, kwa):
@@ -178,27 +173,38 @@ class TaskAccess(TaskPlotModelAccess):
         return out
 
     @property
+    def instrument(self) -> str:
+        "the current instrument type"
+        if self.roottask is None:
+            return self._ctrl.theme.get("tasks", "instrument")
+        return self._ctrl.tasks.instrumenttype(self.roottask)
+
+    @property
     def defaultconfigtask(self) -> Task:
         "returns the config task"
-        return self._ctrl.theme.get("tasks", "tasks", {}, True).get(self.configname, None)
+        return (self._ctrl.theme.get("tasks", "configurations", {}, True)
+                .get(self.instrument, {})
+                .get(self.configname, None))
 
     @property
     def configtask(self) -> Task:
         "returns the config task"
-        return self._tasksmodel.config.tasks[self.configname]
+        return self._tasksmodel.config.configurations[self.instrument][self.configname]
 
     @configtask.setter
     def configtask(self, values: Union[Task, Dict[str,Task]]):
         "returns the config task"
-        task = self._tasksmodel.config.tasks[self.configname]
-        kwa  = diffobj(task, values) if isinstance(values, Task) else values
-        kwa  = self._configattributes(kwa)
+        instr = self.instrument
+        task  = self._tasksmodel.config.configurations[instr][self.configname]
+
+        kwa   = diffobj(task, values) if isinstance(values, Task) else values
+        kwa   = self._configattributes(kwa)
         if not kwa:
             return
 
-        tasks = dict(self._ctrl.theme.get("tasks", "tasks", {}))
-        tasks[self.configname] = self.__deepcopy(tasks[self.configname], kwa)
-        self._ctrl.theme.update("tasks", tasks = tasks)
+        cnf = dict(self._ctrl.theme.get("tasks", "configurations", {}))
+        cnf[instr][self.configname] = self.__deepcopy(cnf[instr][self.configname], kwa)
+        self._ctrl.theme.update("tasks", configurations = cnf)
 
     @property
     def task(self) -> Optional[Task]:

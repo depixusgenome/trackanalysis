@@ -6,6 +6,7 @@ from pathlib            import Path
 from itertools          import chain
 from copy               import deepcopy
 from model.task         import TrackReaderTask
+from data.trackio       import instrumenttype
 from data.tracksdict    import TracksDict
 from utils.logconfig    import getLogger
 LOGS   = getLogger(__name__)
@@ -70,8 +71,11 @@ class ConfigTrackIO(TrackIO):
             return None
 
         items = [tmp[0][0]]
+        instr = instrumenttype(items[0])
+        cnf   = self._ctrl.theme.get("tasks", "configurations")
+        cnf   = cnf.get(instr, self._ctrl.theme.get("tasks", "instrument"))
         for name in self._ctrl.theme.get("tasks.io", "tasks"):
-            task = self._ctrl.theme.get("tasks", "tasks").get(name, None)
+            task  = cnf.get(name, None)
             if not getattr(task, 'disabled', True):
                 items.append(deepcopy(task))
         return [tuple(items)]

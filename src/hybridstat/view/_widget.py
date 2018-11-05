@@ -532,7 +532,7 @@ class _ClippingDescriptor:
     @staticmethod
     def line():
         "the gui line"
-        return ('Discard z(∈ φ5) < z(φ1)-σ[HF]‥α, α =',  ' %(_clipping)of')
+        return ('Discard z(∈ φ5) < z(φ1)-σ[HF]‥α',  ' %(_clipping)of')
 
 class _SingleStrandDescriptor:
     def getdefault(self,inst):
@@ -540,8 +540,9 @@ class _SingleStrandDescriptor:
         return (self if inst is None else
                 not getattr(inst,'_model').singlestrand.configtask.disabled)
 
-    def __get__(self,inst,owner) -> bool:
-        return getattr(inst,'_model').singlestrand.task is not None
+    def __get__(self,inst,owner):
+        return (self if inst is None else
+                getattr(inst,'_model').singlestrand.task is not None)
 
     def __set__(self,inst, value):
         getattr(inst,'_model').singlestrand.update(disabled = not value)
