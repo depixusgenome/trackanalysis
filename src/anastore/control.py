@@ -5,6 +5,7 @@
 from typing          import Tuple, Union
 
 from control.taskio  import TaskIO
+from data.trackio    import instrumenttype
 from utils           import initdefaults
 from utils.logconfig import getLogger
 
@@ -86,3 +87,8 @@ class ConfigAnaIO(AnaIO):
         else:
             raise IOError("Nothing to save", "warning")
         return True
+
+    @staticmethod
+    def instrumenttype(path: str) -> str:
+        "return the instrument type"
+        return instrumenttype(super().open(path, ())[0]['tasks'][0])

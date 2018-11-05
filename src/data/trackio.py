@@ -17,7 +17,8 @@ import  re
 import  numpy              as     np
 
 # pylint: disable=import-error,no-name-in-module
-from    legacy             import readtrack, readgr, fov as readfov
+from    legacy             import (readtrack, readgr, fov as readfov,
+                                   instrumenttype  as _legacyinstrumenttype)
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import,invalid-name
@@ -62,6 +63,11 @@ class _TrackIO(ABC):
     def open(cls, path:PATHTYPE, **_) -> Dict[Union[str, int], Any]:
         "opens a track file"
 
+    @staticmethod
+    @abstractmethod
+    def instrumenttype(path:str) -> str:
+        "return the instrument type"
+
 class PickleIO(_TrackIO):
     "checks and opens pickled paths"
     EXT = '.pk'
@@ -83,6 +89,14 @@ class PickleIO(_TrackIO):
         with open(path, 'wb') as stream:
             return pickle.dump(info, stream)
 
+    @staticmethod
+    def instrumenttype(path: str) -> str:
+        "return the instrument type"
+        data : dict = {}
+        with open(path, "rb") as stream:
+            data = pickle.load(stream)
+        return data.get('instrument', {'type': 'picotwist'})['type']
+
 class LegacyTrackIO(_TrackIO):
     "checks and opens legacy track paths"
     TRKEXT = '.trk'
@@ -97,6 +111,11 @@ class LegacyTrackIO(_TrackIO):
         axis = kwa.pop('axis', 'Z')
         axis = getattr(axis, 'value', axis)[0]
         return readtrack(str(path), kwa.pop('notall', True), axis)
+
+    @staticmethod
+    def instrumenttype(path: str) -> str:
+        "return the instrument type"
+        return _legacyinstrumenttype(path)
 
     @classmethod
     def scan(cls, trkdirs) -> Iterator[Path]:
@@ -159,6 +178,11 @@ class LegacyGRFilesIO(_TrackIO):
             return None
 
         return (trk,) + grs
+
+    @staticmethod
+    def instrumenttype(path: str) -> str:
+        "return the instrument type"
+        return _legacyinstrumenttype(path)
 
     @classmethod
     def open(cls, paths:Tuple[PATHTYPE,PATHTYPE], **kwa) -> dict: # type: ignore
@@ -369,6 +393,11 @@ class Handler:
         track.__setstate__(state)
         return track
 
+    def instrumenttype(self) -> str:
+        "return the instrument type"
+        path = self.path[0] if isinstance(self.path, (list, tuple)) else self.path
+        return self.handler.instrumenttype(str(path))
+
     @classmethod
     def todict(cls, track: 'Track') -> Dict[str, Any]:
         "the oposite of __call__"
@@ -505,6 +534,10 @@ def checkpath(track, **opts) -> Handler:
 def opentrack(track):
     "Opens a track depending on its extension"
     checkpath(track)(track)
+
+def instrumenttype(track) -> str:
+    "return the instrument type"
+    return checkpath(getattr(track, 'path', track)).instrumenttype()
 
 N_SAVE_THREADS = 4
 def _savetrack(args):

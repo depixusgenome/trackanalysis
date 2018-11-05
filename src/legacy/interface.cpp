@@ -1,4 +1,6 @@
 #include <cstdio>
+#include <fstream>
+#include <algorithm>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "legacy/legacyrecord.h"
@@ -42,6 +44,23 @@ namespace legacy
         }
     }
     pybind11::object _readim(std::string name, bool all = true);
+
+    pybind11::object _instrumenttype(std::string name)
+    {
+        std::string ext(".trk");
+        if((name.size() > 4)
+            && std::equal(name.begin()+name.size()-4, name.end(), ext.begin()))
+        {
+            std::ifstream stream(name);
+            std::string line;
+            const std::string find("-src \"equally spaced reference profile");
+            for(int i = 0; i < 10000 && std::getline(stream, line); ++i)
+                if(std::equal(find.begin(), find.end(), line.begin()))
+                    return pybind11::str("picotwist");
+            return pybind11::str("sdi");
+        }
+        return pybind11::none();
+    }
 
     pybind11::object _readrecfov(legacy::GenRecord &rec)
     {
@@ -241,6 +260,10 @@ namespace legacy
     void pymodule(pybind11::module & mod)
     {
         using namespace pybind11::literals;
+        mod.def("instrumenttype", _instrumenttype, "path"_a,
+                "Whether a '.trk' file was created using a picotwist or an SDI.\n"
+                "\n\nThis is found by checking for calibration images in the first\n"
+                "10'000 lines of the file");
         mod.def("readtrack", _readtrack, "path"_a,
                 "clipcycles"_a = true, "axis"_a = "z",
                 "Reads a '.trk' file and returns a dictionnary of beads,\n"
