@@ -228,6 +228,10 @@ class BaseTaskController(Controller):
         ctrl = self._items.get(parent, None)
         return None if ctrl is None else ctrl.keepupto(tsk)
 
+    def instrumenttype(self, parent:RootTask) -> str:
+        "return the instrument type"
+        return self.track(parent).instrument['type'].name
+
     @Controller.emit
     def savetrack(self, path: str) -> None:
         "saves the current model"
