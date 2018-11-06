@@ -39,6 +39,8 @@ The average behavior for all beads is the median across *good* beads of the
 # tag cycles_v6.0
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
+### QC
+
 The gui has been revamped, in particular in tabs *FoV* and *QC*. The later now
 contains better summaries, also available in *RampApp*:
 
@@ -46,10 +48,14 @@ contains better summaries, also available in *RampApp*:
 2. Sizes of beads: beads are clustered by bins of a given size. The bin size is
 set by the used using a slider.
 
+### Peaks
+
 When multiple hairpin sequences are provided in a fasta file, we now use a
 median bead extension to select only meaningful sequences. Thus a 5kb bead will
 discard sequences < 5kb and only consider those extending to ~5kb. When only
 one hairpin sequence is provided, the behaviour is unchanged.
+
+Furthermore, computations are now cached.
 
 # tag cycles_v5.3
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
