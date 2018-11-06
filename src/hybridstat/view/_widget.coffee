@@ -5,12 +5,7 @@ import {WidgetView, Widget} from "models/widgets/widget"
 export class DpxFitParamsView extends WidgetView
     tagName: "div"
 
-    on_change_frozen: () ->
-        $(@el).find('.dpx-pk-freeze').prop('disabled', @model.frozen)
-
-    on_lock: (evt) ->
-        @model.locksequence = !@model.locksequence
-
+    _set_lock: () ->
         elem = $(@el)
         elem = elem.find("#dpx-pk-ls-icon")
         elem.removeClass()
@@ -19,6 +14,13 @@ export class DpxFitParamsView extends WidgetView
         else
             elem.addClass("icon-dpx-unlocked")
 
+    on_change_frozen: () ->
+        $(@el).find('.dpx-pk-freeze').prop('disabled', @model.frozen)
+
+    on_lock: (evt) ->
+        @model.locksequence = !@model.locksequence
+        @_set_lock()
+
     on_input: (evt) ->
         id = evt.target.id[7...]
         @model[id] = evt.target.value
@@ -26,7 +28,7 @@ export class DpxFitParamsView extends WidgetView
     on_change_input: (evt) ->
         itm = $(@el).find("#dpx-pk-#{evt}")
         if "#{evt}" == "locksequence"
-            itm.prop("checked", @model.locksequence)
+            @_set_lock()
         else
             itm.val("#{@model[evt]}")
 
