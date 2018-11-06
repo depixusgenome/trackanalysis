@@ -268,7 +268,13 @@ class FigureSizeDescriptor(_AdvancedDescriptor):
 
 class ThemeNameDescriptor(_AdvancedDescriptor):
     "defines the theme to use"
-    _LABEL  = '%(_{self._attrname}|dark:dark|basic:basic|light:light|caliber:caliber){self._fmt}'
+    _LABEL  = ('%(_{self._attrname}'
+               +'|basic:basic'
+               +'|dark:dark'
+               +'|light_minimal:bokehlight'
+               +'|dark_minimal:bokehdark'
+               +'|caliber:caliber'
+               +'){self._fmt}')
     _cnf    = "main"
     def __init__(self):
         super().__init__("Background color", "c")

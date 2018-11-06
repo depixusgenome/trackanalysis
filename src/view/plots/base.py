@@ -45,7 +45,6 @@ def themed(theme, obj, dflt = '--none--'):
 
     theme = getattr(theme, "_model",    theme)
     theme = getattr(theme, "themename", theme)
-    print(theme, obj.keys())
     return (obj[theme]       if theme in obj              else
             obj[_CNV[theme]] if dflt == '--none--'        else
             obj.get(_CNV.get(theme, None), dflt))
@@ -243,7 +242,10 @@ class PlotThemeView(PlotTheme):
 
     def figure(self, **kwa) -> Figure:
         "creates a figure"
-        return figure(**self.figargs(**kwa))
+        fig = figure(**self.figargs(**kwa))
+        if self.toolbar.get('hide', False):
+            fig.toolbar.autohide = True
+        return fig
 
 class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=too-many-public-methods
     "Base plotter class"

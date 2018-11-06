@@ -125,8 +125,9 @@ class ChoiceOption(Option):
                 break
 
             for i in match.group('cols')[1:].split("|"):
-                sel  = 'selected="selected" ' if i.startswith(str(val)) else ""
-                out += '<option {}value="{}">{}</option>'.format(sel, *i.split(':'))
+                i    = i.split(':')
+                sel  = 'selected="selected" ' if i[0] == str(val) else ""
+                out += '<option {}value="{}">{}</option>'.format(sel, *i)
             return out.format(ident)+'</select>'
         return cls._PATT.sub(_replace, body)
 
@@ -280,7 +281,6 @@ class DpxModal(Model):
         self.__handler = self._build_handler(callback, title, body, model, context)
         self.__always  = always
         self.__running = False
-        print(body)
         self.update(title    = title,
                     body     = self._build_body(body, model),
                     callback = self._build_callback(callback),
@@ -321,14 +321,12 @@ class DpxModal(Model):
             return None
 
         def _hdl(itms, bdy = body):
-            print("*h", bdy)
             if isinstance(bdy, (list, tuple)):
                 if len(bdy) and hasattr(bdy[0], 'body'):
                     bdy = sum((tuple(i.body) for i in bdy), ())
                 bdy = ' '.join(' '.join(k if isinstance(k, str) else k[1] for k in i)
                                for i in bdy)
 
-            print("*h*", bdy)
             converters = [i.converter(model, bdy) for i in self.__OPTIONS]
             ordered    = sorted(itms.items(), key = lambda i: bdy.index('%('+i[0]))
             if context is None:

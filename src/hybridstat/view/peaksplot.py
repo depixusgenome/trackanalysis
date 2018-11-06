@@ -184,8 +184,9 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             else:
                 self.setbounds(cache, self._fig.y_range, 'y', (0., 1.))
 
-            clr = self.__colors('peakscount')
-            cache[self._fig.xaxis[0]].update(axis_label_text_color = clr)
+            clr  = self.__colors('peakscount')
+            axis = next(i for i in self._fig.below if getattr(i, 'x_range_name', '') == 'default')
+            cache[axis].update(axis_label_text_color = clr)
 
             clr  = self.__colors('peaksduration')
             axis = next(i for i in self._fig.above if getattr(i, 'x_range_name', '') == 'duration')

@@ -24,7 +24,8 @@ class SequenceTickerTheme:
     "sequence ticker theme"
     name:     str  = "sequence.ticker"
     standoff: int  = -2
-    grid:     dict = dflt({'color': ('lightgray', 'lightgreen'),
+    grid:     dict = dflt({'color': {'dark':  ('lightgray', 'lightgreen'),
+                                     'basic': ('gray', 'lightgreen')},
                            'width': (1,          1),
                            'alpha': (.8,         .8),
                            'dash' : ('solid',    'solid')})
