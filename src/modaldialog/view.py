@@ -3,7 +3,7 @@
 """
 Allows creating modals from anywhere
 """
-from typing             import Dict, List, Tuple, Any
+from typing             import Dict, List, Tuple, Any, Union
 from abc                import ABC, abstractmethod
 from copy               import deepcopy
 from bokeh.document     import Document
@@ -12,8 +12,49 @@ from view.fonticon      import FontIcon
 from utils              import initdefaults
 from utils.logconfig    import getLogger
 from .                  import dialog
-LOGS   = getLogger(__name__)
-T_BODY = Tuple[Tuple[str, str],...] # pylint: disable=invalid-name
+LOGS               = getLogger(__name__)
+
+class AdvancedTab:
+    "a tab in the widget"
+    __inds = 0
+    def __init__(self, title:str, *items: Tuple[str, ...]) -> None:
+        self.body    = items
+        self.title   = title
+        # pylint: disable=protected-access
+        self.ind     = self.__class__.__inds
+        self.__class__.__inds += 1
+
+    def htmltitle(self, ind) -> str:
+        "return the html version of the title"
+        fcn  = "Bokeh.DpxModal.prototype.clicktab"
+        head = "cur" if ind else ""
+        return ("<button type='button' class='bk-bs-btn bk-bs-btn-default "
+                +f"bbm-dpx-{head}btn' id='bbm-dpx-btn-{self.ind}'"
+                +f'onclick="{fcn}({self.ind})">'
+                +self.title +"</button>")
+
+    def htmlbody(self, ind) -> str:
+        "return the html version of the body"
+        def _elem(val):
+            if isinstance(val, tuple):
+                return f'<td style="{val[0]}">'+val[1]+'</td>'
+            return f'<td>'+val+'</td>'
+
+        head = 'curtab' if ind else 'hidden'
+        return ('<table class="bbm-dpx-'+head+f'" id="bbm-dpx-tab-{self.ind}">'
+                +''.join('<tr>' + ''.join(_elem(i) for i in j) + '</tr>'
+                         for j in self.body)
+                + '</table>')
+
+    @staticmethod
+    def tohtml(tabs: List['AdvancedTab']):
+        "return html"
+        return ("<div class='dpx-span'>"
+                +"".join(j.htmltitle(i == 0) for i, j in enumerate(tabs))+"</div>"
+                +"".join(j.htmlbody(i == 0)  for i, j in enumerate(tabs)))
+
+
+AdvancedWidgetBody = Union[Tuple[Tuple[str, ...],...], Tuple[AdvancedTab,...]]
 
 class AdvancedWidgetTheme:
     "AdvancedWidgetTheme"
@@ -26,7 +67,7 @@ class AdvancedWidgetTheme:
     def __init__(self, **_):
         pass
 
-class AdvancedWidgetMixin(ABC):
+class AdvancedWidget(ABC):
     "A button to access the modal dialog"
     __widget: Button
     __doc:    Document
@@ -36,7 +77,7 @@ class AdvancedWidgetMixin(ABC):
         self._theme = ctrl.theme.add(AdvancedWidgetTheme(), False)
 
     @abstractmethod
-    def _body(self) -> T_BODY:
+    def _body(self) -> AdvancedWidgetBody:
         pass
 
     @abstractmethod
@@ -81,9 +122,17 @@ class AdvancedWidgetMixin(ABC):
 
             return title, f'({disp})', val
 
+        bdy  = self._body()
+        if len(bdy) and isinstance(bdy[0], AdvancedTab):
+            for k in bdy:
+                k.body = tuple(_add(i, j)  for i, j in k.body) # type: ignore
+        else:
+            bdy = tuple(_add(i, j)  for i, j in bdy) # type: ignore
+
+
         args = dict(title   = self._title(),
                     context = lambda title: self,
-                    body    = tuple(_add(i, j)  for i, j in self._body()))
+                    body    = bdy)
         args.update(kwa)
         return args
 
@@ -175,14 +224,15 @@ class TaskDescriptor:
             else:
                 setattr(mdl, self._keys[-1], self._fset(mdl, val))
 
-class AdvancedTaskMixin(AdvancedWidgetMixin):
+class AdvancedTaskWidget(AdvancedWidget):
     "Means for configuring tasks with a modal dialog"
+    _model: Any
     def __init__(self, ctrl):
         super().__init__(ctrl)
         self.__outp: Dict[str, Dict[str, Any]] = {}
 
     @abstractmethod
-    def _body(self) -> T_BODY:
+    def _body(self) -> AdvancedWidgetBody:
         pass
 
     @abstractmethod

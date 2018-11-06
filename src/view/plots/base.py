@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 "The basic architecture"
 from    typing                  import (Tuple, Optional, Type, Sequence, Union, Any,
-                                        Generic, Dict, TypeVar, List, Iterator,
-                                        Iterable, cast)
+                                        Generic, Dict, TypeVar, List, Iterable, cast)
 from    collections             import OrderedDict
 from    abc                     import abstractmethod
 from    contextlib              import contextmanager
@@ -34,6 +33,22 @@ LOGS        = getLogger(__name__)
 ModelType   = TypeVar('ModelType', bound = PlotModelAccess)
 RANGE_TYPE  = Tuple[Optional[float], Optional[float]] # pylint: disable=invalid-name
 CACHE_TYPE  = Dict[Model, Any]                        # pylint: disable=invalid-name
+
+_CNV  = {'dark_minimal':  'dark',
+         'caliber':       'basic',
+         'light_minimal': 'basic',
+         'light':         'basic'}
+def themed(theme, obj, dflt = '--none--'):
+    "return the value for the given theme"
+    if not isinstance(obj, dict):
+        return obj
+
+    theme = getattr(theme, "_model",    theme)
+    theme = getattr(theme, "themename", theme)
+    print(theme, obj.keys())
+    return (obj[theme]       if theme in obj              else
+            obj[_CNV[theme]] if dflt == '--none--'        else
+            obj.get(_CNV.get(theme, None), dflt))
 
 def checksizes(fcn):
     "Checks that the ColumnDataSource have same sizes"
@@ -82,34 +97,14 @@ class PlotAttrsView(PlotAttrs):
     def __init__(self, attrs:PlotAttrs)->None:
         super().__init__(**attrs.__dict__)
 
-    def iterpalette(self, count, *tochange, indexes = None) -> Iterator['PlotAttrs']:
+    def listpalette(self, count, indexes = None, theme = None) -> List[str]:
         "yields PlotAttrs with colors along the palette provided"
         if self.palette is None:
             raise AttributeError()
-        info    = dict(self.__dict__)
-        palette = getattr(bokeh.palettes, self.palette, None)
-
-        if palette is None:
-            for _ in range(count):
-                yield PlotAttrs(**info)
-            return
-
-        colors = palette(count)
-        if indexes is not None:
-            colors = [colors[i] for i in indexes]
-
-        if len(tochange) == 0:
-            tochange = ('color',)
-
-        for color in colors:
-            info.update((name, color) for name in tochange)
-            yield PlotAttrs(**info)
-
-    def listpalette(self, count, indexes = None) -> List[str]:
-        "yields PlotAttrs with colors along the palette provided"
-        if self.palette is None:
-            raise AttributeError()
-        palette = getattr(bokeh.palettes, self.palette, None)
+        if theme is not None:
+            palette = getattr(bokeh.palettes, themed(theme, self.palette), None)
+        else:
+            palette = getattr(bokeh.palettes, self.palette, None)
         if palette is None:
             return [self.color]*count
         if isinstance(palette, dict):
@@ -185,9 +180,7 @@ class PlotAttrsView(PlotAttrs):
         args.pop('glyph')
         args.update(kwa)
         getattr(self, '_'+self.glyph, self._default)(args)
-        args  = {i: j[theme] if isinstance(j, dict) else j for i, j in args.items()}
-        glyph = self.glyph[theme] if isinstance(self.glyph, dict) else self.glyph
-        return args, glyph
+        return {i: themed(theme, j) for i, j in args.items()}, themed(theme, self.glyph)
 
     def addto(self, fig, theme = 'basic', **kwa) -> GlyphRenderer:
         "adds itself to plot: defines color, size and glyph to use"
@@ -303,11 +296,12 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
 
     def addtofig(self, fig, name, **attrs) -> GlyphRenderer:
         "shortcuts for PlotThemeView"
-        theme = self._model.themename
-        if ('color' not in attrs
-                and isinstance(getattr(self._theme, 'colors', None), dict)
-                and name in getattr(self._theme, 'colors').get(theme, {})):
-            attrs['color'] = getattr(self._theme, 'colors')[theme][name]
+        theme  = self._model.themename
+        colors = getattr(self._theme, 'colors', None)
+        if 'color' not in attrs and isinstance(colors, dict):
+            val = themed(theme, colors, {}).get(name, None)
+            if val is not None:
+                attrs['color'] = val
         return PlotAttrsView(getattr(self._theme, name)).addto(fig, theme, **attrs)
 
     def figure(self, **attrs) -> Figure:

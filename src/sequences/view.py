@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Create a grid displaying a sequence"
-from    typing              import List, Optional, Tuple, Any, Dict
+from    typing              import List, Optional, Tuple, Any
 import  numpy               as np
 import  bokeh.core.properties as props
 from    bokeh.plotting      import Figure
@@ -13,26 +13,21 @@ from   utils                import dataclass, dflt
 from   utils.gui            import implementation
 
 from   view.dialog          import FileDialog
-from   view.plots.base      import checksizes
+from   view.plots.base      import checksizes, themed
 from   view.plots.bokehext  import DpxHoverTool
 
 from   .                    import marksequence
 from   .modelaccess         import SequenceModel
 
-GridType = Dict[str, Dict[str,Any]]
 @dataclass
 class SequenceTickerTheme:
     "sequence ticker theme"
-    name:     str      = "sequence.ticker"
-    standoff: int      = -2
-    grid:     GridType = dflt({'dark':  {'color': ('lightgray', 'lightgreen'),
-                                         'width': (1,          1),
-                                         'alpha': (.8,         .8),
-                                         'dash' : ('solid',    'solid')},
-                               'basic': {'color': ('lightgray', 'lightgreen'),
-                                         'width': (1,          1),
-                                         'alpha': (.8,         .8),
-                                         'dash' : ('solid',    'solid')}})
+    name:     str  = "sequence.ticker"
+    standoff: int  = -2
+    grid:     dict = dflt({'color': ('lightgray', 'lightgreen'),
+                           'width': (1,          1),
+                           'alpha': (.8,         .8),
+                           'dash' : ('solid',    'solid')})
 
 def estimatebias(position: np.ndarray, cnt: np.ndarray) -> float:
     "estimate the bias using the plot data"
@@ -96,8 +91,9 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
         self.__defaults = {i: getattr(fig.ygrid[0], i) for i in order}
 
         self.__withbase = dict()
+        theme = self.__model.themename
         for name in ('color', 'dash', 'width', 'alpha'):
-            gridprops = self.__theme.grid[self.__model.themename][name]
+            gridprops = themed(theme, self.__theme.grid[name])
             self.__withbase['grid_line_'+name]       = gridprops[0]
             self.__withbase['minor_grid_line_'+name] = gridprops[1]
 

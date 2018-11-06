@@ -24,3 +24,24 @@
 .bbm-views {
   width: 100%;
   box-sizing: border-box; }
+
+.bbm-dpx-btn {
+    border: none!important;
+    border-radius: 0px 0px 0px 0px !important;
+}
+
+.bbm-dpx-curbtn {
+    border-bottom: none!important;
+    border-radius: 5px 5px 0px 0px !important;
+}
+
+/* Style the tab content */
+.bbm-dpx-hidden {
+    display: none;
+}
+.bbm-dpx-curtab {
+    border: 1px solid lightgray;
+    border-bottom: none!important;
+    border-right: none!important;
+    border-left: none!important;
+}

@@ -17,6 +17,7 @@ from sequences.modelaccess      import SequenceAnaIO
 from sequences.view             import SequenceTicker, SequenceHoverMixin
 from view.colors                import tohex
 from view.plots                 import PlotView, CACHE_TYPE
+from view.plots.base            import themed
 from view.plots.tasks           import TaskPlotCreator
 
 from ._model                    import PeaksPlotModelAccess, PeaksPlotTheme, PeaksPlotModel
@@ -82,7 +83,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         return self._model
 
     def __colors(self, name):
-        return tohex(self._theme.colors[self.model.themename][name])
+        return tohex(themed(self, self._theme.colors)[name])
 
     def __peaks(self, vals = None):
         colors = [self.__colors(i) for i in ('found', 'missing', 'reference')]

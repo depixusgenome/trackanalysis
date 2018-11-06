@@ -32,10 +32,8 @@ class CyclesModelConfig:
 class CyclesPlotTheme(PlotTheme):
     "theme for cycles"
     name       = "cycles.plot"
-    raw        = {'dark':  PlotAttrs('color', 'circle', .1, alpha = .5,
-                                     palette = 'YlOrBr'),
-                  'basic': PlotAttrs('color', 'circle', .1, alpha = .5,
-                                     palette = 'inferno')}
+    raw        = PlotAttrs('color', 'circle', .1, alpha = .5,
+                           palette = {'dark': 'YlOrBr', 'basic': 'inferno'})
     selection  = {'dark'  : PlotAttrs('lightblue', 'line',   3),
                   'basic' : PlotAttrs('blue', 'line',   3)}
     tooltips   = [('(cycle, t, z)', '(@cycle, $~x{1}, $data_y{1.1111})')]

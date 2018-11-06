@@ -16,7 +16,7 @@ from    model.task              import RootTask
 from    model.task.application  import TasksDisplay
 from    sequences.view          import OligoListWidget, SequencePathWidget
 from    view.plots              import DpxNumberFormatter, CACHE_TYPE
-from    modaldialog.view        import AdvancedWidgetMixin
+from    modaldialog.view        import AdvancedWidget as _AdvancedWidget
 
 from    eventdetection.view     import AlignmentWidget, EventDetectionWidget
 from    ._model                 import (CyclesModelAccess, CyclesPlotTheme,
@@ -268,12 +268,12 @@ class FigureSizeDescriptor(_AdvancedDescriptor):
 
 class ThemeNameDescriptor(_AdvancedDescriptor):
     "defines the theme to use"
-    _LABEL  = '%(_{self._attrname}|dark:dark|basic:light){self._fmt}'
+    _LABEL  = '%(_{self._attrname}|dark:dark|basic:basic|light:light|caliber:caliber){self._fmt}'
     _cnf    = "main"
     def __init__(self):
         super().__init__("Background color", "c")
 
-class AdvancedWidget(AdvancedWidgetMixin):
+class AdvancedWidget(_AdvancedWidget):
     "access to the modal dialog"
     def __init__(self, ctrl) -> None:
         self._ctrl = ctrl

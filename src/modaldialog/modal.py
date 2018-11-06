@@ -239,7 +239,7 @@ class DpxModal(Model):
                           CSVOption(float,  _OPT+r'csvf'),
                           CSVOption(str,    _OPT+r'csv'),
                           ChoiceOption())
-    __css__            = [ROUTE+"/backbone.modal.css",
+    __css__            = [ROUTE+"/backbone.modal.css?v=2",
                           ROUTE+"/backbone.modal.theme.css"]
     __javascript__     = [ROUTE+"/underscore-min.js",
                           ROUTE+"/jquery.min.js"]
@@ -280,6 +280,7 @@ class DpxModal(Model):
         self.__handler = self._build_handler(callback, title, body, model, context)
         self.__always  = always
         self.__running = False
+        print(body)
         self.update(title    = title,
                     body     = self._build_body(body, model),
                     callback = self._build_callback(callback),
@@ -296,10 +297,15 @@ class DpxModal(Model):
     @classmethod
     def _build_body(cls, body, model):
         if isinstance(body, (tuple, list)):
-            body = '<table>' + (''.join('<tr>'
-                                        + ''.join(cls._build_elem(i) for i in j)
-                                        + '</tr>'
-                                        for j in body)) + '</table>'
+            if len(body) == 0:
+                return ""
+            if hasattr(body[0], 'tohtml'):
+                body = body[0].tohtml(body)
+            else:
+                body = '<table>' + (''.join('<tr>'
+                                            + ''.join(cls._build_elem(i) for i in j)
+                                            + '</tr>'
+                                            for j in body)) + '</table>'
 
         for tpe in cls.__OPTIONS:
             body = tpe.replace(model, body)
@@ -315,10 +321,14 @@ class DpxModal(Model):
             return None
 
         def _hdl(itms, bdy = body):
+            print("*h", bdy)
             if isinstance(bdy, (list, tuple)):
+                if len(bdy) and hasattr(bdy[0], 'body'):
+                    bdy = sum((tuple(i.body) for i in bdy), ())
                 bdy = ' '.join(' '.join(k if isinstance(k, str) else k[1] for k in i)
                                for i in bdy)
 
+            print("*h*", bdy)
             converters = [i.converter(model, bdy) for i in self.__OPTIONS]
             ordered    = sorted(itms.items(), key = lambda i: bdy.index('%('+i[0]))
             if context is None:

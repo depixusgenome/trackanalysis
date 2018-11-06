@@ -20,10 +20,10 @@ class PlotState(Enum):
 class PlotAttrs:
     "Plot Attributes for one variable"
     def __init__(self,
-                 color        = 'blue',
-                 glyph        = 'line',
-                 size         = 1,
-                 palette: str = None,
+                 color   = 'blue',
+                 glyph   = 'line',
+                 size    = 1,
+                 palette = None,
                  **kwa) -> None:
         self.color   = color
         self.glyph   = glyph

@@ -367,23 +367,44 @@ export class DpxModal       extends Model
         @connect(@properties.startdisplay.change, () => @_startdisplaymodal())
 
     toJSON: () ->
-        title = "<div class='bbm-modal__topbar'>"      +
-                    "<h3 class='bbm-modal__title'>"    +
-                        @title                         +
-                    "</h3>"                            +
+        title = "<div class='bbm-modal__topbar'>"                               +
+                    "<h3 class='bbm-modal__title'>"                             +
+                        @title                                                  +
+                    "</h3>"                                                     +
                 "</div>"
 
-        body  = "<div class='bbm-modal__section'>"     +
-                    '<form id="dpxbbmform">' + @body + "</form>"       +
+        body  = "<div class='bbm-modal__section'>"                              +
+                    '<form id="dpxbbmform" class="bk-root">'+@body+"</form>"    +
                 "</div>"
 
-        btns  = "<div class='bbm-modal__bottombar'>"                    +
-                    "<button type='button' class='bk-bs-btn bk-bs-btn-default "   +
-                    "dpx-modal-cancel'>Cancel</button>"                      +
-                    "<button type='button' class='bk-bs-btn bk-bs-btn-default "   +
-                    "dpx-modal-done'>Apply</button>"                         +
+        btns  = "<div class='bbm-modal__bottombar bk-root'>"                    +
+                    "<button type='button' class='bk-bs-btn bk-bs-btn-default " +
+                    "dpx-modal-cancel'>Cancel</button>"                         +
+                    "<button type='button' class='bk-bs-btn bk-bs-btn-default " +
+                    "dpx-modal-done'>Apply</button>"                            +
                 "</div>"
         return {template: "<fragment>#{title} #{body} #{btns}</fragment>"}
+
+    clicktab: (ind) ->
+        elems = document.getElementsByClassName("bbm-dpx-curtab")
+        for i in [0...elems.length]
+            el = elems[i]
+            el?.classList.add("bbm-dpx-hidden")
+            el?.classList.remove("bbm-dpx-curtab")
+
+        elems = document.getElementsByClassName("bbm-dpx-curbtn")
+        for i in [0...elems.length]
+            el = elems[i]
+            el?.classList.add("bbm-dpx-btn")
+            el?.classList.remove("bbm-dpx-curbtn")
+
+        el = document.getElementById("bbm-dpx-tab-#{ind}")
+        el?.classList.remove("bbm-dpx-hidden")
+        el?.classList.add("bbm-dpx-curtab")
+
+        el = document.getElementById("bbm-dpx-btn-#{ind}")
+        el?.classList.remove("bbm-dpx-btn")
+        el?.classList.add("bbm-dpx-curbtn")
 
     _startdisplaymodal: () ->
         mdl     = new DpxModalDialogView({model: @})

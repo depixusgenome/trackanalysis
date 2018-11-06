@@ -15,7 +15,8 @@ from cleaning.view              import BeadSubtractionModalDescriptor
 from cyclesplot                 import ThemeNameDescriptor, FigureSizeDescriptor
 from eventdetection.view        import AlignmentModalDescriptor
 from excelreports.creation      import writecolumns
-from modaldialog.view           import AdvancedTaskMixin, T_BODY
+from modaldialog.view           import (AdvancedTaskWidget, AdvancedWidgetBody,
+                                        AdvancedTab)
 from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
 from peakfinding.groupby        import FullEm, ByHistogram
 from sequences.view             import (SequenceTicker, SequenceHoverMixin,
@@ -570,7 +571,7 @@ class _PeakDescriptor:
             return
         mdl.peakselection.update(finder=ByHistogram(mincount=getattr(inst,"_eventcount")))
 
-class AdvancedWidget(AdvancedTaskMixin):
+class AdvancedWidget(AdvancedTaskWidget):
     "access to the modal dialog"
     def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
         self._model = model
@@ -582,34 +583,36 @@ class AdvancedWidget(AdvancedTaskMixin):
     def _title() -> str:
         return 'Hybridstat Configuration'
 
-    def _body(self) -> T_BODY:
-        cls = type(self)
-        return (getattr(cls, '_subtracted').line(),
-                getattr(cls, '_alignment').line(),
-                getattr(cls, '_clipping').line(),
-                ('Minimum frame count per event',      ' %(_framecount)d'),
-                ('Minimum event count per peak',       ' %(_eventcount)d'),
-                ('Align cycles using peaks',           ' %(_align5)b'),
-                ('Peak kernel size (blank ⇒ auto)',    ' %(_precision)of'),
-                #('Use EM to find peaks',     '           %(_useem)b'),
-                getattr(cls, '_singlestrand').line(),
-                ('Use a theoretical peak 0 in fits',   ' %(_peak0)b'),
-                ('Exhaustive fit algorithm',           ' %(_fittype)b'),
-                ('Max distance to theoretical peak',   ' %(_dist2theo)d'),
-                *(getattr(cls, i).line for i in ('_themename', '_figwidth', '_figheight'))
-               )
+    def _body(self) -> AdvancedWidgetBody:
+        cls   = type(self)
+        get   = lambda *i: [getattr(cls, "_"+j).line() for j in i]
+        clean = AdvancedTab("Cleaning", *get('subtracted', 'alignment', 'clipping'))
+        alg   = AdvancedTab("Peaks",
+                            ('Min frame count per hybridisation', '%(_framecount)d'),
+                            ('Min hybridisations per peak',       '%(_eventcount)d'),
+                            ('Keep z=0 peak',                     '%(_peak0)b'),
+                            *get('singlestrand'),
+                            ('Re-align cycles using peaks',       '%(_align5)b'),
+                            ('Peak kernel size (blank ⇒ auto)',   '%(_precision)of'),
+                            #('Use EM to find peaks',     '        %(_useem)b'),
+                            ('Exhaustive fit algorithm',          '%(_fittype)b'),
+                            ('Max Δ to theoretical peak',         '%(_dist2theo)d'))
+        get  = lambda *i: [getattr(cls, "_"+j).line for j in i]
+        return (clean,
+                alg,
+                AdvancedTab("Theme", *get('themename', 'figwidth', 'figheight')))
 
     def reset(self, resets):
         "resets the widget when a new file is opened, ..."
-        AdvancedTaskMixin.reset(resets)
+        AdvancedTaskWidget.reset(resets)
 
     _clipping   = _ClippingDescriptor()
     _subtracted = BeadSubtractionModalDescriptor()
     _alignment  = AlignmentModalDescriptor()
-    _framecount = AdvancedTaskMixin.attr('eventdetection.events.select.minlength')
-    _eventcount = AdvancedTaskMixin.attr('peakselection.finder.grouper.mincount')
-    _align5     = AdvancedTaskMixin.none('peakselection.align')
-    _precision  = AdvancedTaskMixin.attr('peakselection.precision')
+    _framecount = AdvancedTaskWidget.attr('eventdetection.events.select.minlength')
+    _eventcount = AdvancedTaskWidget.attr('peakselection.finder.grouper.mincount')
+    _align5     = AdvancedTaskWidget.none('peakselection.align')
+    _precision  = AdvancedTaskWidget.attr('peakselection.precision')
     #_useem      = _PeakDescriptor()
     _singlestrand = _SingleStrandDescriptor()
     _peak0      = _IdAccessor('fit', lambda i: i.firstpeak, lambda i: {'firstpeak': i})
