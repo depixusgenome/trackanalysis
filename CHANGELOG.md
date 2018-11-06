@@ -42,8 +42,9 @@ The average behavior for all beads is the median across *good* beads of the
 The gui has been revamped, in particular in tabs *FoV* and *QC*. The later now
 contains better summaries, also available in *RampApp*:
 
-1. Status of beads
-2. Sizes of beads
+1. Status of beads: beads can be either *ok*, *fixed*, *bad*, or *missing*.
+2. Sizes of beads: beads are clustered by bins of a given size. The bin size is
+set by the used using a slider.
 
 When multiple hairpin sequences are provided in a fasta file, we now use a
 median bead extension to select only meaningful sequences. Thus a 5kb bead will
