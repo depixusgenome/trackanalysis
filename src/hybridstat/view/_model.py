@@ -525,12 +525,17 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
 
     def runbead(self):
         "runs the bead"
-        dtl = None
+        dtl = tmp = None
         try:
-            tmp, dtl = runbead(self)
+            ctrl = self.processors()
+            if ctrl is not None:
+                cache    = ctrl.data.setCacheDefault(-1, {})
+                tmp, dtl = cache.get(self.bead, (None, None))
+                if tmp is None and dtl is None:
+                    tmp, dtl = cache[self.bead] = runbead(self)
         finally:
             cpy = copy(self)
-            cpy.peaksmodel = copy(self.peaksmodel)
+            cpy.peaksmodel         = copy(self.peaksmodel)
             cpy.peaksmodel.display = copy(self.peaksmodel.display)
             disp = cpy.peaksmodel.display
             if dtl is None:
