@@ -84,6 +84,9 @@ class TasksConfig(ConfigObject):
     def __init__(self, **_):
         pass
 
+    def __getitem__(self, key):
+        return getattr(self, InstrumentType(key).name)
+
     @property
     def tasks(self) -> Configuration:
         "return the current task list"
