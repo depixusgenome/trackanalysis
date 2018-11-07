@@ -50,6 +50,14 @@ class DataCleaningErrorMessage:
     def __str__(self):
         return self.message(self.tasktype, self.stats, **self.config)
 
+    def __getstate__(self):
+        state            = dict(self.__dict__)
+        state['parents'] = str(self.parents)
+        return state
+
+    def __setstate__(self, info):
+        self.__dict__.update(info)
+
     def data(self) -> List[Tuple[Optional[int], str, str]]:
         "returns a message if the test is invalid"
         dflt = self.tasktype()
@@ -90,7 +98,8 @@ class DataCleaningErrorMessage:
                  '%d cycles: Δz > %.2f'            % get('extent',     'max'),
                  '%d cycles: Σ|dz| > %.1f'         % get('pingpong',   'max'))
 
-        return '\n'.join(i for i in msg if i[0] != '0')
+        lines = sorted((-int(i[:i.find(' ')]), i) for i in msg if i[0] != '0')
+        return '\n'.join(i for _, i in lines)
 
 class DataCleaningException(ProcessorException):
     "Exception thrown when a bead is not selected"

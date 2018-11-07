@@ -488,6 +488,7 @@ A value at position *n* is aberrant if any:
         lst.append(py::make_tuple("max",    ndarray<float>(0).attr("__class__")));
         lst.append(py::make_tuple("values", ndarray<float>(0).attr("__class__")));
         auto partial(py::module::import("typing").attr("NamedTuple")("Partial", lst));
+        partial.attr("__module__") = "cleaning._core";
         setattr(mod, "Partial", partial);
 
         {
