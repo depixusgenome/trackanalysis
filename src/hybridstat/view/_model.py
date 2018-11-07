@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
-from typing                     import Optional, Dict, Tuple, Any, Sequence, cast
+from   asyncio                  import wrap_future, sleep as _sleep
 from   copy                     import copy
+from   concurrent.futures       import ProcessPoolExecutor
+from   typing                   import Optional, Dict, Tuple, Any, Sequence, cast
 import pickle
 
 import numpy                    as     np
@@ -23,8 +25,8 @@ from peakcalling.processor.fittohairpin     import (Constraints, HairpinFitter,
                                                     PeakMatching, Range,
                                                     DistanceConstraint)
 from sequences.modelaccess      import SequencePlotModelAccess
-from utils                                  import (dataclass, dflt, updatecopy,
-                                                    initdefaults)
+from utils                      import dataclass, dflt, updatecopy, initdefaults
+from view.base                  import spawn
 
 from ..reporting.batch          import fittohairpintask
 from ._processors               import runbead, runrefbead
@@ -45,6 +47,7 @@ class PeaksPlotTheme(PlotTheme):
     xtoplabel       = 'Duration (s)'
     xlabel          = 'Rate (%)'
     widgetsborder   = 10
+    ntitles         = 4
     count           = PlotAttrs('lightblue', 'line', 1)
     eventscount     = PlotAttrs('lightblue', 'circle', 3)
     referencecount  = PlotAttrs('bisque', 'patch', alpha = 0.5)
@@ -85,6 +88,8 @@ class PeaksPlotDisplay(PlotDisplay):
     name                              = "hybridstat.peaks"
     distances : Dict[str, Distance]   = dict()
     peaks:      Dict[str, np.ndarray] = dict()
+    nprocessors                       = 2
+    waittime                          = .1
     estimatedbias                     = 0.
     constraintspath: Any              = None
     useparams: bool                   = False
@@ -525,35 +530,32 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
 
     def runbead(self):
         "runs the bead"
-        dtl = tmp = None
-        try:
-            ctrl = self.processors()
-            if ctrl is not None:
-                cache    = ctrl.data.setCacheDefault(-1, {})
-                tmp, dtl = cache.get(self.bead, (None, None))
-                if tmp is None and dtl is None:
-                    tmp, dtl = cache[self.bead] = runbead(self)
-        finally:
-            cpy = copy(self)
-            cpy.peaksmodel         = copy(self.peaksmodel)
-            cpy.peaksmodel.display = copy(self.peaksmodel.display)
-            disp = cpy.peaksmodel.display
-            if dtl is None:
-                disp.distances     = {}
-                disp.peaks         = createpeaks(cpy, [])
-                disp.estimatedbias = 0.
-            else:
-                tsk   = cast(PeakSelectorTask, self.peakselection.task)
-                peaks = tuple(tsk.details2output(cast(PeakSelectorDetails, dtl)))
+        out      = runbead(self.processors(), self.bead)
+        tmp, dtl = out if isinstance(out, tuple) else (None, None) # type: ignore
 
-                disp.distances     = (getattr(tmp, 'distances')
-                                      if self.identification.task else {})
-                disp.peaks         = createpeaks(cpy, peaks)
-                disp.estimatedbias = disp.peaks['z'][0]
-            info = {i: getattr(disp, i) for i in ('distances', 'peaks', 'estimatedbias')}
-            self._ctrl.display.update(self.peaksmodel.display, **info)
-            if dtl is not None:
-                self.sequencemodel.setnewkey(self._ctrl, cpy.sequencekey)
+        cpy                    = copy(self)
+        cpy.peaksmodel         = copy(self.peaksmodel)
+        cpy.peaksmodel.display = copy(self.peaksmodel.display)
+        disp = cpy.peaksmodel.display
+        if dtl is None:
+            disp.distances     = {}
+            disp.peaks         = createpeaks(cpy, [])
+            disp.estimatedbias = 0.
+        else:
+            tsk   = cast(PeakSelectorTask, self.peakselection.task)
+            peaks = tuple(tsk.details2output(cast(PeakSelectorDetails, dtl)))
+
+            disp.distances     = (getattr(tmp, 'distances')
+                                  if self.identification.task else {})
+            disp.peaks         = createpeaks(cpy, peaks)
+            disp.estimatedbias = disp.peaks['z'][0]
+        info = {i: getattr(disp, i) for i in ('distances', 'peaks', 'estimatedbias')}
+        self._ctrl.display.update(self.peaksmodel.display, **info)
+        if dtl is not None:
+            self.sequencemodel.setnewkey(self._ctrl, cpy.sequencekey)
+
+        if isinstance(out, Exception):
+            raise out # pylint: disable=raising-bad-type
         return dtl
 
     def reset(self) -> bool: # type: ignore
@@ -575,3 +577,55 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         "observes the global model"
         self.identification.setobservers(self, ctrl)
         self.fittoreference.setobservers(ctrl)
+
+        @ctrl.display.observe(self._tasksmodel.display)
+        def _onchangetrack(old = None,  **_):
+            if "roottask" in old:
+                self._poolcompute()
+
+        @ctrl.tasks.observe("addtask", "updatetask", "removetask")
+        def _onchangetasks(**_):
+            self._poolcompute()
+
+    def _poolcompute(self, **_):
+        root  = self.roottask
+        procs = self.processors()
+        if procs is None:
+            return
+
+        store = procs.data.setCacheDefault(-1, {})
+        cache = procs.data.getCache(-1)
+        procs = procs.cleancopy()
+
+        def _future(pool, bead):
+            fut = pool.submit(runbead, procs, bead)
+            return bead, wrap_future(fut)
+
+        async def _iter():
+            keys  = set(self.track.beads.keys()) - set(store)
+            sleep = self.peaksmodel.display.waittime
+            with ProcessPoolExecutor(self.peaksmodel.display.nprocessors) as pool:
+                subm = dict(_future(pool, i) for i in keys)
+                while len(subm):
+                    await _sleep(sleep)
+                    done = {i[0] for i in subm.items() if i[1].done()}
+                    for i in set(subm) & set(store):
+                        fut = subm.pop(i)
+                        if not fut.done():
+                            fut.cancel()
+
+                    if len(done):
+                        yield [(i, subm.pop(i)) for i in set(done) & set(subm)]
+
+                    if cache() is None or root is not self.roottask:
+                        for i in subm.values():
+                            i.cancel()
+                        break
+                pool.shutdown(False)
+
+        async def _thread():
+            async for lst in _iter(): # pylint: disable=not-an-iterable
+                itms = [(i[0], i[1].result()) for i in lst if not i[1].cancelled()]
+                store.update(i for i in itms if i[1] is not None)
+
+        spawn(_thread)

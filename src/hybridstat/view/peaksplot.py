@@ -7,10 +7,11 @@ import bokeh.core.properties as props
 from bokeh                      import layouts
 from bokeh.plotting             import Figure
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
-                                        Model, TapTool, CustomJS)
+                                        Model, TapTool, Title, CustomJS)
 
 import numpy                    as     np
 
+from cleaning.processor         import DataCleaningException
 from control.beadscontrol       import TaskWidgetEnabler
 from peakfinding.histogram      import interpolator
 from sequences.modelaccess      import SequenceAnaIO
@@ -64,9 +65,9 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
 
 class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     "Creates plots for peaks"
-    _rends: List[Tuple]
-    _fig:   Figure
-    _theme: PeaksPlotTheme
+    _rends:  List[Tuple]
+    _fig:    Figure
+    _theme:  PeaksPlotTheme
     __enabler: TaskWidgetEnabler
     def __init__(self, ctrl):
         super().__init__(ctrl, noerase = False)
@@ -162,15 +163,33 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         "specific setup for when this view is the main one"
         self._widgets['advanced'].ismain(_)
 
+    def __settitles(self, cache, label):
+        titles  = [i for i in self._fig.above if isinstance(i, Title)]
+        if label != "":
+            labels  = str(label).split("\n")[::-1]
+            labels += [""]*(len(titles) - len(labels))
+
+            for i, j in zip(titles, labels):
+                cache[i]['text'] = j
+
+        good = label == ""
+        for i in self._fig.above:
+            cache[i]['visible'] = (not good) if isinstance(i, Title) else good
+
     def _reset(self, cache:CACHE_TYPE):
-        tmp = None
+        tmp    = None
         try:
             tmp = self.__data()
+        except DataCleaningException as exc:
+            self.__settitles(cache, exc.args[0])
+            raise
+        else:
+            self.__settitles(cache, "")
         finally:
             self.__enabler.disable(cache, tmp is None)
             dicos = self.__defaults() if tmp is None else tmp
 
-            for i, j in dicos.items():
+            for i, j in dicos.items(): # type: ignore
                 cache[self._src[i]].update(data = j)
 
             self._hover .reset(cache)
@@ -199,9 +218,9 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                 self.attrs(getattr(self._theme, key)).setcolor(rend, cache = cache, **args)
 
     def __create_fig(self):
-        self._fig = self.figure(y_range = Range1d(start = 0., end = 1.),
-                                x_range = Range1d(start = 0., end = 1e3),
-                                name    = 'Peaks:fig')
+        self._fig    = self.figure(y_range = Range1d(start = 0., end = 1.),
+                                   x_range = Range1d(start = 0., end = 1e3),
+                                   name    = 'Peaks:fig')
         self._fig.extra_x_ranges = {"duration": Range1d(start = 0., end = 1.)}
         axis  = LinearAxis(x_range_name          = "duration",
                            axis_label            = self._theme.xtoplabel,
@@ -210,6 +229,8 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         self._fig.xaxis[0].axis_label_text_color = self.__colors('peakscount')
         self._fig.add_layout(axis, 'above')
         self._plotmodel.display.addcallbacks(self._ctrl, self._fig)
+        for _ in range(self._theme.ntitles):
+            self._fig.add_layout(Title(), "above")
 
     def __add_curves(self):
         self._src   = {i: ColumnDataSource(j) for i, j in self.__data().items()}

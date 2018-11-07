@@ -5,14 +5,15 @@ from   typing                     import Dict, Tuple, List, Optional, Sequence
 from   copy                       import copy
 
 from   data                       import BEADKEY
+from   cleaning.processor         import DataCleaningException
 from   control.processor.taskview import TaskViewProcessor
 from   control.modelaccess        import ReplaceProcessors
 from   model.task                 import RootTask
 from   peakfinding.selector       import PeakSelectorDetails
 from   peakfinding.processor      import (PeakSelectorProcessor, PeakSelectorTask,
                                           PeaksDict, SingleStrandProcessor)
-from   peakcalling.processor      import FitToReferenceTask, FitToReferenceDict, FitBead
-from   sequences.modelaccess      import SequencePlotModelAccess
+from   peakcalling.processor      import (FitToReferenceTask, FitToReferenceDict,
+                                          FitToHairpinTask)
 
 class GuiPeakSelectorDetails(PeakSelectorDetails):
     "gui version of PeakSelectorDetails"
@@ -117,17 +118,36 @@ class GuiFitToReferenceProcessor(TaskViewProcessor[FitToReferenceTask,
         cache = args.data.setCacheDefault(self, {})
         return cache, self.store
 
-def runbead(self) -> Tuple[Optional[FitBead], Optional[PeakSelectorDetails]]:
+def runbead(ctrl, bead):
     "runs the bead with specific processors"
-    dtlstore: List[PeakSelectorDetails] = []
-    procs    = (GuiPeakSelectorProcessor(dtlstore),
-                GuiFitToReferenceProcessor(dtlstore),
-                GuiSingleStrandProcessor(dtlstore))
-    with SequencePlotModelAccess.runcontext(self, *procs) as view:
-        fits = None if view is None or self.bead not in view.keys() else view[self.bead]
+    if ctrl is None:
+        return None
 
-    return (fits        if self.identification.task is not None else None,
-            dtlstore[0] if dtlstore and len(dtlstore[0].peaks)  else None)
+    cache = ctrl.data.setCacheDefault(-1, {})
+    out   = cache.get(bead, None)
+    if out is None:
+        store: List[PeakSelectorDetails] = []
+
+        procs = (GuiPeakSelectorProcessor(store),
+                 GuiFitToReferenceProcessor(store),
+                 GuiSingleStrandProcessor(store))
+        ident = any(isinstance(i, FitToHairpinTask) for i in ctrl.model)
+        with ReplaceProcessors(ctrl, *procs, copy = True) as view:
+            if view is None or bead not in view.keys():
+                out = None, None
+            else:
+                try:
+                    tmp = view[bead]
+                except DataCleaningException as exc:
+                    out = cache[bead] = exc
+                else:
+                    out = (tmp      if ident                         else None,
+                           store[0] if store and len(store[0].peaks) else None)
+                    cache[bead] = out
+    else:
+        import utils.logconfig as L
+        L.getLogger().warning("extracting %d", bead)
+    return out
 
 def runrefbead(self, ref: RootTask, bead: BEADKEY
               ) -> Tuple[Sequence, Optional[PeakSelectorDetails]]:
