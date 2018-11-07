@@ -34,7 +34,7 @@ def setup(cnf):
 class _CondaApp(BuildContext):
     fun = cmd = 'app'
     DOALL     = True
-    EXCLUDED  = 'tests','scripting', 'ramp', 'daq'
+    EXCLUDED  = 'tests', 'daq'
 
     def __clean(self):
         self.options.APP_PATH = self.bldnode.make_node("OUTPUT_PY")
@@ -157,10 +157,10 @@ class _CondaApp(BuildContext):
         self.__clean()
         mods = [i for i in MODULES(self)
                 if not any(j in i for j in self.EXCLUDED)]
+        self.__startscripts(mods)
         _basebuild(self, mods)
         if self.DOALL:
             wafbuilder.condasetup(self, copy = 'build/OUTPUT', runtimeonly = True)
-        self.__startscripts(mods)
 
         self.add_group()
         self(rule = lambda _: self.__final(mods), always = True)
