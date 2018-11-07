@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
+import atexit
 from   asyncio                  import wrap_future, sleep as _sleep
 from   copy                     import copy
 from   concurrent.futures       import ProcessPoolExecutor
@@ -606,6 +607,8 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
             sleep = self.peaksmodel.display.waittime
             with ProcessPoolExecutor(self.peaksmodel.display.nprocessors) as pool:
                 subm = dict(_future(pool, i) for i in keys)
+                func = lambda: [i.cancel() for i in subm.values() if not i.done()]
+                atexit.register(func)
                 while len(subm):
                     await _sleep(sleep)
                     done = {i[0] for i in subm.items() if i[1].done()}
@@ -622,6 +625,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
                             i.cancel()
                         break
                 pool.shutdown(False)
+                atexit.unregister(func)
 
         async def _thread():
             async for lst in _iter(): # pylint: disable=not-an-iterable
