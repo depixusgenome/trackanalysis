@@ -180,6 +180,10 @@ class Cache(Iterable[Processor], Sized):
             return Cache(self._items)
         return Cache(self._items[:self.index(task)+1])
 
+    def cleancopy(self) -> 'Cache':
+        "returns a cache with only the processors"
+        return Cache([i.proc for i in self._items])
+
     def getCache(self, ide):
         "access to processor's cache"
         return self._items[self.index(ide)].getCache()

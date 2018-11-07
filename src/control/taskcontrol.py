@@ -82,6 +82,13 @@ class ProcessorController:
         "clears data starting at *tsk*"
         self.data.delCache(tsk)
 
+    def cleancopy(self) -> 'ProcessorController':
+        "returns a cache with only the processors"
+        cpy = self.__class__(copy = self.copy)
+        cpy.model = self.model
+        cpy.data  = self.data.cleancopy()
+        return cpy
+
     def clear(self):
         "clears data starting at *tsk*"
         self.data.delCache()

@@ -141,7 +141,7 @@ class TaskPlotModelAccess(PlotModelAccess):
 
     def runcontext(self, *processors: Processor, copy = True) -> ReplaceProcessors:
         "returns a ReplaceProcessors context from which a trackview can be obtains"
-        return ReplaceProcessors(self, *processors, copy = copy)
+        return ReplaceProcessors(self.processors(), *processors, copy = copy)
 
     def addtodoc(self, _):
         "adds items to the doc"
