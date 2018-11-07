@@ -202,8 +202,8 @@ class TaskAccess(TaskPlotModelAccess):
             return
 
         cnf = dict(self._ctrl.theme.get("tasks", instr, {}))
-        cnf[self.configname] = self.__deepcopy(cnf[instr][self.configname], kwa)
-        self._ctrl.theme.update("tasks", configurations = cnf)
+        cnf[self.configname] = self.__deepcopy(cnf[self.configname], kwa)
+        self._ctrl.theme.update("tasks", **{instr: cnf})
 
     @property
     def task(self) -> Optional[Task]:
