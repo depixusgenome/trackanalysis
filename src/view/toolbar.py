@@ -211,7 +211,7 @@ class MessagesView:
             if 'message' in old:
                 self._settext(self._display.message)
 
-    def addtodoc(self, _, doc, tbar):
+    def addtodoc(self, ctrl, doc, tbar):
         "add to doc"
         self._tbar = tbar
         self._doc  = doc
@@ -228,6 +228,7 @@ class MessagesView:
             elif self._last[1] < time.time():
                 self._last[0]      = None
                 self._tbar.message = ''
+                ctrl.display.update(self._display, message = None)
         doc.add_periodic_callback(_setmsg, self._theme.period)
 
     def _settext(self, text):
