@@ -2,6 +2,7 @@
 
 ## cycles_v6.0
 
+* 2018-11-08 15:51:56 +0100  (tag: cycles_v6.0.1)
 * 2018-11-08 15:11:56 +0100  (tag: ramp_v2.0, tag: cycles_v6.0)
 
 ### QC
@@ -12,6 +13,12 @@ contains better summaries, also available in *RampApp*:
 1. Status of beads: beads can be either *ok*, *fixed*, *bad*, or *missing*.
 2. Sizes of beads: beads are clustered by bins of a given size. The bin size is
 set by the used using a slider.
+
+### Cleaning
+
+It's now possible to discard all bad beads in one go. Simply write `bad` into the
+toolbar text entry for discarding / selecting beads. Other categories are `ok`,
+`missing` and `fixed`. The latter 2 categories are included into the `bad`category.
 
 ### Peaks
 
