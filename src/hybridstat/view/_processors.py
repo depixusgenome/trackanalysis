@@ -113,12 +113,11 @@ class GuiFitToReferenceProcessor(TaskViewProcessor[FitToReferenceTask,
         self.__init__(self.store, **_)
         return self
 
-    def createcache(self, args):
+    def createcache(self, _):
         "creates the cache"
-        cache = args.data.setCacheDefault(self, {})
-        return cache, self.store
+        return self.store
 
-def runbead(ctrl, bead):
+def runbead(ctrl, bead, refcache):
     "runs the bead with specific processors"
     if ctrl is None:
         return None
@@ -129,7 +128,7 @@ def runbead(ctrl, bead):
         store: List[PeakSelectorDetails] = []
 
         procs = (GuiPeakSelectorProcessor(store),
-                 GuiFitToReferenceProcessor(store),
+                 GuiFitToReferenceProcessor((refcache, store)),
                  GuiSingleStrandProcessor(store))
         ident = any(isinstance(i, FitToHairpinTask) for i in ctrl.model)
         with ReplaceProcessors(ctrl, *procs, copy = True) as view:

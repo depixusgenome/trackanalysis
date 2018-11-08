@@ -223,11 +223,11 @@ class PeaksStatsWidget:
             if fittoref.referencepeaks is None:
                 return
 
-            self.values[0] = fittoref.stretch
-            self.values[1] = fittoref.bias
+            self.values[1] = fittoref.stretch
+            self.values[2] = fittoref.bias
 
             nfound          = np.isfinite(mdl.peaks['id']).sum()
-            self.values[8]  = f'{nfound}/{len(fittoref.referencepeaks)}'
+            self.values[9]  = f'{nfound}/{len(fittoref.referencepeaks)}'
             if nfound > 2:
                 self.values[10] = (np.nansum((mdl.peaks['distance'])**2)
                                    / ((np.mean(self.values[3]))**2

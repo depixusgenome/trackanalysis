@@ -132,8 +132,9 @@ class FitToReferenceStore:
                     fitdata      = _DUMMY, peaks     = _DUMMY,
                     interpolator = _DUMMY)
     name         : str = 'hybridstat.fittoreference'
-    ident        : Any = dflt(None)
-    reference    : Any = dflt(None)
+    ident        : Any = None
+    reference    : Any = None
+    refcache     : Any = dflt({})
     fitdata      : Any = dflt(_DUMMY)
     peaks        : Any = dflt(_DUMMY)
     interpolator : Any = dflt(_DUMMY)
@@ -153,34 +154,22 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     @property
     def params(self) -> Optional[Tuple[float, float]]:
         "returns the computed stretch or 1."
-        tsk = cast(FitToReferenceTask, self.task)
-        if tsk is None or self.bead not in tsk.fitdata:
-            return 1., 0.
+        return self.__store.refcache.get(self.bead, (1., 0.))
 
-        mem = self.cache() # pylint: disable=not-callable
-        return (1., 0.) if mem is None else mem.get(self.bead, (1., 0.))
-
-    fitalg  = property(lambda self: ChiSquareHistogramFit())
-    stretch = property(lambda self: self.params[0])
-    bias    = property(lambda self: self.params[1])
-    hmin    = property(lambda self: self.__theme.histmin)
+    refcache = property(lambda self: self.__store.refcache)
+    fitalg   = property(lambda self: ChiSquareHistogramFit())
+    stretch  = property(lambda self: self.params[0])
+    bias     = property(lambda self: self.params[1])
+    hmin     = property(lambda self: self.__theme.histmin)
 
     def update(self, **kwa):
         "removes the task"
-        if kwa.get("disabled", False):
-            super().update(**kwa)
-            return
-
-        assert len(kwa) == 0
-        newdata, newid = self.__computefitdata()
-        if not newdata:
-            return
-
-        # pylint: disable=not-callable
-        cache = None if newid else self.cache()
-        super().update(fitdata = self.__store.fitdata)
-        if cache:
-            self._ctrl.tasks.processors(self.roottask).data.setCacheDefault(self.task, cache)
+        if not kwa.get("disabled", False):
+            assert len(kwa) == 0
+            if not self.__computefitdata():
+                return
+            kwa['fitdata'] = self.__store.fitdata
+        super().update(**kwa)
 
     @property
     def reference(self) -> Optional[RootTask]:
@@ -218,9 +207,9 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
 
     def resetmodel(self):
         "adds a bead to the task"
-        return (self.update()                if self.reference not in (self.roottask, None) else
-                self.update(disabled = True) if self.task                                   else
-                None)
+        if self.reference not in (self.roottask, None):
+            return self.update()
+        return self.update(disabled = True) if self.task else None
 
     def refhistogram(self, xaxis):
         "returns the histogram interpolated to the provided values"
@@ -247,14 +236,14 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     def _configattributes(_):
         return {}
 
-    def __computefitdata(self) -> Tuple[bool, bool]:
+    def __computefitdata(self) -> bool:
         args  = {} # type: Dict[str, Any]
         ident = pickle.dumps(tuple(self._ctrl.tasks.tasklist(self.reference)))
         if self.__store.ident == ident:
             if self.referencepeaks is not None:
-                return False, False
+                return False
         else:
-            args['ident'] = ident
+            args.update(ident = ident, refcache = {})
 
         fits  = self.__store.fitdata
         if not fits:
@@ -283,7 +272,7 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
 
         if args:
             self._ctrl.display.update(self.__store, **args)
-        return True, 'ident' in args
+        return True
 
 @dataclass
 class FitToHairpinConfig:
@@ -531,7 +520,9 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
 
     def runbead(self):
         "runs the bead"
-        out      = runbead(self.processors(), self.bead)
+        out      = runbead(self.processors(),
+                           self.bead,
+                           self.fittoreference.refcache)
         tmp, dtl = out if isinstance(out, tuple) else (None, None) # type: ignore
 
         cpy                    = copy(self)
@@ -600,9 +591,10 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         store = procs.data.setCacheDefault(-1, {})
         cache = procs.data.getCache(-1)
         procs = procs.cleancopy()
+        refc  = self.fittoreference.refcache
 
         def _future(pool, bead):
-            fut = pool.submit(runbead, procs, bead)
+            fut = pool.submit(runbead, procs, bead, refc)
             return bead, wrap_future(fut)
 
         async def _iter():
