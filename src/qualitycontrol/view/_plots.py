@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Provides plots for temperatures and bead extensions"
 import warnings
-from   typing               import Dict, Optional, Tuple, List, Any, cast
+from   typing               import Dict, Union, Tuple, List, Any, cast
 
 from   bokeh                import layouts
 from   bokeh.models         import ColumnDataSource, Range1d
@@ -22,11 +22,12 @@ from   ._model              import (QualityControlModelAccess,
 class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
                                               DriftControlPlotModel]):
     "Shows temperature temporal series"
-    _theme:  DriftControlPlotTheme
-    _config: DriftControlPlotConfig
-    _src:    List[ColumnDataSource]
-    _rends:  List[Tuple[str, Any]]
-    _fig:    Figure
+    _plotmodel: DriftControlPlotModel
+    _theme:     DriftControlPlotTheme
+    _config:    DriftControlPlotConfig
+    _src:       List[ColumnDataSource]
+    _rends:     List[Tuple[str, Any]]
+    _fig:       Figure
     def __init__(self, ctrl, mdl: QualityControlModelAccess, addto = True) -> None:
         super().__init__(ctrl, addto = False)
         name = "qc."+self.__class__.__name__.lower().replace("plotcreator", "")
@@ -96,7 +97,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
         if track is None:
             return self._defaults()
 
-        cycles, meas  = self._measures(track) # type: ignore
+        cycles, meas  = self._measures(track)
         if meas is None or len(meas) == 0:
             return self._defaults()
 
@@ -108,7 +109,8 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
                      pop90    = np.full(2, pops[2], dtype = 'f4')))
 
     @classmethod
-    def _measures(cls, track: Track) -> Optional[np.ndarray]:
+    def _measures(cls, track: Track
+                 ) -> Union[Tuple[np.ndarray, np.ndarray], Tuple[None, None]]:
         name  = cls.__name__.replace('PlotCreator', '').lower()
         vals  = getattr(track.secondaries, name, None)
         if vals is None or not len(vals):
@@ -136,9 +138,8 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
     _theme: ExtensionPlotTheme
     def __init__(self, ctrl, mdl: QualityControlModelAccess) -> None:
         super().__init__(ctrl, mdl, False)
-        mdl        = cast(DriftControlPlotModel, self._plotmodel)
-        mdl.theme  = ExtensionPlotTheme()
-        mdl.config = ExtensionPlotConfig()
+        self._plotmodel.theme  = ExtensionPlotTheme()
+        self._plotmodel.config = ExtensionPlotConfig()
         self.addto(ctrl, False)
 
     def _addtodoc(self, *_):
@@ -177,12 +178,14 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
                     bottom = bars[0,:])
         return data + (new,)
 
-    def _measures(self, track: Track) -> Optional[np.ndarray]: # type: ignore
+    def _measures(self, track: Track # type: ignore
+                 ) -> Union[Tuple[np.ndarray, np.ndarray], Tuple[None, None]]:
         beads = self._model.runbead()
         if beads is not None:
             cyc, cnt = extensions(cast(Beads, beads), *self._config.phases)
-            return (np.concatenate(cyc), np.concatenate(cnt)) if len(cnt) else None
-        return None
+            return ((np.concatenate(cyc), np.concatenate(cnt)) if len(cnt) else
+                    (None, None))
+        return None, None
 
 class QualityControlPlots:
     "All plots together"
