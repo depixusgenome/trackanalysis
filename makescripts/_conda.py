@@ -158,7 +158,7 @@ class _CondaApp(BuildContext):
             out = final.parent/"CHANGELOG.md"
             copy2("CHANGELOG.md", out)
             try:
-                os.system("pandoc -s {} -o {}".format(out, out.with_suffix(".html")))
+                os.system("pandoc --toc -s {} -o {}".format(out, out.with_suffix(".html")))
             except: # pylint: disable=bare-except
                 pass
         for i in list(final.glob("*.bat")) + list(final.glob("*.sh")):
