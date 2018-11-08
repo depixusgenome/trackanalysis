@@ -2,6 +2,8 @@
 
 ## cycles_v6.0
 
+* 2018-11-08 15:11:56 +0100  (tag: ramp_v2.0, tag: cycles_v6.0)
+
 ### QC
 
 The gui has been revamped, in particular in tabs *FoV* and *QC*. The later now
@@ -676,6 +678,8 @@ New application for viewing cycles
 # RampApp
 
 ## ramp_v2.0
+
+* 2018-11-08 15:11:56 +0100  (tag: ramp_v2.0, tag: cycles_v6.0)
 
 Refactored completely the gui. The latter is architectured as follows:
 
