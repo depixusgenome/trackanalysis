@@ -70,8 +70,7 @@ class Beads(TrackView, ITrackView):
         """
         Return the median bead extension (phase 3 - phase 1)
         """
-        data = cast(dict, self.data)
-        arr  = data[ibead] if ibead in data else None
+        arr  = self[ibead] if ibead in self.keys() else None
         return None if arr is None else self.track.beadextension(arr) # type: ignore
 
     def phaseposition(self, phase: int, ibead:BEADKEY) -> Optional[float]:
