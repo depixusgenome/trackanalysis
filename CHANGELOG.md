@@ -3,34 +3,30 @@
 
 Refactored completely the gui. The latter is architectured as follows:
 
-<table class="tg">
+<table style="border: 1px solid black">
 <tr><td>
-<table class="tg">
-  <tr><td><b>Filters</b>: bead quality</td> </tr>
-  <tr><td><b>Choice</b>: the type of graphics </td></tr>
-  <tr><td><b>Table</b>: status summary </td></tr>
-  <tr><td><b>Slider & Table</b>: beads clustered by size </td></tr>
-  <tr><td><b>Slider</b>: providing the average amount of opened hairpins
+<table>
+  <tr><td style="border-bottom: 1px solid black"><b>Filters</b>: bead quality</td> </tr>
+  <tr><td style="border-bottom: 1px solid black"><b>Choice</b>: the type of graphics </td></tr>
+  <tr><td style="border-bottom: 1px solid black"><b>Table</b>: status summary </td></tr>
+  <tr><td style="border-bottom: 1px solid black"><b>Slider & Table</b>: beads clustered by size </td></tr>
+  <tr><td style="border-bottom: 1px solid black"><b>Slider</b>: providing the average amount of opened hairpins
   per choice of Z magnet </td></tr>
   <tr><td><b>Table</b>: bead opening amount per Z magnet</td></tr>
 </table>
 </td>
-<td>
-Graphic displaying one of the following:
+<td style="border-left: 1px solid black">
+<b>Graphic</b>:
 
 * Raw data for a single bead.
 * Average behavior for the current bead and an average behavior of all *good* beads,
 with their length renormalized to 100.
 * Average behavior for the current bead and an average behavior of all *good* beads,
-amount of opened hairpins per | both without length renormalization.
+both without length renormalization.
 
 </td>
 </tr>
 </table>
-
-  Preview
-
-
 
 In particular the amount of opening is very different from the previous
 version. Instead of a number of closed beads, it's the median amount of DNA
