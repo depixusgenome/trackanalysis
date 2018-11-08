@@ -89,7 +89,7 @@ class PeaksPlotDisplay(PlotDisplay):
     name                              = "hybridstat.peaks"
     distances : Dict[str, Distance]   = dict()
     peaks:      Dict[str, np.ndarray] = dict()
-    nprocessors                       = 2
+    nprocessors                       = 0
     waittime                          = .1
     estimatedbias                     = 0.
     constraintspath: Any              = None
@@ -589,6 +589,9 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
             self._poolcompute()
 
     def _poolcompute(self, **_):
+        if self.peaksmodel.display.nprocessors <= 0:
+            return
+
         root  = self.roottask
         procs = self.processors()
         if procs is None:
