@@ -545,15 +545,14 @@ class Track:
                 val = iter((i, cache[i]) for i in ibead)
         return val
 
-    def beadextension(self, ibead: Union[BEADKEY, np.ndarray]) -> float:
+    def beadextension(self, ibead: Union[BEADKEY, np.ndarray], rng = (5., 95.)) -> float:
         """
         Return the median bead extension (phase 3 - phase 1)
         """
-        inds = [PHASE.initial, PHASE.initial+1, PHASE.pull, PHASE.pull+1]
+        inds = [PHASE.initial, PHASE.pull+1]
         arr  = ibead if isinstance(ibead, np.ndarray) else self.data[ibead]
         bead = np.split(arr, self.phases[:, inds].ravel() - self.phases[0,0])[1::2]
-        return np.nanmedian([np.nanmedian(bead[i+1]) - np.nanmedian(bead[i])
-                             for i in range(0, len(bead), 2)])
+        return np.nanmedian([np.diff(np.nanpercentile(i, rng))[0] for i in bead])
 
     def phaseposition(self, phase: int, ibead: Union[BEADKEY, np.ndarray]) -> float:
         """
