@@ -137,6 +137,8 @@ class QCHairpinSizeTheme:
     name:     str   = "qc.hairpinsize"
     title:    str   = "Hairpins bin size"
     binsize:  float = .1
+    binstart: float = .05
+    binend:   float = 1.
     binstep:  float = .05
     headers:  bool  = False
     height:   int   = 125
@@ -193,11 +195,7 @@ class QCHairpinSizeWidget:
         resets[self.__slider].update(**self.__sliderdata())
 
     def _sliderdata(self) -> Dict[str, float]:
-        task = self._model.cleaning.task
-        if task is None:
-            task = self._model.cleaning.configtask
-        return {'start': task.minextent,
-                "end"  : task.maxextent}
+        return {'start': self._theme.binstart, "end"  : self._theme.binend}
 
     def _tabledata(self) -> Iterable[Tuple[int, float]]:
         track = self._model.track

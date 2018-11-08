@@ -3,7 +3,7 @@
 "Ramps widgets"
 from    copy                    import deepcopy
 from    abc                     import ABC
-from    typing                  import List, Dict, TypeVar
+from    typing                  import List, TypeVar
 
 import  numpy                   as     np
 from    scipy.interpolate       import interp1d
@@ -227,10 +227,6 @@ class RampZMagResultsWidget:
 
 class RampHairpinSizeWidget(QCHairpinSizeWidget):
     "Table containing discrete zmag values"
-    def _sliderdata(self) -> Dict[str, float]:
-        task = self._model.config.dataframe.extension
-        return {'start': task[0], "end": task[2]}
-
     def _tabledata(self) -> np.ndarray:
         data = self._model.getdisplay("dataframe")
         if data is None:
