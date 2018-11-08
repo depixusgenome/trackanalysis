@@ -189,4 +189,7 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
 
     def setnewsequencepath(self, path):
         "sets a new path if it is correct"
-        return self.__seq.setnewsequencepath(self._ctrl, path)
+        if not self.__seq.setnewsequencepath(self._ctrl, path):
+            self.reset()
+            return False
+        return True

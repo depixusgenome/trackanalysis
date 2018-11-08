@@ -304,10 +304,11 @@ class SequencePathWidget:
             self.__model.setnewkey(ctrl, new)
         elif new == '←':
             path = self.__dialog.open()
+            self.__widget.value = '→'
             if self.__model.setnewsequencepath(ctrl, path):
-                self.__widget.value = '→'
                 if path is not None:
                     raise IOError("Could not find any sequence in the file")
+
 
 @dataclass
 class OligoListTheme:
