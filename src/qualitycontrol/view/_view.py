@@ -66,8 +66,3 @@ class QualityControlView(PlotView[QualityControlPlotCreator]):
     def ismain(self, ctrl):
         "Cleaning and alignment, ... are set-up by default"
         self._ismain(ctrl, tasks = self.TASKS)
-
-    @staticmethod
-    def observestate(ctrl, fcn):
-        "observe state"
-        ctrl.display.observe("qc.state", fcn)

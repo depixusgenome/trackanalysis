@@ -635,10 +635,6 @@ class PlotView(Generic[PlotType], BokehView):
         "sets up observers"
         self._plotter.observe(ctrl)
 
-    def observestate(self, ctrl, fcn):
-        "sets up state observers"
-        ctrl.display.observe(getattr(self._plotter, '_display').name, fcn)
-
     def addtodoc(self, ctrl, doc):
         "adds items to doc"
         super().addtodoc(ctrl, doc)
