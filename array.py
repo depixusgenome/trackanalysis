@@ -115,31 +115,3 @@ def repeat(data, count, axis = 1):
     if axis == 1:
         return np.repeat(data, count)
     return np.repeat(np.asarray(data)[np.newaxis], count, axis = 0).ravel()
-
-def intlistsummary(beads: Sequence[int]) -> str:
-    """
-    return a string with values in *beads*.
-
-    Sequential values are removed and replaced with a *→*.
-    Thus: `[1, 2, 3, 4,  7,8, 10]` becomes `"1 → 4, 7, 8, 10"`.
-    """
-    beads = np.sort(list(beads))
-    if len(beads) == 0:
-        return ""
-
-    beads = np.sort(beads)
-    txt   = ""
-    last  = 0
-    i     = 1
-    while i < len(beads)-1:
-        if beads[i] + 1 < beads[i+1]:
-            txt    += f", {beads[last]}{', ' if last == i-1 else ' → '}{beads[i]}"
-            last, i = i+1, i+2
-        else:
-            i      += 1
-
-    if last == len(beads)-1:
-        txt += ", "+str(beads[last])
-    else:
-        txt += f", {beads[last]}{', ' if last == len(beads)-2 else ' → '}{beads[-1]}"
-    return txt[2:]

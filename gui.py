@@ -10,13 +10,15 @@ from   pathlib     import Path
 from   functools   import wraps
 from   inspect     import ismethod as _ismeth, isfunction as _isfunc, getmembers
 from   enum        import Enum
-from   typing      import Set, Union, Optional  # pylint: disable=unused-import
+from   typing      import Set, Union, Optional, Sequence
+
+import numpy       as     np
 from   .inspection import ismethod
 from   .logconfig  import getLogger
 
 LOGS = getLogger(__name__)
 
-def coffee(apath:'Union[str,Path]', name:'Optional[str]' = None, **kwa) -> str:
+def coffee(apath: Union[str,Path], name:Optional[str] = None, **kwa) -> str:
     u"returns the javascript implementation code"
     path = Path(apath)
     if name is not None:
@@ -171,10 +173,48 @@ def startfile(filepath:str):
 
 def parseints(new:str) -> Set[int]:
     "returns a set of ints"
-    vals = set()
-    for i in re.split('[:;,]', new):
-        try:
-            vals.add(int(i))
-        except ValueError:
-            continue
+    vals: Set[int] = set()
+    for i in re.split('[;,]', new):
+        for k in '→', '->', 'to', ':':
+            if k in i:
+                j = i.split(k)
+                try:
+                    rng = range(int(j[0]), int(j[1])+1)
+                except ValueError:
+                    continue
+                vals.update(rng)
+                break
+        else:
+            try:
+                vals.add(int(i))
+            except ValueError:
+                continue
     return vals
+
+def intlistsummary(beads: Sequence[int], ordered = True) -> str:
+    """
+    return a string with values in *beads*.
+
+    Sequential values are removed and replaced with a *→*.
+    Thus: `[1, 2, 3, 4,  7,8, 10]` becomes `"1 → 4, 7, 8, 10"`.
+    """
+    beads = np.sort(list(beads)) if ordered else list(beads)
+    if len(beads) == 0:
+        return ""
+
+    beads = np.sort(beads)
+    txt   = ""
+    last  = 0
+    i     = 1
+    while i < len(beads)-1:
+        if beads[i] + 1 < beads[i+1]:
+            txt    += f", {beads[last]}{', ' if last == i-1 else ' → '}{beads[i]}"
+            last, i = i+1, i+2
+        else:
+            i      += 1
+
+    if last == len(beads)-1:
+        txt += ", "+str(beads[last])
+    else:
+        txt += f", {beads[last]}{', ' if last == len(beads)-2 else ' → '}{beads[-1]}"
+    return txt[2:]
