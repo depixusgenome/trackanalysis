@@ -7,7 +7,7 @@ import pathlib
 import pytest
 import numpy as np
 from   utils                import escapenans, fromstream
-from   utils.array          import intlistsummary
+from   utils.gui            import intlistsummary, parseints
 from   utils.lazy           import LazyInstError, LazyInstanciator, LazyDict
 from   utils.attrdefaults   import fieldnames, changefields, initdefaults
 
@@ -249,6 +249,12 @@ def test_intlist():
     assert intlistsummary([])  == ""
     assert intlistsummary([1,2,3, 6,7, 10,11,12, 14]) == "1 → 3, 6, 7, 10 → 12, 14"
     assert intlistsummary([1,3, 6, 2, 10,11,7,12, 14]) == "1 → 3, 6, 7, 10 → 12, 14"
+
+    assert parseints("0 → 4") == {0, 1, 2, 3,  4}
+    assert parseints("1 → 5") == {1, 2, 3, 4, 5}
+    assert parseints("") == set([])
+    assert parseints("1 → 3, 6, 7, 10 → 12, 14")   == {1,2, 3, 6, 7, 10, 11, 12, 14}
+    assert parseints("10 → 12, 1 → 3, 7 , 6 , 14") == {1,2, 3, 6, 7, 10, 11, 12, 14}
 
 if __name__ == '__main__':
     test_intlist()

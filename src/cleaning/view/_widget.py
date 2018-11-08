@@ -13,8 +13,7 @@ import  numpy       as     np
 
 from    control.beadscontrol    import TaskWidgetEnabler
 from    utils                   import initdefaults
-from    utils.array             import intlistsummary
-from    utils.gui               import parseints
+from    utils.gui               import parseints, intlistsummary
 from    view.static             import route
 from    view.plots              import DpxNumberFormatter, CACHE_TYPE
 from    eventdetection.view     import AlignmentWidget
@@ -34,9 +33,9 @@ class BeadSubtractionModalDescriptor:
         mdl = getattr(model, '_model', model)
         ref = mdl.subtracted.referencebeads()
         if ref is not None:
-            return f'ref = {intlistsummary(ref)}'
+            return f'ref = {intlistsummary(ref, False)}'
 
-        pot = intlistsummary([i[-1] for i in mdl.availablefixedbeads])
+        pot = intlistsummary([i[-1] for i in mdl.availablefixedbeads], False)
         return f'{pot} ?' if pot else ''
 
     def line(self) -> Tuple[Union[str, Tuple[str,str]], str]:
@@ -229,7 +228,8 @@ class CleaningFilterWidget:
         info = {i: np.around(getattr(task, i), j) for i, j in self.RND.items()}
         info['framerate'] = getattr(mdl.track, 'framerate', 1./30.)
         info['subtracted']= ', '.join(str(i) for i in sorted(mdl.subtracted.beads))
-        info['fixedbeads']= intlistsummary([i[-1] for i in mdl.availablefixedbeads])
+        info['fixedbeads']= intlistsummary([i[-1] for i in mdl.availablefixedbeads],
+                                           False)
 
         (self.__widget if resets is None else resets[self.__widget]).update(**info)
 
