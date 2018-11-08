@@ -2,6 +2,7 @@
 # encoding: utf-8
 "Everything related to conda"
 import sys
+import os
 from pathlib    import Path
 from itertools  import chain
 from zipfile    import ZipFile
@@ -154,7 +155,12 @@ class _CondaApp(BuildContext):
         self.__copy_gif(final)
 
         if Path("CHANGELOG.md").exists():
-            copy2("CHANGELOG.md", final.parent/"CHANGELOG.md")
+            out = final.parent/"CHANGELOG.md"
+            copy2("CHANGELOG.md", out)
+            try:
+                os.system("pandoc -s {} -o {}".format(out, out.with_suffix(".html")))
+            except: # pylint: disable=bare-except
+                pass
         for i in list(final.glob("*.bat")) + list(final.glob("*.sh")):
             wafbuilder.os.rename(str(i), str(final.parent/i.name))
         rmtree(str(path))

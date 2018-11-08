@@ -1,51 +1,6 @@
-# tag ramps_v2.0
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+# CycleApp
 
-Refactored completely the gui. The latter is architectured as follows:
-
-<table style="border: 1px solid black">
-<tr><td>
-<table>
-  <tr><td style="border-bottom: 1px solid black"><b>Filters</b>: bead quality</td> </tr>
-  <tr><td style="border-bottom: 1px solid black"><b>Choice</b>: the type of graphics </td></tr>
-  <tr><td style="border-bottom: 1px solid black"><b>Table</b>: status summary </td></tr>
-  <tr><td style="border-bottom: 1px solid black"><b>Slider & Table</b>: beads clustered by size </td></tr>
-  <tr><td style="border-bottom: 1px solid black"><b>Slider</b>: providing the average amount of opened hairpins
-  per choice of Z magnet </td></tr>
-  <tr><td><b>Table</b>: bead opening amount per Z magnet</td></tr>
-</table>
-</td>
-<td style="border-left: 1px solid black">
-<b>Graphic</b>:
-
-* Raw data for a single bead.
-* Average behavior for the current bead and an average behavior of all *good* beads,
-with their length renormalized to 100.
-* Average behavior for the current bead and an average behavior of all *good* beads,
-both without length renormalization.
-
-</td>
-</tr>
-</table>
-
-In particular the amount of opening is very different from the previous
-version. Instead of a number of closed beads, it's the median amount of DNA
-bases which remain unaccessible because the of beads still being partially
-opened. This median amount is over all cycles, irrespective of the beads it
-belongs to. Such a computation is hoped to be more robust than the previous one,
-especially given the usually low number of cycles available.
-
-Average behaviors are computed for each bead by:
-
-1. subtracting closing hysteresis (phases ... → 3) from the opening hysteresis
-   (phases 3 → ...)
-2. considering the 25th and 75th percentiles at every available Zmag.
-
-The average behavior for all beads is the median across *good* beads of the
-25th and 75th percentile.
-
-# tag cycles_v6.0
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v6.0
 
 ### QC
 
@@ -65,8 +20,10 @@ one hairpin sequence is provided, the behaviour is unchanged.
 
 Furthermore, computations are now cached.
 
-# tag cycles_v5.3
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v5.3
+
+* 2018-10-16 15:12:02 +0200  (tag: cycles_v5.3.1)
+* 2018-10-15 13:10:46 +0200  (tag: cycles_v5.3)
 
 The *cyclesplot* application was removed. It's already part of* **hybridstat*.
 Similarly, the *_chrome* applications have disappeared as a third party library
@@ -86,8 +43,12 @@ done through the *Advanced* menu.
 
 Loaded tracks can be discarded using the same toolbar menu as for selecting them.
 
-# tag cycles_v5.2
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v5.2
+
+2018-07-17 12:08:28 +0200  (tag: cycles_v5.2.3)
+2018-06-25 11:50:57 +0200  (tag: cycles_v5.2.2)
+2018-06-22 15:53:10 +0200  (tag: cycles_v5.2.1)
+2018-06-15 22:30:54 +0200  (tag: cycles_v5.2)
 
 ### Theme
 
@@ -95,16 +56,19 @@ The user can now change the background color using the *Advanced* menus. The
 size of the figures can also be adapted although the application must be
 restarted for this to take effect.
 
-# tag cycles_v5.1
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v5.1
+
+* 2018-04-30 09:07:33 +0200  (tag: cycles_v5.1)
 
 ### Peaks
 
 The user can now add/remove subtracted beads from the advanced menu. She can also
 change the cycle alignment strategy.
 
-# tag cycles_v5.0
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v5.0
+
+* 2018-04-25 15:31:20 +0200  (tag: cycles_v5.0.1)
+* 2018-04-17 13:10:26 +0200  (tag: cycles_v5.0)
 
 ### Cleaning
 
@@ -152,8 +116,12 @@ The mechanics for displaying tabs have changed. These display much faster. The
 downside is that bugs will occur if the user switches between tabs too fast. Any
 visible bug can be cured by *slowly* switching tabs a couple of times.
 
-# tag cycles_v4.11
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.11
+
+* 2018-01-30 10:01:16 +0100  (tag: cycles_v4.11.3)
+* 2018-01-29 11:26:15 +0100  (tag: cycles_v4.11.2)
+* 2018-01-23 14:37:28 +0100  (tag: cycles_v4.11.1)
+* 2018-01-23 14:28:23 +0100  (tag: cycles_v4.11)
 
 ### Quality Control
 
@@ -176,21 +144,29 @@ discarded. Such a case arises when:
 detectable in ramp files.
 * an oligo is blocking the loop.
 
-# tag cycles_v4.10
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.10
+
+* 2018-01-04 09:25:16 +0100  (tag: cycles_v4.10)
 
 In advanced configuration menus, the default value is indicated if ever the
 value is different.
 
 Subtracted beads are now displayed explicitly in xlsx reports.
 
-# tag cycles_v4.9
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.9
+
+* 2017-12-21 11:32:52 +0100  (tag: cycles_v4.9.5)
+* 2017-12-13 11:10:43 +0100  (tag: cycles_v4.9.4)
+* 2017-12-12 13:53:25 +0100  (tag: cycles_v4.9.3)
+* 2017-12-12 09:34:38 +0100  (tag: cycles_v4.9.2)
+* 2017-12-06 13:47:42 +0100  (tag: cycles_v4.9.1)
+* 2017-12-06 08:04:40 +0100  (tag: cycles_v4.9)
 
 SDI track files can now be displayed as efficiently as Picotwist files
 
-# tag cycles_v4.8
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.8
+
+* 2017-12-05 11:32:52 +0100  (tag: cycles_v4.8)
 
 ### Field of View
 
@@ -238,8 +214,9 @@ Added some information on the peaks graph:
 * The *blue* dots along the *blue* line are the positions of events found.
 * The areas colored in *bisque* is the reference's peaks, should there be a reference.
 
-# tag cycles_v4.7
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.7
+
+* 2017-11-06 14:29:55 +0100  (tag: cycles_v4.7)
 
 ### Menu
 
@@ -249,8 +226,9 @@ Added access to previously loaded tracks.
 
 * Could not read identification files
 
-# tag cycles_v4.6
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.6
+
+* 2017-10-30 14:12:14 +0100  (tag: cycles_v4.6)
 
 ### Bead Selection
 
@@ -275,8 +253,10 @@ The *Ratios* column has been split into 2 columns:
 * *Identified Peak Ratio*: identified peaks / Expected peaks
 * *Unknown Peak Ratio*: Unknown peaks/ Found peaks
 
-# tag cycles_v4.5
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.5
+
+* 2017-10-18 08:40:04 +0200  (tag: cycles_v4.5.1)
+* 2017-10-16 14:08:03 +0200  (tag: cycles_v4.5)
 
 ### User Interface
 
@@ -375,16 +355,19 @@ have the same structure: at least 4 columns *bead*, *reference*, *stretch* and
 *bias* in a *summary* tab. This means a previously created excel report can
 also be used.
 
-# tag cycles_v4.4.3
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.4.3
+
+* 2017-09-28 09:59:18 +0200  (tag: cycles_v4.4.3)
+* 2017-09-27 08:24:06 +0200  (tag: cycles_v4.4.2)
 
 ### Bugs
 
 * Could not open a SDI track file.
 * Could not launch the chrome version.
 
-# tag cycles_v4.4.1
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.4.1
+
+* 2017-09-27 08:13:26 +0200  (tag: cycles_v4.4.1)
 
 ### Cleaning & Xlsx reports
 
@@ -400,8 +383,9 @@ also be used.
   discarded, saving an xlxs file resulted in a crash
 
 
-# tag cycles_v4.4
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.4
+
+* 2017-09-18 06:07:28 +0000  (tag: cycles_v4.4)
 
 ### Messages
 
@@ -430,8 +414,9 @@ Stretch and bias is now estimated in 3 steps:
 * The cleaning tab had various visualization bugs.
 * Cleaning was not correctly ported to all tabs.
 
-# tag cycles_v4.3
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.3
+
+* 2017-09-05 10:20:29 +0200  (tag: cycles_v4.3)
 
 ### Field of View
 
@@ -481,8 +466,9 @@ The *best* alignment has changed somewhat to better detect abnormal cycles.
 
 Various bugs have been corrected. The warm-up time has been divided by 4.
 
-# tag cycles_v4.2
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.2
+
+* 2017-06-07 08:21:15 +0200  (tag: cycles_v4.2)
 
 ### Reporting
 
@@ -523,8 +509,10 @@ primarily on phase 1 then align phase 3 outliers on the median of phase 3.
 These alignments do not rely on the detection of events as does the one which
 can be de-selected in the *Peaks/Advanced* dialog.
 
-# tag cycles_v4.1
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.1
+
+* 2017-05-23 11:11:17 +0200  (tag: cycles_v4.1.1)
+* 2017-05-23 11:01:41 +0200  (tag: cycles_v4.1)
 
 ### Reporting
 
@@ -551,8 +539,9 @@ for the *Cycles* and the *Peaks* tab.
 The application is now created stripped of source code and documentation whenever
 possible. This is necessary for security reasons.
 
-# tag cycles_v4.0
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v4.0
+
+* 2017-05-11 08:44:49 +0200  (tag: cycles_v4.0)
 
 ### Data Treatment
 
@@ -602,8 +591,10 @@ There are no distinctions between upper and lower cases.
 * Changing the *stretch* and *bias* resulted in infinite client-server loops.
 * Could not load *.gr* files.
 
-# tag cycles_v2.0
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v2.0
+
+* 2017-04-13 15:20:20 +0200  (tag: cycles_v2.0)
+
 New application for viewing peaks
 
 ### Features
@@ -634,8 +625,10 @@ tab. It furthermore aligns cycles using phase 5 events.
 * gr files can be opened
 * With chrome, the bead number could not be typed in.
 
-# tag cycles_v1.0
-## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+## cycles_v1.0
+
+* 2017-03-28 08:21:25 +0200  (tag: cycles_v1.0)
+
 New application for viewing cycles
 
 * On the left plot:
@@ -680,8 +673,56 @@ New application for viewing cycles
     durations and number.
     * then open the *.gr* files. You can select all of them in one go.
 
-# tag ramp_v1.3
-## Tagger: David Salthouse <david.salthouse@depixus.com>
+# RampApp
+
+## ramp_v2.0
+
+Refactored completely the gui. The latter is architectured as follows:
+
+<table style="border: 1px solid black">
+<tr><td>
+<table>
+  <tr><td style="border-bottom: 1px solid black"><b>Filters</b>: bead quality</td> </tr>
+  <tr><td style="border-bottom: 1px solid black"><b>Choice</b>: the type of graphics </td></tr>
+  <tr><td style="border-bottom: 1px solid black"><b>Table</b>: status summary </td></tr>
+  <tr><td style="border-bottom: 1px solid black"><b>Slider & Table</b>: beads clustered by size </td></tr>
+  <tr><td style="border-bottom: 1px solid black"><b>Slider</b>: providing the average amount of opened hairpins
+  per choice of Z magnet </td></tr>
+  <tr><td><b>Table</b>: bead opening amount per Z magnet</td></tr>
+</table>
+</td>
+<td style="border-left: 1px solid black">
+<b>Graphic</b>:
+
+* Raw data for a single bead.
+* Average behavior for the current bead and an average behavior of all *good* beads,
+with their length renormalized to 100.
+* Average behavior for the current bead and an average behavior of all *good* beads,
+both without length renormalization.
+
+</td>
+</tr>
+</table>
+
+In particular the amount of opening is very different from the previous
+version. Instead of a number of closed beads, it's the median amount of DNA
+bases which remain unaccessible because the of beads still being partially
+opened. This median amount is over all cycles, irrespective of the beads it
+belongs to. Such a computation is hoped to be more robust than the previous one,
+especially given the usually low number of cycles available.
+
+Average behaviors are computed for each bead by:
+
+1. subtracting closing hysteresis (phases ... → 3) from the opening hysteresis
+   (phases 3 → ...)
+2. considering the 25th and 75th percentiles at every available Zmag.
+
+The average behavior for all beads is the median across *good* beads of the
+25th and 75th percentile.
+
+## ramp_v1.3
+
+* 2017-03-07 11:30:13 +0100  (tag: ramp_v1.3)
 
 User has now access to a slider (top-right) which allows to specify the ratio
 of cycles which the algorithm defines as correct to tag a bead as "good".
@@ -690,8 +731,11 @@ Note that the 2 first cycles of the track file are still automatically
 discarded (as in pias)
 
 
-# tag ramp_v1.2
-## Tagger: David Salthouse <david.salthouse@depixus.com>
+## ramp_v1.2
+
+* 2017-02-22 09:00:37 +0100  (tag: ramp_v1.2)
+* 2017-02-09 16:43:47 +0100  (tag: ramp_v1.1.1)
+* 2017-01-24 11:11:11 +0100  (tag: ramp_v1.0.1)
 
 * Definition of a good bead has changed:
     For a given bead, if less than 20% of cycles do not open and close has expected
@@ -704,3 +748,4 @@ discarded (as in pias)
     into a new window
 * generates a ramp_discard.csv file for pias
 * added a third graph to display the estimated size of each hairpin in the trk files
+
