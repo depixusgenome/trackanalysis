@@ -33,7 +33,7 @@ class BeadSubtractionModalDescriptor:
         mdl = getattr(model, '_model', model)
         ref = mdl.subtracted.referencebeads()
         if ref is not None:
-            return f'ref = {intlistsummary(ref, False)}'
+            return f'ref = {intlistsummary(ref)}'
 
         pot = intlistsummary([i[-1] for i in mdl.availablefixedbeads], False)
         return f'{pot} ?' if pot else ''

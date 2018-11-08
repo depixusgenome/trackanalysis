@@ -11,7 +11,7 @@ import  numpy               as     np
 
 from    control.beadscontrol    import TaskWidgetEnabler
 from    utils                   import dataclass, dflt
-from    utils.array             import intlistsummary
+from    utils.gui               import intlistsummary
 from    view.plots              import DpxNumberFormatter
 from    ._model                 import QualityControlModelAccess
 
@@ -97,6 +97,8 @@ class QCBeadStatusWidget:
     def __init__(self, ctrl, model, **args) -> None:
         self._model = model
         self.__theme = ctrl.theme.add(QCBeadStatusTheme(**args), False) # type: ignore
+        if ctrl.theme.model("toolbar"):
+            ctrl.theme.updatedefaults("toolbar", placeholder = '1, 2, ...? bad ?')
 
     def addtodoc(self, _, ctrl) -> List[Widget]:
         "creates the widget"
@@ -104,6 +106,31 @@ class QCBeadStatusWidget:
                                                            self.__theme,
                                                            self.__data())
         return [self.__widget]
+
+    def observe(self, _, ctrl):
+        "observe the controller"
+        @ctrl.display.observe
+        def _onselectingbeads(text = "", accept = True, beads = None, **_):
+            text = text.strip().lower()
+            text = next((i for i, j in self.__theme.status.items()
+                         if j.lower() == text), text)
+
+            if text not in self.__theme.status:
+                return
+
+            beads.clear()
+            data = self._data()
+            if sum(sum(i) for i in data.values()) == 0:
+                # not ready for processing
+                beads.add(None)
+                return
+
+            if text == "bad" and not accept:
+                for i, j in data.items():
+                    if i != 'ok':
+                        beads.update(j)
+            else:
+                beads.update(data[text])
 
     def reset(self, resets):
         "resets the wiget when a new file is opened"

@@ -35,6 +35,7 @@ class BeadToolbarTheme:
     quitlabel    = 'Quit'
     opentitle    = 'Open a track or analysis file'
     savetitle    = 'Save an analysis file'
+    placeholder  = '1, 2, ..., bad, ... ?'
     fnamesmany   = '{Path(files[0]).stem} + ...'
     fnamessingle = '{Path(path).stem}'
     @initdefaults(frozenset(locals()))
@@ -130,6 +131,7 @@ class DpxToolbar(Widget):
     save        = props.Int(0)
     quit        = props.Int(0)
     bead        = props.Int(-1)
+    placeholder = props.String('')
     discarded   = props.String('')
     accepted    = props.String('')
     currentbead = props.Bool(True)
@@ -335,16 +337,27 @@ class RejectedBeadsInput:
             _ondiscard_currentbead()
 
         def _onaccepted_cb(attr, old, new):
-            beads = set(bdctrl.allbeads) - parseints(new)
-            if (not tbar.seltype) and beads != set(bdctrl.discarded):
-                with ctrl.action:
-                    bdctrl.discarded = beads
+            beads = parseints(new)
+            ctrl.display.handle('selectingbeads',
+                                args = {"text": new, "accept": True, "beads": beads})
+            if not (None in beads or (len(new) and len(beads) == 0)):
+                beads = set(bdctrl.allbeads) - beads
+                if (not tbar.seltype) and beads != set(bdctrl.discarded):
+                    with ctrl.action:
+                        bdctrl.discarded = beads
+                    return
+            _ontasks()
 
         def _ondiscarded_cb(attr, old, new):
             beads = parseints(new)
-            if tbar.seltype and beads != set(bdctrl.discarded):
-                with ctrl.action:
-                    bdctrl.discarded = beads
+            ctrl.display.handle('selectingbeads',
+                                args = {"text": new, "accept": False, "beads": beads})
+            if not (None in beads or (len(new) and len(beads) == 0)):
+                if tbar.seltype and beads != set(bdctrl.discarded):
+                    with ctrl.action:
+                        bdctrl.discarded = beads
+                    return
+            _ontasks()
 
         tbar.on_change('currentbead', _ondiscard_currentbead_cb)
         tbar.on_change('discarded',   _ondiscarded_cb)
@@ -473,7 +486,8 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         "adds items to doc"
         super().addtodoc(ctrl, doc)
         assert doc is not None
-        tbar   = DpxToolbar(hasquit = getattr(self._ctrl, 'FLEXXAPP', None) is not None)
+        tbar   = DpxToolbar(hasquit = getattr(self._ctrl, 'FLEXXAPP', None) is not None,
+                            placeholder = self.__theme.placeholder)
 
         def _ontasks(old = None, **_):
             if 'roottask' not in old:
