@@ -51,7 +51,7 @@ class _CondaApp(BuildContext):
         iswin = sys.platform.startswith("win")
         ext   = ".bat"                          if iswin else ".sh"
         if iswin:
-            cmd = r'cd code; start /min %~dp0pythonw -I '
+            cmd = 'cd code\r\n'+r'start /min %~dp0\code\pythonw -I '
         else:
             cmd =(r'IR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"\n'
                   r'cd $DIR/code\n'
@@ -63,7 +63,7 @@ class _CondaApp(BuildContext):
                       file = stream)
 
         if iswin:
-            cmd   = r"cd code; %~dp0python -I "
+            cmd   = 'cd code\r\n'+r'%~dp0\code\python -I '
             fname = str(self.options.STARTSCRIPT_PATH.make_node(name+"_debug"+ext))
             with open(fname, 'w', encoding = 'utf-8') as stream:
                 print(cmd + r" app/cmdline.pyc " + val + r' -g browser --port random',
