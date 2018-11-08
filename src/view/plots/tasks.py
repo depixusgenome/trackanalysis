@@ -9,12 +9,12 @@ from .base                  import PlotCreator, PlotModelType, CACHE_TYPE
 TModelType = TypeVar('TModelType', bound = TaskPlotModelAccess)
 class TaskPlotCreator(PlotCreator[TModelType, PlotModelType]):
     "Base plotter for tracks"
-    def _onchangetask(self, parent = None, task = None, **_):
+    def _onchangetask(self, parent = None, task = None, calllater = None, **_):
         if self._model.impacts(parent, task):
-            self.reset(False)
+            calllater.append(lambda: self.reset(False))
 
-    def _onchangedisplay(self, old = None, **_):
-        self.reset('roottask' in old)
+    def _onchangedisplay(self, old = None, calllater = None, **_):
+        calllater.append(lambda: self.reset('roottask' in old))
 
     def observetasks(self, ctrl, name = "tasks"):
         "sets-up task model observers"
