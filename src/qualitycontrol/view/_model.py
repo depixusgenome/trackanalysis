@@ -62,6 +62,7 @@ class QualityControlModelAccess(TaskPlotModelAccess):
         "set _tasksmodel to same as main"
         super().addto(ctrl, name, noerase)
         self.__config.addto(ctrl, noerase)
+        ctrl.tasks.observe("addtask", "updatetask", "removetask", self._ontask)
 
     def buildmessages(self):
         "creates beads and warnings where applicable"
@@ -126,6 +127,10 @@ class QualityControlModelAccess(TaskPlotModelAccess):
         "clears the model's cache"
         self._ctrl.display.update(self.__display, messages = {})
 
+    def _ontask(self, parent = None, task = None, **_):
+        if self.impacts(parent, task):
+            self.clear()
+
 class DriftControlPlotTheme(PlotTheme):
     "drift control plot theme"
     name             = "qc.driftcontrol.plot"
@@ -168,6 +173,7 @@ class DriftControlPlotModel(PlotModel):
     theme   = DriftControlPlotTheme()
     config  = DriftControlPlotConfig()
     display = PlotDisplay(name = "qc")
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
