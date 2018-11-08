@@ -34,7 +34,7 @@ def setup(cnf):
 class _CondaApp(BuildContext):
     fun = cmd = 'app'
     DOALL     = True
-    EXCLUDED  = 'tests', 'daq'
+    EXCLUDED  = 'tests', 'scripting', 'daq'
 
     def __clean(self):
         self.options.APP_PATH = self.bldnode.make_node("OUTPUT_PY")
@@ -50,10 +50,12 @@ class _CondaApp(BuildContext):
         "creates the startup script"
         iswin = sys.platform.startswith("win")
         ext   = ".bat"                          if iswin else ".sh"
-        cmd   = (r"start /min %~dp0pythonw -I " if iswin else
-                 r'IR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"\n'
-                 r'cd $DIR\n'
-                 r'./bin/python')
+        if iswin:
+            cmd = r'cd code; start /min %~dp0pythonw -I '
+        else:
+            cmd =(r'IR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"\n'
+                  r'cd $DIR/code\n'
+                  r'./bin/python')
         for optext, opts in (('', ' -g app '),):
             fname = str(self.options.STARTSCRIPT_PATH.make_node(name+optext+ext))
             with open(fname, 'w', encoding = 'utf-8') as stream:
@@ -61,7 +63,7 @@ class _CondaApp(BuildContext):
                       file = stream)
 
         if iswin:
-            cmd   = r"%~dp0python -I "
+            cmd   = r"cd code; %~dp0python -I "
             fname = str(self.options.STARTSCRIPT_PATH.make_node(name+"_debug"+ext))
             with open(fname, 'w', encoding = 'utf-8') as stream:
                 print(cmd + r" app/cmdline.pyc " + val + r' -g browser --port random',
@@ -146,10 +148,15 @@ class _CondaApp(BuildContext):
         final = Path(".")/wafbuilder.git.version()
         if final.exists():
             rmtree(str(final))
+        final.mkdir(exist_ok = True, parents = True)
+        final = final / "code"
         wafbuilder.os.rename(str(out), str(final))
         self.__copy_gif(final)
+
         if Path("CHANGELOG.md").exists():
-            copy2("CHANGELOG.md", final/"CHANGELOG.md")
+            copy2("CHANGELOG.md", final.parent/"CHANGELOG.md")
+        for i in list(final.glob("*.bat")) + list(final.glob("*.sh")):
+            wafbuilder.os.rename(str(i), str(final.parent/i.name))
         rmtree(str(path))
 
     def build_app(self):
