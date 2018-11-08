@@ -93,7 +93,7 @@ def save(cls, task: Task):
     if getattr(cpy, '__scripting_save__', lambda: True)():
         name = cls(task).name
         # pylint: disable=protected-access
-        name = next(j for i, j in cls._cnv().items() if i == name)
+        name = next(j for i, j in cls._cnv(None).items() if i == name)
 
         mdl  = cls.tasksmodel()
         out  = dict(mdl.tasks)
@@ -102,12 +102,21 @@ def save(cls, task: Task):
         scriptapp.writeuserconfig()
 
 @addto(Tasks)
-def let(self, *resets, **kwa) -> Task:
+def let(self, *resets, instrument = None, **kwa) -> Task:
     """
     Same as Tasks.__call__ but saves the configuration as the default
     """
-    res = self(*resets, **kwa)
-    self.save(res)
+    if instrument is not None:
+        old = self.tasksmodel().instrument
+        self.tasksmodel(instrument = instrument)
+        try:
+            res = self(*resets, **kwa)
+            self.save(res)
+        finally:
+            self.tasksmodel(instrument = old)
+    else:
+        res = self(*resets, **kwa)
+        self.save(res)
     return res
 
 @addto(Tasks)
