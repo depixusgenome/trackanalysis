@@ -29,15 +29,13 @@ class Option(metaclass = ABCMeta):
         "returns a method which sets values in a model"
         raise NotImplementedError()
 
-    @classmethod
-    def _default_empty(cls, elems, model, key):
+    def _default_empty(self, elems, model, key):
         if elems[key]:
-            cls.setvalue(model, key, None)
-        elif cls._cnv is str: # pylint: disable=no-member
-            cls.setvalue(model, key, '')
+            self.setvalue(model, key, None)
+        elif self._cnv is str: # pylint: disable=no-member
+            self.setvalue(model, key, '')
 
-    @classmethod
-    def _default_apply(cls, model, elems, # pylint: disable=too-many-arguments
+    def _default_apply(self, model, elems, # pylint: disable=too-many-arguments
                        cnv, storeempty, key, val):
         if key not in elems:
             return False
@@ -48,56 +46,53 @@ class Option(metaclass = ABCMeta):
             except Exception as exc: # pylint: disable=broad-except
                 LOGS.exception(exc)
             else:
-                cls.setvalue(model, key, converted)
+                self.setvalue(model, key, converted)
         elif isinstance(storeempty, Exception):
             raise storeempty
         else:
             storeempty(model, key)
         return True
 
-    @classmethod
-    def _converter(cls, model, elems, cnv, storeempty = None) -> Callable:
+    def _converter(self, model, elems, cnv, storeempty = None) -> Callable:
         "returns a method which sets values in a model"
         if storeempty is None:
-            storeempty = partial(cls._default_empty, elems)
-        fcn = partial(cls._default_apply, model, elems, cnv, storeempty)
+            storeempty = partial(self._default_empty, elems)
+        fcn = partial(self._default_apply, model, elems, cnv, storeempty)
         return cast(Callable, fcn)
 
     _INDEX = re.compile(r"(\w+)\[(\d+)\]")
-    @classmethod
-    def getvalue(cls, mdl, keystr, default):
+    def getvalue(self, mdl, keystr, default):
         "gets the value in the model"
         if isinstance(mdl, dict):
             return mdl[keystr]
 
         keys = keystr.split('.')
         for key in keys[:-1]:
-            match = cls._INDEX.match(key)
+            match = self._INDEX.match(key)
             if match:
                 mdl = getattr(mdl, match.group(1))[int(match.group(2))]
             else:
                 mdl = getattr(mdl, key)
 
-        match = cls._INDEX.match(keys[-1])
+        match = self._INDEX.match(keys[-1])
         if match:
             return getattr(mdl, match.group(1), default)[int(match.group(2))]
         return getattr(mdl, keys[-1], default)
 
-    @classmethod
-    def setvalue(cls, mdl, keystr, val):
+    def setvalue(self, mdl, keystr, val):
         "sets the value in the model"
         if isinstance(mdl, dict):
             mdl[keystr] = val
         else:
             keys = keystr.split('.')
             for key in keys[:-1]:
-                match = cls._INDEX.match(key)
+                match = self._INDEX.match(key)
                 if match:
                     mdl = getattr(mdl, match.group(1))[int(match.group(2))]
                 else:
                     mdl = getattr(mdl, key)
 
-            match = cls._INDEX.match(keys[-1])
+            match = self._INDEX.match(keys[-1])
             if match:
                 getattr(mdl, match.group(1))[int(match.group(2))] = val
             else:
@@ -106,14 +101,12 @@ class Option(metaclass = ABCMeta):
 class ChoiceOption(Option):
     "Converts a text tag to an html check"
     _PATT = re.compile(r'%\((?P<name>[\w\.\[\]]*)(?P<cols>(?:\|[^:]+\:[^|)]+)*)\)c')
-    @classmethod
-    def converter(cls, model, body:str) -> Callable:
+    def converter(self, model, body:str) -> Callable:
         "returns a method which sets values in a model"
-        elems = frozenset(i.group('name') for i in cls._PATT.finditer(body))
-        return cls._converter(model, elems, lambda x: x, AssertionError())
+        elems = frozenset(i.group('name') for i in self._PATT.finditer(body))
+        return self._converter(model, elems, lambda x: x, AssertionError())
 
-    @classmethod
-    def replace(cls, model, body:str) -> str:
+    def replace(self, model, body:str) -> str:
         "replaces a pattern by an html tag"
         def _replace(match):
             key   = match.group('name')
@@ -121,7 +114,7 @@ class ChoiceOption(Option):
             out   = '<select name="{}" id="{}">'.format(key, ident)
             val   = ''
             for i in match.group('cols')[1:].split("|"):
-                val = cls.getvalue(model, key, i.split(":")[0])
+                val = self.getvalue(model, key, i.split(":")[0])
                 break
 
             for i in match.group('cols')[1:].split("|"):
@@ -129,7 +122,7 @@ class ChoiceOption(Option):
                 sel  = 'selected="selected" ' if i[0] == str(val) else ""
                 out += '<option {}value="{}">{}</option>'.format(sel, *i)
             return out.format(ident)+'</select>'
-        return cls._PATT.sub(_replace, body)
+        return self._PATT.sub(_replace, body)
 
 class CheckOption(Option):
     "Converts a text tag to an html check"
@@ -142,24 +135,22 @@ class CheckOption(Option):
             return False
         raise ValueError()
 
-    @classmethod
-    def converter(cls, model, body:str) -> Callable:
+    def converter(self, model, body:str) -> Callable:
         "returns a method which sets values in a model"
-        elems = frozenset(i.group('name') for i in cls._PATT.finditer(body))
-        return cls._converter(model, elems, cls.__cnv, AssertionError())
+        elems = frozenset(i.group('name') for i in self._PATT.finditer(body))
+        return self._converter(model, elems, self.__cnv, AssertionError())
 
-    @classmethod
-    def replace(cls, model, body:str) -> str:
+    def replace(self, model, body:str) -> str:
         "replaces a pattern by an html tag"
         def _replace(match):
             key = match.group('name')
             assert len(key), "keys must have a name"
-            val = 'checked' if bool(cls.getvalue(model, key, False)) else ''
+            val = 'checked' if bool(self.getvalue(model, key, False)) else ''
             return ('<input type="checkbox" class="bk-bs-checkbox '
                     'bk-widget-form-input" name="{}" {} />'
                     .format(key, val))
 
-        return cls._PATT.sub(_replace, body)
+        return self._PATT.sub(_replace, body)
 
 class TextOption(Option):
     "Converts a text tag to an html text input"

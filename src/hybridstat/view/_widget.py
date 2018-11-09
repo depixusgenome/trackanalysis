@@ -3,7 +3,7 @@
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
 import os
 from pathlib               import Path
-from typing                import Any, Dict, List, Optional
+from typing                import Any, Dict, List, Optional, Tuple
 
 import numpy                 as np
 import bokeh.core.properties as props
@@ -12,11 +12,9 @@ from bokeh.models               import (DataTable, TableColumn, CustomJS,
 
 
 from cleaning.view              import BeadSubtractionModalDescriptor
-from cyclesplot                 import ThemeNameDescriptor, FigureSizeDescriptor
 from eventdetection.view        import AlignmentModalDescriptor
 from excelreports.creation      import writecolumns
-from modaldialog.view           import (AdvancedTaskWidget, AdvancedWidgetBody,
-                                        AdvancedTab)
+from modaldialog.view           import tab
 from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
 from peakfinding.groupby        import FullEm, ByHistogram
 from sequences.view             import (SequenceTicker, SequenceHoverMixin,
@@ -30,7 +28,7 @@ from view.plots                 import DpxNumberFormatter, CACHE_TYPE
 from view.static                import ROUTE, route
 from view.toolbar               import FileList
 from ._model                    import (PeaksPlotModelAccess, FitToReferenceStore,
-                                        PeaksPlotTheme)
+                                        PeaksPlotTheme, PeaksPlotDisplay)
 
 @dataclass
 class ReferenceWidgetTheme:
@@ -252,19 +250,19 @@ class PeaksStatsWidget:
             return ('{:'+fmt+'} ± {:'+fmt+'}').format(*val)
 
     def __data(self) -> Dict[str,str]:
-        tab = self._TableConstructor(self.__theme)
-        tab.trackdependant(self.__model)
-        ret = {'': tab()}
+        tbl = self._TableConstructor(self.__theme)
+        tbl.trackdependant(self.__model)
+        ret = {'': tbl()}
 
         if self.__model.identification.task is not None:
             dist = self.__model.distances
             for key in dist:
-                tab.sequencedependant(self.__model, dist, key)
-                ret[key] = tab()
+                tbl.sequencedependant(self.__model, dist, key)
+                ret[key] = tbl()
 
         elif self.__model.fittoreference.task is not None:
-            tab.referencedependant(self.__model)
-            ret[''] = tab()
+            tbl.referencedependant(self.__model)
+            ret[''] = tbl()
         return ret
 
 @dataclass
@@ -484,15 +482,22 @@ class FitParamsWidget:
                                      frozen       = ctrl.task is None)
 
 class _IdAccessor:
-    def __init__(self, name, getter, setter):
-        self._name = name
-        self._fget = getter
-        self._fset = setter
+    _LABEL  = '%({self._attrname}){self._fmt}'
+    def __init__(self, label, getter, setter):
+        self._label    = label[:label.rfind("%(")].strip()
+        self._fmt      = label[label.rfind(")")+1:].strip()
+        self._name     = label[label.rfind("%(")+2:label.rfind(")")].strip()
+        self._attrname = ""
+        self._fget     = getter
+        self._fset     = setter
 
     def getdefault(self, inst, usr = False):
         "returns the default value"
         ident = getattr(inst, '_model').identification
         return self._fget(ident.defaultattribute(self._name, usr))
+
+    def __set_name__(self, _, name):
+        self._attrname = name
 
     def __get__(self, inst, owner):
         return self if inst is None else self.getdefault(inst, True)
@@ -509,7 +514,16 @@ class _IdAccessor:
             mdl.identification.updatedefault(self._name, *val)
         mdl.identification.resetmodel(mdl)
 
+    def line(self) -> Tuple[str, str]:
+        "return the line for this descriptor"
+        return self._label, self._LABEL.format(self = self)
+
+
 class _ClippingDescriptor:
+    _name: str
+    def __set_name__(self, _, name):
+        self._name = name
+
     def getdefault(self,inst):
         "returns default single strand suppression"
         if inst is None:
@@ -530,12 +544,15 @@ class _ClippingDescriptor:
         else:
             cnf.update(disabled  = False, lowfactor = value)
 
-    @staticmethod
-    def line():
+    def line(self):
         "the gui line"
-        return ('Discard z(∈ φ5) < z(φ1)-σ[HF]‥α',  ' %(_clipping)of')
+        return ('Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α',  f'%({self._name})of')
 
 class _SingleStrandDescriptor:
+    _name: str
+    def __set_name__(self, _, name):
+        self._name = name
+
     def getdefault(self,inst):
         "returns default single strand suppression"
         return (self if inst is None else
@@ -548,10 +565,9 @@ class _SingleStrandDescriptor:
     def __set__(self,inst, value):
         getattr(inst,'_model').singlestrand.update(disabled = not value)
 
-    @staticmethod
-    def line():
+    def line(self):
         "the gui line"
-        return ('Discard the single strand peak',     ' %(_singlestrand)b')
+        return ('Discard the single strand peak', f'%({self._name})b')
 
 class _PeakDescriptor:
     def getdefault(self,inst):
@@ -571,58 +587,29 @@ class _PeakDescriptor:
             return
         mdl.peakselection.update(finder=ByHistogram(mincount=getattr(inst,"_eventcount")))
 
-class AdvancedWidget(AdvancedTaskWidget):
+@tab.title('Hybridstat Configuration')
+@tab("Cleaning",
+     _ClippingDescriptor(),
+     BeadSubtractionModalDescriptor(),
+     AlignmentModalDescriptor())
+@tab("Peaks",
+     'Min frame count per hybridisation %(eventdetection.events.select.minlength)d',
+     'Min hybridisations per peak %(peakselection.finder.grouper.mincount)d',
+     _IdAccessor('Keep z=0 peak %(fit)b',
+                 lambda i: i.firstpeak,
+                 lambda i: {'firstpeak': i}),
+     _SingleStrandDescriptor(),
+     tab.tasknoneattr('Re-align cycles using peaks%(peakselection.align)b'),
+     'Peak kernel size (blank ⇒ auto) %(peakselection.precision)of',
+     _IdAccessor('Exhaustive fit algorithm %(fit)b',
+                 lambda i: isinstance(i, PeakGridFit),
+                 lambda i: ((ChiSquareFit, PeakGridFit)[i](),)),
+     _IdAccessor('Max Δ to theoretical peak%(match)d',
+                 lambda i: i.window,
+                 lambda i: {'window': i}))
+@tab.figure(PeaksPlotTheme, PeaksPlotDisplay)
+class AdvancedWidget(tab.taskwidget): # type: ignore
     "access to the modal dialog"
-    def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
-        self._model = model
-        super().__init__(ctrl)
-        self._outp: Dict[str, Dict[str, Any]] = {}
-        self._ctrl = ctrl
-
-    @staticmethod
-    def _title() -> str:
-        return 'Hybridstat Configuration'
-
-    def _body(self) -> AdvancedWidgetBody:
-        cls   = type(self)
-        get   = lambda *i: [getattr(cls, "_"+j).line() for j in i]
-        clean = AdvancedTab("Cleaning", *get('subtracted', 'alignment', 'clipping'))
-        alg   = AdvancedTab("Peaks",
-                            ('Min frame count per hybridisation', '%(_framecount)d'),
-                            ('Min hybridisations per peak',       '%(_eventcount)d'),
-                            ('Keep z=0 peak',                     '%(_peak0)b'),
-                            *get('singlestrand'),
-                            ('Re-align cycles using peaks',       '%(_align5)b'),
-                            ('Peak kernel size (blank ⇒ auto)',   '%(_precision)of'),
-                            #('Use EM to find peaks',     '        %(_useem)b'),
-                            ('Exhaustive fit algorithm',          '%(_fittype)b'),
-                            ('Max Δ to theoretical peak',         '%(_dist2theo)d'))
-        get  = lambda *i: [getattr(cls, "_"+j).line for j in i]
-        return (clean,
-                alg,
-                AdvancedTab("Theme", *get('themename', 'figwidth', 'figheight')))
-
-    def reset(self, resets):
-        "resets the widget when a new file is opened, ..."
-        AdvancedTaskWidget.reset(resets)
-
-    _clipping   = _ClippingDescriptor()
-    _subtracted = BeadSubtractionModalDescriptor()
-    _alignment  = AlignmentModalDescriptor()
-    _framecount = AdvancedTaskWidget.attr('eventdetection.events.select.minlength')
-    _eventcount = AdvancedTaskWidget.attr('peakselection.finder.grouper.mincount')
-    _align5     = AdvancedTaskWidget.none('peakselection.align')
-    _precision  = AdvancedTaskWidget.attr('peakselection.precision')
-    #_useem      = _PeakDescriptor()
-    _singlestrand = _SingleStrandDescriptor()
-    _peak0      = _IdAccessor('fit', lambda i: i.firstpeak, lambda i: {'firstpeak': i})
-    _fittype    = _IdAccessor('fit',
-                              lambda i: isinstance(i, PeakGridFit),
-                              lambda i: ((ChiSquareFit, PeakGridFit)[i](),))
-    _dist2theo  = _IdAccessor('match', lambda i: i.window, lambda i: {'window': i})
-    _themename  = ThemeNameDescriptor()
-    _figwidth   = FigureSizeDescriptor(PeaksPlotTheme.name)
-    _figheight  = FigureSizeDescriptor(PeaksPlotTheme.name)
 
 def createwidgets(ctrl, mdl: PeaksPlotModelAccess) -> Dict[str, Any]:
     "returns a dictionnary of widgets"

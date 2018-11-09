@@ -14,7 +14,7 @@ from   ._bokehext           import DpxHoverModel
 from   ._model              import CyclesModelAccess, CyclesPlotModel
 from   ._raw                import RawMixin
 from   ._hist               import HistMixin
-from   ._widget             import WidgetMixin, ThemeNameDescriptor, FigureSizeDescriptor
+from   ._widget             import WidgetMixin
 
 class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # type: ignore
                         HistMixin, RawMixin, WidgetMixin):

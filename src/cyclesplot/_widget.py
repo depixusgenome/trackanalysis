@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Widgets for configuration"
 
-from    typing              import List, Tuple, Dict, Optional, cast
+from    typing              import List, Tuple, Dict, Optional
 from    abc                 import ABC
 
 from    bokeh               import layouts
@@ -16,11 +16,10 @@ from    model.task              import RootTask
 from    model.task.application  import TasksDisplay
 from    sequences.view          import OligoListWidget, SequencePathWidget
 from    view.plots              import DpxNumberFormatter, CACHE_TYPE
-from    modaldialog.view        import AdvancedWidget as _AdvancedWidget
-
+from    modaldialog.view        import tab
 from    eventdetection.view     import AlignmentWidget, EventDetectionWidget
 from    ._model                 import (CyclesModelAccess, CyclesPlotTheme,
-                                        CyclesModelConfig)
+                                        CyclesModelConfig, CyclesPlotDisplay)
 
 class PeaksTableTheme:
     "peaks table theme"
@@ -44,7 +43,9 @@ class PeaksTableDisplay:
         pass
 
     def __getitem__(self, tasks: TasksDisplay) -> Optional[Tuple[float, float]]:
-        return self.peaks.get(tasks.roottask, {}).get(tasks.bead, None)
+        root, bead = tasks.roottask, tasks.bead
+        return (None if root is None or bead is None else
+                self.peaks.get(root, {}).get(bead, None))
 
 class PeaksTableWidget:
     "Table of peaks in z and dna units"
@@ -208,100 +209,13 @@ class DriftWidget:
             value += [1]
         return dict(active = value)
 
-class _AdvancedDescriptor:
-    _LABEL  = '%(_{self._attrname}){self._fmt}'
-    _cnf    = CyclesModelConfig.name
-    _attrname: str
-    _ctrlname: str
-    def __init__(self, label:str, fmt:str, cnf:str = None) -> None:
-        self._label = label
-        self._fmt   = fmt
-        if cnf is not None:
-            self._cnf = cnf
-
-    def __set_name__(self, _, name):
-        self._attrname = name[1:]
-        if not hasattr(self, '_ctrlname'):
-            self._ctrlname = self._attrname
-
-    def __get__(self, inst, _):
-        return getattr(inst, '_ctrl').theme.get(self._cnf, self._ctrlname) if inst else self
-
-    def __set__(self, inst, value):
-        return getattr(inst, '_ctrl').theme.update(self._cnf, **{self._ctrlname: value})
-
-    def getdefault(self, inst):
-        "return the default value"
-        return getattr(inst, '_ctrl').theme.get(self._cnf, self._ctrlname, defaultmodel = True)
-
-    @property
-    def line(self) -> Tuple[str, str]:
-        "return the line for this descriptor"
-        return self._label, self._LABEL.format(self = self)
-
-class FigureSizeDescriptor(_AdvancedDescriptor):
-    "defines the figure height"
-    _cnf      = CyclesPlotTheme.name
-    _ctrlname = 'figsize'
-    _isheight = cast(bool, property(lambda self: 'height' in self._attrname))
-    def __init__(self, cnf = None):
-        super().__init__("", "d", cnf)
-
-    def __set_name__(self, _, name):
-        super().__set_name__(_, name)
-        self._label = 'Plot '+ ("height" if self._isheight else "width")
-
-    def __get__(self, inst, _):
-        if inst is None:
-            return self
-        out = super().__get__(inst, _)[self._isheight]
-        return out
-
-    def __set__(self, inst, value):
-        vals = list(super().__get__(inst, None))
-        vals[self._isheight] = int(value)
-        return super().__set__(inst, tuple(vals))
-
-    def getdefault(self, inst):
-        "return the default value"
-        return super().getdefault(inst)[self._isheight]
-
-class ThemeNameDescriptor(_AdvancedDescriptor):
-    "defines the theme to use"
-    _LABEL  = ('%(_{self._attrname}'
-               +'|basic:basic'
-               +'|dark:dark'
-               +'|light_minimal:bokehlight'
-               +'|dark_minimal:bokehdark'
-               +'|caliber:caliber'
-               +'){self._fmt}')
-    _cnf    = "main"
-    def __init__(self):
-        super().__init__("Background color", "c")
-
-class AdvancedWidget(_AdvancedWidget):
+@tab.title('Cycles Plot Configuration')
+@tab("Algorithm",
+     (CyclesModelConfig, f"Histogram bin width %(binwidth).3f"),
+     (CyclesModelConfig, f'Minimum frames per hybridisation %(minframes)d'))
+@tab.figure(CyclesPlotTheme, CyclesPlotDisplay)
+class AdvancedWidget(tab.widget): # type: ignore
     "access to the modal dialog"
-    def __init__(self, ctrl) -> None:
-        self._ctrl = ctrl
-        super().__init__(ctrl)
-
-    _binwidth  = _AdvancedDescriptor('Histogram bin width', '.3f')
-    _minframes = _AdvancedDescriptor('Minimum frames per position', 'd')
-    _themename = ThemeNameDescriptor()
-    _figheight = FigureSizeDescriptor()
-    _figwidth  = FigureSizeDescriptor()
-
-    @staticmethod
-    def _title() -> str:
-        return 'Cycles Plot Configuration'
-
-    @classmethod
-    def _body(cls) -> Tuple[Tuple[str,str],...]:
-        return tuple(i.line for i in cls.__dict__.values()
-                     if isinstance(i, _AdvancedDescriptor))
-
-    def _args(self, **kwa):
-        return super()._args(model = self, **kwa)
 
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"

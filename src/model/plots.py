@@ -70,7 +70,7 @@ class PlotDisplay:
             axis = getattr(fig, axname+'_range')
 
             def _on_cb(attr, old, new):
-                if self.state is PlotState.active:
+                if self.state in (PlotState.active, PlotState.resetting):
                     vals = cast(Tuple[Optional[float],...], (axis.start, axis.end))
                     if axis.bounds is not None:
                         rng  = 1e-3*(axis.bounds[1]-axis.bounds[0])

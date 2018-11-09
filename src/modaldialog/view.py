@@ -3,13 +3,12 @@
 """
 Allows creating modals from anywhere
 """
-from typing             import Dict, List, Tuple, Any, Union
-from abc                import ABC, abstractmethod
+from typing             import Dict, List, Tuple, Any, Union, Optional, Callable, cast
 from copy               import deepcopy
 from bokeh.document     import Document
 from bokeh.models       import Widget, Button
 from view.fonticon      import FontIcon
-from utils              import initdefaults
+from utils              import initdefaults, dataclass, dflt
 from utils.logconfig    import getLogger
 from .                  import dialog
 LOGS               = getLogger(__name__)
@@ -53,7 +52,6 @@ class AdvancedTab:
                 +"".join(j.htmltitle(i == 0) for i, j in enumerate(tabs))+"</div>"
                 +"".join(j.htmlbody(i == 0)  for i, j in enumerate(tabs)))
 
-
 AdvancedWidgetBody = Union[Tuple[Tuple[str, ...],...], Tuple[AdvancedTab,...]]
 
 class AdvancedWidgetTheme:
@@ -67,22 +65,243 @@ class AdvancedWidgetTheme:
     def __init__(self, **_):
         pass
 
-class AdvancedWidget(ABC):
+@dataclass
+class TaskDescriptor:
+    "Access to a task"
+    _LABEL = '%({self.attrname}){self.fmt}'
+    __NONE = type('_None', (), {})
+    label: str                = ""
+    fmt  : str                = ""
+    keys : List[str]          = dflt([])
+    fget : Optional[Callable] = None
+    fset : Optional[Callable] = None
+    attrname : str            = ""
+    def __post_init__(self):
+        if not self.fmt:
+            ix1, ix2    = self.label.rfind("%("), self.label.rfind(")")
+            self.fmt   = self.label[ix2+1:]
+            self.keys  = self.label[ix1+2:ix2].split(".")
+            self.label = self.label[:ix1].strip()
+
+        if isinstance(self.keys, str):
+            self.keys = self.keys.split('.')
+        assert len(self.keys) >= 2
+        assert len(self.fmt)
+        assert len(self.label)
+
+    def __set_name__(self, _, name):
+        self.attrname = name
+
+    def __model(self, obj):
+        # pylint: disable=protected-access
+        return getattr(obj._model, self.keys[0]) # pylint: disable=protected-access
+
+    def get(self, obj, wherefrom = "default"):
+        """
+        Gets the attribute in the task.
+
+        Use config = True to access the default value
+        """
+        mdl = self.__model(obj)
+        mdl = (getattr(mdl, 'task', mdl) if wherefrom == "model"  else
+               mdl.configtask            if wherefrom == "config" else
+               mdl.defaultconfigtask)
+
+        for key in self.keys[1:]:
+            mdl = getattr(mdl, key)
+        # pylint: disable=not-callable
+        return self.fget(mdl) if callable(self.fget) else mdl
+
+    getdefault = get
+
+    def __get__(self, obj, tpe):
+        return self if obj is None else self.get(obj, 'model')
+
+    def __set__(self, obj, val):
+        tsk  = self.__model(obj).task
+        outp = obj._get_output() # pylint: disable=protected-access
+        if len(self.keys) == 2:
+            # pylint: disable=not-callable
+            val = self.fset(tsk, val) if callable(self.fset) else val
+            outp.setdefault(self.keys[0], {})[self.keys[1]] = val
+        else:
+            mdl = outp.setdefault(self.keys[0], {}).get(self.keys[1], self.__NONE)
+            if mdl is self.__NONE:
+                mdl = deepcopy(getattr(tsk, self.keys[1]))
+                outp[self.keys[0]][self.keys[1]] = mdl
+
+            for key in self.keys[2:-1]:
+                mdl = getattr(mdl, key)
+
+            if callable(self.fset):
+                # pylint: disable=not-callable
+                setattr(mdl, self.keys[-1], self.fset(mdl, val))
+            else:
+                setattr(mdl, self.keys[-1], val)
+
+    def line(self) -> Tuple[str, str]:
+        "return the line for this descriptor"
+        return self.label, self._LABEL.format(self = self)
+
+    @classmethod
+    def attr(cls, akeys:str, fget = None, fset = None):
+        "sets a task's attribute"
+        return cls(akeys, "", [], fget, fset) # type: ignore
+
+    @classmethod
+    def none(cls, akeys:str):
+        "sets a task's attribute to None or the default value"
+        key = akeys.split('.')[-1]
+        def _fset(obj, val):
+            if val is False:
+                return None
+
+            attr = getattr(obj, key)
+            if attr is None:
+                attr = deepcopy(getattr(type(obj), key))
+            return attr
+
+        return cls(akeys, "", [], lambda i: i is not None, _fset) # type: ignore
+
+@dataclass
+class AdvancedDescriptor:
+    "class for facilitating the creation of descriptors"
+    _LABEL  = '%({self.attrname}){self.fmt}'
+    cnf:      str = ""
+    label:    str = ""
+    fmt:      str = ""
+    ctrlname: str = ""
+    attrname: str = ""
+    ctrlgroup:str = "theme"
+    def __post_init__(self):
+        if isinstance(self.cnf, type):
+            self.cnf = getattr(self.cnf, 'name')
+
+        if self.fmt == "" and "%(" in self.label:
+            ix1, ix2      = self.label.rfind("%("), self.label.rfind(")")
+            self.ctrlname = self.label[ix1+2:ix2].strip()
+            self.fmt      = self.label[ix2+1:].strip()
+            self.label    = self.label[:ix1].strip()
+        elif self.fmt == "" and "%" in self.label:
+            ix1        = self.label.rfind("%")
+            self.fmt   = self.label[ix1+1:].strip()
+            self.label = self.label[:ix1].strip()
+        assert self.cnf != ""
+        assert len(self.fmt)
+        assert len(self.label)
+        if ":" in self.ctrlname:
+            self.ctrlgroup, self.ctrlname = self.ctrlname.split(":")
+
+
+    def __set_name__(self, _, name):
+        assert name == self.attrname or not self.attrname
+        self.attrname = name
+        if not getattr(self, 'ctrlname'):
+            self.ctrlname = name[1 if name[0] == '_' else 0:]
+
+    def _controller(self, inst):
+        return getattr(getattr(inst, '_ctrl'), self.ctrlgroup)
+
+    def __get__(self, inst, _):
+        if inst is None:
+            return self
+        out = self._controller(inst).get(self.cnf, self.ctrlname)
+        return out
+
+    def __set__(self, inst, value):
+        return self._controller(inst).update(self.cnf, **{self.ctrlname: value})
+
+    def getdefault(self, inst):
+        "return the default value"
+        out = self._controller(inst).get(self.cnf, self.ctrlname, defaultmodel = True)
+        return out
+
+    def line(self) -> Tuple[str, str]:
+        "return the line for this descriptor"
+        return self.label, self._LABEL.format(self = self)
+
+@dataclass
+class FigureSizeDescriptor(AdvancedDescriptor):
+    "defines the figure height"
+    label:    str = 'Plot height'
+    fmt:      str = "d"
+    ctrlname: str = "figsize"
+    isheight      = cast(bool, property(lambda self: 'height' in self.attrname))
+    def __set_name__(self, _, name):
+        super().__set_name__(_, name)
+        self.label = 'Plot '+ ("height" if self.isheight else "width")
+
+    def __get__(self, inst, _):
+        return self if inst is None else super().__get__(inst, _)[self.isheight]
+
+    def __set__(self, inst, value):
+        vals = list(super().__get__(inst, None))
+        vals[self.isheight] = int(value)
+        return super().__set__(inst, tuple(vals))
+
+    def getdefault(self, inst):
+        "return the default value"
+        return super().getdefault(inst)[self.isheight]
+
+@dataclass
+class YAxisRangeDescriptor(AdvancedDescriptor):
+    "defines the figure height"
+    label:    str = 'Y-axis max'
+    fmt:      str = ".4of"
+    ctrlname: str = "ybounds"
+    ctrlgroup:str = "display"
+    isheight      = cast(bool, property(lambda self: 'max' in self.attrname))
+    def __set_name__(self, _, name):
+        super().__set_name__(_, name)
+        self.label = 'Y axis'+ ("max" if self.isheight else "min")
+
+    def __get__(self, inst, _):
+        if inst is None:
+            return self
+        out = super().__get__(inst, _)[self.isheight]
+        return out
+
+    def __set__(self, inst, value):
+        vals                = list(super().__get__(inst, None))
+        vals[self.isheight] = None if value is None else float(value)
+        return super().__set__(inst, tuple(vals))
+
+    def getdefault(self, inst):
+        "return the default value"
+        return super().getdefault(inst)[self.isheight]
+
+@dataclass
+class ThemeNameDescriptor(AdvancedDescriptor):
+    "defines the theme to use"
+    _LABEL  = ('%({self.attrname}'
+               +'|basic:basic'
+               +'|dark:dark'
+               +'|light_minimal:bokehlight'
+               +'|dark_minimal:bokehdark'
+               +'|caliber:caliber'
+               +'){self.fmt}')
+
+    fmt:      str = "c"
+    label:    str = "Plot color theme"
+    cnf:      str = "main"
+    ctrlname: str = "themename"
+
+class AdvancedWidget:
     "A button to access the modal dialog"
     __widget: Button
     __doc:    Document
     __action: type
-    def __init__(self, ctrl):
+    def __init__(self, ctrl, mdl = None):
         ctrl.theme.updatedefaults('keystroke', advanced = 'Alt-a')
         self._theme = ctrl.theme.add(AdvancedWidgetTheme(), False)
+        self._ctrl  = ctrl
+        self._model = mdl
 
-    @abstractmethod
-    def _body(self) -> AdvancedWidgetBody:
-        pass
+    def _body(self) -> AdvancedWidgetBody:  # pylint: disable=no-self-use
+        return ()
 
-    @abstractmethod
-    def _title(self) -> str:
-        pass
+    def _title(self) -> str:                # pylint: disable=no-self-use
+        return ""
 
     def _args(self, **kwa) -> Dict[str, Any]:
         model = kwa.get('model', self)
@@ -103,22 +322,22 @@ class AdvancedWidget(ABC):
 
         def _add(title, val):
             keys        = val[val.find('(')+1:val.rfind(')')].split('.')
-            dflt, found = _default(keys)
-            if not found or dflt == _value(keys):
+            dfval, found = _default(keys)
+            if not found or dfval == _value(keys):
                 return title, '', val
 
             if '|' in val:
                 opts = val[val.find('(')+1:val.find(')')]
-                disp = dict(i.split(':') for i in opts.split('|')[1:])[str(dflt)]
+                disp = dict(i.split(':') for i in opts.split('|')[1:])[str(dfval)]
             else:
                 try:
-                    disp = (' '  if dflt is None  else
-                            '✓'  if dflt is True  else
-                            '▢'  if dflt is False else
-                            dflt if isinstance(dflt, str) else
-                            ('%'+val[val.rfind(')')+1:]) % dflt)
+                    disp = (' '  if dfval is None  else
+                            '✓'  if dfval is True  else
+                            '▢'  if dfval is False else
+                            dfval if isinstance(dfval, str) else
+                            ('%'+val[val.rfind(')')+1:]) % dfval)
                 except TypeError:
-                    disp = str(dflt)
+                    disp = str(dfval)
 
             return title, f'({disp})', val
 
@@ -132,7 +351,8 @@ class AdvancedWidget(ABC):
 
         args = dict(title   = self._title(),
                     context = lambda title: self,
-                    body    = bdy)
+                    body    = bdy,
+                    model   = model)
         args.update(kwa)
         return args
 
@@ -171,73 +391,11 @@ class AdvancedWidget(ABC):
         "setup for when this is the main show"
         ctrl.display.updatedefaults('keystroke', advanced = self.on_click)
 
-class TaskDescriptor:
-    "Access to a task"
-    __slots__ = ('_keys', '_fget', '_fset')
-    __none    = type('_None', (), {})
-    def __init__(self, akeys:str, fget = None, fset = None) -> None:
-        self._keys = akeys.split('.')
-        self._fget = fget
-        self._fset = fset
-        assert len(self._keys) >= 2
-
-    def __model(self, obj):
-        return getattr(obj._model, self._keys[0]) # pylint: disable=protected-access
-
-    def get(self, obj, wherefrom = "default"):
-        """
-        Gets the attribute in the task.
-
-        Use config = True to access the default value
-        """
-        mdl = self.__model(obj)
-        mdl = (getattr(mdl, 'task', mdl) if wherefrom == "model"  else
-               mdl.configtask            if wherefrom == "config" else
-               mdl.defaultconfigtask)
-
-        for key in self._keys[1:]:
-            mdl = getattr(mdl, key)
-        return mdl if self._fget is None else self._fget(mdl)
-
-    getdefault = get
-
-    def __get__(self, obj, tpe):
-        return self if obj is None else self.get(obj, 'model')
-
-    def __set__(self, obj, val):
-        tsk  = self.__model(obj).task
-        outp = obj._get_output() # pylint: disable=protected-access
-        if len(self._keys) == 2:
-            val = val if self._fset is None else self._fset(tsk, val)
-            outp.setdefault(self._keys[0], {})[self._keys[1]] = val
-        else:
-            mdl = outp.setdefault(self._keys[0], {}).get(self._keys[1], self.__none)
-            if mdl is self.__none:
-                mdl = deepcopy(getattr(tsk, self._keys[1]))
-                outp[self._keys[0]][self._keys[1]] = mdl
-
-            for key in self._keys[2:-1]:
-                mdl = getattr(mdl, key)
-
-            if self._fset is None:
-                setattr(mdl, self._keys[-1], val)
-            else:
-                setattr(mdl, self._keys[-1], self._fset(mdl, val))
-
 class AdvancedTaskWidget(AdvancedWidget):
     "Means for configuring tasks with a modal dialog"
-    _model: Any
-    def __init__(self, ctrl):
-        super().__init__(ctrl)
+    def __init__(self, ctrl, mdl):
+        super().__init__(ctrl, mdl)
         self.__outp: Dict[str, Dict[str, Any]] = {}
-
-    @abstractmethod
-    def _body(self) -> AdvancedWidgetBody:
-        pass
-
-    @abstractmethod
-    def _title(self) -> str:
-        pass
 
     def __enter__(self):
         self.__outp.clear()
@@ -250,29 +408,75 @@ class AdvancedTaskWidget(AdvancedWidget):
 
         super().__exit__(tpe, val, bkt)
 
-    def _args(self, **kwa) -> Dict[str, Any]:
-        kwa.setdefault('model', self)
-        return super()._args(**kwa)
-
     def _get_output(self):
         return self.__outp
 
+class TabCreator:
+    "create tabs"
+    def __call__(self, title: str, *args, **kwa):
+        "adds descriptors to a class or returns an advanced tab"
+        first     = next((i for i in args if isinstance(i, bool)), True)
+        itms:list = []
+        for i, j in enumerate(args):
+            if isinstance(j, bool):
+                continue
+            label = f"{''.join(title.split()).lower()}{i}"
+            if isinstance(j, str) and "%(" in j and '.' in j[j.rfind("%("):j.rfind(")")]:
+                itms.append((label, self.taskattr(j)))
+            else:
+                itms.append((label, self.line(j))       if isinstance(j, str)   else
+                            (label, self.taskattr(**j)) if isinstance(j, dict)  else
+                            (label, self.line(*j))      if isinstance(j, tuple) else
+                            (label, j))
+
+        itms.extend(kwa.items())
+
+        def _wrapper(cls):
+            lst: list = deepcopy(itms)
+            for i, j in lst:
+                if hasattr(j, '__set_name__'):
+                    j.__set_name__(cls, i)
+
+            old = getattr(cls, '_body')
+            def _body(self) -> AdvancedWidgetBody:
+                cur  = old(self)
+                mine = AdvancedTab(title, *(i.line() for _, i in lst))
+                return (mine, *cur) if first else (*cur, mine)
+            setattr(cls, '_body', _body)
+
+            for i, j in lst:
+                setattr(cls, i, j)
+            return cls
+        return _wrapper
+
     @classmethod
-    def attr(cls, akeys:str, fget = None, fset = None):
+    def taskattr(cls, akeys:str, fget = None, fset = None):
         "sets a task's attribute"
-        return TaskDescriptor(akeys, fget, fset)
+        return TaskDescriptor.attr(akeys, fget, fset)
 
     @classmethod
-    def none(cls, akeys:str):
+    def tasknoneattr(cls, akeys:str):
         "sets a task's attribute to None or the default value"
-        key = akeys.split('.')[-1]
-        def _fset(obj, val):
-            if val is False:
-                return None
+        return TaskDescriptor.none(akeys)
 
-            attr = getattr(obj, key)
-            if attr is None:
-                attr = deepcopy(getattr(type(obj), key))
-            return attr
+    def figure(self, cnf, disp = None):
+        "adds descriptors to a class or returns an advanced tab"
+        return self("Theme",
+                    _themename = ThemeNameDescriptor(),
+                    _figwidth  = FigureSizeDescriptor(cnf),
+                    _figheight = FigureSizeDescriptor(cnf),
+                    _ymin      = YAxisRangeDescriptor(cnf if disp is None else disp),
+                    _ymax      = YAxisRangeDescriptor(cnf if disp is None else disp))
 
-        return TaskDescriptor(akeys, lambda i: i is not None, _fset)
+    line      : type = AdvancedDescriptor
+    widget    : type = AdvancedWidget
+    taskwidget: type = AdvancedTaskWidget
+    @staticmethod
+    def title(title):
+        "add a title"
+        def _wrapper(cls):
+            setattr(cls, '_title', lambda *_: title)
+            return cls
+        return _wrapper
+
+tab = TabCreator() # pylint: disable=invalid-name
