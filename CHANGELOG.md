@@ -2,13 +2,23 @@
 
 ## cycles_v6.0
 
+* 2018-11-07 14:35:56 +0100  (tag: cycles_v6.0.2)
 * 2018-11-08 15:51:56 +0100  (tag: cycles_v6.0.1)
 * 2018-11-08 15:11:56 +0100  (tag: ramp_v2.0, tag: cycles_v6.0)
 
+### General
+
+The gui has been updated, in particular the *FoV* and *QC* tabs as well as the
+*advanced* menus. In the latter, it's now possible to select a number of styles
+for plots. It's also possible to define the y-axis ranges of plots.
+
+Another change is when multiple files are loaded, the names used to differenciate
+them are automatically simplified, removing elements common to all files (elements
+are separated by underscores).
+
 ### QC
 
-The gui has been revamped, in particular in tabs *FoV* and *QC*. The later now
-contains better summaries, also available in *RampApp*:
+This tab now contains better summaries, also available in *RampApp*:
 
 1. Status of beads: beads can be either *ok*, *fixed*, *bad*, or *missing*.
 2. Sizes of beads: beads are clustered by bins of a given size. The bin size is
@@ -21,6 +31,10 @@ toolbar text entry for discarding / selecting beads. Other categories are `ok`,
 `missing` and `fixed`. The latter 2 categories are included into the `bad`category.
 
 ### Peaks
+
+It's now possible to manually select the sequence, a stretch and a bias for each
+bead individually. When a sequence is manually locked-in in the reference track,
+that sequence is marked as such when looking at other tracks.
 
 When multiple hairpin sequences are provided in a fasta file, we now use a
 median bead extension to select only meaningful sequences. Thus a 5kb bead will
@@ -694,7 +708,7 @@ Refactored completely the gui. The latter is architectured as follows:
 <tr><td>
 <table>
   <tr><td style="border-bottom: 1px solid black"><b>Filters</b>: bead quality</td> </tr>
-  <tr><td style="border-bottom: 1px solid black"><b>Choice</b>: the type of graphics </td></tr>
+  <tr><td style="border-bottom: 1px solid black"><b>Choice</b>: the type of plots </td></tr>
   <tr><td style="border-bottom: 1px solid black"><b>Table</b>: status summary </td></tr>
   <tr><td style="border-bottom: 1px solid black"><b>Slider & Table</b>: beads clustered by size </td></tr>
   <tr><td style="border-bottom: 1px solid black"><b>Slider</b>: providing the average amount of opened hairpins
