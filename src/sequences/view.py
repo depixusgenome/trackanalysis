@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Create a grid displaying a sequence"
-from    typing              import List, Optional, Tuple, Any
+from    typing              import List, Optional, Tuple, Any, cast
 import  numpy               as np
 import  bokeh.core.properties as props
 from    bokeh.plotting      import Figure
@@ -219,11 +219,12 @@ class SequenceHoverMixin:
 @dataclass
 class SequencePathTheme:
     "SequencePathWidgetTheme"
-    name       : str           = "sequence.path"
-    dlgtitle   : str           = 'Open a fasta file'
-    missingkey : str           = 'Select a hairpin sequence'
-    missingpath: str           = 'Select a hairpin path'
-    width      : int           = 280
+    name       : str = "sequence.path"
+    dlgtitle   : str = 'Open a fasta file'
+    missingkey : str = 'Select a hairpin sequence'
+    missingpath: str = 'Select a hairpin path'
+    refcheck   : str = '(ref) '
+    width      : int = 280
 
 class SequencePathWidget:
     "Dropdown for choosing a fasta file"
@@ -286,6 +287,9 @@ class SequencePathWidget:
     def _sort(lst) -> List[str]:
         return sorted(lst)
 
+    def _reference(self) -> Optional[str]: # pylint: disable=no-self-use
+        return None
+
     def __data(self) -> dict:
         lst = self.__list
         lst.clear()
@@ -293,11 +297,20 @@ class SequencePathWidget:
 
         key   = self.__model.currentkey
         val   = key if key in lst else None
+        label = self.__theme.missingkey if val is None else key
+
         menu: List[Optional[Tuple[str,str]]] = [(i, i) for i in lst]
         menu += [None if len(menu) else ('', '→'), (self.__theme.missingpath, '←')]
-        return dict(menu  = menu,
-                    label = self.__theme.missingkey if val is None else key,
-                    value = '→'                     if val is None else val)
+
+        ref   = self._reference() # pylint: disable=assignment-from-none
+        ind   = next((i for i, j in enumerate(menu)
+                      if j is not None and j[0] == ref),
+                     None)
+        if ind is not None:
+            vals      = cast(tuple, menu[ind])
+            menu[ind] = vals = (self.__theme.refcheck + vals[0], vals[1])
+            label     = vals[0] if label == vals[1] else label
+        return dict(menu  = menu, label = label, value = '→' if val is None else val)
 
     def __onclick(self, ctrl, new):
         if new in self.__list:
@@ -308,7 +321,6 @@ class SequencePathWidget:
             if self.__model.setnewsequencepath(ctrl, path):
                 if path is not None:
                     raise IOError("Could not find any sequence in the file")
-
 
 @dataclass
 class OligoListTheme:

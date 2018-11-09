@@ -329,13 +329,18 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
 
             cstrs[root][bead] = DistanceConstraint(hairpin, params)
 
-        self._ctrl.display.update(self.__defaults, constraints = cstrs)
+        self._ctrl.display.update(self.__display, constraints = cstrs)
         if  self.task is not None:
             self.update(constraints = {i: dict(j) for i, j in cstrs.items()})
 
-    def constraints(self) -> Tuple[Optional[str], Optional[float], Optional[float]]:
+    def constraints(self,
+                    root: Optional[RootTask] = None,
+                    bead: Optional[int]      = None
+                   ) -> Tuple[Optional[str], Optional[float], Optional[float]]:
         "returns the constraints"
-        root, bead = self.roottask, self.bead
+        root = self.roottask if root is None else root
+        bead = self.bead     if bead is None else bead
+        print("get", root, bead)
         if root is None or bead is None:
             return None, None, None
 

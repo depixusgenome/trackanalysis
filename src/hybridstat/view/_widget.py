@@ -101,6 +101,12 @@ class PeaksSequencePathWidget(SequencePathWidget):
             return sorted(lst, key = lambda i: dist[i].value)
         return super()._sort(lst)
 
+    def _reference(self) -> Optional[str]:
+        ref = self.__peaks.fittoreference.reference
+        if ref is not None and ref != self.__peaks.roottask:
+            return self.__peaks.identification.constraints(ref)[0]
+        return None
+
     # pylint: disable=arguments-differ
     def callbacks(self,  # type: ignore
                   hover: SequenceHoverMixin,
