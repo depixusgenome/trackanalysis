@@ -1,17 +1,5 @@
-require(python = dict(nodejs         = '6.10.0',
-                      bokeh          = '1.0',
-                      holoviews      = '1.10.9',
+require(python = dict(holoviews      = '1.10.9',
                       jupyter        = '1.0',
                       jupyter_client = '5.2.3'),
-        rtime = True)
-def startscripts(bld):
-    "creates start scripts"
-    import sys
-    iswin = sys.platform.startswith("win")
-    ext   = ".bat" if iswin else ".sh"
-    cmd   = r"jupyter notebook"
-    fname = str(bld.options.STARTSCRIPT_PATH.make_node("expertscripting"+ext))
-    with open(fname, 'w', encoding = 'utf-8') as stream:
-        print(cmd, file = stream)
-
+        rtime = False)
 make(locals())

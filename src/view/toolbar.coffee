@@ -133,7 +133,7 @@ export class DpxToolbarView extends WidgetView
                @make_btn('selection', '=', ttips[3])+
                "<input id='dpx-tb-discard'"+
                    " class='dpx-freeze bk-widget-form-input'"+
-                   " type='text' value='#{mdl.discarded}' placeholder='#{mdl.placeholder}'>"+
+                   " type='text' value='#{mdl.discarded}' placeholder='#{mdl.helpmessage}'>"+
                @make_btn('del', @_icon('bin'), ttips[4])+
                "<div id='dpx-tb-message' class='bk-markup'>"+
                    "#{mdl.message}</div>"+
@@ -171,19 +171,19 @@ export class DpxToolbar extends Widget
         @css_classes = ["dpx-row", "dpx-widget", "dpx-tb", "dpx-span"]
 
     @define {
-        frozen:     [p.Bool,    true]
-        open:       [p.Number,  0]
-        currentfile:[p.Number,  -1]
-        delfile:    [p.Number,  -1]
-        filelist:   [p.Array,   []]
-        save:       [p.Number,  0]
-        quit:       [p.Number,  0]
-        bead:       [p.Number,  -1]
-        discarded:  [p.String,  '']
-        accepted:   [p.String,  '']
-        currentbead:[p.Bool,    true]
-        seltype:    [p.Bool,    true]
-        message:    [p.String,  '']
-        hasquit:    [p.Bool,    false]
-        placeholder:[p.String, '']
+        frozen:      [p.Bool,    true],
+        open:        [p.Number,  0],
+        currentfile: [p.Number,  -1],
+        delfile:     [p.Number,  -1],
+        filelist:    [p.Array,   []],
+        save:        [p.Number,  0],
+        quit:        [p.Number,  0],
+        bead:        [p.Number,  -1],
+        discarded:   [p.String,  ''],
+        accepted:    [p.String,  ''],
+        currentbead: [p.Bool,    true],
+        seltype:     [p.Bool,    true],
+        message:     [p.String,  ''],
+        helpmessage: [p.String, ''],
+        hasquit:     [p.Bool,    false]
     }

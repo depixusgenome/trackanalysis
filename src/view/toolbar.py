@@ -126,11 +126,11 @@ class DpxToolbar(Widget):
     __css__            = route("view.css", "icons.css")
     __implementation__ = 'toolbar.coffee'
     __javascript__     = route()
+    frozen      = props.Bool(True)
     open        = props.Int(0)
     save        = props.Int(0)
     quit        = props.Int(0)
     bead        = props.Int(-1)
-    placeholder = props.String('')
     discarded   = props.String('')
     accepted    = props.String('')
     currentbead = props.Bool(True)
@@ -139,7 +139,7 @@ class DpxToolbar(Widget):
     filelist    = props.List(props.String)
     seltype     = props.Bool(True)
     message     = props.String('')
-    frozen      = props.Bool(True)
+    helpmessage = props.String('')
     hasquit     = props.Bool(False)
     def __init__(self, **kwa):
         super().__init__(name = 'Main:toolbar', **kwa)
@@ -486,7 +486,7 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         super().addtodoc(ctrl, doc)
         assert doc is not None
         tbar   = DpxToolbar(hasquit = getattr(self._ctrl, 'FLEXXAPP', None) is not None,
-                            placeholder = self.__theme.placeholder)
+                            helpmessage = self.__theme.placeholder)
 
         def _ontasks(old = None, **_):
             if 'roottask' not in old:
