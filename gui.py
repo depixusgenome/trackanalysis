@@ -10,7 +10,7 @@ from   pathlib     import Path
 from   functools   import wraps
 from   inspect     import ismethod as _ismeth, isfunction as _isfunc, getmembers
 from   enum        import Enum
-from   typing      import Set, Union, Optional, Sequence
+from   typing      import Set, Union, Optional, Sequence, Dict, cast
 
 import numpy       as     np
 from   .inspection import ismethod
@@ -219,3 +219,25 @@ def intlistsummary(beads: Sequence[int], ordered = True) -> str:
             txt += f", {beads[last]}{', ' if last == len(beads)-2 else ' → '}{beads[-1]}"
         return txt[2:]
     return ', '.join(str(i) for i in beads)
+
+def leastcommonkeys(info, tail = ', ...') -> Dict[str, str]:
+    "return simpler names for a list of track files"
+    if not isinstance(info, dict):
+        info = {i: i for i in info}
+    if len(info) == 1:
+        return info
+
+    keys   = {i: (j[:-len(tail)] if j.endswith(tail) else j).split('_')
+              for i, j  in info.items()}
+    common = None
+    for i in keys.values():
+        common = set(i) if common is None else set(i) & cast(set, common)
+
+    if common:
+        keys = {i:'_'.join(k for k in j if k not in common) for i, j in keys.items()}
+    else:
+        keys = {i:'_'.join(k for k in j) for i, j in keys.items()}
+
+    if '' in keys.values():
+        keys[next(i for i, j in keys.items() if j == '')] = 'ref'
+    return {i: j+tail if j.endswith(tail) else j for i, j in keys.items()}
