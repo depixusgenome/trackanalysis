@@ -340,7 +340,6 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         "returns the constraints"
         root = self.roottask if root is None else root
         bead = self.bead     if bead is None else bead
-        print("get", root, bead)
         if root is None or bead is None:
             return None, None, None
 

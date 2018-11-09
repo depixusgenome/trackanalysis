@@ -15,7 +15,7 @@ from bokeh.models         import Widget
 from bokeh.io             import curdoc
 
 from utils                import initdefaults
-from utils.gui            import parseints
+from utils.gui            import parseints, leastcommonkeys
 from utils.logconfig      import getLogger
 from control.taskio       import TaskIO
 from control.beadscontrol import DataSelectionBeadController
@@ -36,8 +36,7 @@ class BeadToolbarTheme:
     opentitle    = 'Open a track or analysis file'
     savetitle    = 'Save an analysis file'
     placeholder  = '1, 2, ..., bad, ... ?'
-    fnamesmany   = '{Path(files[0]).stem} + ...'
-    fnamessingle = '{Path(path).stem}'
+    tail         = ', ...'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -387,17 +386,17 @@ class FileList:
         cnf = ctrl.theme.model("toolbar")
         if isinstance(lst, (tuple, list)):
             if len(lst) > 1:
-                # pylint: disable=eval-used
-                return eval(f'f"{cnf.fnamesmany}"', dict(files = lst, Path = Path))
+                return Path(lst[0]).stem + cnf.tail
             lst = lst[0]
-        # pylint: disable=eval-used
-        return eval(f'f"{cnf.fnamessingle}"', dict(path = lst, Path = Path))
+        return Path(lst).stem
 
     @classmethod
     def get(cls, ctrl) -> Iterator[Tuple[str, 'RootTask']]:
         "returns current roots"
-        lst  = [next(i) for i in getattr(ctrl, 'tasks', ctrl).tasklist(...)]
-        return ((cls.__pathname(ctrl, i), i) for i in lst)
+        cnf   = ctrl.theme.model("toolbar")
+        lst   = [next(i) for i in getattr(ctrl, 'tasks', ctrl).tasklist(...)]
+        names = leastcommonkeys({i: cls.__pathname(ctrl, i) for i in lst}, cnf.tail)
+        return ((names[i], i) for i in lst)
 
     def __call__(self) -> Iterator[Tuple[str, 'RootTask']]:
         "returns current roots"
