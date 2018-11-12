@@ -487,7 +487,7 @@ class TabCreator:
         "sets a task's attribute to None or the default value"
         return TaskDescriptor.none(akeys)
 
-    def figure(self, cnf, disp = None, yaxis = True, xaxis = False):
+    def figure(self, cnf, disp = None, yaxis = True, xaxis = False, **kwa):
         "adds descriptors to a class or returns an advanced tab"
         if disp is None:
             if hasattr(cnf, 'display') and hasattr(cnf, 'theme'):
@@ -503,6 +503,7 @@ class TabCreator:
         if yaxis:
             args += [('_ymin',  YAxisRangeDescriptor(disp)),
                      ('_ymax',  YAxisRangeDescriptor(disp))]
+        args += list(kwa.items())
         return self("Theme", **dict(args))
 
     line      : type = AdvancedDescriptor

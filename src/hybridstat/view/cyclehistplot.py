@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View for cleaning data"
-from typing                 import Dict, cast
+from typing                 import Dict, List, cast
 
 import numpy as np
 
@@ -14,7 +14,7 @@ from model.plots            import (PlotTheme, PlotDisplay, PlotModel, PlotAttrs
 from peakfinding.histogram  import interpolator
 from sequences.modelaccess  import SequenceAnaIO
 from utils                  import initdefaults
-from view.plots             import PlotView, DpxNumberFormatter
+from view.plots             import PlotView
 from view.plots.tasks       import TaskPlotCreator, CACHE_TYPE
 from ._model                import PeaksPlotModelAccess, createpeaks
 from ._widget               import PeaksPlotWidgets, PeakListTheme
@@ -174,7 +174,6 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
         self._display.addcallbacks(ctrl, self._fig)
 
         hover = self._fig.select(HoverTool)
-        print(hover)
         if len(hover) > 0:
             hover = hover[0]
             hover.update(point_policy = self._theme.tooltippolicy,
@@ -239,12 +238,56 @@ class _StateDescriptor:
     def __set__(self, inst, value):
         getattr(inst, '_ctrl').display.update("cyclehist.state", state = PlotState(value))
 
+class _AxisDescriptor:
+    name: str
+    def __init__(self):
+        self.views: List[Figure] = []
+
+    def __set_name__(self, _, name):
+        self.name = name
+
+    @property
+    def _attr(self):
+        return ('major_label_text_font_size' if 'tick' in self.name else
+                'grid_line_alpha'            if 'grid' in self.name else
+                'axis_label_text_font_size')
+
+    @property
+    def _itms(self):
+        if 'grid' in self._attr:
+            return sum((i.grid for i in self.views), [])
+        out  = sum((i.xaxis+i.yaxis for i in self.views), [])
+        excl = self.views[0].yaxis[1], self.views[1].yaxis[0]
+        return [i for i in out if i not in excl]
+
+    def __get__(self, inst, owner):
+        if inst is None:
+            return self
+        out = getattr(self._itms[0], self._attr)
+        return out['value'] if isinstance(out, dict) else out
+
+    def __set__(self, inst, val):
+        attr = self._attr
+        for i in self._itms:
+            if isinstance(getattr(i, attr), dict):
+                setattr(i, attr, {"value": val})
+            else:
+                setattr(i, attr, val)
+
+    def line(self):
+        "return the line to display"
+        if 'grid' in self.name:
+            return "Grid line alpha", f"%({self.name}).2f"
+        if 'tick' in self.name:
+            return "Tick font size", f"%({self.name})s"
+        return "Axis label font size", f"%({self.name})s"
+
 class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
     "Creates plots for peaks & cycles"
     state = cast(PlotState, _StateDescriptor())
     def __init__(self, ctrl):
         super().__init__(ctrl, addto = False)
-        self._cycle     = CyclePlotCreator(ctrl,  noerase = False, model = self._model)
+        self._cycle   = CyclePlotCreator(ctrl,  noerase = False, model = self._model)
         self._hist    = HistPlotCreator(ctrl, noerase = False, model = self._model)
         self._state   = CycleHistPlotState()
         theme         = PeakListTheme(name = "cyclehist.peak.list", height = 200)
@@ -254,7 +297,11 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
                                          peaks = theme,
                                          title = CycleHistPlotView.PANEL_NAME,
                                          cnf   = getattr(self._cycle, '_plotmodel'),
-                                         xaxis = True)
+                                         xaxis = True,
+                                         ticksize  = _AxisDescriptor(),
+                                         labelsize = _AxisDescriptor(),
+                                         gridalpha = _AxisDescriptor()
+                                        )
         ctrl.display.add(self._state)
         self.addto(ctrl)
 
@@ -269,8 +316,6 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
         assert self._model.sequencemodel.config in ctrl.theme
         self._model.setobservers(ctrl)
         self._widgets.observe(ctrl)
-
-
         SequenceAnaIO.observe(ctrl)
 
         @ctrl.display.observe(self._model.sequencemodel.display)
@@ -309,6 +354,9 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
     def _addtodoc(self, ctrl, doc):
         "returns the figure"
         plots = [getattr(i, '_addtodoc')(ctrl, doc) for i in self._plots]
+        for _ in ('ticksize', 'labelsize', 'gridalpha'):
+            getattr(self._widgets.advanced.__class__, _).views.extend(plots)
+
         for i in plots[1:]:
             i.y_range = plots[0].y_range
             i.yaxis[0].update(axis_label = "", major_label_text_font_size = '0pt')

@@ -4,7 +4,9 @@
 
 ### Peaks & Cycles
 
-This new tab is similar to the *Peaks* tab, only offering slightly different plots.
+This new tab is similar to the *Peaks* tab, offering slightly different plots.
+It also allows a few more options on the output: font size and grids can be set
+from the *advanced* menu. 
 
 ## cycles_v6.0
 
