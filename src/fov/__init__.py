@@ -38,8 +38,8 @@ class FoVPlotTheme(PlotTheme):
                             selection_text_color    = 'blue')
     image       = PlotAttrs('Greys256', 'image', x = 0, y = 0)
     radius      = 1.
-    figsize     = 160*5, 100*5, 'fixed'
-    calibfigsize= 256, 192, 'fixed'
+    figsize     = PlotTheme.defaultfigsize(160*5, 100*5)
+    calibfigsize= PlotTheme.defaultfigsize(256, 192)
     ylabel      = 'Y (μm)'
     xlabel      = 'X (μm)'
     colors      = dict(ok      = 'palegreen', fixed     = 'chocolate',
@@ -254,7 +254,8 @@ class FoVPlotCreator(BaseFoVPlotCreator[QualityControlModelAccess, # type: ignor
 
 class FoVPlotView(PlotView[FoVPlotCreator]):
     "FoV plot view"
-    TASKS = ('datacleaning',)
+    PANEL_NAME = 'FoV'
+    TASKS      = ('datacleaning',)
     def ismain(self, ctrl):
         "Cleaning is set up by default"
         self._ismain(ctrl, tasks = self.TASKS)

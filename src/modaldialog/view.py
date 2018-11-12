@@ -3,8 +3,9 @@
 """
 Allows creating modals from anywhere
 """
-from typing             import Dict, List, Tuple, Any, Union, Optional, Callable, cast
 from copy               import deepcopy
+from functools          import partial
+from typing             import Dict, List, Tuple, Any, Union, Optional, Callable, cast
 from bokeh.document     import Document
 from bokeh.models       import Widget, Button
 from view.fonticon      import FontIcon
@@ -243,6 +244,21 @@ class FigureSizeDescriptor(AdvancedDescriptor):
         "return the default value"
         return super().getdefault(inst)[self.isheight]
 
+    @staticmethod
+    def onchangefiguresize(theme, doc, fig, old = None, **_):
+        "on change figure size"
+        if 'figsize' in old:
+            @doc.add_next_tick_callback
+            def _cb():
+                fig.plot_width  = theme.figsize[0]
+                fig.plot_height = theme.figsize[1]
+                fig.trigger("sizing_mode", theme.figsize[-1], theme.figsize[-1])
+
+    @classmethod
+    def observe(cls, ctrl, theme, doc, fig):
+        "applies the figure size changes"
+        ctrl.theme.observe(theme, partial(cls.onchangefiguresize, theme, doc, fig))
+
 @dataclass
 class YAxisRangeDescriptor(AdvancedDescriptor):
     "defines the figure height"
@@ -253,7 +269,7 @@ class YAxisRangeDescriptor(AdvancedDescriptor):
     isheight      = cast(bool, property(lambda self: 'max' in self.attrname))
     def __set_name__(self, _, name):
         super().__set_name__(_, name)
-        self.label = 'Y axis'+ ("max" if self.isheight else "min")
+        self.label = self.label.replace('max', "max" if self.isheight else "min")
 
     def __get__(self, inst, _):
         if inst is None:
@@ -269,6 +285,12 @@ class YAxisRangeDescriptor(AdvancedDescriptor):
     def getdefault(self, inst):
         "return the default value"
         return super().getdefault(inst)[self.isheight]
+
+@dataclass
+class XAxisRangeDescriptor(YAxisRangeDescriptor):
+    "defines the figure height"
+    label:    str = 'X-axis max'
+    ctrlname: str = "xbounds"
 
 @dataclass
 class ThemeNameDescriptor(AdvancedDescriptor):
@@ -296,6 +318,12 @@ class AdvancedWidget:
         self._theme = ctrl.theme.add(AdvancedWidgetTheme(), False)
         self._ctrl  = ctrl
         self._model = mdl
+
+    @classmethod
+    def observefigsize(cls, ctrl, theme, doc, fig):
+        "applies the figure size changes"
+        if any(isinstance(i, FigureSizeDescriptor) for i in cls.__dict__.values()):
+            FigureSizeDescriptor.observe(ctrl, theme, doc, fig)
 
     def _body(self) -> AdvancedWidgetBody:  # pylint: disable=no-self-use
         return ()
@@ -459,14 +487,23 @@ class TabCreator:
         "sets a task's attribute to None or the default value"
         return TaskDescriptor.none(akeys)
 
-    def figure(self, cnf, disp = None):
+    def figure(self, cnf, disp = None, yaxis = True, xaxis = False):
         "adds descriptors to a class or returns an advanced tab"
-        return self("Theme",
-                    _themename = ThemeNameDescriptor(),
-                    _figwidth  = FigureSizeDescriptor(cnf),
-                    _figheight = FigureSizeDescriptor(cnf),
-                    _ymin      = YAxisRangeDescriptor(cnf if disp is None else disp),
-                    _ymax      = YAxisRangeDescriptor(cnf if disp is None else disp))
+        if disp is None:
+            if hasattr(cnf, 'display') and hasattr(cnf, 'theme'):
+                cnf, disp = getattr(cnf, 'theme'), getattr(cnf, 'display')
+            else:
+                disp      = cnf
+        args = [('_themename', ThemeNameDescriptor()),
+                ('_figwidth',  FigureSizeDescriptor(cnf)),
+                ('_figheight', FigureSizeDescriptor(cnf))]
+        if xaxis:
+            args += [('_xmin',  XAxisRangeDescriptor(disp)),
+                     ('_xmax',  XAxisRangeDescriptor(disp))]
+        if yaxis:
+            args += [('_ymin',  YAxisRangeDescriptor(disp)),
+                     ('_ymax',  YAxisRangeDescriptor(disp))]
+        return self("Theme", **dict(args))
 
     line      : type = AdvancedDescriptor
     widget    : type = AdvancedWidget

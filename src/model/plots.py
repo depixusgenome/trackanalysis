@@ -31,6 +31,10 @@ class PlotAttrs:
         self.palette = palette
         self.__dict__.update(kwa)
 
+def defaultfigsize(*args) -> Tuple[int, int, str]:
+    "return the default fig size"
+    return args+(700, 600, 'fixed')[len(args):] # type: ignore
+
 class PlotTheme:
     """
     Default plot theme
@@ -40,7 +44,7 @@ class PlotTheme:
     yrightlabel   = 'Base number'
     xtoplabel     = 'Time (s)'
     xlabel        = 'Frames'
-    figsize       = 700, 600, 'fixed'
+    figsize       = defaultfigsize()
     overshoot     =.001
     toolbar       = dict(sticky   = False,
                          location = 'above',
@@ -50,6 +54,8 @@ class PlotTheme:
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
+
+    defaultfigsize = staticmethod(defaultfigsize)
 
 class PlotDisplay:
     """

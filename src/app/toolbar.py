@@ -45,7 +45,7 @@ class ViewWithToolbar(Generic[TOOLBAR, VIEW]):
         "adds items to doc"
         tbar   = self._bar.addtodoc(ctrl, doc)
         others = self._mainview.addtodoc(ctrl, doc)
-        mode   = ctrl.theme.get('main', 'sizingmode', 'fixed')
+        mode   = ctrl.theme.get('main', 'sizingmode')
         while isinstance(others, (tuple, list)) and len(others) == 1:
             others = others[0]
 

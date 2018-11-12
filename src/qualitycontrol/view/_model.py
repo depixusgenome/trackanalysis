@@ -146,7 +146,7 @@ class DriftControlPlotTheme(PlotTheme):
                                          median   = 'darkgreen',
                                          pop10    = 'darkgreen',
                                          pop90    = 'darkgreen'))
-    figsize          = 700, 150, 'fixed'
+    figsize          = PlotTheme.defaultfigsize(700, 150)
     outlinewidth     = 7
     outlinecolor     = 'red'
     outlinealpha     = .5

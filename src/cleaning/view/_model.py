@@ -179,7 +179,7 @@ class CleaningPlotTheme(PlotTheme):
     """
     name             = "cleaning.theme"
     points           = PlotAttrs('color',  'circle', 1, alpha   = .5)
-    figsize          = 500, 700, 'fixed'
+    figsize          = PlotTheme.defaultfigsize(500, 700)
     widgetwidth      = 470
     order            = ('aberrant', 'hfsigma', 'extent', 'population',
                         'pingpong', 'saturation', 'good')

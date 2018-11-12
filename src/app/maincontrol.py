@@ -158,7 +158,7 @@ class BaseSuperController:
         if isinstance(roots, (tuple, list)) and len(roots) == 1:
             doc.add_root(roots[0])
         else:
-            mode = self.theme.get('main', 'sizingmode', 'fixed')
+            mode = self.theme.get('main', 'sizingmode')
             doc.add_root(layout(roots, sizing_mode = mode))
 
     def _configio(self):

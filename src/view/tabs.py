@@ -41,8 +41,6 @@ class TabsView(BokehView, Generic[TThemeType]):
         for panel in self._panels:
             key                      = self.__key(panel)
             self.__theme.titles[key] = getattr(panel, 'PANEL_NAME', key.capitalize())
-        if 'fov' in self.KEYS:
-            self.__theme.titles['fov']   = 'FoV'
 
         cur = self.__select(self.__initial())
         for panel in self._panels:

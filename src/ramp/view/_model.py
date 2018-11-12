@@ -75,7 +75,7 @@ class RampPlotTheme(PlotTheme):
     beadcycles       = PlotAttrs(beadarea.color, 'line',  1, alpha = .2)
     ylabelnormalized = "Z (% strand size)"
     xlabel           = 'Z magnet (mm)'
-    figsize          = 500, 700, 'fixed'
+    figsize          = PlotTheme.defaultfigsize(500, 700)
     widgetwidth      = 500
     dataformat       = "raw"
     toolbar          = dict(PlotTheme.toolbar)

@@ -68,14 +68,13 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # t
             if 'figsize' in old:
                 @self.calllater
                 def _cb():
-                    root = next(i for i in self._doc.roots if hasattr(i, 'resizedfig'))
-                    self._raw .plot_width  = self._theme.figsize[0]
-                    self._raw .plot_height = self._theme.figsize[1]
-                    root.resizedfig = self._raw
-                    self._hist.plot_width  = self._theme.figsize[0]
-                    self._hist.plot_height = self._theme.figsize[1]
-                    root.resizedfig = self._hist
-                    self.calllater(lambda: setattr(root, 'resizedfig', None))
+                    theme = self._theme.figsize
+                    self._raw .plot_width  = theme[0]
+                    self._raw .plot_height = theme[1]
+                    self._hist.plot_width  = theme[0]
+                    self._hist.plot_height = theme[1]
+                    self._raw.trigger("sizing_mode", theme[-1], theme[-1])
+                    self._hist.trigger("sizing_mode", theme[-1], theme[-1])
 
         ctrl.theme.observe(self._theme, _onchangefig)
 

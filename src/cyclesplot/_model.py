@@ -44,7 +44,7 @@ class CyclesPlotTheme(PlotTheme):
                                'quad', 1, fill_color = None, line_alpha = .5)
     histxtoplabel  = 'Cycles'
     histxlabel     = 'Frames'
-    figsize        = 450, 450, 'fixed'
+    figsize        = PlotTheme.defaultfigsize(450, 450)
     toolbar        = dict(PlotTheme.toolbar)
     toolbar.update(raw   = 'tap,ypan,ybox_zoom,reset,save,dpxhover',
                    items = 'ypan,ybox_zoom,reset,save,dpxhover')
