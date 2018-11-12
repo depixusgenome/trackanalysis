@@ -143,9 +143,6 @@ def runbead(ctrl, bead, refcache):
                     out = (tmp      if ident                         else None,
                            store[0] if store and len(store[0].peaks) else None)
                     cache[bead] = out
-    else:
-        import utils.logconfig as L
-        L.getLogger().warning("extracting %d", bead)
     return out
 
 def runrefbead(self, ref: RootTask, bead: BEADKEY

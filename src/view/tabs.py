@@ -16,7 +16,7 @@ class TabsTheme:
     "Tabs Theme"
     name:    str            = "Tabs"
     initial: str            = ""
-    width:   int            = 500
+    width:   int            = 600
     height:  int            = 30
     titles:  Dict[str, str] = {}
 

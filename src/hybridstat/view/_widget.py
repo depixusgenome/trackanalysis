@@ -12,6 +12,7 @@ from bokeh.models               import (DataTable, TableColumn, CustomJS,
 
 
 from cleaning.view              import BeadSubtractionModalDescriptor
+from control.beadscontrol       import TaskWidgetEnabler
 from eventdetection.view        import AlignmentModalDescriptor
 from excelreports.creation      import writecolumns
 from modaldialog.view           import tab
@@ -43,7 +44,7 @@ class ReferenceWidget:
     __theme : ReferenceWidgetTheme
     __widget: Dropdown
     def __init__(self, ctrl, model) -> None:
-        self.__theme = ctrl.theme.add(ReferenceWidgetTheme())
+        self.__theme = ctrl.theme.add(ReferenceWidgetTheme(), noerase = False)
         self.__model = model
         self.__files = FileList(ctrl)
 
@@ -160,7 +161,7 @@ class PeaksStatsWidget:
     __theme : PeaksStatsWidgetTheme
     def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
         self.__model = model
-        self.__theme = ctrl.theme.add(PeaksStatsWidgetTheme())
+        self.__theme = ctrl.theme.add(PeaksStatsWidgetTheme(), noerase = False)
 
     def addtodoc(self, *_) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
@@ -236,6 +237,10 @@ class PeaksStatsWidget:
                 self.values[10] = (np.nansum((mdl.peaks['distance'])**2)
                                    / ((np.mean(self.values[3]))**2
                                       * (nfound - 2)))
+        def default(self, mdl):
+            "default values"
+            self.values[1] = mdl.stretch
+            self.values[2] = mdl.bias
 
         def __call__(self) -> str:
             return ''.join(self.line.format(i[0], self.__fmt(i[1], j))
@@ -269,6 +274,9 @@ class PeaksStatsWidget:
         elif self.__model.fittoreference.task is not None:
             tbl.referencedependant(self.__model)
             ret[''] = tbl()
+        else:
+            tbl.default(self.__model)
+            ret = {'': tbl()}
         return ret
 
 @dataclass
@@ -291,10 +299,11 @@ class PeakListTheme:
 class PeakListWidget:
     "Table containing stats per peaks"
     __widget: DataTable
-    __theme:  PeakListTheme
-    def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
+    theme:  PeakListTheme
+    def __init__(self, ctrl, model:PeaksPlotModelAccess, theme = None) -> None:
         self.__model = model
-        self.__theme = ctrl.theme.add(PeakListTheme())
+        self.theme   = ctrl.theme.add(PeakListTheme() if theme is None else theme,
+                                      noerase = False)
 
     def __cols(self):
         fmt   = lambda i: (StringFormatter(text_align = 'center',
@@ -303,13 +312,13 @@ class PeakListWidget:
         cols  = list(TableColumn(field      = i[0],
                                  title      = i[1],
                                  formatter  = fmt(i[2]))
-                     for i in self.__theme.columns)
+                     for i in self.theme.columns)
 
         isref = (self.__model.fittoreference.task is not None and
                  self.__model.identification.task is None)
         for name in ('id', 'distance'):
-            ind = next(i for i, j in enumerate(self.__theme.columns) if j[0] == name)
-            fmt = self.__theme.refid if isref else self.__theme.columns[ind][-1]
+            ind = next(i for i, j in enumerate(self.theme.columns) if j[0] == name)
+            fmt = self.theme.refid if isref else self.theme.columns[ind][-1]
             cols[ind].formatter.format = fmt
         return cols
 
@@ -320,8 +329,8 @@ class PeakListWidget:
                                   columns        = cols,
                                   editable       = False,
                                   index_position = None,
-                                  width          = self.__theme.colwidth*len(cols),
-                                  height         = self.__theme.height,
+                                  width          = self.theme.colwidth*len(cols),
+                                  height         = self.theme.height,
                                   name           = "Peaks:List")
         return [self.__widget]
 
@@ -347,7 +356,7 @@ class PeakIDPathWidget:
     def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
         self.keeplistening  = True
         self.__peaks        = model
-        self.__theme        = ctrl.theme.add(PeakIDPathTheme())
+        self.__theme        = ctrl.theme.add(PeakIDPathTheme(), noerase = False)
 
     def callbacks(self, ctrl, doc):
         "sets-up a periodic callback which checks whether the id file has changed"
@@ -593,37 +602,77 @@ class _PeakDescriptor:
             return
         mdl.peakselection.update(finder=ByHistogram(mincount=getattr(inst,"_eventcount")))
 
-@tab.title('Hybridstat Configuration')
-@tab("Cleaning",
-     _ClippingDescriptor(),
-     BeadSubtractionModalDescriptor(),
-     AlignmentModalDescriptor())
-@tab("Peaks",
-     'Min frame count per hybridisation %(eventdetection.events.select.minlength)d',
-     'Min hybridisations per peak %(peakselection.finder.grouper.mincount)d',
-     _IdAccessor('Keep z=0 peak %(fit)b',
-                 lambda i: i.firstpeak,
-                 lambda i: {'firstpeak': i}),
-     _SingleStrandDescriptor(),
-     tab.tasknoneattr('Re-align cycles using peaks%(peakselection.align)b'),
-     'Peak kernel size (blank ⇒ auto) %(peakselection.precision)of',
-     _IdAccessor('Exhaustive fit algorithm %(fit)b',
-                 lambda i: isinstance(i, PeakGridFit),
-                 lambda i: ((ChiSquareFit, PeakGridFit)[i](),)),
-     _IdAccessor('Max Δ to theoretical peak%(match)d',
-                 lambda i: i.window,
-                 lambda i: {'window': i}))
-@tab.figure(PeaksPlotTheme, PeaksPlotDisplay)
-class AdvancedWidget(tab.taskwidget): # type: ignore
-    "access to the modal dialog"
+def advanced(title = 'Peaks', others = None, **figure):
+    "create the advanced button"
+    fig = (tab.figure(PeaksPlotTheme, PeaksPlotDisplay) if len(figure) == 0 else
+           tab.figure(**figure))
+    tbl = (lambda cls: cls) if others is None else others
 
-def createwidgets(ctrl, mdl: PeaksPlotModelAccess) -> Dict[str, Any]:
-    "returns a dictionnary of widgets"
-    return dict(seq       = PeaksSequencePathWidget(ctrl, mdl),
-                ref       = ReferenceWidget(ctrl, mdl),
-                oligos    = OligoListWidget(ctrl, ),
-                stats     = PeaksStatsWidget(ctrl, mdl),
-                peaks     = PeakListWidget(ctrl, mdl),
-                cstrpath  = PeakIDPathWidget(ctrl, mdl),
-                fitparams = FitParamsWidget(ctrl, mdl),
-                advanced  = AdvancedWidget(ctrl, mdl))
+    @tab.title(title+' Configuration')
+    @tbl
+    @tab("Cleaning",
+         _ClippingDescriptor(),
+         BeadSubtractionModalDescriptor(),
+         AlignmentModalDescriptor())
+    @tab("Peaks",
+         'Min frame count per hybridisation %(eventdetection.events.select.minlength)d',
+         'Min hybridisations per peak %(peakselection.finder.grouper.mincount)d',
+         _IdAccessor('Keep z=0 peak %(fit)b',
+                     lambda i: i.firstpeak,
+                     lambda i: {'firstpeak': i}),
+         _SingleStrandDescriptor(),
+         tab.tasknoneattr('Re-align cycles using peaks%(peakselection.align)b'),
+         'Peak kernel size (blank ⇒ auto) %(peakselection.precision)of',
+         _IdAccessor('Exhaustive fit algorithm %(fit)b',
+                     lambda i: isinstance(i, PeakGridFit),
+                     lambda i: ((ChiSquareFit, PeakGridFit)[i](),)),
+         _IdAccessor('Max Δ to theoretical peak%(match)d',
+                     lambda i: i.window,
+                     lambda i: {'window': i}))
+    @fig
+    class AdvancedWidget(tab.taskwidget): # type: ignore
+        "access to the modal dialog"
+    return AdvancedWidget
+
+class PeaksPlotWidgets: # pylint: disable=too-many-instance-attributes
+    "peaks plot widgets"
+    enabler: TaskWidgetEnabler
+    def __init__(self, ctrl, mdl: PeaksPlotModelAccess, **kwa):
+        "returns a dictionnary of widgets"
+        self.seq       = PeaksSequencePathWidget(ctrl, mdl)
+        self.ref       = ReferenceWidget(ctrl, mdl)
+        self.oligos    = OligoListWidget(ctrl, )
+        self.stats     = PeaksStatsWidget(ctrl, mdl)
+        self.peaks     = PeakListWidget(ctrl, mdl, kwa.pop('peaks', None))
+        self.cstrpath  = PeakIDPathWidget(ctrl, mdl)
+        self.fitparams = FitParamsWidget(ctrl, mdl)
+        self.advanced  = advanced(**kwa)(ctrl, mdl)
+
+    def addtodoc(self, mainview, ctrl, doc, **kwa):
+        "creates the widget"
+        peaks = kwa.get('peaks', None)
+        if peaks is None:
+            peaks = getattr(mainview, "_src")['peaks']
+
+        wdg   = {i: j.addtodoc(mainview, ctrl, peaks) for i, j in self.__dict__.items()}
+        self.enabler = TaskWidgetEnabler(wdg)
+        self.cstrpath.callbacks(ctrl, doc)
+        if hasattr(mainview, '_hover'):
+            self.seq.callbacks(getattr(mainview, '_hover'),
+                               getattr(mainview, '_ticker'),
+                               wdg['stats'][-1], wdg['peaks'][-1])
+        self.advanced.callbacks(doc)
+        return wdg, self.enabler
+
+    def observe(self, ctrl):
+        "oberver"
+        for widget in self.__dict__.values():
+            if hasattr(widget, 'observe'):
+                widget.observe(ctrl)
+
+    def reset(self, cache, disable):
+        "oberver"
+        for key, widget in self.__dict__.items():
+            if key != 'enabler':
+                widget.reset(cache)
+        self.enabler.disable(cache, disable)

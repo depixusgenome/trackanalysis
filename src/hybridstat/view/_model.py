@@ -28,10 +28,12 @@ from peakcalling.processor.fittohairpin     import (Constraints, HairpinFitter,
 from sequences.modelaccess      import SequencePlotModelAccess
 from utils                      import dataclass, dflt, updatecopy, initdefaults
 from view.base                  import spawn
+from view.colors                import tohex
+from view.plots.base            import themed
 
 from ..reporting.batch          import fittohairpintask
 from ._processors               import runbead, runrefbead
-from ._peakinfo                 import createpeaks
+from ._peakinfo                 import createpeaks as _createpeaks
 
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from cleaning.processor.__config__       import ClippingTask
@@ -44,34 +46,23 @@ class PeaksPlotTheme(PlotTheme):
     cleaning plot theme
     """
     name            = "hybridstat.peaks.plot"
-    figsize         = 500, 700, "fixed"
+    figsize         = PlotTheme.defaultfigsize(500, 700)
     xtoplabel       = 'Duration (s)'
     xlabel          = 'Rate (%)'
-    widgetsborder   = 10
     ntitles         = 4
-    count           = PlotAttrs('lightblue', 'line', 1)
-    eventscount     = PlotAttrs('lightblue', 'circle', 3)
+    count           = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'}, 'line', 1)
+    eventscount     = PlotAttrs(count.color, 'circle', 3)
+    peakscount      = PlotAttrs(count.color, 'triangle', 15, fill_alpha = 0.5,
+                                angle = np.pi/2.)
     referencecount  = PlotAttrs('bisque', 'patch', alpha = 0.5)
-    peaksduration   = PlotAttrs('lightgreen', 'diamond', 15, fill_alpha = 0.5,
-                                angle = np.pi/2.)
-    peakscount      = PlotAttrs('lightblue', 'triangle', 15, fill_alpha = 0.5,
-                                angle = np.pi/2.)
-    colors          = dict(dark  = dict(reference       = 'bisque',
+    peaksduration   = PlotAttrs({"dark": 'lightgreen', 'basic': 'darkgreen'},
+                                'diamond', 15, fill_alpha = 0.5, angle = np.pi/2.)
+    pkcolors        = dict(dark  = dict(reference       = 'bisque',
                                         missing         = 'red',
-                                        found           = 'black',
-                                        count           = 'lightblue',
-                                        eventscount     = 'lightblue',
-                                        referencecount  = 'bisque',
-                                        peaksduration   = 'lightgreen',
-                                        peakscount      = 'lightblue'),
+                                        found           = 'black'),
                            basic = dict(reference       = 'bisque',
                                         missing         = 'red',
-                                        found           = 'gray',
-                                        count           = 'darkblue',
-                                        eventscount     = 'darkblue',
-                                        referencecount  = 'bisque',
-                                        peaksduration   = 'darkgreen',
-                                        peakscount      = 'darkblue'))
+                                        found           = 'gray'))
     toolbar          = dict(PlotTheme.toolbar)
     toolbar['items'] = 'ypan,ybox_zoom,reset,save,dpxhover,tap'
     @initdefaults(frozenset(locals()))
@@ -451,6 +442,8 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         self.singlestrand    = SingleStrandTaskAccess(self)
         self.fittoreference  = FitToReferenceAccess(self)
         self.identification  = FitToHairpinAccess(self)
+
+        self.peaksmodel.display.peaks = _createpeaks(self, [])
         if addto:
             self.addto(ctrl, noerase = False)
 
@@ -535,7 +528,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         disp = cpy.peaksmodel.display
         if dtl is None:
             disp.distances     = {}
-            disp.peaks         = createpeaks(cpy, [])
+            disp.peaks         = _createpeaks(cpy, [])
             disp.estimatedbias = 0.
         else:
             tsk   = cast(PeakSelectorTask, self.peakselection.task)
@@ -543,7 +536,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
 
             disp.distances     = (getattr(tmp, 'distances')
                                   if self.identification.task else {})
-            disp.peaks         = createpeaks(cpy, peaks)
+            disp.peaks         = _createpeaks(cpy, peaks)
             disp.estimatedbias = disp.peaks['z'][0]
         info = {i: getattr(disp, i) for i in ('distances', 'peaks', 'estimatedbias')}
         self._ctrl.display.update(self.peaksmodel.display, **info)
@@ -632,3 +625,24 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
                 store.update(i for i in itms if i[1] is not None)
 
         spawn(_thread)
+
+def createpeaks(mdl, themecolors, vals) -> Dict[str, np.ndarray]:
+    "create the peaks ColumnDataSource"
+    colors = [tohex(themed(mdl.themename, themecolors)[i])
+              for i in ('found', 'missing', 'reference')]
+    peaks  = dict(mdl.peaks)
+    if vals is not None and mdl.identification.task is not None:
+        alldist = mdl.distances
+        for key in mdl.sequences(...):
+            if key not in alldist:
+                continue
+            peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors[:2])
+
+        if mdl.sequencekey not in alldist and alldist:
+            mdl.sequencekey = max(tuple(alldist), key = lambda x: alldist[x].value)
+        peaks['color'] = peaks[mdl.sequencekey+'color']
+    elif mdl.fittoreference.referencepeaks is not None:
+        peaks['color'] = np.where(np.isfinite(peaks['id']), colors[2], colors[0])
+    else:
+        peaks['color'] = [colors[0]]*len(peaks.get('id', ()))
+    return peaks

@@ -1,5 +1,11 @@
 # CycleApp
 
+## cycles_v6.1
+
+### Peaks & Cycles
+
+This new tab is similar to the *Peaks* tab, only offering slightly different plots.
+
 ## cycles_v6.0
 
 * 2018-11-07 14:35:56 +0100  (tag: cycles_v6.0.2)

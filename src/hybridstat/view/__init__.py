@@ -17,6 +17,7 @@ from view.tabs           import TabsView, TabsTheme, initsubclass
 
 from ._io                import setupio
 from .peaksplot          import PeaksPlotView
+from .cyclehistplot      import CycleHistPlotView
 
 class HybridStatTheme(TabsTheme):
     "HybridStatTheme"
@@ -28,7 +29,8 @@ class HybridStatTheme(TabsTheme):
                QualityControlView : 'qc',
                CleaningView       : 'cleaning',
                CyclesPlotView     : 'cycles',
-               PeaksPlotView      : 'peaks'},
+               PeaksPlotView      : 'peaks',
+               CycleHistPlotView  : 'cyclehist'},
               (CleaningView, PeaksPlotView))
 class HybridStatView(TabsView[HybridStatTheme]):
     "A view with all plots"
