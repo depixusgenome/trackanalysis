@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
-import atexit
-from   asyncio                  import wrap_future, sleep as _sleep
+from   asyncio                  import sleep as _sleep
 from   copy                     import copy
-from   concurrent.futures       import ProcessPoolExecutor
+from   multiprocessing          import Process, Pipe
 from   typing                   import Optional, Dict, Tuple, Any, Sequence, cast
 import pickle
 
@@ -74,14 +73,14 @@ class PeaksPlotConfig:
     "PeaksPlotConfig"
     name:             str   = "hybridstat.peaks"
     estimatedstretch: float = 1./8.8e-4
+    ncpu                    = 0
+    waittime                = .1
 
 class PeaksPlotDisplay(PlotDisplay):
     "PeaksPlotDisplay"
     name                              = "hybridstat.peaks"
     distances : Dict[str, Distance]   = dict()
     peaks:      Dict[str, np.ndarray] = dict()
-    nprocessors                       = 0
-    waittime                          = .1
     estimatedbias                     = 0.
     constraintspath: Any              = None
     useparams: bool                   = False
@@ -576,8 +575,17 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         def _onchangetasks(**_):
             self._poolcompute()
 
+    @staticmethod
+    def _poolrun(pipe, procs, refcache, _, keys):
+        for bead in keys:
+            out = runbead(procs, bead, refcache)
+            pipe.send((bead, out, refcache.get(bead, None)))
+            if pipe.poll():
+                return
+        pipe.send((None, None, None))
+
     def _poolcompute(self, **_):
-        if self.peaksmodel.display.nprocessors <= 0:
+        if self.peaksmodel.config.ncpu <= 0:
             return
 
         root  = self.roottask
@@ -590,39 +598,33 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         procs = procs.cleancopy()
         refc  = self.fittoreference.refcache
 
-        def _future(pool, bead):
-            fut = pool.submit(runbead, procs, bead, refc)
-            return bead, wrap_future(fut)
-
         async def _iter():
-            keys  = set(self.track.beads.keys()) - set(store)
-            sleep = self.peaksmodel.display.waittime
-            with ProcessPoolExecutor(self.peaksmodel.display.nprocessors) as pool:
-                subm = dict(_future(pool, i) for i in keys)
-                func = lambda: [i.cancel() for i in subm.values() if not i.done()]
-                atexit.register(func)
-                while len(subm):
-                    await _sleep(sleep)
-                    done = {i[0] for i in subm.items() if i[1].done()}
-                    for i in set(subm) & set(store):
-                        fut = subm.pop(i)
-                        if not fut.done():
-                            fut.cancel()
-
-                    if len(done):
-                        yield [(i, subm.pop(i)) for i in set(done) & set(subm)]
-
-                    if cache() is None or root is not self.roottask:
-                        for i in subm.values():
-                            i.cancel()
+            keys    = set(self.track.beads.keys()) - set(store)
+            ncpu    = self.peaksmodel.config.ncpu
+            pipe    = Pipe()
+            process = Process(target = self._poolrun,
+                              args   = (pipe[1], procs, refc, ncpu, keys))
+            process.start()
+            out    = [True]
+            while out[0] is not None:
+                await _sleep(self.peaksmodel.config.waittime)
+                while pipe[0].poll() and cache() is not None and root is self.roottask:
+                    out = pipe[0].recv()
+                    if out[0] is None:
                         break
-                pool.shutdown(False)
-                atexit.unregister(func)
+
+                    if out[0] not in store:
+                        yield out
+
+                if out[0] is not None and cache() is None or root is not self.roottask:
+                    pipe[0].send(True)
+                    break
 
         async def _thread():
-            async for lst in _iter(): # pylint: disable=not-an-iterable
-                itms = [(i[0], i[1].result()) for i in lst if not i[1].cancelled()]
-                store.update(i for i in itms if i[1] is not None)
+            async for bead, itms, ref in _iter(): # pylint: disable=not-an-iterable
+                store[bead] = itms
+                if ref is not None:
+                    refc[bead]  = ref
 
         spawn(_thread)
 
