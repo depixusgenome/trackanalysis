@@ -8,13 +8,13 @@ import numpy as np
 from bokeh                  import layouts
 from bokeh.plotting         import Figure
 from bokeh.models           import (ColumnDataSource, Range1d, LinearAxis,
-                                    NumeralTickFormatter)
+                                    NumeralTickFormatter, HoverTool)
 from model.plots            import (PlotTheme, PlotDisplay, PlotModel, PlotAttrs,
                                     PlotState)
 from peakfinding.histogram  import interpolator
 from sequences.modelaccess  import SequenceAnaIO
 from utils                  import initdefaults
-from view.plots             import PlotView
+from view.plots             import PlotView, DpxNumberFormatter
 from view.plots.tasks       import TaskPlotCreator, CACHE_TYPE
 from ._model                import PeaksPlotModelAccess, createpeaks
 from ._widget               import PeaksPlotWidgets, PeakListTheme
@@ -55,8 +55,8 @@ class HistPlotTheme(PlotTheme):
     figsize  = (1000-CyclePlotTheme.figsize[0],)+CyclePlotTheme.figsize[1:]
     xlabel   = 'Rate (%)'
     ylabel   = CyclePlotTheme.ylabel
-    explabel = 'Experimental'
-    reflabel = 'Theoretical'
+    explabel = 'Hybridisations'
+    reflabel = 'Hairpin'
     hist     = PlotAttrs(CyclePlotTheme.frames.color, 'line',      1)
     events   = PlotAttrs(hist.color,                'circle',    3, alpha = .25)
     peaks    = PlotAttrs(hist.color,                'triangle', 5,  alpha = 0.,
@@ -67,8 +67,13 @@ class HistPlotTheme(PlotTheme):
                     basic = dict(reference = 'bisque',
                                  missing   = 'red',
                                  found     = 'gray'))
-    toolbar  = dict(CyclePlotTheme.toolbar)
-    toolbar['items'] = 'pan,box_zoom,reset,save,tap,hover'
+    toolbar          = dict(CyclePlotTheme.toolbar)
+    toolbar['items'] = 'pan,box_zoom,hover,reset,save'
+    tooltipmode      = 'hline'
+    tooltippolicy    = 'follow_mouse'
+    tooltips         = [(i[1], '@'+i[0]+("{"+i[2]+"}" if i[2] else ""))
+                        for i in PeakListTheme().columns[1:-1]]
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
@@ -104,6 +109,7 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
         self._display.addcallbacks(ctrl, self._fig)
         self._fig.add_layout(LinearAxis(axis_label = ""), 'above')
         self._fig.add_layout(LinearAxis(axis_label = ""), 'right')
+        self._fig.yaxis.formatter = NumeralTickFormatter(format = "0.0a")
         return self._fig
 
     def _reset(self, cache: CACHE_TYPE):
@@ -156,14 +162,26 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
         self._fig.add_layout(self._exp, 'right')
         self._fig.add_layout(self._ref, 'right')
         self._fig.add_layout(LinearAxis(axis_label = ""), 'above')
+        self._fig.yaxis.formatter = NumeralTickFormatter(format = "0.0a")
+        self._ref.formatter = NumeralTickFormatter(format = "0a")
 
         self._src = {i: ColumnDataSource(j) for i, j in self._data(None).items()}
-        for i, j in self._src.items():
-            self.addtofig(self._fig, i,
-                          x      = "count",
-                          y      = 'bases' if i == 'peaks' else "z",
-                          source = j)
+        rends = {i: self.addtofig(self._fig, i,
+                                  x      = "count",
+                                  y      = 'bases' if i == 'peaks' else "z",
+                                  source = j)
+                 for i, j in self._src.items()}
         self._display.addcallbacks(ctrl, self._fig)
+
+        hover = self._fig.select(HoverTool)
+        print(hover)
+        if len(hover) > 0:
+            hover = hover[0]
+            hover.update(point_policy = self._theme.tooltippolicy,
+                         tooltips     = self._theme.tooltips,
+                         mode         = self._theme.tooltipmode,
+                         renderers    = [rends['peaks']])
+
         return self._fig
 
     def _reset(self, cache:CACHE_TYPE):
@@ -295,10 +313,6 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
             i.y_range = plots[0].y_range
             i.yaxis[0].update(axis_label = "", major_label_text_font_size = '0pt')
         plots[0].yaxis[1].major_label_text_font_size = '0pt'
-        fmt = NumeralTickFormatter(format = "0.0a")
-        for i in plots:
-            i.yaxis.formatter = fmt
-
         wdg, enabler = self._widgets.addtodoc(self, ctrl, doc,
                                               peaks = getattr(self._hist, '_src')['peaks'])
         enabler.extend([getattr(i, '_fig') for i in self._plots])

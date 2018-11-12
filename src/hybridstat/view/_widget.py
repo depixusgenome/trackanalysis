@@ -288,7 +288,7 @@ class PeakListTheme:
     refid    : str             = '0.0000'
     columns  : List[List[str]] = dflt([['z',        'Z (µm)',                 '0.0000'],
                                        ['bases',    'Z (base)',               '0.0'],
-                                       ['id',       'Id',                     '0'],
+                                       ['id',       'Hairpin',                '0'],
                                        ['orient',   'Strand',                 ''],
                                        ['distance', 'Distance',               '0.0'],
                                        ['count',    PeaksPlotTheme.xlabel,    '0.0'],
