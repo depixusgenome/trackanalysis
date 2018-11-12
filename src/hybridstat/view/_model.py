@@ -73,7 +73,7 @@ class PeaksPlotConfig:
     "PeaksPlotConfig"
     name:             str   = "hybridstat.peaks"
     estimatedstretch: float = 1./8.8e-4
-    ncpu                    = 2
+    ncpu                    = 0
     waittime                = .1
 
 class PeaksPlotDisplay(PlotDisplay):
