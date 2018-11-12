@@ -2,6 +2,8 @@
 
 ## cycles_v6.1
 
+* 2018-11-12 15:42:32 +0100  (tag: cycles_v6.1)
+
 ### Peaks & Cycles
 
 This new tab is similar to the *Peaks* tab, offering slightly different plots.
@@ -10,9 +12,11 @@ from the *advanced* menu.
 
 ## cycles_v6.0
 
-* 2018-11-07 14:35:56 +0100  (tag: cycles_v6.0.2)
-* 2018-11-08 15:51:56 +0100  (tag: cycles_v6.0.1)
+* 2018-11-09 15:42:32 +0100  (tag: cycles_v6.0.3)
+* 2018-11-09 14:51:19 +0100  (tag: cycles_v6.0.2)
+* 2018-11-08 15:26:32 +0100  (tag: cycles_v6.0.1)
 * 2018-11-08 15:11:56 +0100  (tag: ramp_v2.0, tag: cycles_v6.0)
+
 
 ### General
 
