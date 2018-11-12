@@ -102,12 +102,12 @@ class ProcessorController:
                               copy = self.copy if copy is None else copy,
                               pool = pool)
 
-    def keepupto(self, tsk:Task = None) -> 'ProcessorController':
+    def keepupto(self, tsk:Task = None, included = True) -> 'ProcessorController':
         "Returns a processor for a given root and range"
         ind         = None if tsk is None else self.data.index(tsk)
         other       = type(self)(copy = self.copy)
-        other.model = self.model[:None if ind is None else ind+1]
-        other.data  = self.data.keepupto(ind)
+        other.model = self.model[:None if ind is None else ind+(1 if included else 0)]
+        other.data  = self.data.keepupto(ind, included)
         return other
 
     @classmethod
