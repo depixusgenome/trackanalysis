@@ -174,11 +174,11 @@ class Cache(Iterable[Processor], Sized):
         self._items.pop(ind)
     remove = pop
 
-    def keepupto(self, task) -> 'Cache':
+    def keepupto(self, task, included = True) -> 'Cache':
         "returns a Cache with tasks up to and including *task*"
         if task is None or task is Ellipsis:
             return Cache(self._items)
-        return Cache(self._items[:self.index(task)+1])
+        return Cache(self._items[:self.index(task)+(1 if included else 0)])
 
     def cleancopy(self) -> 'Cache':
         "returns a cache with only the processors"
