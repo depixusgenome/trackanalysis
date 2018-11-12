@@ -118,48 +118,50 @@ class PlotAttrsView(PlotAttrs):
         colors  = palette(count)
         return [colors[i] for i in indexes] if indexes is not None else colors
 
+    @staticmethod
+    def _alpha(args, prefix = ('line', 'fill'), name = 'alpha'):
+        for j in ('', 'nonselection_', 'selection_'):
+            if j+name in args:
+                alpha = args.pop(j+name)
+                for i in prefix:
+                    args.setdefault(j+i+'_'+name, alpha)
+
+    @classmethod
+    def _coloralpha(cls, args, prefix = ('line', 'fill')):
+        if args['color']:
+            cls._alpha(args, prefix = prefix, name = 'color')
+        else:
+            args.pop('color', None)
+        cls._alpha(args, prefix = prefix)
+
     @classmethod
     def _text(cls, args):
         cls._default(args)
         args.pop('size',   None)
         args.pop('radius', None)
-        args['text_color'] = args.pop('color')
+        cls._coloralpha(args, prefix = ('text',))
 
     @classmethod
     def _circle(cls, args):
-        cls._default(args)
+        cls._triangle(args)
         if 'radius' in args:
             args.pop('size')
-        if 'alpha' in args:
-            args['line_alpha'] = args['fill_alpha'] = args.pop('alpha')
-        clr = args.pop('color')
-        if clr:
-            for i in ('line_color', 'fill_color'):
-                args.setdefault(i, clr)
 
     @classmethod
     def _line(cls, args):
         cls._default(args)
-        if 'color' in args:
-            args['line_color'] = args.pop('color')
+        cls._coloralpha(args, prefix = ('line',))
         args['line_width'] = args.pop('size')
 
     @classmethod
     def _patch(cls, args):
         cls._triangle(args)
-        if 'alpha' in args:
-            args['line_alpha'] = args['fill_alpha'] = args.pop('alpha')
         args['line_width'] = args.pop('size')
 
     @classmethod
     def _triangle(cls, args):
         cls._default(args)
-        clr = args.pop('color')
-        if 'alpha' in args:
-            args['line_alpha'] = args['fill_alpha'] = args.pop('alpha')
-        if clr:
-            for i in ('line_color', 'fill_color'):
-                args.setdefault(i, clr)
+        cls._coloralpha(args)
 
     _diamond  = _triangle
     _vbar     = _patch
@@ -260,20 +262,46 @@ class PlotThemeView(PlotTheme):
 
 class PlotUpdater(list):
     "updates plot themes"
+    @staticmethod
+    def __set_range_names(cache, args, view):
+        for axis in 'x_range_name', 'y_range_name':
+            if axis in args:
+                cache[view][axis] = args.pop(axis)
+    @staticmethod
+    def __split(nsel, args):
+        tmp = {}
+        key = ('non' if nsel else '')+'selection_'
+        for i in set(args):
+            if i.startswith(key):
+                tmp[i.replace(key, '')] = args.pop(i)
+        return tmp
+
+    @staticmethod
+    def __update(cache, rend, data, key):
+        glyph = getattr(rend, key)
+        data  = {i: j for i, j in data.items()
+                 if ((isinstance(j, (str, set, tuple, list)) or np.isscalar(j))
+                     and getattr(glyph, i) != j)}
+        if len(data):
+            cache[glyph].update(**data)
+
     def reset(self, theme, cache):
         "resets the renderer to the current theme"
         for i, j, k in self:
             args, glyph = j.reset(theme, **k)
-            for axis in 'x_range_name', 'y_range_name':
-                if axis in args:
-                    cache[i][axis] = args.pop(axis)
+            args.pop("palette", None)
+            self.__set_range_names(cache, args, i)
 
-            if getattr(Figure, glyph).__name__ == i.glyph.__class__.__name__:
-                args.pop('source', None)
-                cache[i.glyph].update(**args)
+            itms = [args, self.__split(True, args), self.__split(False, args)]
+            cls  = getattr(_glyphs, getattr(Figure, glyph).__name__)
+            if isinstance(i.glyph, cls):
+                for itm in zip(itms, ("glyph", "nonselection_glyph", "selection_glyph")):
+                    self.__update(cache, i, *itm)
             else:
-                cls  = getattr(_glyphs, getattr(Figure, glyph).__name__)
-                cache[i]['glyph'] = cls(**args)
+                for itm in zip(itms, ("glyph", "nonselection_glyph", "selection_glyph")):
+                    out  = dict(args)
+                    out.update(itm[0])
+                    cache[i][itm[1]] = cls(**out)
 
 class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=too-many-public-methods
     "Base plotter class"
