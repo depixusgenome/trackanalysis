@@ -73,7 +73,7 @@ class PeaksPlotConfig:
     "PeaksPlotConfig"
     name:             str   = "hybridstat.peaks"
     estimatedstretch: float = 1./8.8e-4
-    ncpu                    = 0
+    ncpu                    = 2
     waittime                = .1
 
 class PeaksPlotDisplay(PlotDisplay):
@@ -576,7 +576,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
             self._poolcompute()
 
     @staticmethod
-    def _poolrun(pipe, procs, refcache, _, keys):
+    def _poolrun(pipe, procs, refcache, keys):
         for bead in keys:
             out = runbead(procs, bead, refcache)
             pipe.send((bead, out, refcache.get(bead, None)))
@@ -599,25 +599,32 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         refc  = self.fittoreference.refcache
 
         async def _iter():
-            keys    = set(self.track.beads.keys()) - set(store)
-            ncpu    = self.peaksmodel.config.ncpu
-            pipe    = Pipe()
-            process = Process(target = self._poolrun,
-                              args   = (pipe[1], procs, refc, ncpu, keys))
-            process.start()
+            keys    = np.array(list(set(self.track.beads.keys()) - set(store)))
+            nkeys   = len(keys)
+            ncpu    = min(nkeys, self.peaksmodel.config.ncpu)
+            jobs    = ([keys] if ncpu == 1 else
+                       np.split(keys, list(range(nkeys//ncpu+1, nkeys, nkeys//ncpu+1))))
+            pipes   = [Pipe() for i in range(len(jobs))]
+            process = [Process(target = self._poolrun,
+                               args   = (pipe[1], procs, refc, job))
+                       for pipe, job in zip(pipes, jobs)]
+            for _ in process:
+                _.start()
             out    = [True]
             while out[0] is not None:
                 await _sleep(self.peaksmodel.config.waittime)
-                while pipe[0].poll() and cache() is not None and root is self.roottask:
-                    out = pipe[0].recv()
-                    if out[0] is None:
-                        break
+                for pipe, _ in pipes:
+                    while pipe.poll() and cache() is not None and root is self.roottask:
+                        out = pipe.recv()
+                        if out[0] is None:
+                            break
 
-                    if out[0] not in store:
-                        yield out
+                        if out[0] not in store:
+                            yield out
 
                 if out[0] is not None and cache() is None or root is not self.roottask:
-                    pipe[0].send(True)
+                    for pipe, _ in pipes:
+                        pipe.send(True)
                     break
 
         async def _thread():
