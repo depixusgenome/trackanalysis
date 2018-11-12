@@ -13,6 +13,7 @@ from    threading               import RLock
 import  numpy        as     np
 
 import  bokeh.palettes
+import  bokeh.models.glyphs     as     _glyphs
 from    bokeh.document          import Document
 from    bokeh.models            import Range1d, Model, GlyphRenderer
 from    bokeh.plotting          import figure, Figure
@@ -129,6 +130,8 @@ class PlotAttrsView(PlotAttrs):
         cls._default(args)
         if 'radius' in args:
             args.pop('size')
+        if 'alpha' in args:
+            args['line_alpha'] = args['fill_alpha'] = args.pop('alpha')
         clr = args.pop('color')
         if clr:
             for i in ('line_color', 'fill_color'):
@@ -144,12 +147,16 @@ class PlotAttrsView(PlotAttrs):
     @classmethod
     def _patch(cls, args):
         cls._triangle(args)
+        if 'alpha' in args:
+            args['line_alpha'] = args['fill_alpha'] = args.pop('alpha')
         args['line_width'] = args.pop('size')
 
     @classmethod
     def _triangle(cls, args):
         cls._default(args)
         clr = args.pop('color')
+        if 'alpha' in args:
+            args['line_alpha'] = args['fill_alpha'] = args.pop('alpha')
         if clr:
             for i in ('line_color', 'fill_color'):
                 args.setdefault(i, clr)
@@ -180,6 +187,10 @@ class PlotAttrsView(PlotAttrs):
         args.update(kwa)
         getattr(self, '_'+self.glyph, self._default)(args)
         return {i: themed(theme, j) for i, j in args.items()}, themed(theme, self.glyph)
+
+    def reset(self, theme = 'basic', **kwa) -> GlyphRenderer:
+        "adds itself to plot: defines color, size and glyph to use"
+        return self.__args(theme, kwa)
 
     def addto(self, fig, theme = 'basic', **kwa) -> GlyphRenderer:
         "adds itself to plot: defines color, size and glyph to use"
@@ -247,6 +258,23 @@ class PlotThemeView(PlotTheme):
             fig.toolbar.autohide = True
         return fig
 
+class PlotUpdater(list):
+    "updates plot themes"
+    def reset(self, theme, cache):
+        "resets the renderer to the current theme"
+        for i, j, k in self:
+            args, glyph = j.reset(theme, **k)
+            for axis in 'x_range_name', 'y_range_name':
+                if axis in args:
+                    cache[i][axis] = args.pop(axis)
+
+            if getattr(Figure, glyph).__name__ == i.glyph.__class__.__name__:
+                args.pop('source', None)
+                cache[i.glyph].update(**args)
+            else:
+                cls  = getattr(_glyphs, getattr(Figure, glyph).__name__)
+                cache[i]['glyph'] = cls(**args)
+
 class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=too-many-public-methods
     "Base plotter class"
     _RESET   = frozenset(('bead',))
@@ -264,15 +292,20 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
             self[key]   = value
             return value
 
-    def __init__(self, ctrl, addto = True, noerase = True) -> None:
+    def __init__(self, ctrl,        # pylint: disable=too-many-arguments
+                 addto     = True,
+                 noerase   = True,
+                 model     = None,
+                 plotmodel = None) -> None:
         "sets up this plotter's info"
         def _cls(i, *j):
             cls = templateattribute(self, i)
             return cls(*j) if cls else None
 
+        self._updater   = PlotUpdater()
         self._ctrl      = ctrl
-        self._model     = _cls(0, ctrl)
-        self._plotmodel = _cls(1)
+        self._model     = _cls(0, ctrl) if model     is None else model
+        self._plotmodel = _cls(1)       if plotmodel is None else plotmodel
 
         if addto:
             self.addto(ctrl, noerase = noerase)
@@ -304,7 +337,9 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
             val = themed(theme, colors, {}).get(name, None)
             if val is not None:
                 attrs['color'] = val
-        return PlotAttrsView(getattr(self._theme, name)).addto(fig, theme, **attrs)
+        itm  = PlotAttrsView(getattr(self._theme, name))
+        self._updater.append((itm.addto(fig, theme, **attrs), itm, attrs))
+        return self._updater[-1][0]
 
     def figure(self, **attrs) -> Figure:
         "shortcuts for PlotThemeView"
@@ -371,6 +406,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         old, self.state = self.state, PlotState.resetting
         try:
             self._reset(cache)
+            self._updater.reset(self._model.themename, cache)
         finally:
             self.state     = old
 
@@ -516,6 +552,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
             with self.resetting() as cache:
                 self._model.reset()
                 self._reset(cache)
+                self._updater.reset(self._model.themename, cache)
             ctrl.display.handle('rendered', args = {'plot': self})
     else:
         def __doreset(self, ctrl):
@@ -532,6 +569,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                     with BokehView.computation.type(ctrl, calls = self.__doreset):
                         try:
                             self._reset(cache)
+                            self._updater.reset(self._model.themename, cache)
                         except Exception as exc: # pylint: disable=broad-except
                             args = getattr(exc, 'args', tuple())
                             if len(args) == 2 and args[1] == "warning":
