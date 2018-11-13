@@ -7,17 +7,17 @@ import bokeh.core.properties as props
 from bokeh                      import layouts
 from bokeh.plotting             import Figure
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
-                                        Model, TapTool, Title, CustomJS)
+                                        Model, TapTool, CustomJS)
 
 import numpy                    as     np
 
-from cleaning.processor         import DataCleaningException
 from peakfinding.histogram      import interpolator
 from sequences.modelaccess      import SequenceAnaIO
 from sequences.view             import SequenceTicker, SequenceHoverMixin
 from view.colors                import tohex
 from view.plots                 import PlotView, CACHE_TYPE
 from view.plots.base            import themed
+from view.plots.ploterror       import PlotError
 from view.plots.tasks           import TaskPlotCreator
 
 from ._model                    import (PeaksPlotModelAccess, PeaksPlotTheme,
@@ -68,6 +68,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     _rends:  List[Tuple]
     _fig:    Figure
     _theme:  PeaksPlotTheme
+    _errors: PlotError
     def __init__(self, ctrl):
         super().__init__(ctrl, noerase = False)
         self._src: Dict[str, ColumnDataSource] = {}
@@ -134,30 +135,19 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         "specific setup for when this view is the main one"
         self._widgets.advanced.ismain(_)
 
-    def __settitles(self, cache, label):
-        titles  = [i for i in self._fig.above if isinstance(i, Title)]
-        if label != "":
-            labels  = str(label).split("\n")[::-1]
-            labels += [""]*(len(titles) - len(labels))
-
-            for i, j in zip(titles, labels):
-                cache[i]['text'] = j
-
-        good = label == ""
-        for i in self._fig.above:
-            cache[i]['visible'] = (not good) if isinstance(i, Title) else good
-
     def _reset(self, cache:CACHE_TYPE):
-        tmp    = None
-        try:
-            tmp = self.__data()
-        except DataCleaningException as exc:
-            self.__settitles(cache, exc.args[0])
-            raise
-        else:
-            self.__settitles(cache, "")
-        finally:
+        def _color(name, axname, attr):
+            clr  = self.__colors(name)
+            axis = next(i for i in getattr(self._fig, attr)
+                        if getattr(i, 'x_range_name', '') == axname)
+            cache[axis].update(axis_label_text_color = clr)
+
+        def _reset(tmp):
             dicos = self.__defaults() if tmp is None else tmp
+            if (tmp is not None
+                    and self._model.identification.task is not None
+                    and len(self._model.distances) == 0):
+                self._errors.reset(cache, "Fit unsuccessful!", False)
 
             for i, j in dicos.items(): # type: ignore
                 cache[self._src[i]].update(data = j)
@@ -166,25 +156,20 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             self._ticker.reset(cache)
             self._widgets.reset(cache, tmp is None)
 
-            data = dicos['']
-            if len(data['z']) > 2:
-                self.setbounds(cache, self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
-            else:
-                self.setbounds(cache, self._fig.y_range, 'y', (0., 1.))
+            inds = dicos['']['z'][[0,-1]] if len(dicos['']['z']) > 2 else (0., 1.)
+            self.setbounds(cache, self._fig.y_range, 'y', inds)
 
-            clr  = self.__colors('peakscount')
-            axis = next(i for i in self._fig.below if getattr(i, 'x_range_name', '') == 'default')
-            cache[axis].update(axis_label_text_color = clr)
-
-            clr  = self.__colors('peaksduration')
-            axis = next(i for i in self._fig.above if getattr(i, 'x_range_name', '') == 'duration')
-            cache[axis].update(axis_label_text_color = clr)
+            _color('peakscount',    'default',  'below')
+            _color('peaksduration', 'duration', 'above')
 
             for key, rend in self._rends:
                 args = {'color': self.__colors(key)}
                 if 'peaks' in key:
                     args['line_color'] = 'color'
-                self.attrs(getattr(self._theme, key)).setcolor(rend, cache = cache, **args)
+                attrs = self.attrs(getattr(self._theme, key))
+                attrs.setcolor(rend, cache = cache, **args)
+
+        self._errors(cache, self.__data, _reset)
 
     def __create_fig(self):
         self._fig    = self.figure(y_range = Range1d(start = 0., end = 1.),
@@ -198,8 +183,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         self._fig.xaxis[0].axis_label_text_color = self.__colors('peakscount')
         self._fig.add_layout(axis, 'above')
         self._plotmodel.display.addcallbacks(self._ctrl, self._fig)
-        for _ in range(self._theme.ntitles):
-            self._fig.add_layout(Title(), "above")
+        self._errors = PlotError(self._fig, self._theme)
 
     def __add_curves(self):
         self._src   = {i: ColumnDataSource(j) for i, j in self.__data().items()}

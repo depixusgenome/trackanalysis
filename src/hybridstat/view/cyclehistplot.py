@@ -15,6 +15,7 @@ from peakfinding.histogram  import interpolator
 from sequences.modelaccess  import SequenceAnaIO
 from utils                  import initdefaults
 from view.plots             import PlotView
+from view.plots.ploterror   import PlotError
 from view.plots.tasks       import TaskPlotCreator, CACHE_TYPE
 from ._model                import PeaksPlotModelAccess, createpeaks
 from ._widget               import PeaksPlotWidgets, PeakListTheme
@@ -30,6 +31,7 @@ class CyclePlotTheme(PlotTheme):
     figsize = PlotTheme.defaultfigsize(480, 350)
     xlabel  = 'Time (s)'
     ylabel  = 'Bases'
+    ntitles = 5
     frames  = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'}, 'line', .1)
     toolbar = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,reset,save'
@@ -98,10 +100,11 @@ class CycleHistPlotState:
 
 class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
     "Building the graph of cycles"
-    _model: PeaksPlotModelAccess
-    _theme: CyclePlotTheme
-    _src:   ColumnDataSource
-    _fig:   Figure
+    _model:  PeaksPlotModelAccess
+    _theme:  CyclePlotTheme
+    _src:    ColumnDataSource
+    _fig:    Figure
+    _errors: PlotError
     def _addtodoc(self, ctrl, *_):
         self._src = ColumnDataSource(data = self._data(None))
         self._fig = self.figure(y_range = Range1d, x_range = Range1d)
@@ -110,24 +113,34 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
         self._fig.add_layout(LinearAxis(axis_label = ""), 'above')
         self._fig.add_layout(LinearAxis(axis_label = ""), 'right')
         self._fig.yaxis.formatter = NumeralTickFormatter(format = "0.0a")
+        self._errors = PlotError(self._fig, self._theme)
         return self._fig
 
     def _reset(self, cache: CACHE_TYPE):
-        evts  = self._model.eventdetection.task
-        procs = self._model.processors()
-        if procs is not None and evts is not None:
-            procs = procs.keepupto(evts, False)
-        try:
+        def _data():
+            procs = self._model.processors()
             if procs is None:
-                items = None
-            else:
-                run   = next(iter(procs.run(copy = True)))[self._model.bead, ...]
-                items = list(run.values())
-        finally:
+                return None
+
+            evts = self._model.eventdetection.task
+            if evts is not None:
+                procs = procs.keepupto(evts, False)
+
+            run = next(iter(procs.run(copy = True)))[self._model.bead, ...]
+            return list(run.values())
+
+        def _display(items):
             data = self._data(items)
+            if (items is not None
+                    and self._model.identification.task is not None
+                    and len(self._model.distances) == 0):
+                self._errors.reset(cache, "Fit unsuccessful!", False)
+
             self.setbounds(cache, self._fig.x_range, 'x', data['t'])
             self.setbounds(cache, self._fig.y_range, 'y', data['z'])
             cache[self._src]['data'] = data
+
+        self._errors(cache, _data, _display)
 
     def _data(self, items) -> CurveData:
         if items is None or len(items) == 0 or not any(len(i) for i in items):
