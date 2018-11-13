@@ -447,12 +447,18 @@ class PeakMatching(HairpinFitter, PointwiseOptimization):
         "returns the peaks +- the hairpin extension"
         return self.peaks if self.lastpeak else self.peaks[:-1]
 
-    def pair(self, peaks:np.ndarray, stretch = 1., bias = 0.) -> PEAKS_TYPE:
-        "returns experimental peaks paired to the theory"
-        hpin           = self.expectedpeaks
+    @staticmethod
+    def empty(peaks) -> PEAKS_TYPE:
+        "return an empty output"
         ided           = np.empty((len(peaks),), dtype = PEAKS_DTYPE)
         ided['zvalue'] = peaks
         ided['key']    = np.iinfo('i4').min
+        return ided
+
+    def pair(self, peaks:np.ndarray, stretch = 1., bias = 0.) -> PEAKS_TYPE:
+        "returns experimental peaks paired to the theory"
+        hpin = self.expectedpeaks
+        ided = self.empty(peaks)
 
         if len(peaks) > 0 and len(hpin) > 0:
             peaks = stretch*(peaks-bias)
