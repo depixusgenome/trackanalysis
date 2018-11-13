@@ -21,7 +21,7 @@ class PeakInfo(ABC):
         "returns the list of keys"
 
     @abstractmethod
-    def values(self, mdl: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
+    def values(self, mdl: 'PeaksPlotModelAccess', peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
 
     def defaults(self, mdl, peaks) -> Dict[str, np.ndarray]:
@@ -37,9 +37,9 @@ class ZPeakInfo(PeakInfo):
         return ['z']
 
     @staticmethod
-    def values(mdl: 'PeaksPlotModelAccess', peaks):
+    def values(mdl: 'PeaksPlotModelAccess', peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
-        return {'z': np.array([i for i, _ in peaks], dtype = 'f4')}
+        dico['z'] = np.array([i for i, _ in peaks], dtype = 'f4')
 
 class ReferencePeakInfo(PeakInfo):
     "All FitToReferenceTask related info"
@@ -47,11 +47,11 @@ class ReferencePeakInfo(PeakInfo):
         "returns the list of keys"
         return [] if mdl.identification.task else ['id', 'distance']
 
-    def values(self, mdl: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
+    def values(self, mdl: 'PeaksPlotModelAccess', peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
         zvals  = np.array([i for i, _ in peaks], dtype = 'f4')
         ided   = mdl.fittoreference.identifiedpeaks(zvals)
-        return dict(id = ided, distance = zvals - ided)
+        dico.update(id = ided, distance = zvals - ided)
 
 class IdentificationPeakInfo(PeakInfo):
     "All FitToHairpinTask related info"
@@ -72,41 +72,32 @@ class IdentificationPeakInfo(PeakInfo):
                 dflt[i]  = np.full(len(dflt[i]), ' ', dtype = '<U1')
         return dflt
 
-    def values(self,    # pylint: disable=too-many-locals
-               mdl: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
+    def values(self, mdl: 'PeaksPlotModelAccess', peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
-        zvals = np.array([i for i, _ in peaks], dtype = 'f4')
+        zvals   = np.array([i[0] for i in peaks], dtype = 'f4')
         if not len(mdl.distances):
-            return {'bases': (zvals-mdl.bias)*mdl.stretch}
+            dico['bases'] = (zvals-mdl.bias)*mdl.stretch
+            return
 
-        strori  = '-+ '
-        alldist = mdl.distances
-        dico    = {}
-        task    = cast(FitToHairpinTask, mdl.identification.task)
+        task = cast(FitToHairpinTask, mdl.identification.task)
         for key, hyb in mdl.hybridisations(...).items():
-            if key not in alldist: # type: ignore
+            if key not in mdl.distances:
                 continue
 
-            dist = alldist[key].stretch, alldist[key].bias
+            dist = mdl.distances[key].stretch, mdl.distances[key].bias
             tmp  = task.match[key].pair(zvals, *dist)['key'] # type: ignore
             good = tmp >= 0
             ori  = dict(hyb)
 
-            dico[f'{key}bases'] = (zvals - dist[1])*dist[0]
+            dico[key+'bases']          = (zvals - dist[1])*dist[0]
+            dico[key+'id']      [good] = tmp[good]
+            dico[key+'distance'][good] = (tmp - dico[key+'bases'])[good]
+            dico[key+'orient']  [good] = ['-+ '[ori.get(int(i+0.01), 2)]
+                                          for i in dico[key+'id'][good]]
 
-            dico.update({f'{key}{i}': np.full(len(zvals), np.NaN, dtype = 'f4')
-                         for i in ('id', 'distance')})
-
-            dico[f'{key}id']      [good] = tmp[good]
-            dico[f'{key}distance'][good] = (tmp - dico[f'{key}bases'])[good]
-            dico[f'{key}orient']         = np.full(len(zvals), ' ', dtype = '<U1')
-            dico[f'{key}orient']  [good] = [strori[ori.get(int(i+0.01), 2)]
-                                            for i in dico[f'{key}id'][good]]
-
-        if mdl.sequencekey in mdl.distances:
-            for i in self.basekeys():
-                dico[i] = dico[mdl.sequencekey+i]
-        return dico
+            if key == mdl.sequencekey:
+                for i in self.basekeys():
+                    dico[i] = dico[key+i]
 
 class StatsPeakInfo(PeakInfo):
     "All stats related info"
@@ -114,23 +105,21 @@ class StatsPeakInfo(PeakInfo):
         "returns the list of keys"
         return ['duration', 'sigma', 'count', 'skew']
 
-    def values(self, mdl: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
+    def values(self, mdl: 'PeaksPlotModelAccess', peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
         if len(peaks) == 0:
-            return {}
+            return
 
         task = cast(EventDetectionTask, mdl.eventdetection.task)
-        prob = Probability(framerate   = mdl.track.framerate,
+        prob = Probability(framerate   = getattr(mdl.track, 'framerate', 30.),
                            minduration = task.events.select.minduration)
         dur  = mdl.track.phase.duration(..., task.phase) # type: ignore
-        dico = self.defaults(mdl, peaks)
         for i, (_, evts) in enumerate(peaks):
             val                 = prob(evts, dur)
             dico['duration'][i] = val.averageduration
             dico['sigma'][i]    = prob.resolution(evts)
             dico['count'][i]    = min(100., val.hybridisationrate*100.)
             dico['skew'][i]     = np.nanmedian(prob.skew(evts))
-        return dico
 
 def createpeaks(self: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
     "Creates the peaks data"
@@ -139,5 +128,5 @@ def createpeaks(self: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
     for i in classes:
         dico.update(i.defaults(self, peaks))
     for i in classes:
-        dico.update(i.values  (self, peaks))
+        i.values(self, peaks, dico)
     return dico

@@ -464,17 +464,23 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
     def stretch(self) -> float:
         "return the stretch for the current bead"
         dist = self.peaksmodel.display.distances
-        est  = self.peaksmodel.config.estimatedstretch
         key  = self.sequencekey
-        return getattr(dist.get(key, None), 'stretch', est)
+        if key in dist:
+            return dist[key].stretch
+
+        out = self.identification.constraints()[1]
+        return self.peaksmodel.config.estimatedstretch if out is None else out
 
     @property
     def bias(self) -> float:
         "return the bias for the current bead"
         dist = self.peaksmodel.display.distances
-        est  = self.peaksmodel.display.estimatedbias
         key  = self.sequencekey
-        return getattr(dist.get(key, None), 'bias', est)
+        if key in dist:
+            return dist[key].bias
+
+        out = self.identification.constraints()[2]
+        return self.peaksmodel.display.estimatedbias if out is None else out
 
     @property
     def sequencekey(self) -> Optional[str]:
@@ -639,19 +645,20 @@ def createpeaks(mdl, themecolors, vals) -> Dict[str, np.ndarray]:
     "create the peaks ColumnDataSource"
     colors = [tohex(themed(mdl.themename, themecolors)[i])
               for i in ('found', 'missing', 'reference')]
-    peaks  = dict(mdl.peaks)
-    if vals is not None and mdl.identification.task is not None:
+
+    peaks          = dict(mdl.peaks)
+    peaks['color'] = [colors[0]]*len(peaks.get('id', ()))
+    if vals is not None and mdl.identification.task is not None and len(mdl.distances):
         alldist = mdl.distances
+        if mdl.sequencekey not in alldist:
+            mdl.sequencekey = max(tuple(alldist), key = lambda x: alldist[x].value)
+
         for key in mdl.sequences(...):
             if key not in alldist:
                 continue
             peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors[:2])
-
-        if mdl.sequencekey not in alldist and alldist:
-            mdl.sequencekey = max(tuple(alldist), key = lambda x: alldist[x].value)
-        peaks['color'] = peaks[mdl.sequencekey+'color']
+            if key == mdl.sequencekey:
+                peaks['color'] = peaks[mdl.sequencekey+'color']
     elif mdl.fittoreference.referencepeaks is not None:
         peaks['color'] = np.where(np.isfinite(peaks['id']), colors[2], colors[0])
-    else:
-        peaks['color'] = [colors[0]]*len(peaks.get('id', ()))
     return peaks
