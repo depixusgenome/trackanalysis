@@ -438,7 +438,8 @@ class FileListInput:
             if inew >= len(lst):
                 _setfilelist(model = [ctrl.display.get("tasks", "roottask")])
             elif not stop[0]:
-                ctrl.display.update("tasks", roottask = lst[inew][1])
+                with ctrl.action:
+                    ctrl.display.update("tasks", roottask = lst[inew][1])
         tbar.on_change('currentfile', _oncurrentfile_cb)
 
         def _ondelfile_cb(attr, old, new):
@@ -449,7 +450,8 @@ class FileListInput:
             tbar.delfile = -1
             lst          = list(FileList.get(ctrl))
             if 0 <= inew < len(lst):
-                ctrl.tasks.closetrack(lst[inew][1])
+                with ctrl.action:
+                    ctrl.tasks.closetrack(lst[inew][1])
 
         tbar.on_change('delfile', _ondelfile_cb)
 
