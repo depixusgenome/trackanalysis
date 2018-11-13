@@ -301,9 +301,7 @@ class SequencePathWidget:
                 if path is not None:
                     raise IOError("Could not find any sequence in the file")
         elif new != '→':
-            for i, j in list(self._widget.menu)[:-2]:
-                if j == new:
-                    self._model.setnewkey(ctrl, i)
+            self._model.setnewkey(ctrl, new)
 
 @dataclass
 class OligoListTheme:

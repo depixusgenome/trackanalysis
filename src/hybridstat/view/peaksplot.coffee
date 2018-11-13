@@ -34,7 +34,10 @@
 
     on_change_sequence: (src, peaks, stats, tick1, tick2, menu) ->
         if menu.value in Object.keys(src.data)
-            menu.label       = menu.value
+            for i in menu.menu
+                if i?[1]? == menu.value
+                    menu.label = i[0]
+
             tick1.key        = menu.value
             tick2.key        = menu.value
             src.data['text'] = src.data[menu.value]

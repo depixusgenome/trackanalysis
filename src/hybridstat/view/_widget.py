@@ -111,11 +111,11 @@ class PeaksSequencePathWidget(SequencePathWidget):
         else:
             ind = None
 
-        out['menu'] = [(j, f'[{i+1}] '+ (self._theme.refcheck if i == ind else "") + j)
+        out['menu'] = [(f'[{i+1}] '+ (self._theme.refcheck if i == ind else "") + j, j)
                        for i, j in enumerate(menu)] + out['menu'][-2:]
         for i, j in out['menu'][:-2]:
-            if out['label'] == i:
-                out['label'] = out['value'] = j
+            if out['label'] == j:
+                out['label'] = i
         return out
 
     # pylint: disable=arguments-differ
