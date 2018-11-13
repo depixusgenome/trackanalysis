@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Create a grid displaying a sequence"
-from    typing              import List, Optional, Tuple, Any, cast
+from    typing              import List, Optional, Tuple, Any
 import  numpy               as np
 import  bokeh.core.properties as props
 from    bokeh.plotting      import Figure
@@ -228,47 +228,46 @@ class SequencePathTheme:
 
 class SequencePathWidget:
     "Dropdown for choosing a fasta file"
-    __dialog: FileDialog
-    __widget: Dropdown
-    __theme:  SequencePathTheme
-    __model:  SequenceModel
+    _dialog: FileDialog
+    _widget: Dropdown
+    _theme:  SequencePathTheme
+    _model:  SequenceModel
     def __init__(self, ctrl, noerase = False, **kwa):
-        self.__list: List[str] = []
-        self.__theme           = ctrl.theme.add(SequencePathTheme(**kwa), noerase = noerase)
-        self.__model           = SequenceModel().addto(ctrl, noerase = noerase)
+        self._theme           = ctrl.theme.add(SequencePathTheme(**kwa), noerase = noerase)
+        self._model           = SequenceModel().addto(ctrl, noerase = noerase)
 
     def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
         "creates the widget"
-        self.__widget = Dropdown(name  = 'Cycles:Sequence',
-                                 width = self.__theme.width,
-                                 **self.__data())
+        self._widget = Dropdown(name  = 'Cycles:Sequence',
+                                width = self._theme.width,
+                                **self._data())
 
-        mainview.differedobserver(self.__data, self.__widget,
-                                  ctrl.theme,   self.__model.config,
-                                  ctrl.display, self.__model.display)
+        mainview.differedobserver(self._data, self._widget,
+                                  ctrl.theme,   self._model.config,
+                                  ctrl.display, self._model.display)
 
         @mainview.actionifactive(ctrl)
         def _onclick(new):
-            self.__onclick(ctrl, new)
+            self._onclick(ctrl, new)
 
-        self.__widget.on_click(_onclick)
-        return [self.__widget]
+        self._widget.on_click(_onclick)
+        return [self._widget]
 
     def observe(self, ctrl):
         "sets-up config observers"
-        self.__dialog = FileDialog(ctrl,
-                                   storage   = "sequence",
-                                   title     = self.__theme.dlgtitle,
-                                   filetypes = 'fasta|*')
+        self._dialog = FileDialog(ctrl,
+                                  storage   = "sequence",
+                                  title     = self._theme.dlgtitle,
+                                  filetypes = 'fasta|*')
 
     def reset(self, resets):
         "updates the widget"
-        resets[self.__widget].update(**self.__data())
+        resets[self._widget].update(**self._data())
 
     @property
     def widget(self):
         "returns the widget"
-        return self.__widget
+        return self._widget
 
     def callbacks(self, hover: SequenceHoverMixin, tick1: SequenceTicker):
         "sets-up callbacks for the tooltips and grids"
@@ -280,47 +279,31 @@ class SequencePathWidget:
                                    "  src.data['text'] = src.data[cb_obj.value];"
                                    "  src.change.emit(); }"),
                            args = dict(tick1 = tick1, tick2 = tick1.axis, src = hover.source))
-            self.__widget.js_on_change('value', jsc)
-        return self.__widget
+            self._widget.js_on_change('value', jsc)
+        return self._widget
 
-    @staticmethod
-    def _sort(lst) -> List[str]:
-        return sorted(lst)
-
-    def _reference(self) -> Optional[str]: # pylint: disable=no-self-use
-        return None
-
-    def __data(self) -> dict:
-        lst = self.__list
-        lst.clear()
-        lst.extend(self._sort(sorted(self.__model.config.sequences.keys())))
-
-        key   = self.__model.currentkey
+    def _data(self) -> dict:
+        lst   = sorted(self._model.config.sequences.keys())
+        key   = self._model.currentkey
         val   = key if key in lst else None
-        label = self.__theme.missingkey if val is None else key
+        label = self._theme.missingkey if val is None else key
 
         menu: List[Optional[Tuple[str,str]]] = [(i, i) for i in lst]
-        menu += [None if len(menu) else ('', '→'), (self.__theme.missingpath, '←')]
+        menu += [None if len(menu) else ('', '→'), (self._theme.missingpath, '←')]
 
-        ref   = self._reference() # pylint: disable=assignment-from-none
-        ind   = next((i for i, j in enumerate(menu)
-                      if j is not None and j[0] == ref),
-                     None)
-        if ind is not None:
-            vals      = cast(tuple, menu[ind])
-            menu[ind] = vals = (self.__theme.refcheck + vals[0], vals[1])
-            label     = vals[0] if label == vals[1] else label
         return dict(menu  = menu, label = label, value = '→' if val is None else val)
 
-    def __onclick(self, ctrl, new):
-        if new in self.__list:
-            self.__model.setnewkey(ctrl, new)
-        elif new == '←':
-            path = self.__dialog.open()
-            self.__widget.value = '→'
-            if self.__model.setnewsequencepath(ctrl, path):
+    def _onclick(self, ctrl, new):
+        if new == '←':
+            path = self._dialog.open()
+            self._widget.value = '→'
+            if self._model.setnewsequencepath(ctrl, path):
                 if path is not None:
                     raise IOError("Could not find any sequence in the file")
+        elif new != '→':
+            for i, j in list(self._widget.menu)[:-2]:
+                if j == new:
+                    self._model.setnewkey(ctrl, i)
 
 @dataclass
 class OligoListTheme:

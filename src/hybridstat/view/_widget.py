@@ -95,18 +95,28 @@ class PeaksSequencePathWidget(SequencePathWidget):
         super().__init__(ctrl)
         self.__peaks = mdl
 
-    def _sort(self, lst) -> List[str]: # type: ignore
+    def _data(self) -> dict:
+        out  = super()._data()
         dist = self.__peaks.distances
-        if len(dist):
-            lst  = [i for i in lst if i in dist]
-            return sorted(lst, key = lambda i: dist[i].value)
-        return super()._sort(lst)
+        if len(dist) == 0 or len(out['menu']) <= 3:
+            return out
 
-    def _reference(self) -> Optional[str]:
-        ref = self.__peaks.fittoreference.reference
+        menu = [i[0] for i in out['menu'][:-2] if i[0] in dist]
+        menu = sorted(menu, key = lambda i: dist[i].value)
+        ref  = self.__peaks.fittoreference.reference
         if ref is not None and ref != self.__peaks.roottask:
-            return self.__peaks.identification.constraints(ref)[0]
-        return None
+            tmp = self.__peaks.identification.constraints(ref)[0]
+            ind = next((i for i, j in enumerate(menu) if j is not None and j == tmp),
+                       None)
+        else:
+            ind = None
+
+        out['menu'] = [(j, f'[{i+1}] '+ (self._theme.refcheck if i == ind else "") + j)
+                       for i, j in enumerate(menu)] + out['menu'][-2:]
+        for i, j in out['menu'][:-2]:
+            if out['label'] == i:
+                out['label'] = out['value'] = j
+        return out
 
     # pylint: disable=arguments-differ
     def callbacks(self,  # type: ignore
@@ -263,6 +273,7 @@ class PeaksStatsWidget:
     def __data(self) -> Dict[str,str]:
         tbl = self._TableConstructor(self.__theme)
         tbl.trackdependant(self.__model)
+        tbl.default(self.__model)
         ret = {'': tbl()}
 
         if self.__model.identification.task is not None:
@@ -274,9 +285,6 @@ class PeaksStatsWidget:
         elif self.__model.fittoreference.task is not None:
             tbl.referencedependant(self.__model)
             ret[''] = tbl()
-        else:
-            tbl.default(self.__model)
-            ret = {'': tbl()}
         return ret
 
 @dataclass
