@@ -71,7 +71,7 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
     @classmethod
     def __output(cls, out) -> Iterator[ByHairpinGroup]:
         one  = lambda i, j: ByHairpinBead(i[0], i[1], i[2][j], i[3], i[4])
-        best = {itm.key: min(itm.distances, key = itm.distances.__getitem__)
+        best = {itm.key: min(itm.distances, key = itm.distances.__getitem__, default = None)
                 for itm in out.values()}
         for hpname in sorted(set(best.values()), key = lambda x: x or chr(255)):
             vals = (one(val, hpname) for key, val in out.items() if best[key] == hpname)

@@ -60,15 +60,17 @@ class FitToHairpinTask(Task):
     * `peaks      : the peak position in nm together with the hairpin peak it's affected to.
     * `events     : peak events as out of an `Events` view.
     """
-    level                     = Level.peak
-    fit         : Fitters     = dict()
-    constraints : Constraints = dict()
-    match       : Matchers    = dict()
-    pullphaseratio: float     = .88
-    DEFAULT_FIT               = PeakGridFit
-    DEFAULT_MATCH             = PeakMatching
-    DEFAULT_CONSTRAINTS       = dict(stretch = Range(None, 0.1,  10.),
-                                     bias    = Range(None, 1e-4, 3e-3))
+    level                           = Level.peak
+    fit         : Fitters           = dict()
+    constraints : Constraints       = dict()
+    match       : Matchers          = dict()
+    pullphaseratio: Optional[float] = .88
+    DEFAULT_FIT                     = PeakGridFit
+    DEFAULT_MATCH                   = PeakMatching
+    DEFAULT_CONSTRAINTS             = dict(
+        stretch = Range(None, 0.1,  10.),
+        bias    = Range(None, 1e-4, 3e-3)
+    )
 
     def __delayed_init__(self, kwa):
         if not isinstance(self.fit, dict):
@@ -166,26 +168,21 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
         return cls._transform_to_bead_ids(sel)
 
     def __distances(self, key: BEADKEY, bead: Sequence[float])->Dict[Optional[str], Distance]:
-        fits        = self.config.fit
-        constraints = self.config.constraints
-        cstr        = constraints.get(key, None)
+        fits = self.config.fit
+        cstr = self.config.constraints.get(key, None)
+        hpin = None if cstr is None else fits.get(cast(str, cstr[0]), None)
         if cstr is not None:
-            hpin = fits.get(cast(str, cstr[0]), None)
             if hpin is not None:
-                hpin = updatecopy(hpin, **cstr[1])
-                return {cstr[0]: hpin.optimize(bead)}
-
+                fits = {cast(str, cstr[0]): hpin}
             fits = {i: updatecopy(j, **cstr[1]) for i, j in fits.items()}
 
-        if len(bead) > 0:
-            extent  = self.beadextension(key)
-            if extent is None:
-                return {name: calc.optimize(bead) for name, calc in fits.items()}
-            extent *= self.config.pullphaseratio
-            return {name: calc.optimizewithinrange(bead, extent)
-                    for name, calc in fits.items()}
+        if hpin is None and self.config.pullphaseratio is not None:
+            extent = self.beadextension(key)
+            if extent is not None:
+                extent *= self.config.pullphaseratio
+                fits    = {i: j for i, j in fits.items() if j.withinrange(extent)}
 
-        return {None: next(iter(fits.values())).optimize(bead)}
+        return {name: calc.optimize(bead) for name, calc in fits.items()}
 
     def __beadoutput(self,
                      key     : BEADKEY,
@@ -193,6 +190,9 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
                      events  : PeakEvents,
                      dist    : Dict[Optional[str], Distance],
                     ) -> FitBead:
+        if len(dist) == 0:
+            return FitBead(key, -1., dist, PeakMatching.empty(peaks), events)
+
         best = cast(str, min(dist, key = dist.__getitem__))
         silh = HairpinFitter.silhouette(dist, best)
         alg  = self.config.match.get(best, self.config.DEFAULT_MATCH())
