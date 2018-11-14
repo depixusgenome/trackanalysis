@@ -549,57 +549,6 @@ class _IdAccessor:
         "return the line for this descriptor"
         return self._label, self._LABEL.format(self = self)
 
-
-class _ClippingDescriptor:
-    _name: str
-    def __set_name__(self, _, name):
-        self._name = name
-
-    def getdefault(self,inst):
-        "returns default single strand suppression"
-        if inst is None:
-            return self
-        tsk = getattr(inst,'_model').clipping.configtask
-        return None if tsk is None or tsk.disabled else tsk.lowfactor
-
-    def __get__(self, inst, owner):
-        if inst is None:
-            return self
-        tsk = getattr(inst,'_model').clipping.task
-        return None if tsk is None or tsk.disabled else tsk.lowfactor
-
-    def __set__(self,inst, value):
-        cnf = getattr(inst,'_model').clipping
-        if value is None:
-            cnf.update(disabled = True)
-        else:
-            cnf.update(disabled  = False, lowfactor = value)
-
-    def line(self):
-        "the gui line"
-        return ('Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α',  f'%({self._name})of')
-
-class _SingleStrandDescriptor:
-    _name: str
-    def __set_name__(self, _, name):
-        self._name = name
-
-    def getdefault(self,inst):
-        "returns default single strand suppression"
-        return (self if inst is None else
-                not getattr(inst,'_model').singlestrand.configtask.disabled)
-
-    def __get__(self,inst,owner):
-        return (self if inst is None else
-                getattr(inst,'_model').singlestrand.task is not None)
-
-    def __set__(self,inst, value):
-        getattr(inst,'_model').singlestrand.update(disabled = not value)
-
-    def line(self):
-        "the gui line"
-        return ('Discard the single strand peak', f'%({self._name})b')
-
 class _PeakDescriptor:
     def getdefault(self,inst):
         "returns default peak finder"
@@ -627,18 +576,22 @@ def advanced(title = 'Peaks', others = None, **figure):
     @tab.title(title+' Configuration')
     @tbl
     @tab("Cleaning",
-         _ClippingDescriptor(),
+         'Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α %(clipping.lowfactor).1oF',
          BeadSubtractionModalDescriptor(),
          AlignmentModalDescriptor())
     @tab("Peaks",
-         'Min frame count per hybridisation %(eventdetection.events.select.minlength)d',
-         'Min hybridisations per peak %(peakselection.finder.grouper.mincount)d',
+         """
+         Min frame count per hybridisation %(eventdetection.events.select.minlength)D
+         Min hybridisations per peak %(peakselection.finder.grouper.mincount)D
+         """,
          _IdAccessor('Keep z=0 peak %(fit)b',
                      lambda i: i.firstpeak,
                      lambda i: {'firstpeak': i}),
-         _SingleStrandDescriptor(),
-         tab.tasknoneattr('Re-align cycles using peaks%(peakselection.align)b'),
-         'Peak kernel size (blank ⇒ auto) %(peakselection.precision)of',
+         """
+         Discard the single strand peak %(task.singlestrand)b
+         Re-align cycles using peaks %(peakselection.align)b
+         Peak kernel size (blank ⇒ auto) %(peakselection.precision).4oF
+         """,
          _IdAccessor('Exhaustive fit algorithm %(fit)b',
                      lambda i: isinstance(i, PeakGridFit),
                      lambda i: ((ChiSquareFit, PeakGridFit)[i](),)),
