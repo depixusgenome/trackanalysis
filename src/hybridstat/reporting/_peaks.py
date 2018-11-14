@@ -57,6 +57,8 @@ class Probabilities(HasLengthPeak):
 
     def array(self, name: str, ref:Group, ipk:int):
         "returns an array of values for this hairpin peak"
+        if ref.key not in self.hairpins:
+            return np.empty(0, dtype = 'f4')
         pkkey = np.int32(self.hairpins[ref.key].peaks[ipk]+.1) # type: ignore
         itr   = (self.__call__(name, None, i, j)
                  for i in ref.beads
@@ -104,6 +106,9 @@ class Neighbours(HasLengthPeak):
             self._oldbead = (ref, bead)
 
         if bead is None:
+            if ref.key not in self.hairpins:
+                return 0
+
             i = int(self.hairpins[ref.key].peaks[ipk])
         elif bead.peaks['key'][ipk] < 0:
             i = int(floor(self.basevalue(bead, ipk)+.5))
@@ -118,7 +123,7 @@ class Neighbours(HasLengthPeak):
 
     def neighbours(self, ref:Group, bead:Bead, ipk:int) -> Optional[str]:
         "Peak bases and neighbours"
-        if self.isstructural(ref, bead, ipk):
+        if self.isstructural(ref, bead, ipk) or ref.key not in self._seqs:
             return None
 
         ind = self.__compute(ref, bead, ipk)
@@ -130,7 +135,7 @@ class Neighbours(HasLengthPeak):
 
     def orientation(self, ref:Group, bead:Bead, ipk:int) -> Optional[bool]:
         "Strand on which the oligo sticks"
-        if self.isstructural(ref, bead, ipk):
+        if self.isstructural(ref, bead, ipk) or ref.key not in self._seqs:
             return None
 
         ind = self.__compute(ref, bead, ipk)
@@ -182,6 +187,8 @@ class PositionInRef(HasLengthPeak):
                 return self._posfmt.format(self._peakrow, self._beadrow, self._beadrow)
 
         if bead is None:
+            if ref.key not in self._hpins:
+                return None
             return self._hpins[ref.key].peaks[ipk]
         return self.basevalue(bead, ipk)
 
@@ -215,8 +222,9 @@ class PeaksSheet(Reporter):
             if group.key is None:
                 continue
 
-            hpin = self.config.hairpins[group.key]
-            yield from ((group, None, i) for i in range(len(hpin.peaks)))
+            if group.key in self.config.hairpins:
+                hpin = self.config.hairpins[group.key]
+                yield from ((group, None, i) for i in range(len(hpin.peaks)))
 
             for bead in group.beads:
                 yield from ((group, bead, i) for i in range(len(bead.peaks)))
@@ -258,6 +266,8 @@ class PeaksSheet(Reporter):
         if ipk == 0:
             return 0
         if bead is None:
+            if ref.key not in self.config.hairpins:
+                return None
             return self.config.hairpins[ref.key].peaks[ipk]
         val = bead.peaks['key'][ipk]
         return val if val >= 0 else None
@@ -267,6 +277,8 @@ class PeaksSheet(Reporter):
                    fmt   = Reporter.basefmt)
     def _peakref(self, *args) -> Optional[float]:
         "Position of the peak in the reference's frame"
+        if args[0].key not in self.config.hairpins:
+            return None
         return self._pos.position(*args)
 
     @column_method("Distance to Reference",

@@ -70,15 +70,14 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
 
     @classmethod
     def __output(cls, out) -> Iterator[ByHairpinGroup]:
-        one  = lambda i, j: ByHairpinBead(i[0], i[1], i[2][j], i[3], i[4])
-        best = {itm.key: min(itm.distances, key = itm.distances.__getitem__, default = None)
+        dflt = BeadsByHairpinTask.DEFAULT_FIT().defaultparameters()
+        one  = lambda i, j: ByHairpinBead(i[0], i[1], i[2].get(j, dflt), i[3], i[4])
+        best = {itm.key: min(itm.distances, key = itm.distances.__getitem__, default = '✗')
                 for itm in out.values()}
         for hpname in sorted(set(best.values()), key = lambda x: x or chr(255)):
-            vals = (one(val, hpname) for key, val in out.items() if best[key] == hpname)
-            yield ByHairpinGroup(hpname,
-                                 sorted(vals,
-                                        key     = lambda i: i.silhouette,
-                                        reverse = True))
+            vals = [one(val, hpname) for key, val in out.items() if best[key] == hpname]
+            vals = sorted(vals, key = lambda i: i.silhouette, reverse = True)
+            yield ByHairpinGroup(hpname, vals)
 
     @classmethod
     def _unpooled(cls, cnf, frame):

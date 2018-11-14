@@ -66,9 +66,9 @@ def config(self:OptimType, **kwa) -> Dict[str, float]:
 
 class OptimizationParams:
     "Optimizing parameters"
-    DEFAULT_STRETCH  = 1./8.8e-4
-    stretch          = Range(DEFAULT_STRETCH, 200., 100.)
-    bias             = Range(None,       60./DEFAULT_STRETCH, 60./DEFAULT_STRETCH)
+    defaultstretch  = 1./8.8e-4
+    stretch          = Range(defaultstretch, 200., 100.)
+    bias             = Range(None,       60./defaultstretch, 60./defaultstretch)
     optim: OptimType = LBFGSParameters(1e-4, 1e-8, 1e-4, 1e-8, 100)
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -158,14 +158,14 @@ class PointwiseOptimization(OptimizationParams):
 def _chi2cost(ref, exp, pairs, symmetry, dist):
     if symmetry is Symmetry.both:
         dist += (len(exp)+len(ref)-2.*len(pairs))**2
-        return np.sqrt(dist/(len(exp)+len(ref))) if len(exp)+len(ref) else np.finfo('f4').max
+        return np.sqrt(dist/(len(exp)+len(ref))) if len(exp)+len(ref) else DEFAULT_BEST
 
     if symmetry is Symmetry.left:
         dist += (len(ref)-len(pairs))**2
-        return np.sqrt(dist/len(ref)) if len(ref) else np.finfo('f4').max
+        return np.sqrt(dist/len(ref)) if len(ref) else DEFAULT_BEST
 
     dist += (len(exp)-len(pairs))**2
-    return np.sqrt(dist/len(exp)) if len(exp) else np.finfo('f4').max
+    return np.sqrt(dist/len(exp)) if len(exp) else DEFAULT_BEST
 
 def chisquare(ref       : np.ndarray, # pylint: disable=too-many-arguments
               exp       : np.ndarray,

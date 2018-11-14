@@ -29,6 +29,8 @@ class HasLengthPeak:
             return True
 
         if bead is None:
+            if ref.key not in self.hairpins:
+                return True
             return len(self.hairpins[ref.key].peaks) == ipk+1
 
         return ipk == 0 or (self.haslengthpeak and ipk == len(bead.peaks)-1)
@@ -74,6 +76,8 @@ class ChartCreator:
 
     def _peaks(self, ref:Group, bead:Bead):
         if bead is None:
+            if ref.key not in self._parent.config.hairpins:
+                return np.empty(0, dtype = 'f4')
             return self._parent.config.hairpins[ref.key].peaks
         return bead.peaks['zvalue'] # type: ignore
 

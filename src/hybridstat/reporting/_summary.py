@@ -71,7 +71,7 @@ class SummarySheet(Reporter):
         Median uncertainty on peak positions.
         """
         if bead is None:
-            if ref.key is None:
+            if ref.key not in self.config.hairpins:
                 return None
             npeaks = len(self.config.hairpins[ref.key].peaks[:-1])
             return self._sigmap(npeaks)
@@ -138,9 +138,9 @@ class SummarySheet(Reporter):
     @column_method("Peak Count")
     def _npeaks(self, ref:Group, bead:Bead) -> Optional[int]:
         """Number of peaks detected for that bead."""
-        if bead is None and ref.key is None:
-            return None
         if bead is None:
+            if ref.key not in self.config.hairpins:
+                return None
             return len(self.config.hairpins[ref.key].peaks[:-1])
         return len(bead.peaks)
 
@@ -158,7 +158,7 @@ class SummarySheet(Reporter):
         """
         # ignore first peak which is always set to zero in the ref
         if bead is None:
-            if ref.key is None:
+            if ref.key not in self.config.hairpins:
                 return None
 
             peaks = self.config.hairpins[ref.key].peaks[1:-1]
