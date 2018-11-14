@@ -34,9 +34,14 @@
 
     on_change_sequence: (src, peaks, stats, tick1, tick2, menu) ->
         if menu.value in Object.keys(src.data)
+            good = false
             for i in menu.menu
-                if i?[1]? == menu.value
+                if (i?) && (i[1] == menu.value)
                     menu.label = i[0]
+                    good       = true
+                    break
+            if !good
+                menu.label = menu.value
 
             tick1.key        = menu.value
             tick2.key        = menu.value

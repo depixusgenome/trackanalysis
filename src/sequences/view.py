@@ -224,6 +224,7 @@ class SequencePathTheme:
     missingkey : str = 'Select a hairpin sequence'
     missingpath: str = 'Select a hairpin path'
     refcheck   : str = '(ref) '
+    inds       : str = '₁₂₃₄₅₆₇₈₉'
     width      : int = 280
 
 class SequencePathWidget:

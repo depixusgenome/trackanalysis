@@ -101,21 +101,28 @@ class PeaksSequencePathWidget(SequencePathWidget):
         if len(dist) == 0 or len(out['menu']) <= 3:
             return out
 
-        menu = [i[0] for i in out['menu'][:-2] if i[0] in dist]
-        menu = sorted(menu, key = lambda i: dist[i].value)
+        tmp  = self.__peaks.identification.constraints()[0]
+        menu = [i[0] for i in out['menu'][:-2] if tmp is None or i[0] == tmp]
+        menu = sorted(menu, key = lambda i: (dist.get(i, (np.finfo('f4').max,))[0], i))
+
+        def _get(i, j):
+            if j in dist:
+                inds = self._theme.inds
+                return inds[i]+' ' if i < len(inds) else ''
+            return "" if self.__peaks.identification.task is None else "✗ "
+
+        out['menu'] = [(_get(i, j)+j, j) for i, j in enumerate(menu)]
+
         ref  = self.__peaks.fittoreference.reference
         if ref is not None and ref != self.__peaks.roottask:
             tmp = self.__peaks.identification.constraints(ref)[0]
-            ind = next((i for i, j in enumerate(menu) if j is not None and j == tmp),
-                       None)
-        else:
-            ind = None
+            ind = next((i for i, j in enumerate(menu) if j == tmp), None)
+            if ind is not None:
+                out['menu'][ind] = (self._theme.refcheck+menu[ind], menu[ind])
 
-        out['menu'] = [(f'[{i+1}] '+ (self._theme.refcheck if i == ind else "") + j, j)
-                       for i, j in enumerate(menu)] + out['menu'][-2:]
-        for i, j in out['menu'][:-2]:
-            if out['label'] == j:
-                out['label'] = i
+        for i, j in enumerate(out['menu'][:-2]):
+            if out['label'] == j[1]:
+                out['label'] = j[0]
         return out
 
     # pylint: disable=arguments-differ

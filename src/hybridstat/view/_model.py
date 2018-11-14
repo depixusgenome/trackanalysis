@@ -660,13 +660,7 @@ def createpeaks(mdl, themecolors, vals) -> Dict[str, np.ndarray]:
     peaks          = dict(mdl.peaks)
     peaks['color'] = [colors[0]]*len(peaks.get('id', ()))
     if vals is not None and mdl.identification.task is not None and len(mdl.distances):
-        alldist = mdl.distances
-        if mdl.sequencekey not in alldist:
-            mdl.sequencekey = max(tuple(alldist), key = lambda x: alldist[x].value)
-
         for key in mdl.sequences(...):
-            if key not in alldist:
-                continue
             peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors[:2])
             if key == mdl.sequencekey:
                 peaks['color'] = peaks[mdl.sequencekey+'color']
