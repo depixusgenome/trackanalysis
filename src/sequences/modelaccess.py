@@ -47,7 +47,7 @@ class SequenceModel:
         "sets new probes"
         hpins = dict(self.display.hpins)
         if new is None:
-            hpins.pop(self.tasks.bead)
+            hpins.pop(self.tasks.bead, None)
         else:
             hpins[self.tasks.bead] = new
         ctrl.display.update(self.display, hpins = hpins)
