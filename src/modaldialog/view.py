@@ -5,7 +5,7 @@ Allows creating modals from anywhere
 """
 from copy               import deepcopy
 from functools          import partial
-from typing             import Dict, List, Tuple, Any, Union, Optional, Callable, cast
+from typing             import Dict, List, Tuple, Any, Union, cast
 from bokeh.document     import Document
 from bokeh.models       import Widget, Button
 from view.fonticon      import FontIcon
@@ -71,22 +71,25 @@ class TaskDescriptor:
     "Access to a task"
     _LABEL = '%({self.attrname}){self.fmt}'
     __NONE = type('_None', (), {})
-    label: str                = ""
-    fmt  : str                = ""
-    keys : List[str]          = dflt([])
-    fget : Optional[Callable] = None
-    fset : Optional[Callable] = None
-    attrname : str            = ""
+    label: str       = ""
+    fmt  : str       = ""
+    keys : List[str] = dflt([])
+    attrname : str   = ""
     def __post_init__(self):
         if not self.fmt:
-            ix1, ix2    = self.label.rfind("%("), self.label.rfind(")")
+            ix1, ix2   = self.label.rfind("%("), self.label.rfind(")")
             self.fmt   = self.label[ix2+1:]
             self.keys  = self.label[ix1+2:ix2].split(".")
             self.label = self.label[:ix1].strip()
 
         if isinstance(self.keys, str):
             self.keys = self.keys.split('.')
-        assert len(self.keys) >= 2
+        if self.keys[0] == 'task':
+            self.keys = self.keys[1:]
+        if len(self.keys) == 1:
+            self.fmt = 'b'
+
+        assert len(self.keys) >= 1
         assert len(self.fmt)
         assert len(self.label)
 
@@ -108,61 +111,57 @@ class TaskDescriptor:
                mdl.configtask            if wherefrom == "config" else
                mdl.defaultconfigtask)
 
+        if len(self.keys) == 1:
+            return False if mdl is None else not mdl.disabled
+
         for key in self.keys[1:]:
             mdl = getattr(mdl, key)
-        # pylint: disable=not-callable
-        return self.fget(mdl) if callable(self.fget) else mdl
 
-    getdefault = get
+        if self.fmt == 'b' and not isinstance(mdl, bool):
+            return mdl is not None
+        return mdl
+
+    def getdefault(self, obj):
+        """
+        Gets the attribute in the task.
+
+        Use config = True to access the default value
+        """
+        return self.get(obj)
 
     def __get__(self, obj, tpe):
         return self if obj is None else self.get(obj, 'model')
 
     def __set__(self, obj, val):
-        tsk  = self.__model(obj).task
         outp = obj._get_output() # pylint: disable=protected-access
+        if len(self.keys) == 1:
+            outp.setdefault(self.keys[0], {})['disabled'] = not val
+            return
+
+        tsk = self.__model(obj).tasktype
         if len(self.keys) == 2:
-            # pylint: disable=not-callable
-            val = self.fset(tsk, val) if callable(self.fset) else val
+            mdl = getattr(tsk, self.keys[1])
+            if self.fmt == "b" and not isinstance(mdl, bool):
+                val = deepcopy(mdl) if val else None
             outp.setdefault(self.keys[0], {})[self.keys[1]] = val
-        else:
-            mdl = outp.setdefault(self.keys[0], {}).get(self.keys[1], self.__NONE)
-            if mdl is self.__NONE:
-                mdl = deepcopy(getattr(tsk, self.keys[1]))
-                outp[self.keys[0]][self.keys[1]] = mdl
+            return
 
-            for key in self.keys[2:-1]:
-                mdl = getattr(mdl, key)
+        mdl = outp.setdefault(self.keys[0], {}).get(self.keys[1], self.__NONE)
+        if mdl is self.__NONE:
+            mdl = deepcopy(getattr(tsk, self.keys[1]))
+            outp[self.keys[0]][self.keys[1]] = mdl
 
-            if callable(self.fset):
-                # pylint: disable=not-callable
-                setattr(mdl, self.keys[-1], self.fset(mdl, val))
-            else:
-                setattr(mdl, self.keys[-1], val)
+        for key in self.keys[2:-1]:
+            mdl = getattr(mdl, key)
+
+        attr = getattr(type(mdl)(), self.keys[-1])
+        if self.fmt == "b" and not isinstance(attr, bool):
+            val = deepcopy(attr) if val else None
+        setattr(mdl, self.keys[-1], val)
 
     def line(self) -> Tuple[str, str]:
         "return the line for this descriptor"
         return self.label, self._LABEL.format(self = self)
-
-    @classmethod
-    def attr(cls, akeys:str, fget = None, fset = None):
-        "sets a task's attribute"
-        return cls(akeys, "", [], fget, fset) # type: ignore
-
-    @classmethod
-    def none(cls, akeys:str):
-        "sets a task's attribute to None or the default value"
-        key = akeys.split('.')[-1]
-        def _fset(obj, val):
-            if val is False:
-                return None
-
-            attr = getattr(obj, key)
-            if attr is None:
-                attr = deepcopy(getattr(type(obj), key))
-            return attr
-
-        return cls(akeys, "", [], lambda i: i is not None, _fset) # type: ignore
 
 @dataclass
 class AdvancedDescriptor:
@@ -214,8 +213,7 @@ class AdvancedDescriptor:
 
     def getdefault(self, inst):
         "return the default value"
-        out = self._controller(inst).get(self.cnf, self.ctrlname, defaultmodel = True)
-        return out
+        return self._controller(inst).get(self.cnf, self.ctrlname, defaultmodel = True)
 
     def line(self) -> Tuple[str, str]:
         "return the line for this descriptor"
@@ -348,8 +346,29 @@ class AdvancedWidget:
                 mdl = getattr(mdl, key.split('|')[0])
             return mdl
 
+        def _format(label, val):
+            if isinstance(val, bool):
+                return '▢✓'[val]
+            if isinstance(val, str):
+                return val
+
+            fmt = label[label.rfind("%")+1:]
+            if ')' in fmt:
+                fmt = label[label.rfind(')')+1:]
+            if len(fmt) >= 2 and fmt[-2] == 'o':
+                fmt = fmt[:-2]+fmt[-1]
+
+            if fmt == 'b':
+                return _format('', val is not None)
+            if val is None:
+                return ' '
+            try:
+                return ('%'+fmt) % val
+            except TypeError:
+                return str(val)
+
         def _add(title, val):
-            keys        = val[val.find('(')+1:val.rfind(')')].split('.')
+            keys        = val[val.rfind('%(')+2:val.rfind(')')].split('.')
             dfval, found = _default(keys)
             if not found or dfval == _value(keys):
                 return title, '', val
@@ -358,14 +377,7 @@ class AdvancedWidget:
                 opts = val[val.find('(')+1:val.find(')')]
                 disp = dict(i.split(':') for i in opts.split('|')[1:])[str(dfval)]
             else:
-                try:
-                    disp = (' '  if dfval is None  else
-                            '✓'  if dfval is True  else
-                            '▢'  if dfval is False else
-                            dfval if isinstance(dfval, str) else
-                            ('%'+val[val.rfind(')')+1:]) % dfval)
-                except TypeError:
-                    disp = str(dfval)
+                disp = _format(val, dfval)
 
             return title, f'({disp})', val
 
@@ -443,11 +455,16 @@ class TabCreator:
     "create tabs"
     def __call__(self, title: str, *args, **kwa):
         "adds descriptors to a class or returns an advanced tab"
+        args      = sum((list(i.split('\n')) if isinstance(i, str) else [i] # type: ignore
+                         for i in args), [])
         first     = next((i for i in args if isinstance(i, bool)), True)
         itms:list = []
         for i, j in enumerate(args):
-            if isinstance(j, bool):
+            if isinstance(j, str):
+                j = j.strip()
+            if isinstance(j, bool) or not j:
                 continue
+
             label = f"{''.join(title.split()).lower()}{i}"
             if isinstance(j, str) and "%(" in j and '.' in j[j.rfind("%("):j.rfind(")")]:
                 itms.append((label, self.taskattr(j)))
@@ -478,14 +495,9 @@ class TabCreator:
         return _wrapper
 
     @classmethod
-    def taskattr(cls, akeys:str, fget = None, fset = None):
+    def taskattr(cls, akeys:str):
         "sets a task's attribute"
-        return TaskDescriptor.attr(akeys, fget, fset)
-
-    @classmethod
-    def tasknoneattr(cls, akeys:str):
-        "sets a task's attribute to None or the default value"
-        return TaskDescriptor.none(akeys)
+        return TaskDescriptor(akeys) # type: ignore
 
     def figure(self, cnf, disp = None, yaxis = True, xaxis = False, **kwa):
         "adds descriptors to a class or returns an advanced tab"
