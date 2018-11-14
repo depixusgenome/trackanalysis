@@ -25,7 +25,8 @@ from peakcalling.processor.fittohairpin     import (Constraints, HairpinFitter,
                                                     PeakMatching, Range,
                                                     DistanceConstraint)
 from sequences.modelaccess      import SequencePlotModelAccess
-from utils                      import dataclass, dflt, updatecopy, initdefaults
+from utils                      import (dataclass, dflt, updatecopy, initdefaults,
+                                        NoArgs)
 from view.base                  import spawn
 from view.colors                import tohex
 from view.plots.base            import themed
@@ -387,6 +388,14 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         "return a task attribute"
         return self._ctrl.theme.get(self.__defaults, name, defaultmodel = not usr)
 
+    def attribute(self, name, key = NoArgs):
+        "return a task attribute"
+        task = self.task
+        if task is None:
+            return getattr(self.__defaults, name)
+        attr = getattr(task, name)
+        return attr if key is NoArgs else attr[key]
+
     def default(self, mdl):
         "returns the default identification task"
         ols = mdl.oligos
@@ -460,27 +469,29 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
             return []
         return self.fixedbeads.current(self._ctrl, self.roottask)
 
+    def getfitparameters(self, key = NoArgs) -> Tuple[float, float]:
+        "return the stretch  & bias for the current bead"
+        dist = self.peaksmodel.display.distances
+        key  = self.sequencekey if key is NoArgs else key
+        if key in dist:
+            return dist[key][1:]
+
+        out = self.identification.constraints()[1:]
+        if out[0] is None:
+            out = self.peaksmodel.config.estimatedstretch, out[1]
+        if out[1] is None:
+            out = out[0], self.peaksmodel.display.estimatedbias
+        return cast(Tuple[float, float], out)
+
     @property
     def stretch(self) -> float:
         "return the stretch for the current bead"
-        dist = self.peaksmodel.display.distances
-        key  = self.sequencekey
-        if key in dist:
-            return dist[key].stretch
-
-        out = self.identification.constraints()[1]
-        return self.peaksmodel.config.estimatedstretch if out is None else out
+        return self.getfitparameters()[0]
 
     @property
     def bias(self) -> float:
         "return the bias for the current bead"
-        dist = self.peaksmodel.display.distances
-        key  = self.sequencekey
-        if key in dist:
-            return dist[key].bias
-
-        out = self.identification.constraints()[2]
-        return self.peaksmodel.display.estimatedbias if out is None else out
+        return self.getfitparameters()[1]
 
     @property
     def sequencekey(self) -> Optional[str]:

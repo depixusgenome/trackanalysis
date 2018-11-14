@@ -8,7 +8,6 @@ from itertools                  import product
 import numpy                    as     np
 
 from eventdetection.processor   import EventDetectionTask
-from peakcalling.processor      import FitToHairpinTask
 from peakfinding.probabilities  import Probability
 
 if TYPE_CHECKING:
@@ -74,18 +73,10 @@ class IdentificationPeakInfo(PeakInfo):
 
     def values(self, mdl: 'PeaksPlotModelAccess', peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
-        zvals   = np.array([i[0] for i in peaks], dtype = 'f4')
-        if not len(mdl.distances):
-            dico['bases'] = (zvals-mdl.bias)*mdl.stretch
-            return
-
-        task = cast(FitToHairpinTask, mdl.identification.task)
+        zvals = np.array([i[0] for i in peaks], dtype = 'f4')
         for key, hyb in mdl.hybridisations(...).items():
-            if key not in mdl.distances:
-                continue
-
-            dist = mdl.distances[key].stretch, mdl.distances[key].bias
-            tmp  = task.match[key].pair(zvals, *dist)['key'] # type: ignore
+            dist = mdl.getfitparameters(key)
+            tmp  = mdl.identification.attribute('match', key).pair(zvals, *dist)['key']
             good = tmp >= 0
             ori  = dict(hyb)
 
