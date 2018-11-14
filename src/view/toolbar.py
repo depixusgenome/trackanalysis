@@ -59,7 +59,7 @@ class TrackFileDialog(FileDialog):
 
     def setup(self, ctrl, _):
         "sets the document"
-        self.filetypes = '*|'+TaskIO.extensions(ctrl, 'openers')
+        self.filetypes = TaskIO.extensions(ctrl, 'openers')+'|*'
         self.title     = ctrl.theme.get("toolbar", 'opentitle')
 
     async def run(self, ctrl, doc):

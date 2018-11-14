@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Different file dialogs."
 import sys
+from itertools          import repeat
 from pathlib            import Path
 from typing             import List, Optional, Callable, Dict, Tuple
 from tkinter            import Tk as _Tk
@@ -9,7 +10,7 @@ from tkinter.filedialog import (askopenfilename   as _tkopen,
                                 asksaveasfilename as _tksave)
 from utils              import initdefaults
 
-_m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
+_m_none    = type('_m_none', (), {}) # pylint: disable=invalid-name
 class FileDialogTheme:
     "file dialog info"
     name  = "filedialog"
@@ -100,20 +101,67 @@ class BaseFileDialog:
         self._parse_extension(info)
         return info
 
-    def _tk_run(self, info:dict, dialog:Callable):
+    _HAS_ZENITY = None
+    @classmethod
+    def _haszenity(cls):
+        if cls._HAS_ZENITY is None:
+            if sys.platform.startswith("win"):
+                cls._HAS_ZENITY = False
+            else:
+                from subprocess import run, DEVNULL
+                cls._HAS_ZENITY = run([b'zenity', b'--version'],
+                                      stderr = DEVNULL,
+                                      stdout = DEVNULL).returncode == 0
+        return cls._HAS_ZENITY
+
+    @staticmethod
+    def _callzenity(info, dialog):
+        cmd = ['zenity', '--file-selection', '--title', str(info["title"])]
+        if dialog is _tksave:
+            cmd.append('--save')
+
+        if info.get('initialdir', ''):
+            path = Path(info['initialdir'])
+            if info.get('initialfile', ''):
+                path /= info['initialfile']
+            cmd += ['--filename', str(path)]
+
+        if info.get('multiple', False):
+            cmd.append('--multiple')
+
+        if info.get('filetypes', ()):
+            lst = (f'{i[0]}(*{i[1]})|*{i[1]}' for i in info.get('filetypes', ()))
+            cmd.extend(sum(zip(repeat('--file-filter'), lst), ()))
+
+        from subprocess import run, DEVNULL, PIPE
+        out = run(cmd, stderr = DEVNULL, stdout=PIPE)
+        if out.returncode != 0:
+            return None
+        if info.get('multiple', False):
+            return tuple(i.decode('utf-8').strip() for i in out.stdout.split(b'|'))
+        return out.stdout.decode('utf-8').strip()
+
+    @staticmethod
+    def _calltk(info, dialog):
         root = _Tk()
         root.withdraw()
         root.wm_attributes("-topmost",1)
-
         rets = dialog(**info,parent=root)
         if rets is None or len(rets) == 0:
             return None
-        if (not sys.platform.startswith('win')
-                and isinstance(rets, tuple)
-                and len(rets) > 1
+        if (
+                sys.platform.startswith('win')
+                and isinstance(rets, tuple) and len(rets) > 1
                 and 'initialfile' in info
-                and info.get('multiple', False)):
-            rets = rets[1:] # discard initial file
+                and info.get('multiple', False)
+        ):
+            return rets[1:] # discard initial file
+        return rets
+
+    def _tk_run(self, info:dict, dialog:Callable):
+        rets = (self._callzenity if self._haszenity() else self._calltk)(info, dialog)
+        if rets is None or len(rets) == 0:
+            return None
 
         ret = Path(rets if isinstance(rets, str) else next(iter(rets)))
         self.initialdir  = str(ret.parent)
@@ -172,9 +220,9 @@ class FileDialog(BaseFileDialog):
         def _defaultpath(rets, bcheck: bool = True):
             if rets is None:
                 return
-            vals: Dict[str, str] = {}
+            vals  = dict(ctrl.theme.get("filedialog", "storage"))
             itr   = (rets,) if isinstance(rets, str) else rets
-            first = None
+            first = True
             for ret in itr:
                 ret = Path(ret)
                 if bcheck:
@@ -184,10 +232,11 @@ class FileDialog(BaseFileDialog):
 
                 if ret.suffix and get(ret.suffix[1:]) is not None:
                     vals.setdefault(ret.suffix[1:], str(ret))
-                if first is None:
-                    first = ret
-            if storage is not None:
-                vals[storage] = str(first)
+
+                if storage is not None and first:
+                    vals[storage] = str(ret)
+                    first         = False
+
             ctrl.theme.update("filedialog", storage = vals)
 
         return _defaultpath

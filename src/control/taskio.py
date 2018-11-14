@@ -33,7 +33,8 @@ class TaskIO:
     @classmethod
     def extensions(cls, ctrl, attr:str):
         "returns the list of possible extensions"
-        return '|'.join(chain.from_iterable(i.EXT for i in cls.__get(ctrl, attr)[::-1]))
+        itms = list(chain.from_iterable(i.EXT for i in cls.__get(ctrl, attr)[::-1]))
+        return '|'.join(j for i, j in enumerate(itms) if j not in itms[:i])
 
 def topath(path:Union[PATH_T, Iterable[PATH_T]]) -> Tuple[Path, ...]:
     "converts the argument to a tuple of paths"
