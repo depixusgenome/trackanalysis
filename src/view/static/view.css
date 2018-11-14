@@ -381,6 +381,9 @@ button[data-balloon] {
     white-space: normal;
 width: 100%; }
 
+.dpx-modal-div .bk-bs-checkbox {height: 1px!important;}
+.dpx-modal-div td { border-bottom: lavender dotted 1px}
+
 /* the toolbar */
 .dpx-tb { float: left; height:30px; }
 .dpx-tb  button { width: 30px; min-width: unset !important; }
