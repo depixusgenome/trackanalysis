@@ -134,6 +134,8 @@ class ConfigXlsxIO(TaskIO):
 
         if not isinstance(model[-1], pksmdl.identification.tasktype):
             missing: tuple = (pksmdl.eventdetection, pksmdl.peakselection)
+            if pksmdl.singlestrand.task is not None:
+                missing += (pksmdl.singlestrand,)
             if pksmdl.fittoreference.task is not None:
                 missing += (pksmdl.fittoreference,)
             if pksmdl.identification.task is not None:
