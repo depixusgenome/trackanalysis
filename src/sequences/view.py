@@ -259,7 +259,7 @@ class SequencePathWidget:
         self._dialog = FileDialog(ctrl,
                                   storage   = "sequence",
                                   title     = self._theme.dlgtitle,
-                                  filetypes = 'fasta|*')
+                                  filetypes = 'fasta|txt|*')
 
     def reset(self, resets):
         "updates the widget"

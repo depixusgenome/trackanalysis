@@ -10,17 +10,17 @@ from tkinter.filedialog import (askopenfilename   as _tkopen,
                                 asksaveasfilename as _tksave)
 from utils              import initdefaults
 
-_m_none    = type('_m_none', (), {}) # pylint: disable=invalid-name
 class FileDialogTheme:
     "file dialog info"
     name  = "filedialog"
-    types = {'all':      ('all files',               '.*'),
-             'trk':      ('track files',             '.trk'),
-             'gr':       ('graphics files',          '.gr'),
-             'ana':      ('analysis files',          '.ana'),
-             'fasta':    ('fasta files',             '.fasta'),
-             'xlsx':     ('excel files',             '.xlsx'),
-             'csv':      ('comma-separated values',  '.csv')}
+    types = {'all':   ('all files',              '.*'),
+             'trk':   ('track files',            '.trk'),
+             'gr':    ('graphics files',         '.gr'),
+             'ana':   ('analysis files',         '.ana'),
+             'fasta': ('fasta files',            '.fasta'),
+             'txt':   ('text files',             '.txt'),
+             'xlsx':  ('excel files',            '.xlsx'),
+             'csv':   ('comma-separated values', '.csv')}
     types['any'] = types['all']
     types['*']   = types['all']
     storage: Dict[str, str] = {}
@@ -118,7 +118,7 @@ class BaseFileDialog:
     def _callzenity(info, dialog):
         cmd = ['zenity', '--file-selection', '--title', str(info["title"])]
         if dialog is _tksave:
-            cmd.append('--save')
+            cmd += ['--save', '--confirm-overwrite']
 
         if info.get('initialdir', ''):
             path = Path(info['initialdir'])
@@ -162,6 +162,11 @@ class BaseFileDialog:
         rets = (self._callzenity if self._haszenity() else self._calltk)(info, dialog)
         if rets is None or len(rets) == 0:
             return None
+
+        if isinstance(rets, str):
+            rets = str(Path(rets).resolve())
+        else:
+            rets = tuple(str(Path(i).resolve()) for i in rets)
 
         ret = Path(rets if isinstance(rets, str) else next(iter(rets)))
         self.initialdir  = str(ret.parent)
