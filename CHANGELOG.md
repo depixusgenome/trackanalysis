@@ -1,8 +1,34 @@
 # CycleApp
 
+## cycles_v6.2
+
+* 2018-11-14 15:15:27 +0100  (tag: cycles_v6.2)
+
+### Peaks
+
+By default, frames in phase 5 with values below phase 1 or above phase 3 are
+discarded. This is done after cleaning, thus bead selection, and cycle alignment.
+
+When multiple hairpins are provided by the user and oligos have been specified,
+a few things can happen:
+
+1. if the user locks the hairpin to use for a given bead, then the dropdown
+   menu will only allow selecting that specific choice.
+2. the user does not fix the hairpin, then the software:
+
+    1. sorts the possible choices from best to worst (₁, ₂, ₃, ...),
+    2. specifies the hairpins which could not be fitted (✗),
+    3. indicates which choice of hairpin was made by the user in the reference track.
+
+When producing a report, the software will classify some beads as failed (✗).
+
+A failure (✗) occurs when the phase 3 values are different from from the
+hairpin size.  The conversion factor used is 1 base/µm.
+
 ## cycles_v6.1
 
-* 2018-11-12 15:42:32 +0100  (tag: cycles_v6.1)
+* 2018-11-12 22:15:27 +0100  (tag: cycles_v6.1.1)
+* 2018-11-12 15:12:50 +0100  (tag: cycles_v6.1)
 
 ### Peaks & Cycles
 
@@ -16,7 +42,6 @@ from the *advanced* menu.
 * 2018-11-09 14:51:19 +0100  (tag: cycles_v6.0.2)
 * 2018-11-08 15:26:32 +0100  (tag: cycles_v6.0.1)
 * 2018-11-08 15:11:56 +0100  (tag: ramp_v2.0, tag: cycles_v6.0)
-
 
 ### General
 
