@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "all cleaning related tasks"
 from   functools          import partial
+from   typing             import Optional
 import numpy              as     np
 from   data               import Track
 from   model.level        import Level, PHASE
@@ -24,14 +25,42 @@ class ClippingTask(Task):
         super().__init__(**kwa)
         Task.__init__(self, **kwa)
 
+    def minthreshold(self, track:Track, key:int, data: np.ndarray) -> Optional[float]:
+        "return the min threshold"
+        if self.lowfactor is None or self.lowfactor <= 0.:
+            return None
+        hfs = track.rawprecision(key)
+        return track.phaseposition(self.low,  data)-hfs*self.lowfactor
+
+    def maxthreshold(self, track:Track, key:int, data: np.ndarray) -> Optional[float]:
+        "return the min threshold"
+        if self.highfactor is None or self.highfactor <= 0.:
+            return None
+        hfs = track.rawprecision(key)
+        return track.phaseposition(self.high, data)+hfs*self.highfactor
+
     def __call__(self, track:Track, key:int, data: np.ndarray):
-        hfs  = track.rawprecision(key)
-        minv = track.phaseposition(self.low,  data)-hfs*self.lowfactor
-        maxv = track.phaseposition(self.high, data)+hfs*self.highfactor
-        pha  = track.phase.select(..., [self.correction, self.correction+1])
-        for i in np.split(data, pha.ravel())[1::2]:
-            i[np.isnan(i)]             = maxv+1
-            i[(i < minv) | (i > maxv)] = self.replacement
+        maxv = self.maxthreshold(track, key, data)
+        minv = self.minthreshold(track, key, data)
+        if minv is None and maxv is None:
+            return
+
+        pha  = track.phase.select(..., [self.correction, self.correction+1]).ravel()
+        itms = np.split(data, pha)[1::2]
+        if minv is None and maxv is not None:
+            for i in itms:
+                i[np.isnan(i)] = maxv+1
+                i[(i > maxv)]  = self.replacement
+
+        elif maxv is None and minv is not None:
+            for i in itms:
+                i[np.isnan(i)] = minv-1
+                i[(i < minv)]  = self.replacement
+
+        elif maxv is not None and minv is not None:
+            for i in itms:
+                i[np.isnan(i)]             = maxv+1
+                i[(i < minv) | (i > maxv)] = self.replacement
 
 class ClippingProcessor(Processor[ClippingTask]):
     "Processor for cleaning the data"

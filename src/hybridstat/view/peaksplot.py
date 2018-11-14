@@ -243,7 +243,8 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
 
 class PeaksPlotView(PlotView[PeaksPlotCreator]):
     "Peaks plot view"
-    TASKS = 'extremumalignment', 'eventdetection', 'peakselector', 'singlestrand'
+    TASKS = ('extremumalignment', 'clipping', 'eventdetection', 'peakselector',
+             'singlestrand')
     def advanced(self):
         "triggers the advanced dialog"
         self._plotter.advanced()

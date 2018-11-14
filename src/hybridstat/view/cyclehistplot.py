@@ -32,6 +32,7 @@ class CyclePlotTheme(PlotTheme):
     xlabel  = 'Time (s)'
     ylabel  = 'Bases'
     ntitles = 5
+    format  = '0.0a'
     frames  = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'}, 'line', .1)
     toolbar = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,reset,save'
@@ -59,6 +60,7 @@ class HistPlotTheme(PlotTheme):
     ylabel   = CyclePlotTheme.ylabel
     explabel = 'Hybridisations'
     reflabel = 'Hairpin'
+    formats  = {'bases': '0.0a', 'ref': '0', 'exp': '0.0'}
     hist     = PlotAttrs(CyclePlotTheme.frames.color, 'line',      1)
     events   = PlotAttrs(hist.color,                'circle',    3, alpha = .25)
     peaks    = PlotAttrs(hist.color,                'triangle', 5,  alpha = 0.,
@@ -112,7 +114,7 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
         self._display.addcallbacks(ctrl, self._fig)
         self._fig.add_layout(LinearAxis(axis_label = ""), 'above')
         self._fig.add_layout(LinearAxis(axis_label = ""), 'right')
-        self._fig.yaxis.formatter = NumeralTickFormatter(format = "0.0a")
+        self._fig.yaxis.formatter = NumeralTickFormatter(format = self._theme.format)
         self._errors = PlotError(self._fig, self._theme)
         return self._fig
 
@@ -175,8 +177,11 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
         self._fig.add_layout(self._exp, 'right')
         self._fig.add_layout(self._ref, 'right')
         self._fig.add_layout(LinearAxis(axis_label = ""), 'above')
-        self._fig.yaxis.formatter = NumeralTickFormatter(format = "0.0a")
-        self._ref.formatter = NumeralTickFormatter(format = "0a")
+
+        fmts = self._theme.formats
+        self._fig.yaxis[0].formatter = NumeralTickFormatter(format = fmts['bases'])
+        self._exp.formatter          = NumeralTickFormatter(format = fmts['exp'])
+        self._ref.formatter          = NumeralTickFormatter(format = fmts['ref'])
 
         self._src = {i: ColumnDataSource(j) for i, j in self._data(None).items()}
         rends = {i: self.addtofig(self._fig, i,
@@ -409,7 +414,8 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
 class CycleHistPlotView(PlotView[CycleHistPlotCreator]):
     "Peaks plot view"
     PANEL_NAME = 'Cycles & Peaks'
-    TASKS      = 'extremumalignment', 'eventdetection', 'peakselector', 'singlestrand'
+    TASKS      = ('extremumalignment', 'clipping', 'eventdetection', 'peakselector',
+                  'singlestrand')
     def advanced(self):
         "triggers the advanced dialog"
         self._plotter.advanced()
