@@ -471,10 +471,11 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
 
     def getfitparameters(self, key = NoArgs) -> Tuple[float, float]:
         "return the stretch  & bias for the current bead"
-        dist = self.peaksmodel.display.distances
-        key  = self.sequencekey if key is NoArgs else key
-        if key in dist:
-            return dist[key][1:]
+        if key is not None:
+            dist = self.peaksmodel.display.distances
+            key  = self.sequencekey if key is NoArgs else key
+            if key in dist:
+                return dist[key][1:]
 
         out = self.identification.constraints()[1:]
         if out[0] is None:
