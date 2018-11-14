@@ -227,8 +227,9 @@ def leastcommonkeys(info, tail = ', ...') -> Dict[str, str]:
     if len(info) == 1:
         return info
 
-    keys   = {i: (j[:-len(tail)] if j.endswith(tail) else j).split('_')
-              for i, j  in info.items()}
+    tails  = {i for i, j in info.items() if j.endswith(tail)}
+    dflt   = {i: (j[:-len(tail)] if j.endswith(tail) else j) for i, j in info.items()}
+    keys   = {i: j.split('_')                                for i, j in dflt.items()}
     common = None
     for i in keys.values():
         common = set(i) if common is None else set(i) & cast(set, common)
@@ -238,6 +239,9 @@ def leastcommonkeys(info, tail = ', ...') -> Dict[str, str]:
     else:
         keys = {i:'_'.join(k for k in j) for i, j in keys.items()}
 
-    if '' in keys.values():
+    empties = sum(1 for i in keys.values() if i == '')
+    if empties == 1:
         keys[next(i for i, j in keys.items() if j == '')] = 'ref'
-    return {i: j+tail if j.endswith(tail) else j for i, j in keys.items()}
+    elif empties > 1:
+        keys.update({i: dflt[i] for i, j in keys.items() if j == ''})
+    return {i: j+(tail if i in tails else '') for i, j in keys.items()}
