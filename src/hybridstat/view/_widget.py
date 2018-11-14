@@ -111,7 +111,8 @@ class PeaksSequencePathWidget(SequencePathWidget):
                 return inds[i]+' ' if i < len(inds) else ''
             return "" if self.__peaks.identification.task is None else "✗ "
 
-        out['menu'] = [(_get(i, j)+j, j) for i, j in enumerate(menu)]
+        out['menu'] = ([(_get(i, j)+j, j) for i, j in enumerate(menu)]
+                       + out['menu'][-2:])
 
         ref  = self.__peaks.fittoreference.reference
         if ref is not None and ref != self.__peaks.roottask:
