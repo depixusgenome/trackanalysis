@@ -46,7 +46,10 @@ class SequenceModel:
     def setnewkey(self, ctrl, new):
         "sets new probes"
         hpins = dict(self.display.hpins)
-        hpins[self.tasks.bead] = new
+        if new is None:
+            hpins.pop(self.tasks.bead)
+        else:
+            hpins[self.tasks.bead] = new
         ctrl.display.update(self.display, hpins = hpins)
 
     def setnewprobes(self, ctrl, new):
