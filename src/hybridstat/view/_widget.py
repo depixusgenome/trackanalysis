@@ -66,7 +66,7 @@ class ReferenceWidget:
                 data = self.__data()
                 mainview.calllater(lambda: self.__widget.update(**data))
 
-        ctrl.display.observe(FitToReferenceStore.name, _observe)
+        ctrl.display.observe(FitToReferenceStore().name, _observe)
 
         self.__widget.on_click(_py_cb)
         return [self.__widget]

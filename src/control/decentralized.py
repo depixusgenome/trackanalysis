@@ -83,6 +83,48 @@ def updatedict(self, model, kwa, force = False):
         model.pop(i)
     return dict(control = self, model = model,  old = old, new = new, deleted = rem)
 
+class Indirection:
+    "descriptor for accessing a given model"
+    _ctrl: str
+    _attr: str
+    __slots__ = ('_ctrl', '_attr')
+    def __set_name__(self, _, attr):
+        self._attr = attr
+
+    def get(self, ctrl, attr):
+        "get the model"
+
+    def observe(self, ctrl, inst, *args, **kwa):
+        "add the model to the controller"
+        attr = inst.__dict__[self._attr]
+        return getattr(ctrl, self._ctrl).observe(attr, *args, **kwa)
+
+    def controller(self, ctrl):
+        "get the controller"
+        return getattr(ctrl, self._ctrl)
+
+    def __get__(self, inst, owner):
+        if inst is None:
+            return self
+        return self.controller(getattr(inst, '_ctrl')).model(inst.__dict__[self._attr])
+
+    def __set__(self, inst, value):
+        if isinstance(value, dict):
+            attr = inst.__dict__[self._attr]
+            self.controller(getattr(inst, '_ctrl')).update(attr.name, **value)
+        else:
+            assert self._attr not in inst.__dict__
+            inst.__dict__[self._attr] = value.name
+            self.controller(getattr(inst, '_ctrl')).add(value, noerase = False)
+
+class DisplayIndirection(Indirection):
+    "descriptor for accessing a given model"
+    _ctrl : str = 'display'
+
+class ThemeIndirection(Indirection):
+    "descriptor for accessing a given model"
+    _ctrl : str = 'theme'
+
 ObjType = TypeVar("ObjType")
 class DecentralizedController(Controller):
     """

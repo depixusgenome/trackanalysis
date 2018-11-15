@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
 from   asyncio                  import sleep as _sleep
-from   copy                     import copy
+from   copy                     import copy, deepcopy
 from   multiprocessing          import Process, Pipe
 from   typing                   import Optional, Dict, Tuple, Any, Sequence, cast
 import pickle
 
 import numpy                    as     np
 
+from control.decentralized      import ThemeIndirection, DisplayIndirection
 from control.modelaccess        import TaskAccess
 from cleaning.view              import (BeadSubtractionAccess,
                                         FixedBeadDetectionModel,
@@ -25,8 +26,7 @@ from peakcalling.processor.fittohairpin     import (Constraints, HairpinFitter,
                                                     PeakMatching, Range,
                                                     DistanceConstraint)
 from sequences.modelaccess      import SequencePlotModelAccess
-from utils                      import (dataclass, dflt, updatecopy, initdefaults,
-                                        NoArgs)
+from utils                      import updatecopy, initdefaults, NoArgs
 from view.base                  import spawn
 from view.colors                import tohex
 from view.plots.base            import themed
@@ -69,13 +69,13 @@ class PeaksPlotTheme(PlotTheme):
     def __init__(self, **_):
         super().__init__(**_)
 
-@dataclass
 class PeaksPlotConfig:
     "PeaksPlotConfig"
-    name:             str   = "hybridstat.peaks"
-    estimatedstretch: float = 1./8.8e-4
-    ncpu                    = 0
-    waittime                = .1
+    def __init__(self):
+        self.name:             str   = "hybridstat.peaks"
+        self.estimatedstretch: float = 1./8.8e-4
+        self.ncpu:             int   = 0
+        self.waittime:         float = .1
 
 class PeaksPlotDisplay(PlotDisplay):
     "PeaksPlotDisplay"
@@ -100,21 +100,20 @@ class PeaksPlotModel(PlotModel):
     def __init__(self, **_):
         super().__init__()
 
-@dataclass
 class FitToReferenceConfig:
     """
     stuff needed to display the FitToReferenceTask
     """
-    name          : str   = 'hybridstat.fittoreference'
-    histmin       : float = 1e-4
-    peakprecision : float = 1e-2
+    def __init__(self):
+        self.name          : str   = 'hybridstat.fittoreference'
+        self.histmin       : float = 1e-4
+        self.peakprecision : float = 1e-2
 
 _DUMMY = type('_DummyDict', (),
               dict(get          = lambda *_: None,
                    __contains__ = lambda _: False,
                    __len__      = lambda _: 0,
                    __iter__     = lambda _: iter(())))()
-@dataclass
 class FitToReferenceStore:
     """
     stuff needed to display the FitToReferenceTask
@@ -122,29 +121,28 @@ class FitToReferenceStore:
     DEFAULTS = dict(ident        = None,   reference = None,
                     fitdata      = _DUMMY, peaks     = _DUMMY,
                     interpolator = _DUMMY)
-    name         : str = 'hybridstat.fittoreference'
-    ident        : Any = None
-    reference    : Any = None
-    refcache     : Any = dflt({})
-    fitdata      : Any = dflt(_DUMMY)
-    peaks        : Any = dflt(_DUMMY)
-    interpolator : Any = dflt(_DUMMY)
+    def __init__(self, reference = None):
+        self.name         : str                 = 'hybridstat.fittoreference'
+        self.ident        : Optional[bytes]     = None
+        self.reference    : Optional[RootTask]  = reference
+        self.refcache     : Dict[RootTask, Any] = {}
+        self.fitdata      : Dict[RootTask, Any] = {}
+        self.peaks        : Dict[RootTask, Any] = {}
+        self.interpolator : Dict[RootTask, Any] = {}
 
 class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     "access to the FitToReferenceTask"
+    __store = DisplayIndirection()
+    __theme = ThemeIndirection()
     def __init__(self, mdl):
         super().__init__(mdl)
         self.__store = FitToReferenceStore()
         self.__theme = FitToReferenceConfig()
 
-    def addto(self, ctrl, noerase): # pylint: disable=arguments-differ
-        "add to the controller"
-        self.__store = ctrl.display.add(self.__store, noerase)
-        self.__theme = ctrl.theme.add(self.__theme, noerase)
-
     @property
     def params(self) -> Optional[Tuple[float, float]]:
         "returns the computed stretch or 1."
+        # pylint: disable=no-member
         return self.__store.refcache.get(self.bead, (1., 0.))
 
     refcache = property(lambda self: self.__store.refcache)
@@ -178,6 +176,7 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     @property
     def referencepeaks(self) -> Optional[np.ndarray]:
         "returns reference peaks"
+        # pylint: disable=no-member
         pks = self.__store.peaks.get(self.bead, None)
         return None if pks is None or len(pks) == 0 else pks
 
@@ -186,7 +185,7 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
         def _onref(old = None, **_):
             if 'reference' in old:
                 self.resetmodel()
-        ctrl.display.observe(self.__store, _onref)
+        type(self).__store.observe(ctrl, self, _onref)
 
         def _ontask(parent = None, **_):
             if parent == self.reference:
@@ -265,38 +264,36 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
             self._ctrl.display.update(self.__store, **args)
         return True
 
-@dataclass
 class FitToHairpinConfig:
     """
     stuff needed to display the FitToHairpinTask
     """
-    name        : str               = 'hybridstat.fittohairpin'
-    fit         : HairpinFitter     = dflt(FitToHairpinTask.DEFAULT_FIT())
-    match       : PeakMatching      = dflt(FitToHairpinTask.DEFAULT_MATCH())
-    constraints : Dict[str, Range]  = dflt(FitToHairpinTask.DEFAULT_CONSTRAINTS)
-    stretch     : Tuple[float, int] = (5.,   1)
-    bias        : Tuple[float, int] = (5e-3, 1)
+    def __init__(self):
+        cls                                  = FitToHairpinTask
+        self.name        : str               = 'hybridstat.fittohairpin'
+        self.fit         : HairpinFitter     = cls.DEFAULT_FIT()
+        self.match       : PeakMatching      = cls.DEFAULT_MATCH()
+        self.constraints : Dict[str, Range]  = deepcopy(cls.DEFAULT_CONSTRAINTS)
+        self.stretch     : Tuple[float, int] = (5.,   1)
+        self.bias        : Tuple[float, int] = (5e-3, 1)
 
 ConstraintsDict = Dict[RootTask, Constraints]
-@dataclass
 class FitToHairpinDisplay:
     """
     stuff needed to display the FitToHairpinTask
     """
-    name:        str             = 'hybridstat.fittohairpin'
-    constraints: ConstraintsDict = dflt({})
+    def __init__(self):
+        self.name:        str             = 'hybridstat.fittohairpin'
+        self.constraints: ConstraintsDict = {}
 
 class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
     "access to the FitToHairpinTask"
+    __defaults = ThemeIndirection()
+    __display  = DisplayIndirection()
     def __init__(self, mdl):
         super().__init__(mdl)
         self.__defaults = FitToHairpinConfig()
         self.__display  = FitToHairpinDisplay()
-
-    def addto(self, ctrl, noerase): # pylint: disable=arguments-differ
-        "add to the controller"
-        self.__defaults = ctrl.theme.add(self.__defaults, noerase)
-        self.__display  = ctrl.display.add(self.__display,  noerase)
 
     def newconstraint(self,
                       hairpin : Optional[str],
@@ -334,6 +331,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         if root is None or bead is None:
             return None, None, None
 
+        # pylint: disable=no-member
         cur = self.__display.constraints.get(root, {}).get(bead, None)
         if cur is None:
             return None, None, None
@@ -351,7 +349,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
                 self.update(**(task.config() if task else {'disabled': True}))
 
         ctrl.theme  .observe(mdl.sequencemodel.config, _observe)
-        ctrl.theme  .observe(self.__defaults,          _observe)
+        type(self).__defaults.observe(ctrl, self, _observe)
         ctrl.display.observe(mdl.peaksmodel.display,   _observe)
 
         @ctrl.display.observe
@@ -440,16 +438,16 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
     "Access to peaks"
     def __init__(self, ctrl, addto = False):
         super().__init__(ctrl)
-        self.peaksmodel      = PeaksPlotModel.create(ctrl, False)
-        self.subtracted      = BeadSubtractionAccess(self)
-        self.fixedbeads      = FixedBeadDetectionModel(ctrl)
-        self.alignment       = ExtremumAlignmentTaskAccess(self)
-        self.clipping        = ClippingTaskAccess(self)
-        self.eventdetection  = EventDetectionTaskAccess(self)
-        self.peakselection   = PeakSelectorTaskAccess(self)
-        self.singlestrand    = SingleStrandTaskAccess(self)
-        self.fittoreference  = FitToReferenceAccess(self)
-        self.identification  = FitToHairpinAccess(self)
+        self.peaksmodel     = PeaksPlotModel.create(ctrl, False)
+        self.subtracted     = BeadSubtractionAccess(self)
+        self.fixedbeads     = FixedBeadDetectionModel(ctrl)
+        self.alignment      = ExtremumAlignmentTaskAccess(self)
+        self.clipping       = ClippingTaskAccess(self)
+        self.eventdetection = EventDetectionTaskAccess(self)
+        self.peakselection  = PeakSelectorTaskAccess(self)
+        self.singlestrand   = SingleStrandTaskAccess(self)
+        self.fittoreference = FitToReferenceAccess(self)
+        self.identification = FitToHairpinAccess(self)
 
         self.peaksmodel.display.peaks = _createpeaks(self, [])
         if addto:
@@ -458,8 +456,6 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
     def addto(self, ctrl, name = "tasks", noerase = False):
         "set _tasksmodel to same as main"
         super().addto(ctrl, name, noerase)
-        self.fittoreference.addto(ctrl, noerase)
-        self.identification.addto(ctrl, noerase)
         self.fixedbeads.addto(ctrl, noerase)
 
     @property
