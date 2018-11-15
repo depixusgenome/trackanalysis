@@ -81,7 +81,7 @@ class RawMixin(ABC):
 
     def __addcallbacks(self):
         fig = self._raw
-        self._plotmodel.display.addcallbacks(self._ctrl, fig)
+        self._display.addcallbacks(self._ctrl, fig)
         fig.x_range.callback = CustomJS(code = "hvr.on_change_raw_bounds(cb_obj, trng)",
                                         args = dict(hvr  = self._hover,
                                                     trng = fig.extra_x_ranges["time"]))

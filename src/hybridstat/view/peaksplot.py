@@ -182,7 +182,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                           )
         self._fig.xaxis[0].axis_label_text_color = self.__colors('peakscount')
         self._fig.add_layout(axis, 'above')
-        self._plotmodel.display.addcallbacks(self._ctrl, self._fig)
+        self._display.addcallbacks(self._ctrl, self._fig)
         self._errors = PlotError(self._fig, self._theme)
 
     def __add_curves(self):
