@@ -86,7 +86,7 @@ class BaseSuperController:
     def _open(self, viewcls, doc, kwa):
         keys = DpxKeyEvent(self)
         self.topview = viewcls(self, **kwa)
-        if hasattr(self.topview.views[0], 'ismain'):
+        if len(self.topview.views) and hasattr(self.topview.views[0], 'ismain'):
             self.topview.views[0].ismain(self)
 
         self._configio()
@@ -134,7 +134,8 @@ class BaseSuperController:
         for mdl in orders().dynloads():
             getattr(sys.modules.get(mdl, None), 'document', lambda x: None)(doc)
 
-        roots = getattr(self.topview.views[0], 'addtodoc', lambda *_: None)(self, doc)
+        first = next(iter(self.topview.views), None)
+        roots = getattr(first, 'addtodoc', lambda *_: None)(self, doc)
         if roots is None:
             return
 
