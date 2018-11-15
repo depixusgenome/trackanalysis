@@ -112,16 +112,26 @@ class TabsView(BokehView, Generic[TThemeType]):
                     width  = self.__theme.width,
                     height = self.__theme.height)
 
-        @ctrl.display.observe
-        def _onapplicationstarted(**_):
-            doc.add_root(self._roots[ind])
+        first = [hasattr(ctrl, 'tasks')]
+        if first[0]:
+            @ctrl.tasks.observe
+            def _onopentrack(**_):
+                if first[0]:
+                    doc.add_next_tick_callback(lambda: doc.add_root(self._roots[ind]))
+                    first[0] = False
+        else:
+            @ctrl.display.observe
+            def _onapplicationstarted(**_):
+                doc.add_next_tick_callback(lambda: doc.add_root(self._roots[ind]))
 
         @ctrl.action
         def _py_cb(attr, old, new):
             self._panels[old].activate(False)
-            doc.remove_root(self._roots[old])
+            if not first[0]:
+                doc.remove_root(self._roots[old])
             self._panels[new].activate(True)
-            doc.add_root(self._roots[new])
+            if not first[0]:
+                doc.add_root(self._roots[new])
             ctrl.undos.handle('undoaction',
                               ctrl.emitpolicy.outastuple,
                               (lambda: setattr(self._tabs, 'active', old),))
