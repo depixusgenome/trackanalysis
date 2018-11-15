@@ -16,7 +16,7 @@ from   ..computations       import extensions
 from   ._model              import (QualityControlModelAccess,
                                     DriftControlPlotModel,
                                     DriftControlPlotTheme,
-                                    DriftControlPlotConfig,
+                                    DriftControlPlotConfig, PlotDisplay,
                                     ExtensionPlotTheme, ExtensionPlotConfig)
 
 class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
@@ -28,16 +28,18 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
     _src:       List[ColumnDataSource]
     _rends:     List[Tuple[str, Any]]
     _fig:       Figure
-    def __init__(self, ctrl, mdl: QualityControlModelAccess, addto = True) -> None:
-        super().__init__(ctrl, addto = False)
-        name = "qc."+self.__class__.__name__.lower().replace("plotcreator", "")
-        self._display.name   = name
-        self._config .name   = name
-        self._theme  .name   = name+".plot"
-        self._theme  .ylabel = f'T {name[3:].lower()} (°C)'
-        self._model          = mdl
-        if addto:
-            self.addto(ctrl, False)
+    def __init__(self, ctrl, **kwa) -> None:
+        name         = "qc."+type(self).__name__.lower().replace("plotcreator", "")
+        kwa.setdefault('config',  DriftControlPlotConfig()).name   = name
+        kwa.setdefault('display', PlotDisplay())           .name   = name
+
+        theme        = kwa.setdefault('theme',   DriftControlPlotTheme ())
+        theme.name   = name+'.plot'
+        theme.ylabel = f'T {name[3:].lower()} (°C)'
+        super().__init__(ctrl, addto = True, noerase = False, **kwa)
+        assert self._plotmodel.theme in ctrl.theme
+        assert self._plotmodel.display in ctrl.display
+        assert self._plotmodel.config in ctrl.theme
 
     def _addtodoc(self, *_):
         "returns the figure"
@@ -136,11 +138,10 @@ class TServoPlotCreator(DriftControlPlotCreator):
 class ExtensionPlotCreator(DriftControlPlotCreator):
     "Shows bead extension temporal series"
     _theme: ExtensionPlotTheme
-    def __init__(self, ctrl, mdl: QualityControlModelAccess) -> None:
-        super().__init__(ctrl, mdl, False)
-        self._plotmodel.theme  = ExtensionPlotTheme()
-        self._plotmodel.config = ExtensionPlotConfig()
-        self.addto(ctrl, False)
+    def __init__(self, ctrl, **kwa) -> None:
+        super().__init__(ctrl,
+                         theme  = ExtensionPlotTheme(),
+                         config = ExtensionPlotConfig(), **kwa)
 
     def _addtodoc(self, *_):
         fig  = super()._addtodoc(_)
@@ -190,10 +191,10 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
 class QualityControlPlots:
     "All plots together"
     def __init__(self, ctrl, mdl):
-        self.tsample = TSamplePlotCreator(ctrl, mdl)
-        self.tsink   = TSinkPlotCreator(ctrl, mdl)
-        self.tservo  = TServoPlotCreator(ctrl, mdl)
-        self.ext     = ExtensionPlotCreator(ctrl, mdl)
+        self.tsample = TSamplePlotCreator(ctrl,   model = mdl)
+        self.tsink   = TSinkPlotCreator(ctrl,     model = mdl)
+        self.tservo  = TServoPlotCreator(ctrl,    model = mdl)
+        self.ext     = ExtensionPlotCreator(ctrl, model = mdl)
 
     def observe(self, ctrl):
         "observe the controller"

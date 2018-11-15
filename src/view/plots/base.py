@@ -66,31 +66,56 @@ PlotModelType    = TypeVar('PlotModelType',    bound = PlotModel)
 ControlModelType = TypeVar('ControlModelType', bound = PlotModelAccess)
 
 class _StateDescriptor:
-    def __get__(self, inst, owner):
-        return getattr(inst, '_plotmodel').display.state if inst else self
-
     @staticmethod
-    def setdefault(inst, value):
+    def __elems(inst):
+        ctrl = getattr(inst, '_ctrl').display
+        mdl  = getattr(inst, '_plotmodel').display.name
+        return ctrl, mdl
+
+    def __get__(self, inst, owner):
+        if inst is None:
+            return self
+        ctrl, mdl = self.__elems(inst)
+        return ctrl.model(mdl).state
+
+    @classmethod
+    def setdefault(cls, inst, value):
         "sets the default value"
-        getattr(inst, '_ctrl').display.updatedefaults(getattr(inst, '_plotmodel').display,
-                                                      state = PlotState(value))
+        ctrl, mdl = cls.__elems(inst)
+        ctrl.updatedefaults(mdl, state = PlotState(value))
 
     def __set__(self, inst, value):
-        getattr(inst, '_ctrl').display.update(getattr(inst, '_plotmodel').display,
-                                              state = PlotState(value))
+        ctrl, mdl = self.__elems(inst)
+        ctrl.update(mdl, state = PlotState(value))
 
 class _ModelDescriptor:
-    def __init__(self):
-        self._name = ''
-
+    _name: str
+    _ctrl: str
     def __set_name__(self, _, name):
-        self._name  = name[1:]
+        self._name = name[1:]
+        self._ctrl = 'display' if name.endswith('display') else 'theme'
+
+    def ctrl(self, inst):
+        "return the controller"
+        return getattr(getattr(inst, '_ctrl'), self._ctrl)
+
+    def mdl(self, inst):
+        "return the model"
+        mdl = getattr(getattr(inst, '_plotmodel'), self._name, None)
+        return None if mdl is None else mdl.name
 
     def __get__(self, inst, owner):
-        return getattr(getattr(inst, '_plotmodel'), self._name, None) if inst else self
+        if inst is None:
+            return self
+
+        mdl = self.mdl(inst)
+        return None if mdl is None else self.ctrl(inst).model(mdl)
 
     def __set__(self, inst, value):
-        getattr(inst, '_ctrl').display.update(self.__get__(inst, None), **value)
+        mdl = self.mdl(inst)
+        if mdl is not None:
+            return self.ctrl(inst).update(mdl, **value)
+        raise AttributeError(f"no such model: {self._name}")
 
 class PlotAttrsView(PlotAttrs):
     "implements PlotAttrs"
@@ -324,16 +349,16 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                  addto     = True,
                  noerase   = True,
                  model     = None,
-                 plotmodel = None) -> None:
+                 plotmodel = None, **kwa) -> None:
         "sets up this plotter's info"
-        def _cls(i, *j):
+        def _cls(i, *j, **k):
             cls = templateattribute(self, i)
-            return cls(*j) if cls else None
+            return cls(*j, **k) if cls else None
 
         self._updater   = PlotUpdater()
         self._ctrl      = ctrl
-        self._model     = _cls(0, ctrl) if model     is None else model
-        self._plotmodel = _cls(1)       if plotmodel is None else plotmodel
+        self._model     = _cls(0, ctrl)  if model     is None else model
+        self._plotmodel = _cls(1, **kwa) if plotmodel is None else plotmodel
 
         if addto:
             self.addto(ctrl, noerase = noerase)
