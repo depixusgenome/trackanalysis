@@ -124,7 +124,7 @@ def _files(directory, files, bead):
             ctrl.tasks.opentrack(files)
         INITIAL_ORDERS.append(_open)
 
-    if len(files) or len(directory) and  bead is not None:
+    if (len(files) or len(directory)) and  bead is not None:
         def _setbead(ctrl):
             ctrl.display.update("tasks", bead = bead)
         INITIAL_ORDERS.append(_setbead)
