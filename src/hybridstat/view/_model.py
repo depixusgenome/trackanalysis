@@ -9,7 +9,7 @@ import pickle
 
 import numpy                    as     np
 
-from control.decentralized      import ThemeIndirection, DisplayIndirection
+from control.decentralized      import Indirection
 from control.modelaccess        import TaskAccess
 from cleaning.view              import (BeadSubtractionAccess,
                                         FixedBeadDetectionModel,
@@ -132,8 +132,8 @@ class FitToReferenceStore:
 
 class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     "access to the FitToReferenceTask"
-    __store = DisplayIndirection()
-    __theme = ThemeIndirection()
+    __store = Indirection()
+    __theme = Indirection()
     def __init__(self, mdl):
         super().__init__(mdl)
         self.__store = FitToReferenceStore()
@@ -288,8 +288,8 @@ class FitToHairpinDisplay:
 
 class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
     "access to the FitToHairpinTask"
-    __defaults = ThemeIndirection()
-    __display  = DisplayIndirection()
+    __defaults = Indirection()
+    __display  = Indirection()
     def __init__(self, mdl):
         super().__init__(mdl)
         self.__defaults = FitToHairpinConfig()
@@ -453,9 +453,8 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         if addto:
             self.addto(ctrl, noerase = False)
 
-    def addto(self, ctrl, name = "tasks", noerase = False):
-        "set _tasksmodel to same as main"
-        super().addto(ctrl, name, noerase)
+    def addto(self, ctrl, noerase = False):
+        "set models to same as main"
         self.fixedbeads.addto(ctrl, noerase)
 
     @property
@@ -580,7 +579,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         self.identification.setobservers(self, ctrl)
         self.fittoreference.setobservers(ctrl)
 
-        @ctrl.display.observe(self._tasksmodel.display)
+        @ctrl.display.observe(self._tasksdisplay)
         def _onchangetrack(old = None,  **_):
             if "roottask" in old:
                 self._poolcompute()

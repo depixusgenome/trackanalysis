@@ -85,14 +85,13 @@ def updatedict(self, model, kwa, force = False):
 
 class Indirection:
     "descriptor for accessing a given model"
-    _ctrl: str
-    _attr: str
     __slots__ = ('_ctrl', '_attr')
+    def __init__(self):
+        self._ctrl: str = ""
+        self._attr: str = ""
+
     def __set_name__(self, _, attr):
         self._attr = attr
-
-    def get(self, ctrl, attr):
-        "get the model"
 
     def observe(self, ctrl, inst, *args, **kwa):
         "add the model to the controller"
@@ -111,19 +110,14 @@ class Indirection:
     def __set__(self, inst, value):
         if isinstance(value, dict):
             attr = inst.__dict__[self._attr]
-            self.controller(getattr(inst, '_ctrl')).update(attr.name, **value)
+            self.controller(getattr(inst, '_ctrl')).update(attr, **value)
         else:
             assert self._attr not in inst.__dict__
+            ctrl       = type(value).__name__.lower()
+            self._ctrl = ("display" if any(i in ctrl for i in ("display", "store")) else
+                          "theme")
             inst.__dict__[self._attr] = value.name
             self.controller(getattr(inst, '_ctrl')).add(value, noerase = False)
-
-class DisplayIndirection(Indirection):
-    "descriptor for accessing a given model"
-    _ctrl : str = 'display'
-
-class ThemeIndirection(Indirection):
-    "descriptor for accessing a given model"
-    _ctrl : str = 'theme'
 
 ObjType = TypeVar("ObjType")
 class DecentralizedController(Controller):

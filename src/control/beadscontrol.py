@@ -3,26 +3,46 @@
 "Deals with bead selection"
 from typing                     import Optional, Iterator, Iterable, cast
 
+from control.decentralized      import Indirection
 from data.track                 import Track
 from model.task                 import RootTask, DataSelectionTask
 from model.task.application     import TasksDisplay
 
+def getavailablebeads(ctrl, root) -> Iterable[int]:
+    "return available beads"
+    track = ctrl.tasks.track(root)
+    if track is None:
+        return iter(tuple())
+
+    procs    = ctrl.tasks.processors(root)
+    if procs is None:
+        return iter(tuple())
+
+    selected = None
+    for itm in procs.data.items():
+        selected = itm.proc.beads(itm.cache(), selected)
+    return cast(Iterable[int], selected)
+
+def findanybead(ctrl, root) -> Optional[int]:
+    "find a starting bead"
+    return next(iter(getavailablebeads(ctrl, root)), None)
+
 class BeadController:
     "Deals with bead selection"
-    def __init__(self, ctrl, mdl: TasksDisplay = None) -> None:
-        self._ctrl   = ctrl
-        self.__tasks = self._ctrl.display.add(TasksDisplay() if mdl is None else mdl,
-                                              False)
+    _tasksdisplay = Indirection()
+    def __init__(self, ctrl) -> None:
+        self._ctrl         = ctrl
+        self._tasksdisplay = TasksDisplay()
 
     @property
     def roottask(self) -> Optional[RootTask]:
         "returns the current root task"
-        return self.__tasks.roottask
+        return self._tasksdisplay.roottask
 
     @property
     def track(self) -> Optional[Track]:
         "returns the current root task"
-        return self.__tasks.track(self._ctrl)
+        return self._tasksdisplay.track(self._ctrl)
 
     @property
     def allbeads(self) -> Iterator[int]:
@@ -33,17 +53,7 @@ class BeadController:
     @property
     def availablebeads(self) -> Iterable[int]:
         "returns available beads"
-        if self.track is None:
-            return iter(tuple())
-
-        procs    = self.__tasks.processors(self._ctrl)
-        if procs is None:
-            return iter(tuple())
-
-        selected = None
-        for itm in procs.data.items():
-            selected = itm.proc.beads(itm.cache(), selected)
-        return cast(Iterable[int], selected)
+        return getavailablebeads(self._ctrl, self._tasksdisplay.roottask)
 
     @property
     def discarded(self):
@@ -54,8 +64,10 @@ class BeadController:
     @property
     def bead(self) -> Optional[int]:
         "returns the current bead number"
-        bead = self.__tasks.bead
-        return next(iter(self.availablebeads), None) if bead is None else bead
+        bead = self._tasksdisplay.bead
+        if bead is None:
+            return findanybead(self._ctrl, self._tasksdisplay.roottask)
+        return bead
 
     @bead.setter
     def bead(self, value):
@@ -67,7 +79,7 @@ class BeadController:
            * *value > current*: the new current bead is either *value* or the first
            available bead beyond *value*.
         """
-        bead = self.__tasks.bead
+        bead = self._tasksdisplay.bead
         if value == bead:
             return
 

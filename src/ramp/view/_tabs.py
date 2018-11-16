@@ -3,6 +3,7 @@
 "all view aspects here"
 from typing                 import Set, Dict
 
+from control.decentralized  import Indirection
 from fov                    import BaseFoVPlotCreator, FoVPlotModel
 from view.plots             import PlotView
 from view.tabs              import TabsView, TabsTheme, initsubclass
@@ -17,24 +18,16 @@ class RampTabTheme(TabsTheme):
 class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess, # type: ignore
                                         FoVPlotModel]):
     "Plots a default bead and its FoV"
-    def __init__(self,  ctrl):
-        "sets up this plotter's info"
-        self._rampdisplay = RampPlotDisplay()
-        super().__init__(ctrl)
-
+    _rampdisplay = Indirection()
     def observe(self, ctrl):
         "sets-up model observers"
         super().observe(ctrl)
+        self._rampdisplay = RampPlotDisplay()
 
         @ctrl.display.observe(self._rampdisplay)
         def _ondataframes(old = (), **_):
             if len({"dataframe", "consensus"} & set(old)):
                 self.reset(False)
-
-    def addto(self, ctrl, noerase = True):
-        "adds the models to the controller"
-        super().addto(ctrl, noerase)
-        self._rampdisplay = ctrl.display.add(self._rampdisplay, noerase = noerase)
 
     def _tooltips(self):
         return self._oktooltips({})

@@ -161,9 +161,8 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
         self.subtracted = BeadSubtractionAccess(self)
         self.fixedbeads = FixedBeadDetectionModel(ctrl)
 
-    def addto(self, ctrl, name = "tasks", noerase = False):
-        "set _tasksmodel to same as main"
-        super().addto(ctrl, name, noerase)
+    def addto(self, ctrl, noerase = False):
+        "set models to same as main"
         self.fixedbeads.addto(ctrl, noerase)
 
     @property

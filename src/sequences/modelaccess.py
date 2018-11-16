@@ -6,6 +6,7 @@ from tempfile               import mkstemp
 from typing                 import Any, Sequence, List, Optional, Dict, Union, cast
 
 from utils                  import dataclass, field
+from control.decentralized  import Indirection
 from control.modelaccess    import TaskPlotModelAccess
 from model.task.application import TasksDisplay
 from .                      import (read as _readsequence, peaks as _sequencepeaks,
@@ -141,40 +142,40 @@ class SequenceAnaIO:
 
 class SequencePlotModelAccess(TaskPlotModelAccess):
     "access to the sequence path and the oligo"
+    _seqconfig  = Indirection()
+    _seqdisplay = Indirection()
     def __init__(self, ctrl) -> None:
-        self.__seq = SequenceModel()
+        SequenceModel().addto(ctrl, noerase = False)
         super().__init__(ctrl)
-
-    def addto(self, ctrl, name = "tasks", noerase = False):
-        "set _tasksmodel to same as main"
-        super().addto(ctrl, name, noerase)
-        self.__seq.addto(ctrl, noerase = noerase)
+        self._seqconfig  = SequenceConfig()
+        self._seqdisplay = SequenceDisplay()
 
     @property
     def sequencemodel(self):
         "return the sequence model"
-        return self.__seq
+        return SequenceModel(self._seqconfig, self._seqdisplay, self._tasksdisplay)
 
     @property
     def sequencepath(self) -> Optional[str]:
         "return the seqence path"
-        return self.__seq.config.path
+        return self._seqconfig.path
 
     @property
     def sequencekey(self) -> Optional[str]:
         "returns the sequence key"
-        return self.__seq.currentkey
+        return self.sequencemodel.currentkey
 
     @property
     def oligos(self) -> Optional[Sequence[str]]:
         "return the current probe"
-        return self.__seq.currentprobes
+        return self.sequencemodel.currentprobes
 
     def sequences(self, sequence = ...):
         "returns current sequences"
-        seqs = self.__seq.config.sequences
+        seqs = self._seqconfig.sequences
         if sequence is Ellipsis:
             return dict(seqs)
+        # pylint: disable=no-member
         return seqs.get(self.sequencekey if sequence is None else sequence, None)
 
     def hybridisations(self, sequence = ...):
@@ -192,7 +193,7 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
 
     def setnewsequencepath(self, path):
         "sets a new path if it is correct"
-        if not self.__seq.setnewsequencepath(self._ctrl, path):
+        if not self.sequencemodel.setnewsequencepath(self._ctrl, path):
             self.reset()
             return False
         return True

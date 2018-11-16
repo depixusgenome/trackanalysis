@@ -5,11 +5,12 @@ from typing                 import (Tuple, Optional, Iterator, Union, Any,
                                     Callable, Dict, Type, ClassVar, cast)
 from copy                   import copy as shallowcopy
 
-from model.task             import RootTask, Task
-from model.task.application import ConfigurationDescriptor, TasksModel
+from control.decentralized  import Indirection
 from data.track             import Track
 from data.views             import TrackView
 from data.views             import BEADKEY
+from model.task             import RootTask, Task
+from model.task.application import ConfigurationDescriptor, TasksModel
 from utils                  import NoArgs
 from utils.inspection       import diffobj
 from .processor             import Processor
@@ -36,7 +37,7 @@ class PlotModelAccess:
         "return the theme name"
         return self._ctrl.theme.get("main", "themename", "dark")
 
-    def addto(self, ctrl, name = "tasks", noerase = False):
+    def addto(self, ctrl, noerase = False):
         "add to controller"
         pass
 
@@ -67,60 +68,40 @@ class ReplaceProcessors(CacheReplacement):
 
 class TaskPlotModelAccess(PlotModelAccess):
     "Contains all access to model items likely to be set by user actions"
+    _tasksconfig  = Indirection()
+    _tasksdisplay = Indirection()
     def __init__(self, model:Union[Controller, 'PlotModelAccess']) -> None:
         super().__init__(model)
-        self._tasksmodel = TasksModel()
-
-    def addto(self, ctrl, name = "tasks", noerase = False):
-        "set _tasksmodel to same as main"
-        lst = (('display', 'display'), ('config', 'theme'))
-        for i, j in lst:
-            itm = getattr(self._tasksmodel , i)
-            itm.name = name
-            setattr(self._tasksmodel, i, getattr(ctrl, j).add(itm, noerase))
-
-        objs = [(i, getattr(ctrl, j).model(getattr(self._tasksmodel, i))) for i, j in lst]
-        done = set()
-        itms = {self}
-        while len(itms):
-            cur = itms.pop()
-            for i, j in objs:
-                setattr(getattr(cur, '_tasksmodel'), i, j)
-            done.add(cur)
-            itms.update(i for i in cur.__dict__.values()
-                        if isinstance(i, TaskPlotModelAccess) and i not in done)
+        mdl = TasksModel()
+        self._tasksconfig  = mdl.config
+        self._tasksdisplay = mdl.display
 
     @property
     def roottask(self) -> Optional[RootTask]:
         "returns the current track"
-        return self._tasksmodel.display.roottask
+        return self._tasksdisplay.roottask
 
     @property
     def tasklist(self) -> Iterator[Task]:
         "return the tasklist associated to the root task"
-        return self._tasksmodel.display.tasklist(self._ctrl)
+        return self._tasksdisplay.tasklist(self._ctrl)
 
     @property
     def track(self) -> Optional[Track]:
         "returns the current track"
-        return self._tasksmodel.display.track(self._ctrl)
+        return self._tasksdisplay.track(self._ctrl)
 
     @property
     def bead(self) -> Optional[BEADKEY]:
         "returns the current bead number"
-        bead = self._tasksmodel.display.bead
-        if bead is None:
-            track = self.track
-            if track is not None:
-                return next(iter(track.beads.keys()))
-        return bead
+        return self._tasksdisplay.bead
 
     def impacts(self, root:RootTask, task:Task) -> bool:
         "returns whether changing this tasks affects the model output"
         if root is not self.roottask:
             return False
 
-        order = tuple(self._tasksmodel.config.taskorder)
+        order = tuple(self._tasksconfig.taskorder)
         order = order[order.index(type(task)):]
         return any(val.tasktype in order for val in self.__dict__.values()
                    if isinstance(val, TaskAccess))
@@ -132,7 +113,7 @@ class TaskPlotModelAccess(PlotModelAccess):
 
         check = tuple(i.check for i in self.__dict__.values() if isinstance(i, TaskAccess))
         good  = next((j for j in tuple(self.tasklist)[::-1] if any(i(j) for i in check)), None)
-        return self._tasksmodel.display.processors(self._ctrl, good) if good else None
+        return self._tasksdisplay.processors(self._ctrl, good) if good else None
 
     def runbead(self) -> Optional[TrackView]:
         "returns a TrackView to be displayed"
@@ -188,14 +169,14 @@ class TaskAccess(TaskPlotModelAccess):
     @property
     def configtask(self) -> Task:
         "returns the config task"
-        return self._tasksmodel.config[self.instrument][self.configname]
+        return self._tasksconfig[self.instrument][self.configname]
 
     @configtask.setter
     def configtask(self, values: Union[Task, Dict[str,Task]]):
         "returns the config task"
         instr = self.instrument
 
-        task  = self._tasksmodel.config[instr][self.configname]
+        task  = self._tasksconfig[instr][self.configname]
         kwa   = diffobj(task, values) if isinstance(values, Task) else values
         kwa   = self._configattributes(kwa)
         if not kwa:
@@ -214,12 +195,12 @@ class TaskAccess(TaskPlotModelAccess):
     @property
     def index(self) -> Optional[Task]:
         "returns the index the new task should have"
-        return self._tasksmodel.config.defaulttaskindex(self.tasklist, self.tasktype, self.side)
+        return self._tasksconfig.defaulttaskindex(self.tasklist, self.tasktype, self.side)
 
     @property
     def cache(self) -> Callable[[],Any]:
         "returns the processor's cache if it exists"
-        return self._tasksmodel.display.cache(self._ctrl, self.task)
+        return self._tasksdisplay.cache(self._ctrl, self.task)
 
     @property
     def processor(self) -> Optional[Processor]:
