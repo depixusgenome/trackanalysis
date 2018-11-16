@@ -118,7 +118,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         "returns the figure"
         self.__create_fig()
         rends = self.__add_curves()
-        self.__setup_tools(doc, rends)
+        self.__setup_tools(rends)
 
         self._widgets.advanced.observefigsize(ctrl, self._theme, doc, self._fig)
         return self._keyedlayout(ctrl, self._fig,
@@ -210,13 +210,13 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             self._rends.append((key, val))
         return rends
 
-    def __setup_tools(self, doc, rends):
+    def __setup_tools(self, rends):
         tool = self._fig.select(TapTool)
         if len(tool) == 1:
             tool[0].renderers = rends[::-1]
 
         self._hover.create(self._fig, self._model)
-        doc.add_root(self._hover)
+
         self._ticker.create(self._ctrl, self._fig, self._model,
                             self._model.peaksmodel.theme.yrightlabel, "right")
         self._hover.jsslaveaxes(self._fig, self._src['peaks'])

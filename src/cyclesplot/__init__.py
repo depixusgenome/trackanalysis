@@ -28,14 +28,11 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # t
         HistMixin  .__init__(self, ctrl)
         WidgetMixin.__init__(self, ctrl, self._model)
 
-    def _addtodoc(self, ctrl, doc):
+    def _addtodoc(self, ctrl, _):
         "returns the figure"
         fcn = lambda attr, old, new: self._model.newparams(**{attr: new})
         self._hover.on_change("stretch", fcn)
         self._hover.on_change("bias",    fcn)
-
-        doc.add_root(self._hover)
-
         shape = self._createraw()
         self._createhist(self._rawsource.data, shape, self._raw.y_range)
         parent  = self._keyedlayout(ctrl, self._raw, self._hist)
