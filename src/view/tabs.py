@@ -34,7 +34,6 @@ class TabsView(BokehView, Generic[TThemeType]):
     def __init__(self, ctrl = None, **kwa):
         "Sets up the controller"
         super().__init__(ctrl = ctrl, **kwa)
-        self._roots  = [] # type: ignore
         self.__theme = ctrl.theme.add(templateattribute(self, 0))
         self._panels = [cls(ctrl, **kwa) for cls in self.KEYS]
 
@@ -78,21 +77,7 @@ class TabsView(BokehView, Generic[TThemeType]):
                         break
             ctrl.display.updatedefaults('keystroke', advanced = _advanced)
 
-    def addtodoc(self, ctrl, doc):
-        "returns object root"
-        super().addtodoc(ctrl, doc)
-
-        titles = self.__theme.titles
-        mode   = self.defaultsizingmode()
-        def _panel(view):
-            ret = view.addtodoc(ctrl, doc)
-            while isinstance(ret, (tuple, list)) and len(ret) == 1:
-                ret = ret[0]
-            if isinstance(ret, (tuple, list)):
-                ret = layouts.column(ret, **mode)
-            self._roots.append(ret)
-            return Panel(title = titles[self.__key(view)], child = Spacer(), **mode)
-
+    def __setstates(self):
         ind = next((i for i, j in enumerate(self._panels)
                     if self.__state(j) is PlotState.active),
                    None)
@@ -105,38 +90,60 @@ class TabsView(BokehView, Generic[TThemeType]):
         self.__state(self._panels[ind], PlotState.active)
         for panel in self._panels[ind+1:]:
             self.__state(panel, PlotState.disabled)
+        return ind
 
-        tabs = Tabs(tabs   = [_panel(panel) for panel in self._panels],
+    def __createtabs(self, ind):
+        panels = [Panel(title = self.__theme.titles[self.__key(i)],
+                        child = Spacer(),
+                        **self.defaultsizingmode())
+                  for i in self._panels]
+        return Tabs(tabs   = panels,
                     active = ind,
                     name   = self.NAME,
                     width  = self.__theme.width,
                     height = self.__theme.height)
 
-        first = [hasattr(ctrl, 'tasks')]
-        if first[0]:
-            @ctrl.tasks.observe
-            def _onopentrack(**_):
-                if first[0]:
-                    doc.add_next_tick_callback(lambda: doc.add_root(self._roots[ind]))
-                    first[0] = False
-        else:
-            @ctrl.display.observe
-            def _onapplicationstarted(**_):
-                doc.add_next_tick_callback(lambda: doc.add_root(self._roots[ind]))
+    def addtodoc(self, ctrl, doc):
+        "returns object root"
+        super().addtodoc(ctrl, doc)
+        tabs  = self.__createtabs(self.__setstates())
+
+        roots = [None]*len(self._panels)
+        def _root(ind):
+            if roots[ind] is None:
+                ret = self._panels[ind].addtodoc(ctrl, doc)
+                while isinstance(ret, (tuple, list)) and len(ret) == 1:
+                    ret = ret[0]
+                if isinstance(ret, (tuple, list)):
+                    ret  = layouts.column(ret, **self.defaultsizingmode())
+
+                doc.add_next_tick_callback(lambda: self._panels[ind].plotter.reset(False))
+                roots[ind] = ret
+            return roots[ind]
 
         @ctrl.action
         def _py_cb(attr, old, new):
             self._panels[old].activate(False)
-            if not first[0]:
-                doc.remove_root(self._roots[old])
             self._panels[new].activate(True)
-            if not first[0]:
-                doc.add_root(self._roots[new])
             ctrl.undos.handle('undoaction',
                               ctrl.emitpolicy.outastuple,
-                              (lambda: setattr(self._tabs, 'active', old),))
+                              (lambda: setattr(tabs, 'active', old),))
+            if roots[old] is not None:
+                doc.remove_root(roots[old])
+                doc.add_root(_root(new))
+
         tabs.on_change('active', _py_cb)
-        self._tabs = tabs
+
+        def _fcn(**_):
+            itm = next(i for i, j in enumerate(self._panels) if j.plotter.isactive())
+            doc.add_root(_root(itm))
+
+        if hasattr(ctrl, 'tasks'):
+            ctrl.tasks.oneshot("opentrack", _fcn)
+        else:
+            ctrl.display.oneshot("applicationstarted", _fcn)
+
+        mode = self.defaultsizingmode()
         return layouts.row(layouts.widgetbox(tabs, **mode), **mode)
 
     def observe(self, ctrl):
