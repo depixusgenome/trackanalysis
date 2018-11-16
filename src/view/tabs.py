@@ -117,7 +117,7 @@ class TabsView(BokehView, Generic[TThemeType]):
                 if isinstance(ret, (tuple, list)):
                     ret  = layouts.column(ret, **self.defaultsizingmode())
 
-                doc.add_next_tick_callback(lambda: self._panels[ind].plotter.reset(False))
+                doc.add_next_tick_callback(lambda: self._panels[ind].plotter.reset(True))
                 roots[ind] = ret
             return roots[ind]
 
