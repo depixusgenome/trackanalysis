@@ -156,8 +156,13 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             self._ticker.reset(cache)
             self._widgets.reset(cache, tmp is None)
 
-            inds = dicos['']['z'][[0,-1]] if len(dicos['']['z']) > 2 else (0., 1.)
-            self.setbounds(cache, self._fig.y_range, 'y', inds)
+            if len(dicos['']['z']):
+                inds = dicos['']['z'][[0,-1]]
+                self.setbounds(cache, self._fig.y_range, 'y', inds)
+                inds = (inds - self._model.bias)*self._model.stretch
+                self.setbounds(cache, self._fig.extra_y_ranges['bases'], None, inds)
+            else:
+                self.setbounds(cache, self._fig.y_range, 'y', (0, 1))
 
             _color('peakscount',    'default',  'below')
             _color('peaksduration', 'duration', 'above')
