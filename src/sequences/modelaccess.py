@@ -98,7 +98,7 @@ class SequenceModel:
 class SequenceAnaIO:
     "stuff for loading/saving ana files"
     @staticmethod
-    def onopenanafile(controller = None, model = None):
+    def onopenanafile(controller = None, model = None, **_):
         "action to be performed on opening a file"
         root = model.get('tasks', [[None]])[0][0]
         if root is None:
@@ -127,7 +127,7 @@ class SequenceAnaIO:
             controller.tasks.oneshot("opentrack", _fcn)
 
     @staticmethod
-    def onsaveanafile(controller = None, model = None):
+    def onsaveanafile(controller = None, model = None, **_):
         "action to be performed on saving a file"
         cnf = controller.theme.getconfig("sequence").maps[0]
         cnf.pop('history', None)
