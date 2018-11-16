@@ -138,7 +138,7 @@ class _AutoHP(OligoMappingDisplay):
 
         hpc  = self.__pins[key]
         data = np.copy(hpc.data)
-        data[:,1] *= np.nanmax(next(iter(crv)).data[:,1])
+        data[:,1] *= np.nanmax(next(iter(crv)).data[['events']])
 
         pos  = lambda x: .8*np.nanmax(x)+.2*np.nanmin(x)
         pars = np.round(dist.stretch, 1), np.round(dist.bias, 4)
@@ -177,7 +177,7 @@ class _ManualHP(OligoMappingDisplay):
         if sequence != cache[2]:
             hpc        = self.__pins[sequence]
             data       = np.copy(hpc.data)
-            data[:,1] *= np.nanmax(clones[0].data[:,1])
+            data[:,1] *= np.nanmax(clones[0].data[['events']])
             cache[2]   = sequence
             cache[3]   = [hpc.clone(data = data)]
 

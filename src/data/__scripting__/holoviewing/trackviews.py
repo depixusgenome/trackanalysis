@@ -34,6 +34,7 @@ class Display(BasicDisplay): # pylint: disable=abstract-method
 
     def __getitem__(self, value):
         self._keys = value if isinstance(value, list) else [value]
+        return self
 
     @staticmethod
     def graphdims():
