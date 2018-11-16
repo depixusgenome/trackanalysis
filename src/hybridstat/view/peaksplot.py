@@ -186,7 +186,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         self._errors = PlotError(self._fig, self._theme)
 
     def __add_curves(self):
-        self._src   = {i: ColumnDataSource(j) for i, j in self.__data().items()}
+        self._src   = {i: ColumnDataSource(j) for i, j in self.__defaults().items()}
 
         self._rends = []
         rends       = []
