@@ -611,6 +611,8 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         def __doreset(self, ctrl):
             with self.resetting():
                 self._model.reset()
+            if getattr(self, '_doc', None) is None:
+                return
 
             old, self.state = self.state, PlotState.abouttoreset
             durations       = [0.]

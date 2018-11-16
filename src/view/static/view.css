@@ -385,6 +385,9 @@ width: 100%; }
 .dpx-modal-div td { border-bottom: lavender dotted 1px}
 
 /* the toolbar */
+.dpx-tb-layout { margin-top: -10px!important; }
+.bk-root {margin-left: -10px!important; }
+
 .dpx-tb { float: left; height:30px; }
 .dpx-tb  button { width: 30px; min-width: unset !important; }
 #dpx-tb-bead    { width: 50px; height: 28px; }

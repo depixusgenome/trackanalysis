@@ -56,7 +56,7 @@ class ViewWithToolbar(Generic[TOOLBAR, VIEW]):
         else:
             children = [tbar, others]
 
-        return column(children, sizing_mode = mode)
+        return column(children, sizing_mode = mode, css_classes = ["dpx-tb-layout"])
 
 def toolbarview(tbar, main) -> type:
     "return the view with toolbar"
