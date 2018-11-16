@@ -107,9 +107,10 @@ class HistMixin(ABC):
         self._hover.slaveaxes(self._hist, self._histsource)
 
     def _oncyclessequence(self, **_):
-        with self.resetting() as cache:
-            self._ticker.reset(cache)
-            self._hover.resethist(cache)
+        if self.isactive():
+            with self.resetting() as cache:
+                self._ticker.reset(cache)
+                self._hover.resethist(cache)
 
 
     def _histobservers(self, ctrl):
