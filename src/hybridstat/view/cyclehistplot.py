@@ -331,7 +331,6 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
 
         self._widgets = PeaksPlotWidgets(ctrl, self._model,
                                          peaks = theme,
-                                         title = CycleHistPlotView.PANEL_NAME,
                                          cnf   = getattr(self._cycle, '_plotmodel'),
                                          **_AxisDescriptor.args())
         ctrl.display.add(self._state)

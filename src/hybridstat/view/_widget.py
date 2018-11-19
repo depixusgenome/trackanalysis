@@ -573,14 +573,12 @@ class _PeakDescriptor:
             return
         mdl.peakselection.update(finder=ByHistogram(mincount=getattr(inst,"_eventcount")))
 
-def advanced(title = 'Peaks', **kwa):
+def advanced(**kwa):
     "create the advanced button"
     fig = (tab.figure(PeaksPlotTheme, PeaksPlotDisplay) if len(kwa) == 0 else
            tab.figure(**kwa))
 
     @tab(f"""
-         # {title} Configuration
-
          ## Cleaning
 
          Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α %(clipping.lowfactor).1oF

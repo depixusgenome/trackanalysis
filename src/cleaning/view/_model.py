@@ -7,11 +7,13 @@ import numpy as np
 from utils                          import NoArgs, initdefaults
 from model.task                     import RootTask
 from model.plots                    import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
+from control.decentralized          import Indirection
 # pylint: disable=unused-import
 from control.modelaccess                 import TaskPlotModelAccess, TaskAccess
 from eventdetection.processor.__config__ import ExtremumAlignmentTask
 from ..beadsubtraction                   import FixedBeadDetection, FIXED_LIST
-from ..processor.__config__              import DataCleaningTask, BeadSubtractionTask
+from ..processor.__config__              import (DataCleaningTask,
+                                                 BeadSubtractionTask, ClippingTask)
 
 class DataCleaningAccess(TaskAccess, tasktype = DataCleaningTask):
     "access to data cleaning"
@@ -97,6 +99,9 @@ class BeadSubtractionAccess(TaskAccess, tasktype = BeadSubtractionTask):
 class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
     "access to bead subtraction"
 
+class ClippingTaskAccess(TaskAccess, tasktype = ClippingTask):
+    "access to the ClippingTask"
+
 class FixedBeadDetectionConfig(FixedBeadDetection):
     """
     Fixed bead detection configuration.
@@ -106,7 +111,7 @@ class FixedBeadDetectionConfig(FixedBeadDetection):
     """
     name = "fixedbeads"
 
-class FixedBeadDetectionData:
+class FixedBeadDetectionStore:
     "For saving in the right place"
     name                             = "fixedbeads"
     data: Dict[RootTask, FIXED_LIST] = {}
@@ -114,63 +119,51 @@ class FixedBeadDetectionData:
     def __init__(self, **_):
         pass
 
-class FixedBeadDetectionModel:
-    """
-    Fixed bead detection
-    """
-    config: FixedBeadDetectionConfig
-    data:   FixedBeadDetectionData
-    def __init__(self, ctrl):
-        self.config = ctrl.theme  .add(FixedBeadDetectionConfig(), False)
-        self.data   = ctrl.display.add(FixedBeadDetectionData(), False)
+class DataCleaningModelAccess(TaskPlotModelAccess):
+    "Access to cleaning tasks"
+    _fixedbeadsconfig = Indirection()
+    _fixedbeadsstore  = Indirection()
+    def __init__(self, ctrl, **_):
+        super().__init__(ctrl)
+        self._fixedbeadsconfig = FixedBeadDetectionConfig()
+        self._fixedbeadsstore  = FixedBeadDetectionStore()
+        self.alignment         = ExtremumAlignmentTaskAccess(self)
+        self.clipping          = ClippingTaskAccess(self)
+        self.cleaning          = DataCleaningAccess(self)
+        self.subtracted        = BeadSubtractionAccess(self)
 
     def addto(self, ctrl, noerase = False):
         "add to the controller"
-        self.config = ctrl.theme  .add(self.config, noerase)
-        self.data   = ctrl.display.add(self.data,   noerase)
-
         @ctrl.tasks.observe
         def _onclosetrack(task = None, **_):
-            if task in self.data.data:
-                info = dict(self.data.data)
+            data = self._fixedbeadsstore.data
+            if task in data:
+                info = dict(data)
                 info.pop(task)
-                ctrl.display.update(self.data, data = info)
+                self._fixedbeadsstore = {'data': info}
 
-    def current(self, ctrl, root:RootTask) -> FIXED_LIST:
-        "returns bead ids for potential fixed beads"
-        if root is None:
-            return []
-
-        beads = self.data.data.get(root, None)
-        if beads is None:
-            track = ctrl.tasks.track(root)
-            if track is None:
-                return []
-
-            info  = dict(self.data.data)
-            beads = info[root] = self.config(track.beads)
-            ctrl.display.update(self.data, data = info)
-        return beads
-
-class DataCleaningModelAccess(TaskPlotModelAccess):
-    "Model for Cycles View"
-    def __init__(self, ctrl) -> None:
-        super().__init__(ctrl)
-        self.alignment  = ExtremumAlignmentTaskAccess(self)
-        self.cleaning   = DataCleaningAccess(self)
-        self.subtracted = BeadSubtractionAccess(self)
-        self.fixedbeads = FixedBeadDetectionModel(ctrl)
-
-    def addto(self, ctrl, noerase = False):
-        "set models to same as main"
-        self.fixedbeads.addto(ctrl, noerase)
+        @ctrl.theme.observe(self._fixedbeadsconfig)
+        def _onchangeconfig(**_):
+            self._fixedbeadsstore = {'data': {}}
 
     @property
     def availablefixedbeads(self) -> FIXED_LIST:
-        "return the availablefixed beads for the current track"
-        if self.roottask is None:
+        "returns bead ids for potential fixed beads"
+        root = self.roottask
+        if root is None:
             return []
-        return self.fixedbeads.current(self._ctrl, self.roottask)
+
+        data  = self._fixedbeadsstore.data
+        beads = data.get(root, None)
+        if beads is None:
+            track = self._ctrl.tasks.track(root)
+            if track is None:
+                return []
+
+            info  = dict(data)
+            beads = info[root] = self._fixedbeadsconfig(track.beads)
+            self._fixedbeadsstore = {'data': info}
+        return beads
 
 class CleaningPlotTheme(PlotTheme):
     """

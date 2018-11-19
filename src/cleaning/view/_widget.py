@@ -14,10 +14,13 @@ import  numpy       as     np
 from    control.beadscontrol    import TaskWidgetEnabler
 from    utils                   import initdefaults
 from    utils.gui               import parseints, intlistsummary
+from    modaldialog.view        import tab
 from    view.static             import route
 from    view.plots              import DpxNumberFormatter, CACHE_TYPE
-from    eventdetection.view     import AlignmentWidget
-from    ._model                 import DataCleaningModelAccess, DataCleaningTask
+from    eventdetection.view     import (AlignmentWidget, # pylint: disable=unused-import
+                                        AlignmentModalDescriptor)
+from    ._model                 import (DataCleaningModelAccess, DataCleaningTask,
+                                        CleaningPlotModel, FixedBeadDetectionConfig)
 
 class BeadSubtractionModalDescriptor:
     "for use with modal dialogs"
@@ -248,10 +251,35 @@ class WidgetMixin(ABC):
     "Everything dealing with changing the config"
     __objects : TaskWidgetEnabler
     def __init__(self, ctrl, model):
+        fix      = FixedBeadDetectionConfig.__name__
+        advanced = tab(f"""
+                       ## Fixed Beads
+                       Δz <                                 %({fix}:maxextent).3F
+                       σ[HF] <                              %({fix}:maxhfsigma).3F
+                       φ5 repeatability: max(|z-mean(z)|) < %({fix}:maxdiff).2F
+                       %(BeadSubtractionModalDescriptor:)
+
+                       ## Cleaning
+
+                       |z| <                            %(cleaning.maxabsvalue).1F
+                       |dz/dt| <                        %(cleaning.maxderivate).3F
+                       Δz >                             %(cleaning.minextent).3F
+                       Δz <                             %(cleaning.maxextent).3F
+                       σ[HF] >                          %(cleaning.minhfsigma).3F
+                       σ[HF] <                          %(cleaning.maxhfsigma).3F
+                       % good >                         %(cleaning.minpopulation)D
+                       Non-closing cycles >             %(cleaning.maxsaturation)D
+                       %(AlignmentModalDescriptor:)
+                       Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α  %(clipping.lowfactor).1oF
+                       """,
+                       accessors = globals(),
+                       figure    = CleaningPlotModel,
+                       base      = tab.taskwidget)
         self.__widgets = dict(table    = CyclesListWidget(ctrl, model.cleaning),
                               align    = AlignmentWidget(ctrl, model.alignment),
                               cleaning = CleaningFilterWidget(model),
-                              sampling = DownsamplingWidget(ctrl))
+                              sampling = DownsamplingWidget(ctrl),
+                              advanced = advanced(ctrl, model))
 
     def _widgetobservers(self, ctrl):
         for widget in self.__widgets.values():
@@ -263,8 +291,9 @@ class WidgetMixin(ABC):
                 self.reset(False)
         ctrl.theme.observe("cleaning.downsampling", _ondownsampling)
 
-    def _createwidget(self, ctrl, fig):
+    def _createwidget(self, ctrl, doc, fig):
         widgets = {i: j.addtodoc(self, ctrl) for i, j in self.__widgets.items()}
+        self.__widgets['advanced'].callbacks(doc)
         self.__widgets['cleaning'].setfigure(fig)
         self.__objects = TaskWidgetEnabler(widgets)
         return widgets

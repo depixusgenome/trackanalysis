@@ -6,8 +6,8 @@ from    typing              import List, Tuple, Dict, Optional
 from    abc                 import ABC
 
 from    bokeh               import layouts
-from    bokeh.models        import (ColumnDataSource, Slider, CustomJS, Paragraph,
-                                    DataTable, TableColumn, IntEditor, NumberEditor,
+from    bokeh.models        import (ColumnDataSource, Slider, CustomJS, DataTable,
+                                    TableColumn, IntEditor, NumberEditor,
                                     CheckboxButtonGroup, Widget)
 
 from    utils                   import initdefaults
@@ -171,7 +171,7 @@ class DriftWidgetTheme:
     "drift widget theme"
     name   = 'cycles.drift'
     labels = ['Per bead', 'Per cycle']
-    title  = 'Drift Removal'
+    title  = 'dpx-drift-widget'
 
 class DriftWidget:
     "Allows removing the drifts"
@@ -184,10 +184,11 @@ class DriftWidget:
         "creates the widget"
         self.__widget = CheckboxButtonGroup(labels = self.__theme.labels,
                                             name   = 'Cycles:DriftWidget',
+                                            css_classes = [self.__theme.title],
                                             **self.__data())
         self.__widget.on_click(mainview.actionifactive(ctrl)(self._onclick_cb))
 
-        return [Paragraph(text = self.__theme.title), self.__widget]
+        return [self.__widget]
 
     def _onclick_cb(self, value):
         "action to be performed when buttons are clicked"
@@ -209,18 +210,20 @@ class DriftWidget:
             value += [1]
         return dict(active = value)
 
-@tab.title('Cycles Plot Configuration')
-@tab("Algorithm",
-     (CyclesModelConfig, f"Histogram bin width %(binwidth).3f"),
-     (CyclesModelConfig, f'Minimum frames per hybridisation %(minframes)d'))
-@tab.figure(CyclesPlotTheme, CyclesPlotDisplay)
-class AdvancedWidget(tab.widget): # type: ignore
-    "access to the modal dialog"
-
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
     __objects: TaskWidgetEnabler
     def __init__(self, ctrl, model):
+        cnf = CyclesModelConfig.__name__
+        adv = tab(f"""
+                  ## Histogram Construction
+                  Histogram bin width              %({cnf}:binwidth).3f
+                  Minimum frames per hybridisation %({cnf}:minframes)d
+                  """,
+                  figure    = (CyclesPlotTheme, CyclesPlotDisplay),
+                  base      = tab.widget,
+                  accessors = globals())
+
         self.__widgets = dict(table    = PeaksTableWidget(ctrl, model),
                               sliders  = ConversionSlidersWidget(ctrl, model),
                               seq      = SequencePathWidget(ctrl),
@@ -228,7 +231,7 @@ class WidgetMixin(ABC):
                               align    = AlignmentWidget(ctrl, model.alignment),
                               drift    = DriftWidget(ctrl, model),
                               events   = EventDetectionWidget(ctrl, model.eventdetection),
-                              advanced = AdvancedWidget(ctrl))
+                              advanced = adv(ctrl))
 
     def ismain(self, ctrl):
         "setup for when this is the main show"

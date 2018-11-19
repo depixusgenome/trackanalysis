@@ -6,8 +6,7 @@ from   typing                   import List, Dict, Set, Tuple, Iterator
 from   data                     import BEADKEY
 from   control.decentralized    import Indirection
 from   control.beadscontrol     import DataSelectionBeadController
-from   control.modelaccess      import TaskPlotModelAccess, TaskAccess
-from   cleaning.view            import FixedBeadDetectionModel, FIXED_LIST
+from   cleaning.view            import DataCleaningModelAccess
 from   cleaning.processor       import DataCleaningProcessor
 from   model.level              import PHASE
 from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
@@ -26,9 +25,6 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
             # pylint: disable=unsubscriptable-object
             lst = [(info[0],)+ i for i in err.args[0].data()]
             cache.setdefault('messages', []).extend(lst)
-
-class DataCleaningTaskAccess(TaskAccess, tasktype = DataCleaningTask):
-    "access to the DataCleaningTask"
 
 class MissinBeadDetectionConfig:
     "filters on messages to reinterpret these as missing beads"
@@ -51,21 +47,18 @@ class QualityControlDisplay:
         self.name:     str             = "qc"
         self.messages: Dict[str, list] = {}
 
-class QualityControlModelAccess(TaskPlotModelAccess):
+class QualityControlModelAccess(DataCleaningModelAccess):
     "access to data cleaning"
     __missing = Indirection()
     __display = Indirection()
     def __init__(self, ctrl) -> None:
         super().__init__(ctrl)
-        self.cleaning  = DataCleaningTaskAccess(self)
-        self.__ctrl    = ctrl
-        self.__config  = FixedBeadDetectionModel(ctrl)
         self.__missing = MissinBeadDetectionConfig()
         self.__display = QualityControlDisplay()
 
     def addto(self, ctrl, noerase = False):
         "set models to same as main"
-        self.__config.addto(ctrl, noerase)
+        super().addto(ctrl, noerase = noerase)
         ctrl.tasks.observe("addtask", "updatetask", "removetask", self._ontask)
 
     def buildmessages(self):
@@ -93,12 +86,6 @@ class QualityControlModelAccess(TaskPlotModelAccess):
             return set()
         return set(self.messages()['bead']) # pylint: disable=unsubscriptable-object
 
-    def availablefixedbeads(self) -> FIXED_LIST:
-        "returns bead ids with extent == all cycles"
-        if self.roottask is None:
-            return []
-        return self.__config.current(self._ctrl, self.roottask)
-
     def messages(self) -> Dict[str, List]:
         "returns beads and warnings where applicable"
         msg = self.__display.messages
@@ -113,10 +100,10 @@ class QualityControlModelAccess(TaskPlotModelAccess):
 
         msg  = self.messages()
         data = {'bad':       set(msg["bead"]), # pylint: disable=unsubscriptable-object
-                'fixed':     set(i[-1] for i in self.availablefixedbeads()),
+                'fixed':     set(i[-1] for i in self.availablefixedbeads),
                 'ok':        set(self.track.beads.keys()),
                 'missing':   set(self.__missing.filter(self.track.ncycles, msg)),
-                'discarded': set(DataSelectionBeadController(self.__ctrl).discarded)}
+                'discarded': set(DataSelectionBeadController(self._ctrl).discarded)}
 
         for i, j in data.items():
             if i != "ok":

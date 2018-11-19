@@ -65,7 +65,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         super().__init__(ctrl, noerase = False)
         WidgetMixin.__init__(self, ctrl, self._model)
 
-    def _addtodoc(self, ctrl, *_):
+    def _addtodoc(self, ctrl, doc):
         self.__source = ColumnDataSource(data = self.__data(None, None))
 
         self.__fig = fig = self.figure(y_range = Range1d,
@@ -84,10 +84,9 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         self._display.addcallbacks(self._ctrl, fig)
 
         mode    = self.defaultsizingmode(width = self._theme.widgetwidth)
-        widgets = self._createwidget(ctrl, fig)
-        left    = layouts.widgetbox(widgets['cleaning']+widgets['table']
-                                    +widgets['align']+widgets['sampling'],
-                                    **mode)
+        widgets = self._createwidget(ctrl, doc, fig)
+        order   = 'cleaning', 'align', 'advanced', 'table', 'sampling'
+        left    = layouts.widgetbox(sum((widgets[i] for i in order), []), **mode)
         return self._keyedlayout(ctrl, fig, left = left)
 
     def _reset(self, cache: CACHE_TYPE):

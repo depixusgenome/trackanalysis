@@ -11,9 +11,7 @@ import numpy                    as     np
 
 from control.decentralized      import Indirection
 from control.modelaccess        import TaskAccess
-from cleaning.view              import (BeadSubtractionAccess,
-                                        FixedBeadDetectionModel,
-                                        FIXED_LIST)
+from cleaning.view              import DataCleaningModelAccess
 from model.task                 import RootTask
 from model.plots                import PlotModel, PlotTheme, PlotAttrs, PlotDisplay
 from peakfinding.histogram      import interpolator
@@ -36,8 +34,7 @@ from ._processors               import runbead, runrefbead
 from ._peakinfo                 import createpeaks as _createpeaks
 
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
-from cleaning.processor.__config__       import ClippingTask
-from eventdetection.processor.__config__ import EventDetectionTask, ExtremumAlignmentTask
+from eventdetection.processor.__config__ import EventDetectionTask
 from peakfinding.processor.__config__    import PeakSelectorTask, SingleStrandTask
 from peakcalling.processor.__config__    import FitToHairpinTask, FitToReferenceTask
 
@@ -418,12 +415,6 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         elif task != cur:
             self.update(**task.config())
 
-class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
-    "access to the ExtremumAlignmentTask"
-
-class ClippingTaskAccess(TaskAccess, tasktype = ClippingTask):
-    "access to the ClippingTask"
-
 class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
     "access to the EventDetectionTask"
 
@@ -434,15 +425,12 @@ class SingleStrandTaskAccess(TaskAccess, tasktype = SingleStrandTask):
     "access to the SingleStrandTask"
 
 # pylint: disable=too-many-instance-attributes
-class PeaksPlotModelAccess(SequencePlotModelAccess):
+class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
     "Access to peaks"
     def __init__(self, ctrl, addto = False):
-        super().__init__(ctrl)
+        DataCleaningModelAccess.__init__(self, ctrl)
+        SequencePlotModelAccess.__init__(self, ctrl)
         self.peaksmodel     = PeaksPlotModel.create(ctrl, False)
-        self.subtracted     = BeadSubtractionAccess(self)
-        self.fixedbeads     = FixedBeadDetectionModel(ctrl)
-        self.alignment      = ExtremumAlignmentTaskAccess(self)
-        self.clipping       = ClippingTaskAccess(self)
         self.eventdetection = EventDetectionTaskAccess(self)
         self.peakselection  = PeakSelectorTaskAccess(self)
         self.singlestrand   = SingleStrandTaskAccess(self)
@@ -452,17 +440,6 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         self.peaksmodel.display.peaks = _createpeaks(self, [])
         if addto:
             self.addto(ctrl, noerase = False)
-
-    def addto(self, ctrl, noerase = False):
-        "set models to same as main"
-        self.fixedbeads.addto(ctrl, noerase)
-
-    @property
-    def availablefixedbeads(self) -> FIXED_LIST:
-        "return the availablefixed beads for the current track"
-        if self.roottask is None:
-            return []
-        return self.fixedbeads.current(self._ctrl, self.roottask)
 
     def getfitparameters(self, key = NoArgs) -> Tuple[float, float]:
         "return the stretch  & bias for the current bead"
