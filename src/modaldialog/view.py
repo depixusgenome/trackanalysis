@@ -453,7 +453,7 @@ class AdvancedTaskWidget(AdvancedWidget):
 
 class TabCreator:
     "create tabs"
-    def __call__(self, *args, accessors: Sequence[type] = (), **kwa):
+    def __call__(self, *args, accessors: Union[Dict[str, Any], Sequence[type]] = (), **kwa):
         "adds descriptors to a class or returns an advanced tab"
         title, args, inds = self.__splitargs(args)
         def _create(elems):
@@ -521,7 +521,9 @@ class TabCreator:
 
         fcn  = lambda i: list(i.strip().split('\n')) if isinstance(i, str) else [i]
         args = sum((fcn(i) for i in args), [])
-        args = [i for i in args if not (isinstance(i, str) and len(i.strip()) == 0)]
+        args = [i.strip() if isinstance(i, str) else i
+                for i in args
+                if not (isinstance(i, str) and len(i.strip()) == 0)]
         inds = [i for i, j in enumerate(args) if isinstance(j, str) and j.startswith('##')]
         inds.append(len(args))
         if inds[0] != 0:
@@ -531,7 +533,8 @@ class TabCreator:
     @classmethod
     def __parseargs(cls, title, accessors, args):
         itms:list = []
-        acc       = {i.__name__: i for i in accessors}
+        acc       = (accessors if isinstance(accessors, dict) else
+                     {i.__name__: i for i in accessors})
         for i, j in enumerate(args):
             if isinstance(j, bool) or not j:
                 continue
@@ -564,6 +567,9 @@ class TabCreator:
     @staticmethod
     def __createwrapper(title, first, itms):
         def _wrapper(cls):
+            if len(itms) == 0:
+                return cls
+
             lst: list = deepcopy(itms)
             for i, j in lst:
                 if hasattr(j, '__set_name__'):

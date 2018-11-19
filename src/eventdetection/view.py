@@ -74,11 +74,16 @@ class AlignmentModalDescriptor:
     __ORDER = (None, AlignmentTactic.pull, AlignmentTactic.onlyinitial,
                AlignmentTactic.onlypull)
     __NAMES = 'ø','best', 'Φ1', 'Φ3'
-    def __init__(self):
+    def __init__(self, *_):
         self._name = '_alignment'
 
     def __set_name__(self, _, name):
         self._name = name
+
+    @classmethod
+    def text(cls):
+        "return the text for creating this line of menu"
+        return "%({cls.__name__}:)"
 
     def line(self) -> Tuple[str, str]:
         "return the modal dialog line"

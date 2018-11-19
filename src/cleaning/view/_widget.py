@@ -21,7 +21,7 @@ from    ._model                 import DataCleaningModelAccess, DataCleaningTask
 
 class BeadSubtractionModalDescriptor:
     "for use with modal dialogs"
-    def __init__(self):
+    def __init__(self, *_):
         self._name = '_subtracted'
 
     def __set_name__(self, _, name):
@@ -41,6 +41,11 @@ class BeadSubtractionModalDescriptor:
     def line(self) -> Tuple[Union[str, Tuple[str,str]], str]:
         "return the modal dialog line"
         return (('width: 40%', 'Subtracted beads'), f"%({self._name})220csvi")
+
+    @classmethod
+    def text(cls):
+        "return the text for creating this line of menu"
+        return "%({cls.__name__}:)"
 
     def __get__(self,inst,owner):
         if inst is None:

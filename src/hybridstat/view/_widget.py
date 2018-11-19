@@ -11,9 +11,9 @@ from bokeh.models               import (DataTable, TableColumn, CustomJS,
                                         Widget, Div, StringFormatter, Dropdown)
 
 
-from cleaning.view              import BeadSubtractionModalDescriptor
+from cleaning.view              import BeadSubtractionModalDescriptor # pylint: disable=unused-import
 from control.beadscontrol       import TaskWidgetEnabler
-from eventdetection.view        import AlignmentModalDescriptor
+from eventdetection.view        import AlignmentModalDescriptor # pylint: disable=unused-import
 from excelreports.creation      import writecolumns
 from modaldialog.view           import tab
 from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
@@ -584,10 +584,9 @@ def advanced(title = 'Peaks', **kwa):
          ## Cleaning
 
          Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α %(clipping.lowfactor).1oF
-         """,
-         BeadSubtractionModalDescriptor(),
-         AlignmentModalDescriptor(),
-         """
+         %(BeadSubtractionModalDescriptor:)
+         %(AlignmentModalDescriptor:)
+
          ## Peaks
 
          Min frame count per hybridisation  %(eventdetection.events.select.minlength)D
@@ -599,7 +598,7 @@ def advanced(title = 'Peaks', **kwa):
          Exhaustive fit algorithm           %(_IdAccessor:alg)b
          Max Δ to theoretical peak          %(_IdAccessor:window)d
          """,
-         accessors = (_IdAccessor,)
+         accessors = globals()
         )
     @fig
     class AdvancedWidget(tab.taskwidget): # type: ignore
