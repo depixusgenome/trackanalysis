@@ -132,6 +132,9 @@ class SequenceAnaIO:
         "action to be performed on saving a file"
         cnf = controller.theme.getconfig("sequence").maps[0]
         cnf.pop('history', None)
+        cnf['probes'] = SequenceModel().addto(controller).currentprobes
+        if not cnf['probes']:
+            cnf.pop('probes')
         model["sequence"] = cnf
 
     @classmethod
