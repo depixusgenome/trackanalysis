@@ -367,11 +367,14 @@ export class DpxModal       extends Model
         @connect(@properties.startdisplay.change, () => @_startdisplaymodal())
 
     toJSON: () ->
-        title = "<div class='bbm-modal__topbar'>"                               +
-                    "<h3 class='bbm-modal__title'>"                             +
-                        @title                                                  +
-                    "</h3>"                                                     +
-                "</div>"
+        if @title == ""
+            title = "<p style='height:5px;'></p>"
+        else
+            title = "<div class='bbm-modal__topbar'>"                           +
+                        "<h3 class='bbm-modal__title'>"                         +
+                            @title                                              +
+                        "</h3>"                                                 +
+                    "</div>"
 
         body  = "<div class='bbm-modal__section'>"                              +
                     '<form id="dpxbbmform" class="bk-root">'+@body+"</form>"    +
