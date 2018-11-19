@@ -429,11 +429,10 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         def _observer(**_):
             if self.isactive() and not done[0]:
                 done[0] = True
-                data    = fcn()
                 @self._doc.add_next_tick_callback
                 def _later():
-                    widget.update(**data)
-                    done[0] = True
+                    widget.update(**fcn())
+                    done[0] = False
 
         if len(args) % 2 != 0:
             raise ValueError()
