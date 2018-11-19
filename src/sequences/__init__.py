@@ -63,7 +63,7 @@ PEAKS_TYPE  = Sequence[Tuple[int, bool]]                    # pylint: disable=in
 
 class Translator:
     "Translates a sequence to peaks"
-    __END    = '_'
+    __END    = '_', 'singlestrand', '$'
     __SYMBOL = '!'
     __METHS  = ((re.compile('.'+__SYMBOL), lambda x: '('+x.string[x.start()]+')'),
                 (re.compile(__SYMBOL+'.'), lambda x: '('+x.string[x.end()-1]+')'))
@@ -73,7 +73,7 @@ class Translator:
     __TRANS.update({i.upper(): j for i, j in __TRANS.items()})
 
     __TRAFIND = re.compile('['+''.join(__TRANS)+']')
-    __ALPHABET= 'atgc'+''.join(__TRANS)+__SYMBOL+__END
+    __ALPHABET= 'atgc'+''.join(__TRANS)+__SYMBOL+__END[0]
     __SPLIT   = re.compile((r'(?:[^%(alph)s]*)([%(alph)s]+)(?:[^%(alph)s]+|$)*'
                             % dict(alph =__ALPHABET)), re.IGNORECASE)
 
@@ -101,8 +101,10 @@ class Translator:
     @classmethod
     def __get(cls, state, seq, oligs, flags):
         for oli in oligs:
-            if state and oli == cls.__END:
-                yield (len(seq), state)
+            if oli == cls.__END[1]:
+                if state:
+                    yield (len(seq), state)
+                continue
 
             patt = cls.__translate(oli, state)
             reg  = re.compile(patt, flags)
@@ -189,10 +191,10 @@ class Translator:
     @classmethod
     def split(cls, oligs:str)->Sequence[str]:
         "splits a string of oligos into a list"
-        oligs = oligs.replace("singlestrand", cls.__END)
-        oligs = oligs.replace("SINGLESTRAND", cls.__END)
-        oligs = oligs.replace("$",            cls.__END)
-        return sorted(i.lower() for i in cls.__SPLIT.findall(oligs))
+        for i in cls.__END[1:]:
+            oligs = oligs.replace(i, cls.__END[0]).replace(i.upper(), cls.__END[0])
+        out   = sorted(i.lower() for i in cls.__SPLIT.findall(oligs))
+        return [cls.__END[1] if i == cls.__END[0] else i for i in out]
 
 peaks       = Translator.peaks # pylint: disable=invalid-name
 splitoligos = Translator.split # pylint: disable=invalid-name
