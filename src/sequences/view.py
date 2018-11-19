@@ -309,7 +309,7 @@ class OligoListTheme:
     "OligoListTheme"
     name   : str = "sequence.probes"
     title  : str = ""
-    tooltip: str = 'Oligos: comma-separated list'
+    tooltip: str = 'cc!wgg, aat, singlestrand, ...?'
     width  : int = 280
 
 class OligoListWidget:
