@@ -112,7 +112,7 @@ class Indirection:
             attr = inst.__dict__[self._attr]
             self.controller(getattr(inst, '_ctrl')).update(attr, **value)
         else:
-            assert self._attr not in inst.__dict__
+            assert inst.__dict__.get(self._attr, value.name) == value.name
             ctrl       = type(value).__name__.lower()
             self._ctrl = ("display" if any(i in ctrl for i in ("display", "store")) else
                           "theme")
