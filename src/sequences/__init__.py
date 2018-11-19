@@ -63,6 +63,7 @@ PEAKS_TYPE  = Sequence[Tuple[int, bool]]                    # pylint: disable=in
 
 class Translator:
     "Translates a sequence to peaks"
+    __END    = '_'
     __SYMBOL = '!'
     __METHS  = ((re.compile('.'+__SYMBOL), lambda x: '('+x.string[x.start()]+')'),
                 (re.compile(__SYMBOL+'.'), lambda x: '('+x.string[x.end()-1]+')'))
@@ -72,7 +73,7 @@ class Translator:
     __TRANS.update({i.upper(): j for i, j in __TRANS.items()})
 
     __TRAFIND = re.compile('['+''.join(__TRANS)+']')
-    __ALPHABET= 'atgc'+''.join(__TRANS)+__SYMBOL
+    __ALPHABET= 'atgc'+''.join(__TRANS)+__SYMBOL+__END
     __SPLIT   = re.compile((r'(?:[^%(alph)s]*)([%(alph)s]+)(?:[^%(alph)s]+|$)*'
                             % dict(alph =__ALPHABET)), re.IGNORECASE)
 
@@ -100,6 +101,9 @@ class Translator:
     @classmethod
     def __get(cls, state, seq, oligs, flags):
         for oli in oligs:
+            if state and oli == cls.__END:
+                yield (len(seq), state)
+
             patt = cls.__translate(oli, state)
             reg  = re.compile(patt, flags)
             val  = reg.search(seq, 0)
@@ -107,7 +111,7 @@ class Translator:
             cnt  = range(1, patt.count('(')+1)
             if '(' in patt:
                 while val is not None:
-                    spans = (val.span(i)[-1] for i in cnt)
+                    spans = [val.span(i)[-1] for i in cnt]
                     yield from ((i, state) for i in spans if i > 0)
                     val = reg.search(seq, val.start()+1)
             else:
@@ -131,42 +135,53 @@ class Translator:
 
         Example:
 
-            >>> import numpy as np
-            >>> seq = "atcgATATATgtcgCCCaaGGG"
-            >>> res = peaks(seq, ('ATAT', 'CCC'))
-            >>> assert len(res) == 4
-            >>> assert all(a == b for a, b in zip(res['position'],    [8, 10, 17, 22]))
-            >>> assert all(a == b for a, b in zip(res['orientation'], [True]*3+[False]))
-            >>> res = peaks(seq, 'ATAT')
-            >>> assert len(res) == 2
-            >>> assert all(a == b for a, b in zip(res['position'],    [8, 10]))
-            >>> assert all(a == b for a, b in zip(res['orientation'], [True]*2))
-            >>> seq = "c"*5+"ATC"+"g"*5+"TAG"+"c"*5
-            >>> res = peaks(seq, 'wws')
-            >>> assert len(res) == 4
+        ```python
+        import numpy as np
+        seq = "atcgATATATgtcgCCCaaGGG"
+
+        res = peaks(seq, ('ATAT', 'CCC'))
+        assert len(res) == 4
+        assert all(a == b for a, b in zip(res['position'],    [8, 10, 17, 22]))
+        assert all(a == b for a, b in zip(res['orientation'], [True]*3+[False]))
+
+        res = peaks(seq, 'ATAT')
+        assert len(res) == 2
+        assert all(a == b for a, b in zip(res['position'],    [8, 10]))
+        assert all(a == b for a, b in zip(res['orientation'], [True]*2))
+
+        seq = "c"*5+"ATC"+"g"*5+"TAG"+"c"*5
+        res = peaks(seq, 'wws')
+        assert len(res) == 4
+        ```
         """
         ispath = False
         if isinstance(oligs, (dict, Path)):
             seq, oligs = oligs, seq
 
+        if isinstance(oligs, str):
+            oligs = cls.split(oligs)
+
         if isinstance(seq, dict):
             return ((i, cls.peaks(j, oligs)) for i, j in seq.items())
 
-        try:
-            ispath = isinstance(seq, Path) or Path(seq).exists()
-        except OSError:
-            pass
+        ispath = isinstance(seq, Path)
+        if (
+                isinstance(seq, str)
+                and any(i in seq for i in '/.\\')
+                and len(seq) <= 1024
+        ):
+            try:
+                ispath = Path(seq).exists()
+            except OSError:
+                pass
 
         if ispath:
             return ((i, cls.peaks(j, oligs)) for i, j in read(seq))
 
-        if isinstance(oligs, str):
-            oligs = (oligs,)
-
         if len(oligs) == 0:
             return np.empty((0,), dtype = PEAKS_DTYPE)
 
-        vals = dict() # type: Dict[int, bool]
+        vals  = dict() # type: Dict[int, bool]
         vals.update(cls.__get(False, seq, oligs, flags))
         vals.update(cls.__get(True, seq, oligs, flags))
         return np.array(sorted(vals.items()), dtype = PEAKS_DTYPE)
@@ -174,6 +189,9 @@ class Translator:
     @classmethod
     def split(cls, oligs:str)->Sequence[str]:
         "splits a string of oligos into a list"
+        oligs = oligs.replace("singlestrand", cls.__END)
+        oligs = oligs.replace("SINGLESTRAND", cls.__END)
+        oligs = oligs.replace("$",            cls.__END)
         return sorted(i.lower() for i in cls.__SPLIT.findall(oligs))
 
 peaks       = Translator.peaks # pylint: disable=invalid-name

@@ -10,10 +10,22 @@ def test_peaks():
     assert len(res) == 4
     assert all(a == b for a, b in zip(res['position'],    [8, 10, 17, 22]))
     assert all(a == b for a, b in zip(res['orientation'], [True]*3+[False]))
+
     res = peaks(seq, 'ATAT')
     assert len(res) == 2
     assert all(a == b for a, b in zip(res['position'],    [8, 10]))
     assert all(a == b for a, b in zip(res['orientation'], [True]*2))
+
+    res = peaks(seq, "$")
+    assert len(res) == 1
+    assert all(a == b for a, b in zip(res['position'],    [len(seq)]))
+    assert all(a == b for a, b in zip(res['orientation'], [True]))
+
+    res = peaks(seq, ('A!TAT', '!CCC'))
+    assert len(res) == 6
+    assert all(a == b for a, b in zip(res['position'],    [6, 7, 8, 9, 15, 22]))
+    assert all(a == b for a, b in zip(res['orientation'], [True,False,True,False,True,False]))
+
     seq = "c"*5+"ATC"+"g"*5+"TAG"+"c"*5
     res = peaks(seq, 'wws')
     assert len(res) == 4
@@ -23,6 +35,7 @@ def test_peaks():
     res = tuple(tuple(i) for i in peaks(seq, 't!att')) == ((6, False),)
     res = tuple(tuple(i) for i in peaks(seq, 't!a!tt')) == ((6, False), (7, False))
     res = tuple(tuple(i) for i in peaks(seq, 'a!t!aa')) == ((5, True), (6, True))
+
 
 def test_overlap():
     "tests overlaps"
