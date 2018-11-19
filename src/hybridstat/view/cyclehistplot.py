@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"View for cleaning data"
+"View for seeing both cycles and peaks"
 from copy                   import deepcopy
 from typing                 import Dict, cast
 
@@ -19,16 +19,15 @@ from utils                  import initdefaults
 from view.plots             import PlotView
 from view.plots.ploterror   import PlotError
 from view.plots.tasks       import TaskPlotCreator, CACHE_TYPE
-from ._model                import PeaksPlotModelAccess, PeaksPlotTheme, createpeaks
+from ._model                import (PeaksPlotModelAccess, PeaksPlotTheme,
+                                    createpeaks, resetrefaxis)
 from ._widget               import PeaksPlotWidgets, PeakListTheme
 from ._io                   import setupio
 
 CurveData = Dict[str, np.ndarray]
 HistData  = Dict[str, CurveData]
 class CyclePlotTheme(PlotTheme):
-    """
-    cleaning plot theme
-    """
+    "cycles & peaks plot theme: cycles"
     name      = "cyclehist.plot.cycle"
     figsize   = PlotTheme.defaultfigsize(530, 300)
     phasezoom = PHASE.measure, 20
@@ -46,9 +45,7 @@ class CyclePlotTheme(PlotTheme):
         super().__init__(**_)
 
 class CyclePlotModel(PlotModel):
-    """
-    cleaning plot model
-    """
+    "cycles & peaks plot model: cycles"
     theme   = CyclePlotTheme()
     display = PlotDisplay(name = "cyclehist.plot.cycle")
     @initdefaults(frozenset(locals()))
@@ -56,10 +53,8 @@ class CyclePlotModel(PlotModel):
         super().__init__()
 
 class HistPlotTheme(PlotTheme):
-    """
-    cleaning plot theme
-    """
-    name             = "cyclehist.plot.hist"
+    "cycles & peaks plot theme: histogram"
+    name     = "cyclehist.plot.hist"
     figsize          = (1000-CyclePlotTheme.figsize[0],)+CyclePlotTheme.figsize[1:]
     xlabel           = PeaksPlotTheme.xlabel
     ylabel           = CyclePlotTheme.ylabel
@@ -83,9 +78,7 @@ class HistPlotTheme(PlotTheme):
         super().__init__(**_)
 
 class HistPlotModel(PlotModel):
-    """
-    cleaning plot model
-    """
+    "cycles & peaks plot plot model: histogram"
     theme   = HistPlotTheme()
     display = PlotDisplay(name = "cyclehist.plot.hist")
     @initdefaults(frozenset(locals()))
@@ -176,7 +169,7 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
         return dict(t = tval, z = zval)
 
 class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
-    "Creates plots for peaks"
+    "Creates a histogram of peaks"
     _theme: HistPlotTheme
     _fig: Figure
     _src: Dict[str, ColumnDataSource]
@@ -238,7 +231,7 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
 
             pks = self._model.peaks['bases']
             cache[self._exp]['ticker'] = list(pks[np.isfinite(pks)])
-
+            cache[self._ref] = resetrefaxis(self._model, self._theme.reflabel)
             task = self._model.identification.task
             fit  = getattr(task, 'fit', {}).get(self._model.sequencekey, None)
             if fit is None or len(fit.peaks) <= 0:

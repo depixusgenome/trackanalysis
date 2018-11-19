@@ -41,7 +41,7 @@ from peakcalling.processor.__config__    import FitToHairpinTask, FitToReference
 
 class PeaksPlotTheme(PlotTheme):
     """
-    cleaning plot theme
+    peaks plot theme
     """
     name            = "hybridstat.peaks.plot"
     figsize         = PlotTheme.defaultfigsize(500, 700)
@@ -677,3 +677,18 @@ def createpeaks(mdl, themecolors, vals) -> Dict[str, np.ndarray]:
     elif mdl.fittoreference.referencepeaks is not None:
         peaks['color'] = np.where(np.isfinite(peaks['id']), colors[2], colors[0])
     return peaks
+
+def resetrefaxis(mdl, reflabel):
+    "sets up the ref axis"
+    task = mdl.identification.task
+    fit  = getattr(task, 'fit', {}).get(mdl.sequencekey, None)
+    if fit is None or len(fit.peaks) <= 2:
+        return dict(visible = False)
+    else:
+        label = mdl.sequencekey
+        if not label:
+            label = reflabel
+        return dict(ticker     = list(fit.peaks[1:-1]),
+                    visible    = True,
+                    axis_label = label)
+
