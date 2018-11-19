@@ -436,6 +436,8 @@ width: 100%; }
   bottom: 7px;
 }
 
+.dpx-alignment-widget::before { content: "Alignment "; }
+.dpx-drift-widget::before { content: "Drift Removal "; }
 .dpx-protocol-active { text-decoration-line: underline; }
 
 .dpx-inner { display: inline-block; }

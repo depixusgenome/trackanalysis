@@ -15,7 +15,7 @@ class WidgetTheme:
     "WidgetTheme"
     name   = "alignment"
     labels = ['ø', 'best', 'Φ1', 'Φ3']
-    title  = 'Alignment'
+    title  = 'css:dpx-alignment-widget'
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
@@ -38,6 +38,9 @@ class BaseWidget(Generic[T]):
         self.__widget.on_click(mainview.actionifactive(ctrl)(self._onclick_cb))
 
         if self._theme.title:
+            if self._theme.title.startswith("css:"):
+                self.__widget.css_classes = [self._theme.title[4:]]
+                return [self.__widget]
             return [Paragraph(text = self._theme.title), self.__widget]
         return [self.__widget]
 
