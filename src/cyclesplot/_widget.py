@@ -24,9 +24,9 @@ from    ._model                 import (CyclesModelAccess, CyclesPlotTheme,
 class PeaksTableTheme:
     "peaks table theme"
     name    = "cycles.peakstable"
-    height  = 100
+    height  = 80
     width   = 280
-    title   = 'dna ↔ nm'
+    title   = 'base ↔ µm'
     columns = [CyclesPlotTheme.yrightlabel, CyclesPlotTheme.ylabel]
     zstep   = 1e-4
     zformat = '0.0000'
@@ -84,7 +84,7 @@ class PeaksTableWidget:
                 data = self.__data()
                 mainview.calllater(lambda: setattr(self.__widget.source, 'data', data))
 
-        return [Paragraph(text = self.__theme.title), self.__widget]
+        return [self.__widget]
 
     def reset(self, resets:CACHE_TYPE):
         "updates the widget"
