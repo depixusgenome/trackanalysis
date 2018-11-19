@@ -175,12 +175,20 @@ class AdvancedDescriptor:
     ctrlgroup:str = "theme"
     def __post_init__(self):
         if isinstance(self.cnf, type):
-            self.cnf = getattr(self.cnf, 'name')
+            self.ctrlgroup = 'theme'
+            if any(i in self.cnf.__name__ for i in ('store','display')):
+                self.ctrlgroup = 'display'
+            self.cnf       = getattr(self.cnf(), 'name')
+        elif not isinstance(self.cnf, str):
+            self.ctrlgroup = 'theme'
+            if any(i in type(self.cnf).__name__ for i in ('store','display')):
+                self.ctrlgroup = 'display'
+            self.cnf       = getattr(self.cnf, 'name')
 
         if self.fmt == "" and "%(" in self.label:
-            ix1, ix2      = self.label.rfind("%("), self.label.rfind(")")
-            self.ctrlname = self.label[ix1+2:ix2].strip()
-            self.fmt      = self.label[ix2+1:].strip()
+            ix1, ix2, ix3 = [self.label.rfind(i) for i in ("%(", ":", ")")]
+            self.ctrlname = self.label[max(ix2+1, ix1+2):ix3].strip()
+            self.fmt      = self.label[ix3+1:].strip()
             self.label    = self.label[:ix1].strip()
         elif self.fmt == "" and "%" in self.label:
             ix1        = self.label.rfind("%")
@@ -357,6 +365,7 @@ class AdvancedWidget:
                 fmt = label[label.rfind(')')+1:]
             if len(fmt) >= 2 and fmt[-2] == 'o':
                 fmt = fmt[:-2]+fmt[-1]
+            fmt = fmt.lower()
 
             if fmt == 'b':
                 return _format('', val is not None)
@@ -453,7 +462,11 @@ class AdvancedTaskWidget(AdvancedWidget):
 
 class TabCreator:
     "create tabs"
-    def __call__(self, *args, accessors: Union[Dict[str, Any], Sequence[type]] = (), **kwa):
+    def __call__(self, *args,
+                 accessors: Union[Dict[str, Any], Sequence[type]] = (),
+                 figure                                           = False,
+                 base:      Union[None, str, type]                = None,
+                 **kwa):
         "adds descriptors to a class or returns an advanced tab"
         title, args, inds = self.__splitargs(args)
         def _create(elems):
@@ -462,15 +475,27 @@ class TabCreator:
             itms.extend(kwa.items())
             return self.__createwrapper(tit, first, itms)
 
-        wraps = [_create(args[inds[i]:inds[i+1]]) for i in range(len(inds)-1)][::-1]
+        wraps = [_create(args[inds[i]:inds[i+1]]) for i in range(len(inds)-1)]
+        if isinstance(figure, dict):
+            wraps.append(self.figure(**figure))
+        elif isinstance(figure, (list, tuple)):
+            wraps.append(self.figure(*figure))
+        elif figure not in (False, None):
+            wraps.append(self.figure(figure))
+
+        wraps = wraps[::-1]
         for i in args:
-            if isinstance(args, str) and i.startswith("#") and not i.startswith("##"):
+            if isinstance(i, str) and i.startswith("#") and not i.startswith("##"):
                 wraps.insert(0, self.title(i[1:].strip()))
 
         def _mwrapper(cls):
             for fcn in wraps:
                 cls = fcn(cls)
             return cls
+        if isinstance(base, str):
+            base = getattr(self, base)
+        if isinstance(base, type):
+            return _mwrapper(type('AdvancedWidget', (cast(type, base),), {}))
         return _mwrapper
 
     @classmethod
@@ -552,10 +577,14 @@ class TabCreator:
 
                 assert len(title)
                 info = j[j.rfind("%("):j.rfind(")")]
-                elem = (cls.line(j)                    if "%(" not in j else
-                        acc[info[2:info.rfind(':')]](j) if ':'  in info  else
-                        cls.taskattr(j)                if '.'  in info  else
-                        cls.line(j))
+                if '%(' in j and ':'  in info:
+                    tpe  = acc[info[2:info.rfind(':')]]
+                    elem = (tpe(j) if callable(getattr(tpe, '__get__', None)) else
+                            cls.line(tpe, j))
+                else:
+                    elem = (cls.line(j)     if "%(" not in j else
+                            cls.taskattr(j) if '.'  in info  else
+                            cls.line(j))
             else:
                 elem = (cls.taskattr(**j) if isinstance(j, dict)  else
                         cls.line(*j)      if isinstance(j, tuple) else
