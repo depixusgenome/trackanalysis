@@ -514,13 +514,19 @@ class FitParamsWidget:
 
 class _IdAccessor:
     _LABEL  = '%({self._attrname}){self._fmt}'
-    def __init__(self, label, getter, setter):
+    def __init__(self, label):
         self._label    = label[:label.rfind("%(")].strip()
         self._fmt      = label[label.rfind(")")+1:].strip()
-        self._name     = label[label.rfind("%(")+2:label.rfind(")")].strip()
         self._attrname = ""
-        self._fget     = getter
-        self._fset     = setter
+
+        attr       = label[label.rfind(':')+1:label.rfind(')')]
+        self._name = 'match' if attr == 'window' else 'fit'
+        if attr == 'alg':
+            self._fget = lambda i: isinstance(i, PeakGridFit)
+            self._fset = lambda i: ((ChiSquareFit, PeakGridFit)[i](),)
+        else:
+            self._fget = lambda i: getattr(i, attr)
+            self._fset = lambda i: {attr: i}
 
     def getdefault(self, inst, usr = False):
         "returns the default value"
@@ -567,37 +573,34 @@ class _PeakDescriptor:
             return
         mdl.peakselection.update(finder=ByHistogram(mincount=getattr(inst,"_eventcount")))
 
-def advanced(title = 'Peaks', others = None, **figure):
+def advanced(title = 'Peaks', **kwa):
     "create the advanced button"
-    fig = (tab.figure(PeaksPlotTheme, PeaksPlotDisplay) if len(figure) == 0 else
-           tab.figure(**figure))
-    tbl = (lambda cls: cls) if others is None else others
+    fig = (tab.figure(PeaksPlotTheme, PeaksPlotDisplay) if len(kwa) == 0 else
+           tab.figure(**kwa))
 
-    @tab.title(title+' Configuration')
-    @tbl
-    @tab("Cleaning",
-         'Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α %(clipping.lowfactor).1oF',
+    @tab(f"""
+         # {title} Configuration
+
+         ## Cleaning
+
+         Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α %(clipping.lowfactor).1oF
+         """,
          BeadSubtractionModalDescriptor(),
-         AlignmentModalDescriptor())
-    @tab("Peaks",
+         AlignmentModalDescriptor(),
          """
-         Min frame count per hybridisation %(eventdetection.events.select.minlength)D
-         Min hybridisations per peak %(peakselection.finder.grouper.mincount)D
+         ## Peaks
+
+         Min frame count per hybridisation  %(eventdetection.events.select.minlength)D
+         Min hybridisations per peak        %(peakselection.finder.grouper.mincount)D
+         Keep z=0 peak                      %(_IdAccessor:firstpeak)b
+         Discard the single strand peak     %(task.singlestrand)b
+         Re-align cycles using peaks        %(peakselection.align)b
+         Peak kernel size (blank ⇒ auto)    %(peakselection.precision).4oF
+         Exhaustive fit algorithm           %(_IdAccessor:alg)b
+         Max Δ to theoretical peak          %(_IdAccessor:window)d
          """,
-         _IdAccessor('Keep z=0 peak %(fit)b',
-                     lambda i: i.firstpeak,
-                     lambda i: {'firstpeak': i}),
-         """
-         Discard the single strand peak %(task.singlestrand)b
-         Re-align cycles using peaks %(peakselection.align)b
-         Peak kernel size (blank ⇒ auto) %(peakselection.precision).4oF
-         """,
-         _IdAccessor('Exhaustive fit algorithm %(fit)b',
-                     lambda i: isinstance(i, PeakGridFit),
-                     lambda i: ((ChiSquareFit, PeakGridFit)[i](),)),
-         _IdAccessor('Max Δ to theoretical peak%(match)d',
-                     lambda i: i.window,
-                     lambda i: {'window': i}))
+         accessors = (_IdAccessor,)
+        )
     @fig
     class AdvancedWidget(tab.taskwidget): # type: ignore
         "access to the modal dialog"

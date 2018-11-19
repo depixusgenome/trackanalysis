@@ -5,7 +5,7 @@ Allows creating modals from anywhere
 """
 from copy               import deepcopy
 from functools          import partial
-from typing             import Dict, List, Tuple, Any, Union, cast
+from typing             import Dict, List, Tuple, Any, Union, Sequence, cast
 from bokeh.document     import Document
 from bokeh.models       import Widget, Button
 from view.fonticon      import FontIcon
@@ -453,46 +453,25 @@ class AdvancedTaskWidget(AdvancedWidget):
 
 class TabCreator:
     "create tabs"
-    def __call__(self, title: str, *args, **kwa):
+    def __call__(self, *args, accessors: Sequence[type] = (), **kwa):
         "adds descriptors to a class or returns an advanced tab"
-        args      = sum((list(i.split('\n')) if isinstance(i, str) else [i] # type: ignore
-                         for i in args), [])
-        first     = next((i for i in args if isinstance(i, bool)), True)
-        itms:list = []
-        for i, j in enumerate(args):
-            if isinstance(j, str):
-                j = j.strip()
-            if isinstance(j, bool) or not j:
-                continue
+        title, args, inds = self.__splitargs(args)
+        def _create(elems):
+            first     = next((i for i in elems if isinstance(i, bool)), True)
+            tit, itms = self.__parseargs(title, accessors, elems)
+            itms.extend(kwa.items())
+            return self.__createwrapper(tit, first, itms)
 
-            label = f"{''.join(title.split()).lower()}{i}"
-            if isinstance(j, str) and "%(" in j and '.' in j[j.rfind("%("):j.rfind(")")]:
-                itms.append((label, self.taskattr(j)))
-            else:
-                itms.append((label, self.line(j))       if isinstance(j, str)   else
-                            (label, self.taskattr(**j)) if isinstance(j, dict)  else
-                            (label, self.line(*j))      if isinstance(j, tuple) else
-                            (label, j))
+        wraps = [_create(args[inds[i]:inds[i+1]]) for i in range(len(inds)-1)][::-1]
+        for i in args:
+            if isinstance(args, str) and i.startswith("#") and not i.startswith("##"):
+                wraps.insert(0, self.title(i[1:].strip()))
 
-        itms.extend(kwa.items())
-
-        def _wrapper(cls):
-            lst: list = deepcopy(itms)
-            for i, j in lst:
-                if hasattr(j, '__set_name__'):
-                    j.__set_name__(cls, i)
-
-            old = getattr(cls, '_body')
-            def _body(self) -> AdvancedWidgetBody:
-                cur  = old(self)
-                mine = AdvancedTab(title, *(i.line() for _, i in lst))
-                return (mine, *cur) if first else (*cur, mine)
-            setattr(cls, '_body', _body)
-
-            for i, j in lst:
-                setattr(cls, i, j)
+        def _mwrapper(cls):
+            for fcn in wraps:
+                cls = fcn(cls)
             return cls
-        return _wrapper
+        return _mwrapper
 
     @classmethod
     def taskattr(cls, akeys:str):
@@ -515,8 +494,9 @@ class TabCreator:
         if yaxis:
             args += [('_ymin',  YAxisRangeDescriptor(disp)),
                      ('_ymax',  YAxisRangeDescriptor(disp))]
+        text  = (kwa.pop('text'),) if 'text' in kwa  else ()
         args += list(kwa.items())
-        return self("Theme", **dict(args))
+        return self("Theme", *text, **dict(args))
 
     line      : type = AdvancedDescriptor
     widget    : type = AdvancedWidget
@@ -526,6 +506,78 @@ class TabCreator:
         "add a title"
         def _wrapper(cls):
             setattr(cls, '_title', lambda *_: title)
+            return cls
+        return _wrapper
+
+    @staticmethod
+    def __splitargs(args):
+        title = ""
+        if isinstance(args[0], str) and '%' not in args[0]:
+            title = args[0].strip()
+            if title.startswith('##'):
+                title = title[2:].strip()
+
+            args  = args[1:]
+
+        fcn  = lambda i: list(i.strip().split('\n')) if isinstance(i, str) else [i]
+        args = sum((fcn(i) for i in args), [])
+        args = [i for i in args if not (isinstance(i, str) and len(i.strip()) == 0)]
+        inds = [i for i, j in enumerate(args) if isinstance(j, str) and j.startswith('##')]
+        inds.append(len(args))
+        if inds[0] != 0:
+            inds.insert(0, 0)
+        return title, args, inds
+
+    @classmethod
+    def __parseargs(cls, title, accessors, args):
+        itms:list = []
+        acc       = {i.__name__: i for i in accessors}
+        for i, j in enumerate(args):
+            if isinstance(j, bool) or not j:
+                continue
+
+            if isinstance(j, str):
+                j = j.strip()
+                if len(j) == 0:
+                    continue
+
+                if j.startswith("##"):
+                    title = j[2:].strip()
+                    continue
+                if j.startswith("#"):
+                    continue
+
+                assert len(title)
+                info = j[j.rfind("%("):j.rfind(")")]
+                elem = (cls.line(j)                    if "%(" not in j else
+                        acc[info[2:info.rfind(':')]](j) if ':'  in info  else
+                        cls.taskattr(j)                if '.'  in info  else
+                        cls.line(j))
+            else:
+                elem = (cls.taskattr(**j) if isinstance(j, dict)  else
+                        cls.line(*j)      if isinstance(j, tuple) else
+                        j)
+
+            itms.append((f"{''.join(title.split()).lower()}{i}", elem))
+        return title, itms
+
+    @staticmethod
+    def __createwrapper(title, first, itms):
+        def _wrapper(cls):
+            lst: list = deepcopy(itms)
+            for i, j in lst:
+                if hasattr(j, '__set_name__'):
+                    j.__set_name__(cls, i)
+
+            old = getattr(cls, '_body')
+            def _body(self) -> AdvancedWidgetBody:
+                cur  = old(self)
+                mine = AdvancedTab(title, *(i.line() for _, i in lst))
+                return (mine, *cur) if first else (*cur, mine)
+            setattr(cls, '_body', _body)
+
+            for i, j in lst:
+                setattr(cls, i, j)
             return cls
         return _wrapper
 

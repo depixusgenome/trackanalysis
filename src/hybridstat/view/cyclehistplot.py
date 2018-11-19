@@ -258,12 +258,15 @@ class _StateDescriptor:
         getattr(inst, '_ctrl').display.update("cyclehist.state", state = PlotState(value))
 
 class _AxisDescriptor:
-    name: str
-    def __init__(self):
+    def __init__(self, label):
         self.views: List[Figure] = []
+        self.name  : str = label[label.rfind(':')+1:label.rfind(')')]
+        self.label : str = label[:label.rfind('%(')]
+        self.fmt   : str = label[label.rfind(')')+1:]
+        self.attr  : str = ""
 
     def __set_name__(self, _, name):
-        self.name = name
+        self.attr = name
 
     @property
     def _attr(self):
@@ -295,11 +298,25 @@ class _AxisDescriptor:
 
     def line(self):
         "return the line to display"
-        if 'grid' in self.name:
-            return "Grid line alpha", f"%({self.name}).2f"
-        if 'tick' in self.name:
-            return "Tick font size", f"%({self.name})s"
-        return "Axis label font size", f"%({self.name})s"
+        return self.label,  f"%({self.attr}){self.fmt}"
+
+    @classmethod
+    def extendviews(cls, adv, plots):
+        "extends views"
+        for i in adv.__class__.__dict__.values():
+            if isinstance(i, cls):
+                i.views.extend(plots)
+
+    @classmethod
+    def args(cls):
+        "return the text to create the figure advanced menu"
+        return dict(text = """
+                           Grid line alpha      %(_AxisDescriptor:grid).2f
+                           Tick font size       %(_AxisDescriptor:tick)s
+                           Axis label font size %(_AxisDescriptor:label)s
+                           """,
+                    accessors = (cls,),
+                    xaxis     = True)
 
 class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
     "Creates plots for peaks & cycles"
@@ -316,11 +333,7 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
                                          peaks = theme,
                                          title = CycleHistPlotView.PANEL_NAME,
                                          cnf   = getattr(self._cycle, '_plotmodel'),
-                                         xaxis = True,
-                                         ticksize  = _AxisDescriptor(),
-                                         labelsize = _AxisDescriptor(),
-                                         gridalpha = _AxisDescriptor()
-                                        )
+                                         **_AxisDescriptor.args())
         ctrl.display.add(self._state)
         self.addto(ctrl)
 
@@ -373,8 +386,7 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
     def _addtodoc(self, ctrl, doc):
         "returns the figure"
         plots = [getattr(i, '_addtodoc')(ctrl, doc) for i in self._plots]
-        for _ in ('ticksize', 'labelsize', 'gridalpha'):
-            getattr(self._widgets.advanced.__class__, _).views.extend(plots)
+        _AxisDescriptor.extendviews(self._widgets.advanced, plots)
 
         for i in plots[1:]:
             i.y_range = plots[0].y_range
