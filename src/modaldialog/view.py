@@ -175,15 +175,18 @@ class AdvancedDescriptor:
     ctrlgroup:str = "theme"
     def __post_init__(self):
         if isinstance(self.cnf, type):
-            self.ctrlgroup = 'theme'
-            if any(i in self.cnf.__name__ for i in ('store','display')):
-                self.ctrlgroup = 'display'
-            self.cnf       = getattr(self.cnf(), 'name')
+            grpname  = self.cnf.__name__
+            self.cnf = getattr(self.cnf(), 'name')
         elif not isinstance(self.cnf, str):
+            grpname  = type(self.cnf).__name__
+            self.cnf = getattr(self.cnf, 'name')
+        else:
+            grpname  = ""
+
+        if grpname and not self.ctrlgroup:
             self.ctrlgroup = 'theme'
-            if any(i in type(self.cnf).__name__ for i in ('store','display')):
+            if any(i in grpname for i in ('store','display')):
                 self.ctrlgroup = 'display'
-            self.cnf       = getattr(self.cnf, 'name')
 
         if self.fmt == "" and "%(" in self.label:
             ix1, ix2, ix3 = [self.label.rfind(i) for i in ("%(", ":", ")")]
@@ -194,16 +197,17 @@ class AdvancedDescriptor:
             ix1        = self.label.rfind("%")
             self.fmt   = self.label[ix1+1:].strip()
             self.label = self.label[:ix1].strip()
-        assert self.cnf != ""
-        assert len(self.fmt)
-        assert len(self.label)
+
         if ":" in self.ctrlname:
             self.ctrlgroup, self.ctrlname = self.ctrlname.split(":")
+
+        for i in ('cnf', 'fmt', 'label', 'ctrlgroup'):
+            assert getattr(self, i) != ""
 
     def __set_name__(self, _, name):
         assert name == self.attrname or not self.attrname
         self.attrname = name
-        if not getattr(self, 'ctrlname'):
+        if not self.ctrlname:
             self.ctrlname = name[1 if name[0] == '_' else 0:]
 
     def _controller(self, inst):
@@ -226,13 +230,12 @@ class AdvancedDescriptor:
         "return the line for this descriptor"
         return self.label, self._LABEL.format(self = self)
 
-@dataclass
 class FigureSizeDescriptor(AdvancedDescriptor):
     "defines the figure height"
-    label:    str = 'Plot height'
-    fmt:      str = "d"
-    ctrlname: str = "figsize"
     isheight      = cast(bool, property(lambda self: 'height' in self.attrname))
+    def __init__(self, cnf):
+        super().__init__(cnf, 'Plot height', "d", "figsize", "", "theme")
+
     def __set_name__(self, _, name):
         super().__set_name__(_, name)
         self.label = 'Plot '+ ("height" if self.isheight else "width")
@@ -264,14 +267,16 @@ class FigureSizeDescriptor(AdvancedDescriptor):
         "applies the figure size changes"
         ctrl.theme.observe(theme, partial(cls.onchangefiguresize, theme, doc, fig))
 
-@dataclass
 class YAxisRangeDescriptor(AdvancedDescriptor):
     "defines the figure height"
-    label:    str = 'Y-axis max'
-    fmt:      str = ".4of"
-    ctrlname: str = "ybounds"
-    ctrlgroup:str = "display"
     isheight      = cast(bool, property(lambda self: 'max' in self.attrname))
+    def __init__(self, cnf):
+        letter = type(self).__name__[0]
+        super().__init__(cnf, letter+'-axis max', ".4of", letter.lower()+"bounds",
+                         "", "display")
+        assert self.ctrlgroup == "display"
+        assert "bounds" in self.ctrlname
+
     def __set_name__(self, _, name):
         super().__set_name__(_, name)
         self.label = self.label.replace('max', "max" if self.isheight else "min")
@@ -291,11 +296,8 @@ class YAxisRangeDescriptor(AdvancedDescriptor):
         "return the default value"
         return super().getdefault(inst)[self.isheight]
 
-@dataclass
 class XAxisRangeDescriptor(YAxisRangeDescriptor):
     "defines the figure height"
-    label:    str = 'X-axis max'
-    ctrlname: str = "xbounds"
 
 @dataclass
 class ThemeNameDescriptor(AdvancedDescriptor):
@@ -507,13 +509,16 @@ class TabCreator:
                 ('_figwidth',  FigureSizeDescriptor(cnf)),
                 ('_figheight', FigureSizeDescriptor(cnf))]
         if xaxis:
+            assert hasattr(disp, 'xbounds')
             args += [('_xmin',  XAxisRangeDescriptor(disp)),
                      ('_xmax',  XAxisRangeDescriptor(disp))]
         if yaxis:
+            assert hasattr(disp, 'ybounds')
             args += [('_ymin',  YAxisRangeDescriptor(disp)),
                      ('_ymax',  YAxisRangeDescriptor(disp))]
         text  = (kwa.pop('text'),) if 'text' in kwa  else ()
         args += list(kwa.items())
+        print(cnf, disp)
         return self("Theme", *text, **dict(args))
 
     line      : type = AdvancedDescriptor
