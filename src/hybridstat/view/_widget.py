@@ -568,6 +568,8 @@ def advanced(**kwa):
     "create the advanced button"
     fig = (tab.figure(PeaksPlotTheme, PeaksPlotDisplay) if len(kwa) == 0 else
            tab.figure(**kwa))
+    msg = ("<b>To fit to the baseline (singlestrand) peak, add '0'"
+           " ('singlestrand') to the oligos.<b>")
 
     @tab(f"""
          ## Cleaning
@@ -578,7 +580,7 @@ def advanced(**kwa):
 
          ## Peaks
 
-         To fit to the baseline (singlestrand) peak, add '0' ('singlestrand') to the oligos.
+         {msg}
 
          Min frame count per hybridisation  %(eventdetection.events.select.minlength)D
          Min hybridisations per peak        %(peakselection.finder.grouper.mincount)D
@@ -593,6 +595,7 @@ def advanced(**kwa):
     @fig
     class AdvancedWidget(tab.taskwidget): # type: ignore
         "access to the modal dialog"
+
     return AdvancedWidget
 
 class PeaksPlotWidgets: # pylint: disable=too-many-instance-attributes
