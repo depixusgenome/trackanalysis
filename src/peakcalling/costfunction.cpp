@@ -85,7 +85,7 @@ namespace peakcalling { namespace cost
                     auto n2 = _norm2(pos2, aweight2, size2, alpha, sig);
                     auto n1 = _norm1(pos1, aweight1, size1, sig);
 
-                    float sum =  std::get<0>(cross);
+                    float sum = std::get<0>(cross);
                     float c   = std::sqrt(std::get<0>(n2)*n1);
                     float x   = sum/c;
                     return std::make_tuple(1.-x,
@@ -98,6 +98,31 @@ namespace peakcalling { namespace cost
             auto r1 = cost(bead1, yvals1, size1,
                            bead2, yvals2, size2,
                            stretch, bias, cf.sigma);
+
+            if(cf.singlestrand > 0 && bead1[size1-1] < bead2[size2-1]*stretch+bias)
+            {
+                float maxv = bead1[size1-1];
+                float sumv = 0.f, dx1 = 0.0f, dx2 = 0.0f;
+                for(int i = int(size2)-1; i >= 0; --i)
+                {
+                    auto val = bead2[i]*stretch+bias;
+                    if(val <= maxv)
+                        break;
+
+                    val     = (val-maxv)/cf.sigma;
+                    auto ex = std::exp(-.5f*val*val);
+                        
+                    sumv += 1.0f-ex;
+                    ex   *= val/cf.sigma;
+                    dx1  += bead2[i]*ex;
+                    dx2  += ex;
+                }
+
+                r1 = std::make_tuple(float(std::get<0>(r1) + sumv*cf.singlestrand),
+                                     float(std::get<1>(r1) + dx1*cf.singlestrand),
+                                     float(std::get<2>(r1) + dx2*cf.singlestrand));
+            }
+
             if(!cf.symmetric)
                 return r1;
 

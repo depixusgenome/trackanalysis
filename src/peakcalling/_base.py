@@ -10,8 +10,6 @@ from   itertools    import product
 import numpy        as     np
 from   utils        import initdefaults
 
-from ._core         import match as _match # pylint: disable=import-error
-
 DEFAULT_BEST = float(np.finfo('f4').max)
 
 class CobylaParameters(NamedTuple): # pylint: disable=missing-docstring
@@ -45,7 +43,6 @@ class Pivot(Enum):
     top      = 'top'
     bottom   = 'bottom'
 
-
 class Symmetry(Enum):
     "Which side to consider"
     both  = 'both'
@@ -73,10 +70,17 @@ class OptimizationParams:
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
+
+    def _defaultdistance(self) -> Distance:
+        "return the default distance"
+        return Distance(DEFAULT_BEST,
+                        (self.stretch.center or self.defaultstretch),
+                        (self.bias.center    or 0.))
+
     def constraints(self):
         "the stretch & bias constraints for the chisquare"
-        scstr = ((self.stretch.center if self.stretch.center else 0.) - self.stretch.size,
-                 (self.stretch.center if self.stretch.center else 0.) + self.stretch.size)
+        scstr = ((self.stretch.center or self.defaultstretch) - self.stretch.size,
+                 (self.stretch.center or self.defaultstretch) + self.stretch.size)
         bcstr = None
         if self.bias.center is not None:
             pots: List[float] = [(self.bias.center - self.bias.size)*scstr[0],
@@ -154,91 +158,3 @@ class PointwiseOptimization(OptimizationParams):
     def optimconfig(self, **kwa) -> Dict[str, Any]:
         "returns the configuration"
         return config(self.optim, **kwa)
-
-def _chi2cost(ref, exp, pairs, symmetry, dist):
-    if symmetry is Symmetry.both:
-        dist += (len(exp)+len(ref)-2.*len(pairs))**2
-        return np.sqrt(dist/(len(exp)+len(ref))) if len(exp)+len(ref) else DEFAULT_BEST
-
-    if symmetry is Symmetry.left:
-        dist += (len(ref)-len(pairs))**2
-        return np.sqrt(dist/len(ref)) if len(ref) else DEFAULT_BEST
-
-    dist += (len(exp)-len(pairs))**2
-    return np.sqrt(dist/len(exp)) if len(exp) else DEFAULT_BEST
-
-def chisquare(ref       : np.ndarray, # pylint: disable=too-many-arguments
-              exp       : np.ndarray,
-              firstpeak : bool,
-              symmetry  : Symmetry,
-              window    : float,
-              stretch   : float,
-              bias      : float,
-              stretchcstr: tuple = None,
-              biascstr:    tuple = None):
-    """
-    We use the GaussianProductFit results to match exp then estimate
-    the best Χ² fit between matched exp, adding their count as well.
-    """
-    def _pairs(params):
-        tmp   = exp*params[0]+params[1]
-        pairs = _match.compute(ref, tmp, window)
-        if firstpeak and len(pairs) and any(i == 0 for i in pairs[0]):
-            return pairs[1:]
-        return pairs
-
-    def _fit(pairs):
-        xvals, yvals = exp[pairs[:,1]], ref[pairs[:,0]]
-        cov          = np.cov(yvals, xvals)
-        newstretch   = cov[0,1]/cov[1,1]
-        if stretchcstr is not None:
-            newstretch = max(stretchcstr[0], min(stretchcstr[1], newstretch))
-
-        newbias = np.mean(yvals)-newstretch*np.mean(xvals)
-        if biascstr is not None:
-            newbias = max(biascstr[0], min(biascstr[1],  newbias))
-
-        params = newstretch, newbias
-        return params, _pairs(params)
-
-    pairs = _pairs((stretch, bias))
-    if len(pairs) > 1:
-        params, newpairs  = _fit(pairs)
-        if len(newpairs) > len(pairs):
-            params, newpairs = _fit(newpairs)
-        if params is not None:
-            pairs  = newpairs
-        else:
-            params = stretch, bias
-
-        dist  = ((params[0]*exp[pairs[:,1]]+params[1] - ref[pairs[:,0]])**2).sum()
-        dist /= window**2
-    else:
-        params = (stretch, bias)
-        dist   = 0.
-
-    return _chi2cost(ref, exp, pairs, symmetry, dist), params[0], params[1]
-
-def chisquarevalue(ref       : np.ndarray, # pylint: disable=too-many-arguments
-                   exp       : np.ndarray,
-                   firstpeak : bool,
-                   symmetry  : Symmetry,
-                   window    : float,
-                   stretch   : float,
-                   bias      : float):
-    """
-    We use the GaussianProductFit results to match exp then estimate
-    the best Χ² fit between matched exp, adding their count as well.
-    """
-    tmp   = exp*stretch+bias
-    pairs = _match.compute(ref, tmp, window)
-    if firstpeak and len(pairs) and any(i == 0 for i in pairs[0]):
-        pairs = pairs[1:]
-
-    if len(pairs) > 1:
-        dist  = ((stretch*exp[pairs[:,1]]+bias - ref[pairs[:,0]])**2).sum()
-        dist /= window**2
-    else:
-        dist = 0.
-
-    return _chi2cost(ref, exp, pairs, symmetry, dist), stretch, bias

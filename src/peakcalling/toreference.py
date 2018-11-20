@@ -17,9 +17,9 @@ from    peakfinding.processor       import PeaksDict
 from    peakfinding.histogram       import Histogram, HistogramData
 from    peakfinding.probabilities   import Probability
 from    peakfinding.selector        import PeakSelectorDetails
+from    .chisquare                  import ChiSquare
 from    ._base                      import (GriddedOptimization, CobylaParameters,
-                                            Distance, Range, chisquare, chisquarevalue,
-                                            Symmetry, Pivot, DEFAULT_BEST)
+                                            Distance, Range, Symmetry, Pivot, DEFAULT_BEST)
 
 class HistogramFitData(NamedTuple): # pylint: disable=missing-docstring
     fcn:   interp1d
@@ -295,9 +295,9 @@ class CorrectedHistogramFit(HistogramFit):
 
 
     def _chisquarecomputation(self, left, right, params):
-        res = chisquare(left.peaks[self.firstregpeak:], right.peaks,
-                        False, self.symmetry, self.window, params[1], -params[1]*params[2],
-                        *self.constraints())
+        res = (ChiSquare(left.peaks[self.firstregpeak:], right.peaks, self.window,
+                         params[1], params[2], self.symmetry, False, True)
+               .optimize(*self.constraints()))
         return res[0], res[1], -res[2]/res[1]
 
 class ChiSquareHistogramFit(CorrectedHistogramFit):
@@ -323,9 +323,9 @@ class ChiSquareHistogramFit(CorrectedHistogramFit):
 
     def _cost_function(self, left: ChiSquareData, right: ChiSquareData, # type: ignore
                        stretch: float, bias: float):
-        return chisquarevalue(left.peaks[self.firstregpeak:], right.peaks,
-                              False, self.symmetry, self.window,
-                              stretch, -stretch*bias)[0]
+        return ChiSquare(left.peaks[self.firstregpeak:], right.peaks,
+                         self.window, stretch, bias, self.symmetry,
+                         False, True).value()[0]
 
 class HairpinFitAlg(ReferenceFit):
     "adaptor for hairpin fitters"

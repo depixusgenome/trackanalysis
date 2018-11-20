@@ -7,7 +7,7 @@ from data.views               import BEADKEY, TrackView
 from control.processor        import Processor
 from control.processor.runner import pooledinput, pooldump
 from peakfinding.peaksarray   import Output as PeakFindingOutput, PeaksArray
-from ..tohairpin              import Distance
+from .._base                  import Distance, DEFAULT_BEST
 from .fittohairpin            import (FitToHairpinTask, FitToHairpinProcessor,
                                       Fitters, Constraints, Matchers, Input,
                                       PeakEventsTuple)
@@ -74,6 +74,9 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
         one  = lambda i, j: ByHairpinBead(i[0], i[1], i[2].get(j, dflt), i[3], i[4])
         best = {itm.key: min(itm.distances, key = itm.distances.__getitem__, default = '✗')
                 for itm in out.values()}
+        for i, j  in best.items():
+            if out[i].distances[j][0] == DEFAULT_BEST:
+                best[i] = '✗'
         for hpname in sorted(set(best.values()), key = lambda x: x or chr(255)):
             vals = [one(val, hpname) for key, val in out.items() if best[key] == hpname]
             vals = sorted(vals, key = lambda i: i.silhouette, reverse = True)

@@ -23,7 +23,7 @@ class HairpinCycleAlignment(PeakCorrelationAlignment, HairpinFitter):
     class Action(PeakCorrelationAlignmentAction):
         "Container class for computing a bias with given options."
         def reference(self, wtab, projector, hists):
-            ref = wtab.parent.expectedpeaks/wtab.stretch + wtab.bias
+            ref = wtab.parent.peaks/wtab.stretch + wtab.bias
             return projector.apply(*hists[1:], hists[0][0].shape[1], ref)
 
         @staticmethod

@@ -5,7 +5,8 @@ namespace peakcalling { namespace cost
 {
     struct Parameters: public optimizer::Parameters
     {
-        bool symmetric;
+        bool  symmetric;
+        float singlestrand;
     };
 
     using Output = optimizer::Output;

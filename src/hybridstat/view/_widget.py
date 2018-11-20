@@ -220,18 +220,9 @@ class PeaksStatsWidget:
             self.values[1] = dist[key].stretch
             self.values[2] = dist[key].bias
 
-            task      = mdl.identification.task
-            tmp       = task.match[key].peaks
-            if len(tmp):
-                remove = task.match[key].peaks[[0,-1]]
-                nrem   = sum(i in remove for i in mdl.peaks[key+'id'])
-            else:
-                nrem   = 0
-            nfound         = np.isfinite(mdl.peaks[key+'id']).sum()-nrem
-            self.values[9] = f'{nfound}/{len(task.match[key].hybridisations)}'
-            if nrem == 2:
-                self.values[9] += self.openhp
-
+            task            = mdl.identification.task
+            nfound          = np.isfinite(mdl.peaks[key+'id']).sum()
+            self.values[9]  = f'{nfound}/{len(task.match[key].peaks)}'
             self.values[10] = PeakGridFit.silhouette(dist, key)
 
             if nfound > 2:
@@ -587,9 +578,10 @@ def advanced(**kwa):
 
          ## Peaks
 
+         To fit to the baseline (singlestrand) peak, add '0' ('singlestrand') to the oligos.
+
          Min frame count per hybridisation  %(eventdetection.events.select.minlength)D
          Min hybridisations per peak        %(peakselection.finder.grouper.mincount)D
-         Keep z=0 peak                      %(_IdAccessor:firstpeak)b
          Discard the single strand peak     %(task.singlestrand)b
          Re-align cycles using peaks        %(peakselection.align)b
          Peak kernel size (blank ⇒ auto)    %(peakselection.precision).4oF

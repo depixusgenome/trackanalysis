@@ -10,46 +10,37 @@ import numpy        as     np
 
 from utils          import StreamUnion, initdefaults
 from sequences      import read as _read, peaks as _peaks
-from ._core         import cost as _cost, match as _match # pylint: disable=import-error
+from .chisquare     import ChiSquare
 from ._base         import (Distance, GriddedOptimization, PointwiseOptimization,
-                            DEFAULT_BEST, OptimizationParams, Symmetry, Pivot,
-                            chisquare, chisquarevalue)
+                            OptimizationParams, Symmetry, Pivot)
+from ._core         import cost as _cost, match as _match # pylint: disable=import-error
 
 class HairpinFitter(OptimizationParams):
     "Class containing theoretical peaks and means for matching them to experimental ones"
-    peaks     = np.empty((0,), dtype = 'f4') # type: np.array
-    firstpeak = True
-    lastpeak  = False
+    peaks           = np.empty((0,), dtype = 'f4') # type: np.array
+    hassinglestrand = False
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    @property
-    def expectedpeaks(self) -> np.ndarray:
-        "returns the peaks +- the hairpin extension"
-        pks = self.peaks[None if self.firstpeak else 1:None if self.lastpeak  else -1]
-        return np.asarray(pks)
-
-    @property
-    def hybridisations(self) -> np.ndarray:
-        "returns only peaks linked to hibridizations"
-        return np.asarray(self.peaks[1:-1])
-
     @staticmethod
     def topeaks(seq:str, oligos:Sequence[str]) -> np.ndarray:
         "creates a peak sequence from a dna sequence and a list of oligos"
-        return np.pad(np.array(_peaks(seq, oligos)['position'], dtype = 'i4'),
-                      1, 'constant', constant_values = (0, len(seq)))
+        return np.array(_peaks(seq, oligos)['position'], dtype = 'i4')
 
     @classmethod
     def read(cls, path:Union[StreamUnion, Dict], oligos:Sequence[str], **kwa
             ) -> Iterator[Tuple[str, 'HairpinFitter']]:
         "creates a list of *HairpinFitter* from a fasta file and a list of oligos"
-        itr = (path         if isinstance(path, Iterator)             else
-               path.items() if callable(getattr(path, 'items', None)) else # type: ignore
-               _read(path))
-        itr = cast(Iterator[Tuple[str,Any]], itr)
-        return ((name, cls(**kwa, peaks = cls.topeaks(seq, oligos))) for name, seq in itr)
+        itr   = (path         if isinstance(path, Iterator)             else
+                 path.items() if callable(getattr(path, 'items', None)) else # type: ignore
+                 _read(path))
+
+        for name, seq in cast(Iterator[Tuple[str,Any]], itr):
+            self = cls(**kwa, peaks = cls.topeaks(seq, oligos))
+            self.hassinglestrand = self.peaks[-1] == len(seq)
+            yield (name, self)
 
     @staticmethod
     def silhouette(dist, key = None) -> float:
@@ -64,11 +55,10 @@ class HairpinFitter(OptimizationParams):
 
     def withinrange(self, extension) -> bool:
         "return whether the bead extension is within range of the last peak (hairpin size)"
-        get  = lambda x, y: x if y.center is None else y.center
-        mins = get(self.defaultstretch, self.stretch) - self.stretch.size
-        maxs = get(self.defaultstretch, self.stretch) + self.stretch.size
-        minb = get(0., self.bias) - self.bias.size
-        maxb = get(0., self.bias) + self.bias.size
+        mins = (self.stretch.center or self.defaultstretch) - self.stretch.size
+        maxs = (self.stretch.center or self.defaultstretch) + self.stretch.size
+        minb = (self.bias.center or 0.) - self.bias.size
+        maxb = (self.bias.center or 0.) + self.bias.size
         return (extension-maxb)*mins < self.peaks[-1] < (extension-minb)*maxs
 
     def defaultparameters(self):
@@ -108,29 +98,30 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
     def optimize(self, peaks: np.ndarray) -> Distance:
         "optimizes the cost function"
         peaks = np.asarray(peaks)
-        best  = DEFAULT_BEST, self.stretch.center, (self.bias.center or 0.)
+        best  = self._defaultdistance()
         delta = hpdelta = 0.
         if len(peaks) > 1:
-            rng   = lambda x, y, z: (('min_'+x, y-z), (x, y), ('max_'+x, y+z))
-            brng  = lambda w, x, y, z: rng(w, x[0]*(x[1]+y), z*x[0])
-            args  = self.optimconfig(symmetry = self.symmetry is Symmetry.both,
-                                     noise = self.precision)
+            args  = self.optimconfig(symmetry     = self.symmetry is Symmetry.both,
+                                     noise        = self.precision,
+                                     singlestrand = 1. if self.hassinglestrand else 0.)
 
             hpdelta = self.peaks[-2] if len(self.peaks) > 2 and self.pivot == Pivot.top else 0
-            hpin    = self.expectedpeaks - hpdelta
+            hpin    = self.peaks - hpdelta
 
             delta = (peaks[0] if self.pivot == Pivot.bottom   else
                      0        if self.pivot == Pivot.absolute else
                      peaks[-1])
-            peaks = (peaks - delta)[None if self.firstpeak else 1:]
-
+            peaks = peaks - delta
+            bias  = 0. if self.bias.center is None else delta
 
             for vals in self.grid:
-                args.update(rng('stretch', vals[0], self.stretch.step))
-                if self.bias.center is None:
-                    args.update(brng('bias', vals, 0.,    self.bias.step))
-                else:
-                    args.update(brng('bias', vals, delta, self.bias.step))
+                args.update(min_stretch = vals[0] - self.stretch.step,
+                            stretch     = vals[0],
+                            max_stretch = vals[0] + self.stretch.step,
+                            min_bias    = vals[0]*(vals[1]+bias) - vals[0]*self.bias.step,
+                            bias        = vals[0]*(vals[1]+bias),
+                            max_bias    = vals[0]*(vals[1]+bias) + vals[0]*self.bias.step)
+
                 try:
                     out = self._optimize(hpin, peaks, args)
                 except: # pylint: disable=bare-except
@@ -144,8 +135,11 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
         "computes the cost value at a given stretch and bias as well as derivates"
         if len(peaks) == 0:
             return 0., 0., 0.
-        hpin  = self.expectedpeaks
-        peaks = (peaks - peaks[0])[None if self.firstpeak else 1:]
+        hpin  = self.peaks
+        delta = (peaks[0] if self.pivot == Pivot.bottom   else
+                 0        if self.pivot == Pivot.absolute else
+                 peaks[-1])
+        peaks = peaks - delta
         if any(isinstance(i, (Sequence, np.ndarray)) for i in (stretch, bias)):
             stretch = np.asarray(stretch)
             bias    = -np.asarray(bias)*stretch
@@ -155,8 +149,9 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
             ufcn    = np.frompyfunc(fcn, 2, 3)
             return ufcn(stretch, bias)
         return self._value(hpin, peaks, stretch, -bias*stretch,
-                           symmetry = self.symmetry is Symmetry.both,
-                           noise    = self.precision)
+                           symmetry     = self.symmetry is Symmetry.both,
+                           noise        = self.precision,
+                           singlestrand = self.hassinglestrand)
 
     @staticmethod
     def _value(hpin: np.ndarray, peaks: np.ndarray, stretch:float, bias:float, **_):
@@ -173,16 +168,17 @@ class ChiSquareFit(GaussianProductFit):
     """
     symmetry = Symmetry.right
     window   = 10.
+    def _chisquare(self, hpin, peaks, stretch, bias):
+        sym = Symmetry.both if self.symmetry is Symmetry.both else Symmetry.left
+        return ChiSquare(hpin, peaks, self.window, stretch, bias, sym)
+
     def _optimalvalue(self, hpin: np.ndarray, peaks: np.ndarray, # type: ignore
                       stretch:float, bias:float, **_):
-        sym = Symmetry.both if self.symmetry is Symmetry.both else Symmetry.left
-        return chisquare(hpin, peaks, self.firstpeak, sym, self.window,
-                         stretch, bias, *self.constraints())
+        return self._chisquare(hpin, peaks, stretch, bias).optimize(*self.constraints())
 
     def _value(self, hpin: np.ndarray, peaks: np.ndarray, # type: ignore
                stretch:float, bias:float, **_):
-        sym = Symmetry.both if self.symmetry is Symmetry.both else Symmetry.left
-        return chisquarevalue(hpin, peaks, self.firstpeak, sym, self.window, stretch, bias)
+        return self._chisquare(hpin, peaks, stretch, bias).value()
 
     def _optimize(self, hpin, peaks, args):
         "optimizes the cost function"
@@ -194,10 +190,9 @@ class ChiSquareFit(GaussianProductFit):
         peaks = np.asarray(peaks)
         ret   = super().optimize(peaks)
         if self.symmetry is Symmetry.right and len(peaks) > 1:
-            hpin = self.expectedpeaks
-            return Distance(chisquarevalue(hpin, (peaks-ret[2])*ret[1], self.firstpeak,
-                                           self.symmetry, self.window, 1., 0.)[0],
-                            ret[1], ret[2])
+            chi = ChiSquare(self.peaks, peaks, self.window, ret[1], ret[2],
+                            self.symmetry, self.hassinglestrand, True)
+            return Distance(chi.value()[0], ret[1], ret[2])
         return ret
 
 class PeakGridFit(HairpinFitter):
@@ -218,15 +213,12 @@ class PeakGridFit(HairpinFitter):
     """
     window    = 10.
     symmetry  = Symmetry.left
-    firstpeak = False
-    lastpeak  = False
-    DEFAULT   = Distance(DEFAULT_BEST, 1./8.8e-4, 0.)
     def optimize(self, peaks:np.ndarray) -> Distance:
         "computes stretch and bias for potential pairings"
         peaks = np.asarray(peaks)
-        ref   = self.expectedpeaks
+        ref   = self.peaks
         if len(peaks) < 2 or len(ref) == 0:
-            return self.DEFAULT
+            return self._defaultdistance()
 
         rng   = lambda val: ((val.center if val.center else 0.) - val.size,
                              (val.center if val.center else 0.) + val.size)
@@ -237,10 +229,12 @@ class PeakGridFit(HairpinFitter):
         if delta != 0.:
             peaks = peaks - delta
 
-        itr   = tuple(i for i in _match.PeakIterator(ref, peaks, *args)) + (centr,)
-        first = ref, peaks, False, self.symmetry, self.window
-        cstr  = self.constraints()
-        minv  = min(chisquare(*first, stretch, -stretch*bias, *cstr) for stretch, bias in itr)
+        itr  = tuple(i for i in _match.PeakIterator(ref, peaks, *args)) + (centr,)
+        chi  = ChiSquare(ref, peaks, self.window,
+                         symmetry     = self.symmetry,
+                         singlestrand = self.hassinglestrand)
+        cstr = self.constraints()
+        minv = min(chi.update(i[0], i[1], True).optimize(*cstr) for i in itr)
 
         return Distance(minv[0], minv[1], delta-minv[2]/minv[1])
 
@@ -249,7 +243,7 @@ class PeakGridFit(HairpinFitter):
               bias:    Union[float, np.ndarray]) -> float:
         "computes the cost value at a given stretch and bias"
         np.seterr(under = "ignore")
-        left  = self.expectedpeaks
+        left  = self.peaks
         fcn   = partial(self._cost_function, left, peaks)
         if any(isinstance(i, (np.ndarray, Sequence)) for i in  (stretch, bias)):
             bias = np.asarray(bias)-peaks.minv+left.minv/np.asarray(stretch)
@@ -258,9 +252,8 @@ class PeakGridFit(HairpinFitter):
         return fcn(stretch, bias-peaks.minv+left.minv/stretch)
 
     def _cost_function(self, left, right, stretch: float, bias: float):
-        return chisquarevalue(left, right,
-                              False, self.symmetry, self.window,
-                              stretch, -stretch*bias)[0]
+        return ChiSquare(left, right, self.window, stretch, bias,
+                         self.symmetry, self.hassinglestrand, True).value()[0]
 
 class EdgePeaksGridFit(HairpinFitter):
     """
@@ -310,9 +303,6 @@ class EdgePeaksGridFit(HairpinFitter):
     """
     window    = 10.
     symmetry  = Symmetry.left
-    firstpeak = False
-    lastpeak  = False
-    DEFAULT   = Distance(DEFAULT_BEST, 1./8.8e-4, cast(float, (0., 0.)))
     def optimize(self, peaks:np.ndarray) -> Distance:
         "computes stretch and bias for potential pairings"
         rng  = lambda val: ((val.center if val.center else 0.) - val.size,
@@ -328,7 +318,7 @@ class EdgePeaksGridFit(HairpinFitter):
                 np.asarray(peaks[np.searchsorted(peaks,  peaks[-1]-extr[1]):])
                ]
         if any(len(i) < 2 for i in pks):
-            return self.DEFAULT
+            return self._defaultdistance()
 
         args = stretch + (-np.finfo('f4').max, np.finfo('f4').max) + (True,)
         itrs = [tuple(np.copy(i) for i in _match.PeakIterator(ref, item, *args))
@@ -336,7 +326,7 @@ class EdgePeaksGridFit(HairpinFitter):
 
         nref = sum(len(i) for i in self.peaks)
         minv = min((self.__chisquare(nref, pks, inds) for inds in product(*itrs)),
-                   default = self.DEFAULT)
+                   default = self._defaultdistance())
         return Distance(minv[0], minv[1], -(np.asarray(minv[2])/minv[1]))
 
     def value(self, peaks:np.ndarray,
@@ -344,7 +334,7 @@ class EdgePeaksGridFit(HairpinFitter):
               bias:    Union[float, np.ndarray]) -> float:
         "computes the cost value at a given stretch and bias"
         np.seterr(under = "ignore")
-        left  = self.expectedpeaks
+        left  = self.peaks
         fcn   = partial(self._cost_function, left, peaks)
         if any(isinstance(i, (np.ndarray, Sequence)) for i in  (stretch, bias)):
             bias = np.asarray(bias)-peaks.minv+left.minv/np.asarray(stretch)
@@ -353,9 +343,8 @@ class EdgePeaksGridFit(HairpinFitter):
         return fcn(stretch, bias-peaks.minv+left.minv/stretch)
 
     def _cost_function(self, left, right, stretch: float, bias: float):
-        return chisquarevalue(left, right,
-                              False, self.symmetry, self.window,
-                              stretch, -stretch*bias)[0]
+        return ChiSquare(left, right, self.window, stretch, bias, self.symmetry,
+                         self.hassinglestrand, True).value()[0]
 
     def __selection(self, peaks:Sequence[np.ndarray], inds: Sequence[np.ndarray]):
         return ([i[j[:,0]] for i, j in zip(self.peaks, inds)],
@@ -398,13 +387,13 @@ class EdgePeaksGridFit(HairpinFitter):
                     peaks:          Sequence[np.ndarray],
                     indexes:        Sequence[np.ndarray]):
         if any(len(i) == 0 for i in indexes):
-            return self.DEFAULT
+            return self._defaultdistance()
         stretch, biases = self.__params(peaks, indexes)
 
         inds = [_match.compute(i, j*stretch+bias, self.window)
                 for i, j, bias in zip(self.peaks, peaks, biases)]
         if any(len(i) == 0 for i in inds):
-            return self.DEFAULT
+            return self._defaultdistance()
         stretch, biases = self.__params(peaks, inds)
 
         inds = [_match.compute(i, j*stretch+bias, self.window)
@@ -438,18 +427,12 @@ PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray] # pylint: disable=inv
 class PeakMatching(HairpinFitter, PointwiseOptimization):
     "Identifying experimental peaks with the theoretical ones"
     window          = 10.
-    lastpeak        = True
     bases           = (20, 20)
     dataprecisions  = 1., 1e-3
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         HairpinFitter.__init__(self, **kwa)
         PointwiseOptimization.__init__(self, **kwa)
-
-    @property
-    def expectedpeaks(self):
-        "returns the peaks +- the hairpin extension"
-        return self.peaks if self.lastpeak else self.peaks[:-1]
 
     @staticmethod
     def empty(peaks) -> PEAKS_TYPE:
@@ -461,7 +444,7 @@ class PeakMatching(HairpinFitter, PointwiseOptimization):
 
     def pair(self, peaks:np.ndarray, stretch = 1., bias = 0.) -> PEAKS_TYPE:
         "returns experimental peaks paired to the theory"
-        hpin = self.expectedpeaks
+        hpin = self.peaks
         ided = self.empty(peaks)
 
         if len(peaks) > 0 and len(hpin) > 0:
@@ -472,7 +455,7 @@ class PeakMatching(HairpinFitter, PointwiseOptimization):
 
     def nfound(self, peaks:np.ndarray, stretch = 1., bias = 0.) -> int:
         "returns the number of paired peaks"
-        hpin = self.expectedpeaks
+        hpin = self.peaks
         if len(peaks) > 0 and len(hpin) > 0:
             peaks = stretch*(peaks-bias)
             return _match.nfound(hpin, peaks, self.window)
@@ -492,19 +475,19 @@ class PeakMatching(HairpinFitter, PointwiseOptimization):
             4. N: number of paired peaks
         """
 
-        hpin = self.expectedpeaks
+        hpin = self.peaks
         return _match.distance(hpin, peaks, self.window, stretch, -bias*stretch)
 
     def optimize(self, peaks:np.ndarray) -> Distance:
         "Optimizes the distance"
-        best  = DEFAULT_BEST, self.stretch.center, (self.bias.center or 0.)
+        best  = self._defaultdistance()
         if len(peaks) > 1:
             rng   = lambda x, y, z: (('min_'+x, y-z), (x, y), ('max_'+x, y+z))
             args  = self.optimconfig(window = self.window)
-            hpin  = self.expectedpeaks
+            hpin  = self.peaks
             pots  = {i: self.distance(peaks, *i)[-1]
                      for i in self.pointgrid(self.peaks, peaks)}
-            maxi  = max(pots.values(), default = DEFAULT_BEST)-1 # type: ignore
+            maxi  = max(pots.values(), default = best[0])-1 # type: ignore
             good  = set((int(i[0]/self.dataprecisions[0]), int(i[1]/self.dataprecisions[1]))
                         for i, j in pots.items() if j >= maxi)
             for ivals in good:
