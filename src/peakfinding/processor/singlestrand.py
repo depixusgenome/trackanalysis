@@ -113,6 +113,9 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         """
         Removes the single strand peak if detected
         """
+        if frame.track.phase.duration(..., self.task.phase).mean() < self.task.eventstart:
+            return info
+
         peaks  = (info[1]    if isinstance(info[1], np.ndarray) else
                   np.array(list(info[1]), dtype = self._DTYPE))
         return info[0], peaks[:self.singlestrandpeakindex(frame, info[0], peaks)]
