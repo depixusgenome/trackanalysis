@@ -12,7 +12,7 @@ from view.fonticon      import FontIcon
 from utils              import initdefaults, dataclass, dflt
 from utils.logconfig    import getLogger
 from .                  import dialog
-LOGS               = getLogger(__name__)
+LOGS = getLogger(__name__)
 
 class AdvancedTab:
     "a tab in the widget"
@@ -200,7 +200,6 @@ class AdvancedDescriptor:
         if ":" in self.ctrlname:
             self.ctrlgroup, self.ctrlname = self.ctrlname.split(":")
 
-
     def __set_name__(self, _, name):
         assert name == self.attrname or not self.attrname
         self.attrname = name
@@ -377,7 +376,9 @@ class AdvancedWidget:
                 return str(val)
 
         def _add(title, val):
-            keys        = val[val.rfind('%(')+2:val.rfind(')')].split('.')
+            if val == '':
+                return title, '', ''
+            keys         = val[val.rfind('%(')+2:val.rfind(')')].split('.')
             dfval, found = _default(keys)
             if not found or dfval == _value(keys):
                 return title, '', val
@@ -475,23 +476,15 @@ class TabCreator:
             itms.extend(kwa.items())
             return self.__createwrapper(tit, first, itms)
 
-        wraps = [_create(args[inds[i]:inds[i+1]]) for i in range(len(inds)-1)]
-        if isinstance(figure, dict):
-            wraps.append(self.figure(**figure))
-        elif isinstance(figure, (list, tuple)):
-            wraps.append(self.figure(*figure))
-        elif figure not in (False, None):
-            wraps.append(self.figure(figure))
-
-        wraps = wraps[::-1]
-        for i in args:
-            if isinstance(i, str) and i.startswith("#") and not i.startswith("##"):
-                wraps.insert(0, self.title(i[1:].strip()))
+        wraps  = [_create(args[inds[i]:inds[i+1]]) for i in range(len(inds)-1)]
+        wraps += self.__addfigure(figure) + self.__addtitle(args)
+        wraps  = wraps[::-1]
 
         def _mwrapper(cls):
             for fcn in wraps:
                 cls = fcn(cls)
             return cls
+
         if isinstance(base, str):
             base = getattr(self, base)
         if isinstance(base, type):
@@ -582,7 +575,8 @@ class TabCreator:
                     elem = (tpe(j) if callable(getattr(tpe, '__get__', None)) else
                             cls.line(tpe, j))
                 else:
-                    elem = (cls.line(j)     if "%(" not in j else
+                    elem = (j               if "%"  not in j else
+                            cls.line(j)     if "%(" not in j else
                             cls.taskattr(j) if '.'  in info  else
                             cls.line(j))
             else:
@@ -606,14 +600,32 @@ class TabCreator:
 
             old = getattr(cls, '_body')
             def _body(self) -> AdvancedWidgetBody:
-                cur  = old(self)
-                mine = AdvancedTab(title, *(i.line() for _, i in lst))
+                cur   = old(self)
+                lines = (i.line() if hasattr(i, 'line') else (i, '') for _, i in lst)
+                mine  = AdvancedTab(title, *lines)
                 return (mine, *cur) if first else (*cur, mine)
             setattr(cls, '_body', _body)
 
             for i, j in lst:
-                setattr(cls, i, j)
+                if callable(getattr(j, '__get__', None)):
+                    setattr(cls, i, j)
             return cls
         return _wrapper
+
+    def __addfigure(self, figure):
+        if isinstance(figure, dict):
+            return [self.figure(**figure)]
+        if isinstance(figure, (list, tuple)):
+            return [self.figure(*figure)]
+        if figure not in (False, None):
+            return [self.figure(figure)]
+        return []
+
+    @classmethod
+    def __addtitle(cls, args):
+        for i in args:
+            if isinstance(i, str) and i.startswith("#") and not i.startswith("##"):
+                return [cls.title(i[1:].strip())]
+        return []
 
 tab = TabCreator() # pylint: disable=invalid-name
