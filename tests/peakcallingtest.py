@@ -201,13 +201,13 @@ def test_hairpincost():
     assert len(results) == 3
     assert len(results['hp100']) == 1
     assert len(results['hp101']) == 1
-    assert len(results[None])    == 1
+    assert len(results['✗'])    == 1
     assert results['hp100'][0].key == 100
     assert results['hp101'][0].key == 101
     assert_equal(results['hp100'][0].peaks['key'],
                  np.insert(np.int32(truth[0][:-1]+.1), 1, np.iinfo('i4').min))
     assert_equal(results['hp101'][0].peaks['key'], np.int32(truth[1][:-1]+.1))
-    assert results[None][0].key    == 110
+    assert results['✗'][0].key    == 110
 
     hpins   = {'hp100': ChiSquareFit(peaks = truth[0]),
                'hp101': ChiSquareFit(peaks = truth[1])}
@@ -215,13 +215,13 @@ def test_hairpincost():
     assert len(results) == 3
     assert len(results['hp100']) == 1
     assert len(results['hp101']) == 1
-    assert len(results[None])    == 1
+    assert len(results['✗'])    == 1
     assert results['hp100'][0].key == 100
     assert results['hp101'][0].key == 101
     assert_equal(results['hp100'][0].peaks['key'],
                  np.insert(np.int32(truth[0][:-1]+.1), 1, np.iinfo('i4').min))
     assert_equal(results['hp101'][0].peaks['key'], np.int32(truth[1][:-1]+.1))
-    assert results[None][0].key    == 110
+    assert results['✗'][0].key    == 110
 
 def test_constrainedhairpincost():
     u"tests hairpin cost method with constraints"
