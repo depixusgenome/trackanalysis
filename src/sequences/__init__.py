@@ -63,7 +63,8 @@ PEAKS_TYPE  = Sequence[Tuple[int, bool]]                    # pylint: disable=in
 
 class Translator:
     "Translates a sequence to peaks"
-    __END    = '_', 'singlestrand', '$'
+    __START  = "'", '0', 'start', 'first', 'zero', 'doublestrand', 'closed'
+    __END    = '_', 'singlestrand', '$', '-1', 'last', 'end', 'open'
     __SYMBOL = '!'
     __METHS  = ((re.compile('.'+__SYMBOL), lambda x: '('+x.string[x.start()]+')'),
                 (re.compile(__SYMBOL+'.'), lambda x: '('+x.string[x.end()-1]+')'))
@@ -73,7 +74,7 @@ class Translator:
     __TRANS.update({i.upper(): j for i, j in __TRANS.items()})
 
     __TRAFIND = re.compile('['+''.join(__TRANS)+']')
-    __ALPHABET= 'atgc'+''.join(__TRANS)+__SYMBOL+__END[0]
+    __ALPHABET= 'atgc'+''.join(__TRANS)+__SYMBOL+__END[0]+__START[0]
     __SPLIT   = re.compile((r'(?:[^%(alph)s]*)([%(alph)s]+)(?:[^%(alph)s]+|$)*'
                             % dict(alph =__ALPHABET)), re.IGNORECASE)
 
@@ -101,6 +102,11 @@ class Translator:
     @classmethod
     def __get(cls, state, seq, oligs, flags):
         for oli in oligs:
+            if oli == cls.__START[1]:
+                if state:
+                    yield (0, state)
+                continue
+
             if oli == cls.__END[1]:
                 if state:
                     yield (len(seq), state)
@@ -191,10 +197,14 @@ class Translator:
     @classmethod
     def split(cls, oligs:str)->Sequence[str]:
         "splits a string of oligos into a list"
+        for i in cls.__START[1:]:
+            oligs = oligs.replace(i, cls.__START[0]).replace(i.upper(), cls.__START[0])
         for i in cls.__END[1:]:
             oligs = oligs.replace(i, cls.__END[0]).replace(i.upper(), cls.__END[0])
         out   = sorted(i.lower() for i in cls.__SPLIT.findall(oligs))
-        return [cls.__END[1] if i == cls.__END[0] else i for i in out]
+        return [cls.__END[1]    if i == cls.__END[0]   else
+                cls.__START[1]  if i == cls.__START[0] else
+                i for i in out]
 
 peaks       = Translator.peaks # pylint: disable=invalid-name
 splitoligos = Translator.split # pylint: disable=invalid-name
