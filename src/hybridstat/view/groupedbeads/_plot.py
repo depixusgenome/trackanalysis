@@ -4,25 +4,29 @@
 from typing                 import Dict, List
 import numpy as np
 
+from bokeh                  import layouts
 from bokeh.plotting         import Figure
 from bokeh.models           import (ColumnDataSource, Range1d, FactorRange,
                                     NumeralTickFormatter, HoverTool, LinearAxis)
 from bokeh.transform        import jitter
+
+from sequences.modelaccess  import SequenceAnaIO
 from view.plots             import PlotView
+from view.plots.base        import stateattr
 from view.plots.ploterror   import PlotError
 from view.plots.tasks       import TaskPlotCreator, CACHE_TYPE
-from .._model               import resetrefaxis
+from .._model               import resetrefaxis, PeaksPlotTheme
 from .._io                  import setupio
-from ._model                import (GroupedBeadsPlotModel, GroupedBeadsModelAccess,
-                                    GroupedBeadsPlotTheme, GroupedBeadsHistModel,
+from ._model                import (GroupedBeadsScatterModel, GroupedBeadsModelAccess,
+                                    GroupedBeadsScatterTheme, GroupedBeadsHistModel,
                                     GroupedBeadsHistTheme)
 
 ColumnData = Dict[str, np.ndarray]
 FigData    = Dict[str, ColumnData]
-class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsPlotModel]):
+class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScatterModel]):
     "Building a scatter plot of beads vs hybridization positions"
     _model:  GroupedBeadsModelAccess
-    _theme:  GroupedBeadsPlotTheme
+    _theme:  GroupedBeadsScatterTheme
     _src:    Dict[str, ColumnDataSource]
     _fig:    Figure
     _ref:    LinearAxis
@@ -47,7 +51,7 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBe
                          mode         = self._theme.tooltipmode,
                          renderers    = [rend])
 
-        self._display.addcallbacks(ctrl, self._fig)
+        self._display.addcallbacks(ctrl, self._fig, 'y')
         self._fig.yaxis.formatter = NumeralTickFormatter(format = self._theme.format)
         self._errors = PlotError(self._fig, self._theme)
         return self._fig
@@ -90,7 +94,7 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBe
         return {"events": _create(('bead', 'bases'), False),
                 "peaks":  _create(cols, True)}
 
-class GroupedHistPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsHistModel]):
+class GBHistCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsHistModel]):
     "Building a histogram for a given peak characteristic"
     _model:     GroupedBeadsModelAccess
     _theme:     GroupedBeadsHistTheme
@@ -111,8 +115,8 @@ class GroupedHistPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBea
 
     _empty = np.empty(0, dtype = 'f4')
     def _data(self) -> Dict[str, np.ndarray]:
-        items = self._peaks
-        if items is None:
+        items = getattr(self, '_peaks', None)
+        if items is None or len(items.data['count']) == 0:
             return {i: self._empty for i in 'xy'}
 
         vals  = items.data[self._theme.xdata]
@@ -129,10 +133,84 @@ class GroupedHistPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBea
         edges = np.arange(int((rng[0]-rng[1])/bsize)+1, dtype = 'f4')*bsize+rng[-1]
         return {"x": edges, "y": np.histogram(vals, bins = edges)}
 
-    def onselected_cb(self, attr, old, new):
-        "on selected"
-        with self.resetting() as cache:
-            self._reset(cache)
+    def setpeaks(self, peaks):
+        "sets the peaks data source"
+        self._peaks = peaks
+
+        def onselected_cb(attr, old, new):
+            "on selected"
+            with self.resetting() as cache:
+                self._reset(cache)
+        peaks.selected.on_change("indices", onselected_cb)
+
+@stateattr("groupedbeads.state")
+class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
+    "Building scatter & hist plots"
+    def __init__(self, ctrl):
+        super().__init__(ctrl, addto = False)
+        self._scatter  = GBScatterCreator(ctrl, noerase = False, model = self._model)
+        theme          = GroupedBeadsHistTheme(xdata   = "duration",
+                                               binsize = .1,
+                                               xlabel  = PeaksPlotTheme.xtoplabel,
+                                               name    = "groupedbeads.plot.duration")
+        self._duration = GBHistCreator(ctrl,
+                                       noerase = False,
+                                       model   = self._model,
+                                       theme   = theme)
+
+        theme          = GroupedBeadsHistTheme(xdata   = "count",
+                                               binsize = .5,
+                                               xlabel  = PeaksPlotTheme.xlabel,
+                                               name    = "groupedbeads.plot.rate")
+        self._rate     = GBHistCreator(ctrl,
+                                       noerase = False,
+                                       model   = self._model,
+                                       theme   = theme)
+        self.addto(ctrl)
+
+    @property
+    def _plots(self):
+        return [self._scatter, self._duration, self._rate]
+
+    def observe(self, ctrl):
+        "observes the model"
+        super().observe(ctrl)
+        self._model.setobservers(ctrl)
+        #self._widgets.observe(ctrl)
+        SequenceAnaIO.observe(ctrl)
+
+        @ctrl.display.observe(self._model.sequencemodel.display)
+        def _onchangekey(old = None, **_):
+            if self.isactive():
+                root = self._model.roottask
+                if root is not None and {'hpins'} == set(old):
+                    self.calllater(lambda: self.reset(False))
+
+    def addto(self, ctrl, noerase = True):
+        "adds the models to the controller"
+        for i in self._plots:
+            i.addto(ctrl, noerase=noerase)
+
+    def _addtodoc(self, ctrl, doc):
+        "returns the figure"
+        plots = [getattr(i, '_addtodoc')(ctrl, doc) for i in self._plots]
+        loc   = self._ctrl.theme.get(GroupedBeadsScatterTheme, 'toolbar')['location']
+        mode  = self.defaultsizingmode()
+        return layouts.gridplot([plots[:1], plots[1:]], **mode, toolbar_location = loc)
+
+    def _reset(self, cache:CACHE_TYPE):
+        done = 0
+        for i in self._plots:
+            try:
+                i.delegatereset(cache)
+                done += 1
+            finally:
+                pass
+        #  try:
+            #  self._widgets.reset(cache, done != 2)
+            #  done += 1
+        #  finally:
+            #  pass
 
 class GroupedBeadsPlotView(PlotView[GroupedBeadsPlotCreator]):
     "Peaks plot view"

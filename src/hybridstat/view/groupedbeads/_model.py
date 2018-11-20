@@ -9,7 +9,7 @@ from utils              import initdefaults
 from .._model           import PeaksPlotModelAccess, PeakSelectorTask, PeaksPlotTheme
 from .._peakinfo        import createpeaks as _createpeaks
 
-class GroupedBeadsPlotTheme(PlotTheme):
+class GroupedBeadsScatterTheme(PlotTheme):
     "grouped beads plot theme"
     name     = "groupedbeads.plot"
     figsize  = PlotTheme.defaultfigsize(800, 350)
@@ -34,9 +34,9 @@ class GroupedBeadsPlotTheme(PlotTheme):
     def __init__(self, **_):
         super().__init__(**_)
 
-class GroupedBeadsPlotModel(PlotModel):
+class GroupedBeadsScatterModel(PlotModel):
     "grouped beads plot model"
-    theme   = GroupedBeadsPlotTheme()
+    theme   = GroupedBeadsScatterTheme()
     display = PlotDisplay(name = "groupedbeads.plot")
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):

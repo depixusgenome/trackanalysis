@@ -126,6 +126,38 @@ class _ModelDescriptor:
             return self.ctrl(inst).update(mdl, **value)
         raise AttributeError(f"no such model: {self._name}")
 
+def stateattr(name: str):
+    "return a state descriptor"
+    class PlotStateDisplay:
+        "cycles & peaks plot state"
+        name = name
+        def __init__(self, state = PlotState.active, **_):
+            self.state = state
+
+    class StateDescriptor:
+        "get the state"
+
+        @staticmethod
+        def setdefault(inst, value):
+            "sets the default value"
+            getattr(inst, '_ctrl').display.updatedefaults(name, state = PlotState(value))
+
+        def __get__(self, inst, owner):
+            getattr(inst, '_ctrl').display.get(name, 'state')
+
+        def __set__(self, inst, value):
+            getattr(inst, '_ctrl').display.update(name, state = PlotState(value))
+
+    def _wrapper(cls):
+        cls.state = StateDescriptor()
+        old       = cls.__init__
+        def __init__(self, ctrl, *args, **kwa):
+            ctrl.display.add(PlotStateDisplay())
+            old(self, *args, **kwa)
+        cls.__init__ = __init__
+        return cls
+    return _wrapper
+
 class PlotAttrsView(PlotAttrs):
     "implements PlotAttrs"
     def __init__(self, attrs:PlotAttrs)->None:
