@@ -17,12 +17,11 @@ LOGS = getLogger(__name__)
 class AdvancedTab:
     "a tab in the widget"
     __inds = 0
-    def __init__(self, title:str, *items: Tuple[str, ...]) -> None:
-        self.body    = items
-        self.title   = title
-        # pylint: disable=protected-access
-        self.ind     = self.__class__.__inds
-        self.__class__.__inds += 1
+    def __init__(self, title:str, *items: Tuple[str, ...], body : str = "") -> None:
+        self.body : Union[str, Tuple[Tuple[str,...],...]] = items if len(items) else body
+        self.title = title
+        self.ind   = type(self).__inds
+        type(self).__inds += 1
 
     def htmltitle(self, ind) -> str:
         "return the html version of the title"
@@ -35,16 +34,20 @@ class AdvancedTab:
 
     def htmlbody(self, ind) -> str:
         "return the html version of the body"
+        head = 'curtab' if ind else 'hidden'
+        patt = ('<{div} class="bbm-dpx-'+head+f'" id="bbm-dpx-tab-{self.ind}">'
+                + '{body}</{div}>')
+
+        if isinstance(self.body, str):
+            return patt.format(div = "div", body = self.body)
+
         def _elem(val):
             if isinstance(val, tuple):
                 return f'<td style="{val[0]}">'+val[1]+'</td>'
             return f'<td>'+val+'</td>'
 
-        head = 'curtab' if ind else 'hidden'
-        return ('<table class="bbm-dpx-'+head+f'" id="bbm-dpx-tab-{self.ind}">'
-                +''.join('<tr>' + ''.join(_elem(i) for i in j) + '</tr>'
-                         for j in self.body)
-                + '</table>')
+        body = ''.join('<tr>' + ''.join(_elem(i) for i in j) + '</tr>' for j in self.body)
+        return patt.format(div = "table", body = body)
 
     @staticmethod
     def tohtml(tabs: List['AdvancedTab']):
