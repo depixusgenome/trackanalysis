@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "all view aspects here"
 from collections         import OrderedDict
+from pathlib             import Path
 from typing              import Dict, ClassVar, TypeVar, Tuple, Generic, Type
 
 from bokeh               import layouts
@@ -11,10 +12,11 @@ from utils.inspection    import templateattribute
 from model.plots         import PlotState
 from modaldialog         import dialog
 from view.base           import BokehView
-from version             import version as _version, hashdate
+from version             import version as _version
 
 class TabsTheme:
     "Tabs Theme"
+    CHANGELOG = "CHANGELOG.html"
     def __init__(self, initial: str, panels: Dict[Type, str], version = 0, startup = ""):
         self.name:    str            = "app.tabs"
         self.version: int            = version
@@ -27,6 +29,46 @@ class TabsTheme:
             self.titles[j] = getattr(i, 'PANEL_NAME', j.capitalize())
         assert self.initial in self.titles
 
+    def defaultstartup(self):
+        "extracts default startup message from a changelog"
+        if self.startup != "":
+            return
+
+        path = Path(".").absolute()
+        for _ in range(4):
+            if (path/self.CHANGELOG).exists():
+                break
+            path = path.parent
+        else:
+            return
+
+        path /= self.CHANGELOG
+        with open(path, "r", encoding="utf-8") as stream:
+            version = _version().split('_')[0]
+            head    = f'<h2 id="{version}'
+            line    = ""
+            for line in stream:
+                if line.startswith(head):
+                    break
+            else:
+                return
+
+            lines   = ""
+            for line in stream:
+                if line.startswith('<h2 id="') or line.startswith('<h1'):
+                    break
+                lines += line
+
+            self.startup = lines
+
+            version      = '.'.join(_version().split('-')[0].split('.')[:2])
+            numbers      = [int(i) for i in version.split('v')[1].split('"')[0].split('.')]
+            self.version = 10000*numbers[0]
+            if len(numbers) > 1:
+                self.version += 100*numbers[1]
+                if len(numbers) > 2:
+                    self.version += numbers[2]
+
 TThemeType = TypeVar("TThemeType", bound = TabsTheme)
 class TabsView(BokehView, Generic[TThemeType]):
     "A view with all plots"
@@ -37,7 +79,9 @@ class TabsView(BokehView, Generic[TThemeType]):
     def __init__(self, ctrl = None, **kwa):
         "Sets up the controller"
         super().__init__(ctrl = ctrl, **kwa)
-        self.__theme = ctrl.theme.add(templateattribute(self, 0)()) # type: ignore
+        mdl          = templateattribute(self, 0)() # type: ignore
+        mdl.defaultstartup()
+        self.__theme = ctrl.theme.add(mdl)
         self._panels = [cls(ctrl, **kwa) for cls in self.KEYS]
 
         cur = self.__select(self.__initial())
@@ -164,8 +208,8 @@ class TabsView(BokehView, Generic[TThemeType]):
                     appname = type(self).__name__.replace('View', '')
 
                 dialog(self._doc,
-                       title   = appname+" "+_version().split("_")[1],
-                       body    = f"<p>created on {hashdate()}<p>"+ msg,
+                       title   = appname+" "+_version().split("-")[0],
+                       body    = msg,
                        buttons = "ok")
         ctrl.tasks.oneshot("opentrack", _observe)
 
