@@ -9,6 +9,7 @@ from bokeh                  import layouts
 from bokeh.plotting         import Figure
 from bokeh.models           import (ColumnDataSource, Range1d, LinearAxis,
                                     NumeralTickFormatter, HoverTool)
+from model.level            import PHASE
 from model.plots            import (PlotTheme, PlotDisplay, PlotModel, PlotAttrs,
                                     PlotState)
 from peakfinding.histogram  import interpolator
@@ -27,14 +28,15 @@ class CyclePlotTheme(PlotTheme):
     """
     cleaning plot theme
     """
-    name    = "cyclehist.plot.cycle"
-    figsize = PlotTheme.defaultfigsize(480, 350)
-    xlabel  = 'Time (s)'
-    ylabel  = 'Bases'
-    ntitles = 5
-    format  = '0.0a'
-    frames  = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'}, 'line', .1)
-    toolbar = dict(PlotTheme.toolbar)
+    name      = "cyclehist.plot.cycle"
+    figsize   = PlotTheme.defaultfigsize(530, 300)
+    phasezoom = PHASE.measure, 5
+    xlabel    = 'Time (s)'
+    ylabel    = 'Bases'
+    ntitles   = 5
+    format    = '0.0a'
+    frames    = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'}, 'line', .1)
+    toolbar   = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,reset,save'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -138,11 +140,26 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
                     and len(self._model.distances) == 0):
                 self._errors.reset(cache, "Fit unsuccessful!", False)
 
-            self.setbounds(cache, self._fig.x_range, 'x', data['t'])
-            self.setbounds(cache, self._fig.y_range, 'y', data['z'])
+            self.__setbounds(cache, data)
             cache[self._src]['data'] = data
 
         self._errors(cache, _data, _display)
+
+    def __setbounds(self, cache, data):
+        self.setbounds(cache, self._fig, data['t'], data['z'])
+        if not (self._theme.phasezoom and self._theme.phasezoom[0]):
+            return
+
+        out = cache[self._fig.x_range]
+        if any(out[i] != out['reset_'+i] for i in ('start', 'end')):
+            return
+
+        pha, delta = self._theme.phasezoom
+        trk        = self._model.track
+        tx1        = trk.phase.duration(..., range(0,pha)).mean()   - delta
+        tx2        = trk.phase.duration(..., range(0,pha+1)).mean() + delta
+        tmp        = self.newbounds('x', [tx1/trk.framerate, tx2/trk.framerate])
+        out.update(start = tmp['start'], end = tmp['end'])
 
     def _data(self, items) -> CurveData:
         if items is None or len(items) == 0 or not any(len(i) for i in items):
@@ -209,9 +226,10 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
             data = self._data(itms)
             for i, j in data.items():
                 cache[self._src[i]]['data'] = j
-            self.setbounds(cache, self._fig.x_range, 'x',
-                           [0., np.nanmax(data['peaks']['count'])])
-            self.setbounds(cache, self._fig.y_range, 'y', data['hist']['z'])
+
+            xarr = data['peaks']['count']
+            xarr = [0., np.nanmax(xarr) if len(xarr) else 1.]
+            self.setbounds(cache, self._fig, xarr, data['hist']["z"])
 
             pks = self._model.peaks['bases']
             cache[self._exp]['ticker'] = list(pks[np.isfinite(pks)])
