@@ -30,6 +30,7 @@ from view.static                import ROUTE, route
 from view.toolbar               import FileList
 from ._model                    import (PeaksPlotModelAccess, FitToReferenceStore,
                                         PeaksPlotTheme, PeaksPlotDisplay)
+from ._model                    import SingleStrandConfig # pylint: disable=unused-import
 
 @dataclass
 class ReferenceWidgetTheme:
@@ -584,7 +585,7 @@ def advanced(**kwa):
 
          Min frame count per hybridisation  %(eventdetection.events.select.minlength)D
          Min hybridisations per peak        %(peakselection.finder.grouper.mincount)D
-         Discard the single strand peak     %(task.singlestrand)b
+         Discard the single strand peak (unless in oligos)  %(SingleStrandConfig:automated)b
          Re-align cycles using peaks        %(peakselection.align)b
          Peak kernel size (blank ⇒ auto)    %(peakselection.precision).4oF
          Exhaustive fit algorithm           %(_IdAccessor:alg)b

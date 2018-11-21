@@ -173,6 +173,11 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
         "return the current probe"
         return self.sequencemodel.currentprobes
 
+    @property
+    def hassinglestrand(self) -> bool:
+        "return the current probe"
+        return "singlestrand" in self.sequencemodel.currentprobes
+
     def sequences(self, sequence = ...):
         "returns current sequences"
         seqs = self._seqconfig.sequences

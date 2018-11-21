@@ -39,7 +39,7 @@ class HairpinFitter(OptimizationParams):
 
         for name, seq in cast(Iterator[Tuple[str,Any]], itr):
             self = cls(**kwa, peaks = cls.topeaks(seq, oligos))
-            self.hassinglestrand = self.peaks[-1] == len(seq)
+            self.hassinglestrand = len(self.peaks) and self.peaks[-1] == len(seq)
             yield (name, self)
 
     @staticmethod
@@ -55,6 +55,8 @@ class HairpinFitter(OptimizationParams):
 
     def withinrange(self, extension) -> bool:
         "return whether the bead extension is within range of the last peak (hairpin size)"
+        if len(self.peaks) == 0:
+            return False
         mins = (self.stretch.center or self.defaultstretch) - self.stretch.size
         maxs = (self.stretch.center or self.defaultstretch) + self.stretch.size
         minb = (self.bias.center or 0.) - self.bias.size

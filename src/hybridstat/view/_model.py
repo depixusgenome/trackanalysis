@@ -421,8 +421,26 @@ class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
 class PeakSelectorTaskAccess(TaskAccess, tasktype = PeakSelectorTask):
     "access to the PeakSelectorTask"
 
+class SingleStrandConfig:
+    "Whether the task is automatically added & removed according to oligos"
+    def __init__(self):
+        self.automated = True
+        self.name      = "singlestrand"
+
 class SingleStrandTaskAccess(TaskAccess, tasktype = SingleStrandTask):
     "access to the SingleStrandTask"
+    __config = Indirection()
+    def __init__(self, mdl):
+        super().__init__(mdl)
+        self.__config = SingleStrandConfig()
+
+    def setobservers(self, mdl, ctrl):
+        "observes the global model"
+        ctrl.theme.observe(self.__config, lambda **_: mdl.reset())
+
+    def resetmodel(self, mdl):
+        "resets the model"
+        self.update(disabled = not (self.__config.automated and mdl.hassinglestrand))
 
 # pylint: disable=too-many-instance-attributes
 class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
@@ -549,12 +567,14 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
 
         self.fittoreference.resetmodel()
         self.identification.resetmodel(self)
+        self.singlestrand.resetmodel(self)
         return False
 
     def setobservers(self, ctrl):
         "observes the global model"
         self.identification.setobservers(self, ctrl)
         self.fittoreference.setobservers(ctrl)
+        self.singlestrand.setobservers(self, ctrl)
 
         @ctrl.display.observe(self._tasksdisplay)
         def _onchangetrack(old = None,  **_):
