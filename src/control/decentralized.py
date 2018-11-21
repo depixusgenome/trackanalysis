@@ -98,6 +98,11 @@ class Indirection:
         attr = inst.__dict__[self._attr]
         return getattr(ctrl, self._ctrl).observe(attr, *args, **kwa)
 
+    def update(self, inst, **value):
+        "update the model"
+        attr = inst.__dict__[self._attr]
+        self.controller(getattr(inst, '_ctrl')).update(attr, **value)
+
     def controller(self, ctrl):
         "get the controller"
         return getattr(ctrl, self._ctrl)

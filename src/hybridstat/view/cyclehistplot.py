@@ -30,7 +30,7 @@ class CyclePlotTheme(PlotTheme):
     """
     name      = "cyclehist.plot.cycle"
     figsize   = PlotTheme.defaultfigsize(530, 300)
-    phasezoom = PHASE.measure, 5
+    phasezoom = PHASE.measure, 20
     xlabel    = 'Time (s)'
     ylabel    = 'Bases'
     ntitles   = 5
@@ -146,28 +146,26 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
         self._errors(cache, _data, _display)
 
     def __setbounds(self, cache, data):
-        self.setbounds(cache, self._fig, data['t'], data['z'])
         if not (self._theme.phasezoom and self._theme.phasezoom[0]):
-            return
-
-        out = cache[self._fig.x_range]
-        if any(out[i] != out['reset_'+i] for i in ('start', 'end')):
+            self.setbounds(cache, self._fig, data['t'], data['z'])
             return
 
         pha, delta = self._theme.phasezoom
         trk        = self._model.track
         tx1        = trk.phase.duration(..., range(0,pha)).mean()   - delta
         tx2        = trk.phase.duration(..., range(0,pha+1)).mean() + delta
-        tmp        = self.newbounds('x', [tx1/trk.framerate, tx2/trk.framerate])
-        out.update(start = tmp['start'], end = tmp['end'])
+        xbnds       = [tx1/trk.framerate, tx2/trk.framerate]
+        ybnds      = data['z'][(data['t'] >= xbnds[0]) & (data['t'] <= xbnds[1])]
+
+        self.setbounds(cache, self._fig, data['t'], data['z'], xbnds, ybnds)
 
     def _data(self, items) -> CurveData:
         if items is None or len(items) == 0 or not any(len(i) for i in items):
             return {"z": [], "t": []}
 
-        lens   = np.cumsum([0]+[len(i)+5 for i in items])
+        lens   = np.cumsum([0]+[len(i)+2 for i in items])
         zval   = np.full(lens[-1]-1, np.NaN, dtype = 'f4')
-        tval   = np.full(lens[-1]-1, np.NaN, dtype = 'f4')
+        tval   = np.zeros(lens[-1]-1, dtype = 'f4')
 
         tpatt  = np.arange(max(len(i) for i in items), dtype = 'f4')
         tpatt /= getattr(self._model.track, 'framerate')

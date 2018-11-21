@@ -63,6 +63,8 @@ class PlotDisplay:
     """
     name                = ""
     state               = PlotState.active
+    xinit:   RANGE_TYPE = (None, None)
+    yinit:   RANGE_TYPE = (None, None)
     xbounds: RANGE_TYPE = (None, None)
     ybounds: RANGE_TYPE = (None, None)
     @initdefaults(frozenset(locals()))
@@ -76,15 +78,22 @@ class PlotDisplay:
             axis = getattr(fig, axname+'_range')
 
             def _on_cb(attr, old, new):
-                if self.state in (PlotState.active, PlotState.resetting):
-                    vals = cast(Tuple[Optional[float],...], (axis.start, axis.end))
-                    if axis.bounds is not None:
-                        rng  = 1e-3*(axis.bounds[1]-axis.bounds[0])
-                        vals = tuple(None if abs(i-j) < rng else j
-                                     for i, j in zip(axis.bounds, vals))
-                    updating[0] = True
-                    ctrl.display.update(self, **{axname+'bounds': vals})
-                    updating[0] = False
+                if self.state not in (PlotState.active, PlotState.resetting):
+                    return
+
+                vals = cast(Tuple[Optional[float],...], (axis.start, axis.end))
+                bnds = getattr(self, axname+'init')
+                if None in bnds and axis.bounds is not None:
+                    bnds = axis.bounds
+
+                if None not in bnds:
+                    rng  = 1e-3*(bnds[1]-bnds[0])
+                    vals = tuple(None if abs(i-j) < rng else j
+                                 for i, j in zip(bnds, vals))
+
+                updating[0] = True
+                ctrl.display.update(self, **{axname+'bounds': vals})
+                updating[0] = False
 
             axis.on_change('start', _on_cb)
             axis.on_change('end',   _on_cb)

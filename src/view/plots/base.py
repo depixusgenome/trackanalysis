@@ -99,6 +99,13 @@ class _ModelDescriptor:
         "return the controller"
         return getattr(getattr(inst, '_ctrl'), self._ctrl)
 
+    def update(self, inst, **value):
+        "update the model"
+        mdl = self.mdl(inst)
+        if mdl is not None:
+            return self.ctrl(inst).update(mdl, **value)
+        raise AttributeError(f"no such model: {self._name}")
+
     def mdl(self, inst):
         "return the model"
         mdl = getattr(getattr(inst, '_plotmodel'), self._name, None)
@@ -529,10 +536,26 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                      reset_start = vmin, reset_end = vmax)
         return attrs
 
-    def setbounds(self, cache:CACHE_TYPE, fig, xarr, yarr):
+    def setbounds(self, cache:CACHE_TYPE, fig, # pylint: disable=too-many-arguments
+                  xarr, yarr, xinit = None, yinit = None):
         "Sets the range boundaries"
         cache[fig.x_range] = self.newbounds('x', xarr)
         cache[fig.y_range] = self.newbounds('y', yarr)
+        if xinit is None and yinit is None:
+            return
+
+        args: Dict[str, Tuple[Optional[float], Optional[float]]] = {}
+        if xinit is not None:
+            tmp = self.newbounds('x', xinit)
+            cache[fig.x_range].update(start = tmp['start'], end = tmp['end'])
+            args['xinit'] = tmp['reset_start'], tmp['reset_end']
+
+        if yinit is not None:
+            tmp  = self.newbounds('y', yinit)
+            cache[fig.y_range].update(start = tmp['start'], end = tmp['end'])
+            args['yinit'] = tmp['reset_start'], tmp['reset_end']
+
+        self._ctrl.display.update(self._display, **args)
 
     def bounds(self, arr):
         "Returns boundaries for a column"
