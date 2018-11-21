@@ -3,7 +3,7 @@
 """
 Allows creating modals from anywhere
 """
-from copy               import deepcopy
+from copy               import deepcopy, copy
 from functools          import partial
 from typing             import Dict, List, Tuple, Any, Union, Sequence, cast
 from bokeh.document     import Document
@@ -213,18 +213,35 @@ class AdvancedDescriptor:
     def _controller(self, inst):
         return getattr(getattr(inst, '_ctrl'), self.ctrlgroup)
 
+    def __get(self, inst, defaultmodel):
+        ctrl = self._controller(inst)
+        if '.' not in self.ctrlname:
+            return ctrl.get(self.cnf, self.ctrlname, defaultmodel = defaultmodel)
+
+        vals = self.ctrlname.split('.')
+        mdl  = ctrl.get(self.cnf, vals[0], defaultmodel = defaultmodel)
+        for i in vals[1:]:
+            mdl = getattr(mdl, i)
+        return mdl
+
     def __get__(self, inst, _):
-        if inst is None:
-            return self
-        out = self._controller(inst).get(self.cnf, self.ctrlname)
-        return out
+        return self if inst is None else self.__get(inst, False)
 
     def __set__(self, inst, value):
-        return self._controller(inst).update(self.cnf, **{self.ctrlname: value})
+        ctrl = self._controller(inst)
+        if '.' not in self.ctrlname:
+            return ctrl.update(self.cnf, **{self.ctrlname: value})
+
+        vals = self.ctrlname.split('.')
+        mdl  = cur = copy(ctrl.get(self.cnf, vals[0]))
+        for i in vals[1:-1]:
+            mdl = getattr(mdl, i)
+        setattr(mdl, vals[-1], value)
+        return ctrl.update(self.cnf, **{vals[0]: cur})
 
     def getdefault(self, inst):
         "return the default value"
-        return self._controller(inst).get(self.cnf, self.ctrlname, defaultmodel = True)
+        return self.__get(inst, True)
 
     def line(self) -> Tuple[str, str]:
         "return the line for this descriptor"

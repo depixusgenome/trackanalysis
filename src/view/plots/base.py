@@ -317,10 +317,10 @@ class PlotUpdater(list):
         if len(data):
             cache[glyph].update(**data)
 
-    def reset(self, theme, cache):
+    def reset(self, mdl, theme, cache):
         "resets the renderer to the current theme"
         for i, j, k in self:
-            args, glyph = j.reset(theme, **k)
+            args, glyph = PlotAttrsView(getattr(mdl, j)).reset(theme, **k)
             args.pop("palette", None)
             self.__set_range_names(cache, args, i)
 
@@ -398,7 +398,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
             if val is not None:
                 attrs['color'] = val
         itm  = PlotAttrsView(getattr(self._theme, name))
-        self._updater.append((itm.addto(fig, theme, **attrs), itm, attrs))
+        self._updater.append((itm.addto(fig, theme, **attrs), name, attrs))
         return self._updater[-1][0]
 
     def figure(self, **attrs) -> Figure:
@@ -465,7 +465,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         old, self.state = self.state, PlotState.resetting
         try:
             self._reset(cache)
-            self._updater.reset(self._model.themename, cache)
+            self._updater.reset(self._theme, self._model.themename, cache)
         finally:
             self.state     = old
 
@@ -622,7 +622,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
             with self.resetting() as cache:
                 self._model.reset()
                 self._reset(cache)
-                self._updater.reset(self._model.themename, cache)
+                self._updater.reset(self._theme, self._model.themename, cache)
             ctrl.display.handle('rendered', args = {'plot': self})
     else:
         def __doreset(self, ctrl):
@@ -641,7 +641,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                     with BokehView.computation.type(ctrl, calls = self.__doreset):
                         try:
                             self._reset(cache)
-                            self._updater.reset(self._model.themename, cache)
+                            self._updater.reset(self._theme, self._model.themename, cache)
                         except Exception as exc: # pylint: disable=broad-except
                             args = getattr(exc, 'args', tuple())
                             if len(args) == 2 and args[1] == "warning":

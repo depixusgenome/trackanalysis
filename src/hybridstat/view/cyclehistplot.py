@@ -35,7 +35,8 @@ class CyclePlotTheme(PlotTheme):
     ylabel    = 'Bases'
     ntitles   = 5
     format    = '0.0a'
-    frames    = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'}, 'line', .1)
+    frames    = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'}, 'line', 1.,
+                          alpha=.25)
     toolbar   = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,reset,save'
     @initdefaults(frozenset(locals()))
@@ -110,8 +111,8 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
     _fig:    Figure
     _errors: PlotError
     def _addtodoc(self, ctrl, *_):
-        self._src = ColumnDataSource(data = self._data(None))
-        self._fig = self.figure(y_range = Range1d, x_range = Range1d)
+        self._src  = ColumnDataSource(data = self._data(None))
+        self._fig  = self.figure(y_range = Range1d, x_range = Range1d)
         self.addtofig(self._fig, 'frames', x = 't', y = 'z', source = self._src)
         self._display.addcallbacks(ctrl, self._fig)
         self._fig.add_layout(LinearAxis(axis_label = ""), 'above')
@@ -328,11 +329,12 @@ class _AxisDescriptor:
     def args(cls):
         "return the text to create the figure advanced menu"
         return dict(text = """
+                           Cycle lines alpha    %(CyclePlotTheme:frames.alpha).2f
                            Grid line alpha      %(_AxisDescriptor:grid).2f
                            Tick font size       %(_AxisDescriptor:tick)s
                            Axis label font size %(_AxisDescriptor:label)s
                            """,
-                    accessors = (cls,),
+                    accessors = (cls, CyclePlotTheme),
                     xaxis     = True)
 
 class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
@@ -359,12 +361,12 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
 
     def observe(self, ctrl):
         "observes the model"
-        assert self._model.sequencemodel.config in ctrl.theme
         super().observe(ctrl)
-        assert self._model.sequencemodel.config in ctrl.theme
         self._model.setobservers(ctrl)
         self._widgets.observe(ctrl)
         SequenceAnaIO.observe(ctrl)
+
+        ctrl.theme.observe(CyclePlotTheme.name, lambda **_: self.reset(False))
 
         @ctrl.display.observe(self._model.sequencemodel.display)
         def _onchangekey(old = None, **_):
@@ -397,7 +399,6 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
         "adds the models to the controller"
         for i in self._plots:
             i.addto(ctrl, noerase=noerase)
-        assert self._model.sequencemodel.config in ctrl.theme
 
     def _addtodoc(self, ctrl, doc):
         "returns the figure"
