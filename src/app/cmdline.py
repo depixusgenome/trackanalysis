@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Runs an app"
-from   copy    import copy
+from   copy    import copy, deepcopy
 from   pathlib import Path
 from   time    import time
 import logging
@@ -165,12 +165,22 @@ def _config(lines):
 
     def _fcn(ctrl):
         for line in lines:
+            if line == "clear":
+                for key, vals in ctrl.theme.config.items():
+                    chg = {i: deepcopy(vals.maps[1][i]) for i in vals.maps[0]}
+                    if len(chg):
+                        ctrl.theme.update(key, **chg)
+                continue
+
             if '@' not in line and '=' not in line:
                 # shortcut for selecting a tab
                 line = "theme.app.tabs@initial="+line
 
             args,  val   = line.split('=')
             names, attrs = args.split("@")
+            if not any(names.startswith(i) for i in ('display', 'theme')):
+                names = "theme."+names
+
             cnf          = getattr(ctrl, names[:names.find('.')])
             names        = names[names.find('.')+1:]
 
