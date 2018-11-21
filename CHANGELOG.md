@@ -1,5 +1,54 @@
 # CycleApp
 
+## cycles_v6.3
+
+* 2018-11-21 10:15:27 +0100  (tag: cycles_v6.3)
+
+### Peaks
+
+#### Selecting peaks: probes, baseline and singlestrand
+
+**Warning:** The way in which peaks to consider in fits can be set has changed.
+
+Prior to this version, one could go to the *advanced* menu and select whether
+to use the baseline position (`z=0`) and/or the single strand position in fits.
+Starting from *v6.3*, this is now set throught the list of probes ( oligos):
+
+1. to select the baseline position, add `0` to the list of probes,
+2. to select the single strand position, add `singlestrand` or `$` to the list
+   of probes.
+
+If, and only if, the single strand position is not used, the software will try
+to detect that position and discard it from the list of hybridizations. This
+detection relies on phase 4 being a *slow* ramp. Nothing is done should the
+ramp be too fast.
+
+When the single strand is selected, the cost function used to determine the
+best stretch and bias has changed: stretches and biases which set some peaks
+above the single strand position are disadvantaged. The same is done for the
+baseline position when selected.
+
+These changes were made in order to improve the situation with microRNA. They
+should improve any other situation where there are less than 3 reference
+positions. In such a case, consider using `singlestrand`
+
+#### Probe positions, a reminder
+
+By default, the probe position is defined as the binding base closest to the
+loop. This is not valid for methylation detection. In that case, use a `!` to
+indicate that the base right after should be the probe position. For example
+the position for `cc!wgg` is in the middle of the sequence. This feature exists
+since version *v4*.
+
+### Cleaning
+
+Fixed beads are those beads with a *small* extension (`Δz < 0.035`), little
+noise (`σ[HF] < 0.006`) and a good signal stability, or repeatability, from
+cycle to cycle. The latter means that a median behavior is computed and beads
+are defined as fixed only if 95 percent of cycles never stray too far (`δz < 0.01`)
+for too long (`< 90%` of frames) from that median. These various parameters can
+now be set by the user.
+
 ## cycles_v6.2
 
 * 2018-11-14 15:15:27 +0100  (tag: cycles_v6.2)
