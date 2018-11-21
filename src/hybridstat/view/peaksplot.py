@@ -156,7 +156,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             self._ticker.reset(cache)
             self._widgets.reset(cache, tmp is None)
 
-            inds = dicos['']['z'][[0,-1]] if len(dicos['']['z']) else [0, 1]
+            inds = dicos['']['z'][[0,-1]] if len(dicos['']['z']) else np.array([0, 1])
             cache[self._fig.y_range] = self.newbounds('y', inds)
 
             inds = (inds - self._model.bias)*self._model.stretch

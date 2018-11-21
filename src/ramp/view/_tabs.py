@@ -10,11 +10,6 @@ from view.tabs              import TabsView, TabsTheme, initsubclass
 from ._plot                 import RampPlotView
 from ._model                import RampTaskPlotModelAccess, RampPlotDisplay
 
-class RampTabTheme(TabsTheme):
-    "HybridStatTheme"
-    name:    str = "ramp.tab"
-    initial: str = "ramp"
-
 class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess, # type: ignore
                                         FoVPlotModel]):
     "Plots a default bead and its FoV"
@@ -42,8 +37,14 @@ class FoVPlotView(PlotView[FoVPlotCreator]):
         "Cleaning is set up by default"
         self._ismain(ctrl, tasks = self.TASKS)
 
-@initsubclass("Ramps:Tabs",
-              {FoVPlotView: 'fov', RampPlotView: 'ramp'},
-              (RampPlotView,))
+PANELS = {FoVPlotView: 'fov', RampPlotView: 'ramp'}
+
+class RampTabTheme(TabsTheme):
+    "Ramps tab theme"
+    def __init__(self):
+        super().__init__("ramp", PANELS, 1, "")
+
+@initsubclass("Ramps:Tabs", PANELS, (RampPlotView,))
 class RampView(TabsView[RampTabTheme]):
     "view of ramps & FoV"
+    APPNAME = "RampApp"

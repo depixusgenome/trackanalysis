@@ -522,7 +522,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         vmin -= delta
         vmax += delta
 
-        curr = getattr(self._display, axis+'bounds', (None, None))
+        curr = getattr(self._display, f'{axis}bounds', (None, None))
         attrs: Dict[str, Any] = OrderedDict(bounds = (vmin, vmax))
         attrs.update(start = vmin if curr[0]  is None else curr[0], # type: ignore
                      end   = vmax if curr[1]  is None else curr[1],

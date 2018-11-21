@@ -2,27 +2,30 @@
 # -*- coding: utf-8 -*-
 "all view aspects here"
 from collections         import OrderedDict
-from typing              import Dict, ClassVar, TypeVar, Tuple, Generic
+from typing              import Dict, ClassVar, TypeVar, Tuple, Generic, Type
 
 from bokeh               import layouts
 from bokeh.models        import Panel, Spacer, Tabs
 
-from utils               import initdefaults
 from utils.inspection    import templateattribute
 from model.plots         import PlotState
+from modaldialog         import dialog
 from view.base           import BokehView
+from version             import version as _version, hashdate
 
 class TabsTheme:
     "Tabs Theme"
-    name:    str            = "Tabs"
-    initial: str            = ""
-    width:   int            = 600
-    height:  int            = 30
-    titles:  Dict[str, str] = {}
-
-    @initdefaults(locals())
-    def __init__(self, **_):
-        pass
+    def __init__(self, initial: str, panels: Dict[Type, str], version = 0, startup = ""):
+        self.name:    str            = "app.tabs"
+        self.version: int            = version
+        self.startup: str            = startup
+        self.initial: str            = initial
+        self.width:   int            = 600
+        self.height:  int            = 30
+        self.titles:  Dict[str, str] = {}
+        for i, j in panels.items():
+            self.titles[j] = getattr(i, 'PANEL_NAME', j.capitalize())
+        assert self.initial in self.titles
 
 TThemeType = TypeVar("TThemeType", bound = TabsTheme)
 class TabsView(BokehView, Generic[TThemeType]):
@@ -34,12 +37,8 @@ class TabsView(BokehView, Generic[TThemeType]):
     def __init__(self, ctrl = None, **kwa):
         "Sets up the controller"
         super().__init__(ctrl = ctrl, **kwa)
-        self.__theme = ctrl.theme.add(templateattribute(self, 0))
+        self.__theme = ctrl.theme.add(templateattribute(self, 0)()) # type: ignore
         self._panels = [cls(ctrl, **kwa) for cls in self.KEYS]
-
-        for panel in self._panels:
-            key                      = self.__key(panel)
-            self.__theme.titles[key] = getattr(panel, 'PANEL_NAME', key.capitalize())
 
         cur = self.__select(self.__initial())
         for panel in self._panels:
@@ -151,6 +150,29 @@ class TabsView(BokehView, Generic[TThemeType]):
         super().observe(ctrl)
         for panel in self._panels:
             panel.observe(ctrl)
+
+        mdl  = self.__theme
+        msg  = ctrl.theme.get(mdl, 'startup')
+        cur  = ctrl.theme.get(mdl, 'version')
+        vers = ctrl.theme.get(mdl, 'version', defaultmodel = True)
+        if not msg or cur > vers:
+            return
+
+        def _observe(**_):
+            @self._doc.add_next_tick_callback
+            def _modal():
+                ctrl.theme.update(mdl, version = vers+1)
+                ctrl.writeuserconfig()
+
+                appname = getattr(ctrl, "APPNAME", "")
+                if appname == "":
+                    appname = type(self).__name__.replace('View', '')
+
+                dialog(self._doc,
+                       title   = appname+" "+_version().split("_")[1],
+                       body    = f"<p>created on {hashdate()}<p>"+ msg,
+                       buttons = "ok")
+        ctrl.tasks.oneshot("opentrack", _observe)
 
 def initsubclass(name, keys, tasksclasses = ()):
     "init TabsView subclass"

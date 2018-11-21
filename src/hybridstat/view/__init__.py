@@ -12,6 +12,7 @@ from cyclesplot          import CyclesPlotView
 from fov                 import FoVPlotView
 from model.plots         import PlotState
 from qualitycontrol.view import QualityControlView
+from utils               import dataclass
 from view.base           import BokehView
 from view.tabs           import TabsView, TabsTheme, initsubclass
 
@@ -19,18 +20,19 @@ from ._io                import setupio
 from .peaksplot          import PeaksPlotView
 from .cyclehistplot      import CycleHistPlotView
 
+PANELS = {FoVPlotView        : 'fov',
+          QualityControlView : 'qc',
+          CleaningView       : 'cleaning',
+          CyclesPlotView     : 'cycles',
+          PeaksPlotView      : 'peaks',
+          CycleHistPlotView  : 'cyclehist'}
+NAME   = "CyclesApp"
 class HybridStatTheme(TabsTheme):
     "HybridStatTheme"
-    name    = "hybridstat"
-    initial = "cleaning"
+    def __init__(self):
+        super().__init__("cleaning", PANELS, 1, "<H2> Hello </H2>")
 
-@initsubclass("HybridStat:Tabs",
-              {FoVPlotView        : 'fov',
-               QualityControlView : 'qc',
-               CleaningView       : 'cleaning',
-               CyclesPlotView     : 'cycles',
-               PeaksPlotView      : 'peaks',
-               CycleHistPlotView  : 'cyclehist'},
-              (CleaningView, PeaksPlotView))
+@initsubclass("HybridStat:Tabs", PANELS, (CleaningView, PeaksPlotView))
 class HybridStatView(TabsView[HybridStatTheme]):
     "A view with all plots"
+    APPNAME = "CyclesApp"
