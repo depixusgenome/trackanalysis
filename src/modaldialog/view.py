@@ -518,7 +518,6 @@ class TabCreator:
                      ('_ymax',  YAxisRangeDescriptor(disp))]
         text  = (kwa.pop('text'),) if 'text' in kwa  else ()
         args += list(kwa.items())
-        print(cnf, disp)
         return self("Theme", *text, **dict(args))
 
     line      : type = AdvancedDescriptor
