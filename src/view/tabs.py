@@ -77,13 +77,8 @@ class TabsView(BokehView, Generic[TThemeType]):
             ctrl.display.updatedefaults('keystroke', advanced = _advanced)
 
     def __setstates(self):
-        ind = next((i for i, j in enumerate(self._panels)
-                    if self.__state(j) is PlotState.active),
-                   None)
-        if ind is None:
-            cur = self.__initial()
-            ind = next(i for i, j in enumerate(self._panels) if isinstance(i, cur))
-
+        cur = self.__select(self.__initial())
+        ind = next((i for i, j in enumerate(self._panels) if j is cur), 0)
         for panel in self._panels[:ind]:
             self.__state(panel, PlotState.disabled)
         self.__state(self._panels[ind], PlotState.active)
