@@ -13,7 +13,7 @@ from model.plots         import PlotState
 from modaldialog         import dialog
 from modaldialog.view    import AdvancedTab
 from view.base           import BokehView
-from version             import version as _version
+from version             import timestamp as _timestamp
 
 class TabsTheme:
     "Tabs Theme"
@@ -28,19 +28,10 @@ class TabsTheme:
         for i, j in panels.items():
             self.titles[j] = getattr(i, 'PANEL_NAME', j.capitalize())
         assert self.initial in self.titles
-        if version == 0:
-            version = '.'.join(_version().split('-')[0].split('.')[:2])
-            numbers = [int(i) for i in version.split('v')[1].split('"')[0].split('.')]
-            self.version: int = 10000*numbers[0]
-            if len(numbers) > 1:
-                self.version += 100*numbers[1]
-                if len(numbers) > 2:
-                    self.version += numbers[2]
-        else:
-            self.version: int = version
+        self.version: int = _timestamp() if version == 0 else version
 
     @classmethod
-    def defaultstartup(cls):
+    def defaultstartup(cls, name):
         "extracts default startup message from a changelog"
         path = Path(".").absolute()
         for _ in range(4):
@@ -52,9 +43,8 @@ class TabsTheme:
 
         path /= cls.CHANGELOG
         with open(path, "r", encoding="utf-8") as stream:
-            version = _version().split('_')[0]
-            head    = f'<h2 id="{version}'
-            line    = ""
+            head = '<h2 id="'+name.lower().split('_')[0].replace('app', '')
+            line = ""
             for line in stream:
                 if line.startswith(head):
                     break
@@ -199,7 +189,7 @@ class TabsView(BokehView, Generic[TThemeType]):
             return
         msg = ctrl.theme.get(mdl, 'startup')
         if msg == "":
-            msg = mdl.defaultstartup()
+            msg = mdl.defaultstartup(getattr(ctrl, 'APPNAME', None))
             if msg is None:
                 return
 

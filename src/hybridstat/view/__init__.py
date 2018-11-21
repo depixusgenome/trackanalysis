@@ -35,4 +35,4 @@ class HybridStatTheme(TabsTheme):
 @initsubclass("HybridStat:Tabs", PANELS, (CleaningView, PeaksPlotView))
 class HybridStatView(TabsView[HybridStatTheme]):
     "A view with all plots"
-    APPNAME = "CyclesApp"
+    APPNAME = "CycleApp"

@@ -94,6 +94,7 @@ class RampPlotModel(PlotModel):
     tasks   = TasksDisplay()
     def addto(self, ctrl, noerase = True):
         "sets-up model observers"
+        super().addto(ctrl, noerase = noerase)
         self.tasks = ctrl.display.add(self.tasks, noerase)
 
     def getdisplay(self, name):

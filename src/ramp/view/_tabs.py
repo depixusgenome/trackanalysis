@@ -42,7 +42,7 @@ PANELS = {FoVPlotView: 'fov', RampPlotView: 'ramp'}
 class RampTabTheme(TabsTheme):
     "Ramps tab theme"
     def __init__(self):
-        super().__init__("ramp", PANELS, 1, "")
+        super().__init__("ramp", PANELS)
 
 @initsubclass("Ramps:Tabs", PANELS, (RampPlotView,))
 class RampView(TabsView[RampTabTheme]):
