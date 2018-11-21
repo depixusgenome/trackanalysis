@@ -1,1 +1,1 @@
-guimake('view.HybridStatView', locals())
+guimake('view.HybridStatView', locals(), scriptname = 'CycleApp')

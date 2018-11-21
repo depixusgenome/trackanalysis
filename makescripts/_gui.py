@@ -21,14 +21,15 @@ def build_bokehjs(bld, *modules):
         cls_keyword = lambda _: 'Bokeh',
         group       = 'bokeh')
 
-def guimake(viewname, locs):
+def guimake(viewname, locs, scriptname = None):
     "default make for a gui"
     make(locs)
 
     if 'startscripts' not in locs:
         def startscripts(bld):
             "creates start scripts"
-            bld.make_startup_script(locs['APPNAME'], locs['APPNAME']+'.'+viewname)
+            name = locs['APPNAME'] if scriptname is None else scriptname
+            bld.make_startup_script(name, locs['APPNAME']+'.'+viewname)
         locs['startscripts'] = startscripts
 
     old = locs.pop('build')
