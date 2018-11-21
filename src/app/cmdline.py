@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Runs an app"
+from   copy    import copy
 from   pathlib import Path
 from   time    import time
 import logging
@@ -158,6 +159,34 @@ def _launch(view, app, gui, kwa):
 def _port(port):
     return int(random.randint(5000, 8000)) if port == 'random' else int(port)
 
+def _config(lines):
+    if len(lines) == 0:
+        return
+
+    def _fcn(ctrl):
+        for line in lines:
+            if '@' not in line and '=' not in line:
+                # shortcut for selecting a tab
+                line = "theme.app.tabs@initial="+line
+
+            args,  val   = line.split('=')
+            names, attrs = args.split("@")
+            cnf          = getattr(ctrl, names[:names.find('.')])
+            names        = names[names.find('.')+1:]
+
+            if '.' in attrs:
+                attrs = attrs.split('.')
+                mdl   = cur = copy(cnf.get(names, attrs[0]))
+                for i in attrs[1:-1]:
+                    cur = getattr(cur, i)
+                setattr(cur, attrs[-1], type(getattr(cur, attrs[-1]))(val))
+                cnf.update(names, **{attrs[0]: mdl})
+            else:
+                mdl = type(cnf.get(names, attrs))(val)
+                cnf.update(names, **{attrs: mdl})
+
+    INITIAL_ORDERS.default_config = _fcn
+
 def _version(ctx, _, value):
     import version
     if not value or ctx.resilient_parsing:
@@ -211,6 +240,9 @@ def defaultclick(*others):
                                                       'none']),
                            default    = 'app',
                            help       = 'The type of browser to use.')(fcn)
+        fcn = click.option("-c", "--config",
+                           multiple   = True,
+                           help       = 'Changing the config')(fcn)
 
         for i in others:
             fcn = i(fcn)
@@ -232,9 +264,10 @@ def defaultclick(*others):
                            help       = 'track path, gr path and match'),
               click.argument('files', nargs = -1, type = click.Path()))
 def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
-         gui, port, raiseerr, nothreading):
+         gui, config, port, raiseerr, nothreading):
     "Launches an view"
     _files(tracks, files, bead)
+    _config(config)
     return defaultmain(view, gui, port, raiseerr, nothreading, "app.toolbar")
 
 if __name__ == '__main__':
