@@ -563,8 +563,9 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
             return 0., 1.
 
         if isinstance(arr, np.ndarray):
-            vmin  = np.nanmin(arr)
-            vmax  = np.nanmax(arr)
+            good  = arr[np.isfinite(arr)]
+            vmin  = good.min()
+            vmax  = good.max()
         else:
             vmin  = min(arr)
             vmax  = max(arr)

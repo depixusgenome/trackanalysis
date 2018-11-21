@@ -226,7 +226,8 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
                 cache[self._src[i]]['data'] = j
 
             xarr = data['peaks']['count']
-            xarr = [0., np.nanmax(xarr) if len(xarr) else 1.]
+            xarr = xarr[np.isfinite(xarr)]
+            xarr = [0., xarr.max() if len(xarr) else 1.]
             self.setbounds(cache, self._fig, xarr, data['hist']["z"])
 
             pks = self._model.peaks['bases']

@@ -49,17 +49,17 @@ class ClippingTask(Task):
         itms = np.split(data, pha)[1::2]
         if minv is None and maxv is not None:
             for i in itms:
-                i[np.isnan(i)] = maxv+1
-                i[(i > maxv)]  = self.replacement
+                i[~np.isfinite(i)] = maxv+1
+                i[(i > maxv)]      = self.replacement
 
         elif maxv is None and minv is not None:
             for i in itms:
-                i[np.isnan(i)] = minv-1
-                i[(i < minv)]  = self.replacement
+                i[~np.isfinite(i)] = minv-1
+                i[(i < minv)]      = self.replacement
 
         elif maxv is not None and minv is not None:
             for i in itms:
-                i[np.isnan(i)]             = maxv+1
+                i[~np.isfinite(i)]         = maxv+1
                 i[(i < minv) | (i > maxv)] = self.replacement
 
 class ClippingProcessor(Processor[ClippingTask]):
