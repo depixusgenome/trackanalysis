@@ -82,8 +82,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
             extr = lambda x: ([np.nanmin(i[x])  for i in data if len(i[x])]
                               +[np.nanmax(i[x]) for i in data if len(i[x])])
 
-            self.setbounds(cache, self.__fig.x_range, 'x', extr("zmag"))
-            self.setbounds(cache, self.__fig.y_range, 'y', extr("z"))
+            self.setbounds(cache, self.__fig, extr("zmag"), extr("z"))
 
             label = (self._theme.ylabel if self._theme.dataformat != "norm" else
                      self._theme.ylabelnormalized)

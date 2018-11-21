@@ -4,7 +4,7 @@
 
 import  warnings
 from    abc            import ABC
-from    typing         import Any
+from    typing         import Any, Callable, TYPE_CHECKING
 
 from    bokeh.plotting import Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
@@ -125,4 +125,7 @@ class HistMixin(ABC):
         self._ticker.reset(cache)
 
         cache[self._histsource]['data'] = hist
-        getattr(self, 'setbounds')(cache, self._hist.y_range, 'y', data['z'])
+        cache[self._hist.y_range] = self.newbounds('y', data['z'])
+
+    if TYPE_CHECKING:
+        newbounds: Callable

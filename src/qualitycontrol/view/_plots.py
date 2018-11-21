@@ -63,15 +63,14 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
         data = self._data()
         cache.update({i: dict(data = j) for i, j in zip(self._src, data)})
 
-        self.setbounds(cache, self._fig.x_range, 'x',
-                       (0., getattr(self._model.track, 'ncycles', 1)))
+        yvals = data[0]['measures'][np.isfinite(data[0]['measures'])]
+        self.setbounds(cache, self._fig,
+                       [0., getattr(self._model.track, 'ncycles', 1)],
+                       [np.min(yvals), np.max(yvals)] if len(yvals) else [0., 30.])
 
-        xvals = data[0]['measures'][np.isfinite(data[0]['measures'])]
-        xrng  = (np.min(xvals), np.max(xvals)) if len(xvals) else (0., 30.)
-        self.setbounds(cache, self._fig.y_range, 'y', xrng)
-        if len(xvals):
+        if len(yvals):
             perc, factor = self._config.yspan
-            span         = np.percentile(xvals, perc)
+            span         = np.percentile(yvals, perc)
             delta        = max(1e-5, span[1]-span[0])
             span         = span[0]-delta*factor, span[1]+delta*factor
             cache[self._fig.y_range].update(start = span[0], end = span[1])

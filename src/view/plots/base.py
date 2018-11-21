@@ -500,7 +500,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         del self._ctrl
         del self._doc
 
-    def newbounds(self, rng, axis, arr) -> dict:
+    def newbounds(self, axis, arr) -> dict:
         "Sets the range boundaries"
         over  = self._theme.overshoot
 
@@ -522,23 +522,17 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         vmin -= delta
         vmax += delta
 
-        curr = getattr(self._display, f'{axis}bounds') if axis else (None, None)
+        curr = getattr(self._display, axis+'bounds', (None, None))
         attrs: Dict[str, Any] = OrderedDict(bounds = (vmin, vmax))
         attrs.update(start = vmin if curr[0]  is None else curr[0], # type: ignore
                      end   = vmax if curr[1]  is None else curr[1],
                      reset_start = vmin, reset_end = vmax)
-        if hasattr(rng, 'range_padding'):
-            attrs['range_padding'] = over*100.
-
         return attrs
 
-    def setbounds(self, cache:CACHE_TYPE, # pylint: disable=too-many-arguments
-                  rng, axis, arr, reinit = True):
+    def setbounds(self, cache:CACHE_TYPE, fig, xarr, yarr):
         "Sets the range boundaries"
-        vals = self.newbounds(rng, axis, arr)
-        if reinit and hasattr(rng, 'reinit'):
-            vals['reinit'] = not rng.reinit
-        cache[rng] = vals
+        cache[fig.x_range] = self.newbounds('x', xarr)
+        cache[fig.y_range] = self.newbounds('y', yarr)
 
     def bounds(self, arr):
         "Returns boundaries for a column"

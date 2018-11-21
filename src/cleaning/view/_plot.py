@@ -96,8 +96,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
             disable     = False
         finally:
             data        = self.__data(items, nans)
-            self.setbounds(cache, self.__fig.x_range, 'x', data['t'])
-            self.setbounds(cache, self.__fig.y_range, 'y', data['z'])
+            self.setbounds(cache, self.__fig, data['t'], data['z'])
             cache[self.__source]['data'] = data
             self._resetwidget(cache, disable)
 

@@ -177,8 +177,7 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
         cache[self._calibsource].update(data = dict(image = [img],
                                                     dw    = [dist[0]],
                                                     dh    = [dist[1]]))
-        self.setbounds(cache, self._calibfig.x_range, 'x', [0, dist[0]])
-        self.setbounds(cache, self._calibfig.y_range, 'y', [0, dist[1]])
+        self.setbounds(cache, self._calibfig, [0, dist[0]], [0, dist[1]])
 
     def _imagedata(self, cache):
         fov = self._fov
@@ -193,8 +192,7 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
                                                   dw    = [dist[0]],
                                                   dh    = [dist[1]]))
 
-        self.setbounds(cache, self._fig.x_range, 'x', [0, dist[0]])
-        self.setbounds(cache, self._fig.y_range, 'y', [0, dist[1]])
+        self.setbounds(cache, self._fig, [0, dist[0]], [0, dist[1]])
 
     def _beadsdata(self):
         fov = self._fov
