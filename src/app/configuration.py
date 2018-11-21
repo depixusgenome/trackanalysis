@@ -86,7 +86,7 @@ class ConfigurationIO:
         views    = tuple(get(i) for i in views if get(i))
         appname  = next((i.APPNAME for i in views if hasattr(i, 'APPNAME')), None)
         if appname is None:
-            appname = views[0].__name__.lower().replace('view', '')
+            appname = views[0].__name__.replace('view', '')
 
         class Main: # type: ignore
             "The main view"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updates app manager so as to deal with controllers and toolbar"
-from typing           import Generic, TypeVar
+from typing           import Generic, TypeVar, cast
 
 from bokeh.layouts    import layout, column
 
@@ -16,16 +16,18 @@ VIEW    = TypeVar("VIEW")
 
 class _AppName:
     def __get__(self, _, owner):
-        name = templateattribute(owner, 1).__name__
-        return name.lower().replace('view', '')
+        cls  = templateattribute(owner, 1)
+        assert cls is not None and not isinstance(cls, cast(type, TypeVar))
+        return getattr(cls, "APPNAME", cls.__name__.replace('view', ''))
 
 class ViewWithToolbar(Generic[TOOLBAR, VIEW]):
     "A view with the toolbar on top"
     APPNAME = _AppName()
     def __init__(self, ctrl = None, **kwa):
-        assert not isinstance(templateattribute(self, 0), TypeVar)
-        self._bar      = templateattribute(self, 0)(ctrl = ctrl, **kwa)
-        self._mainview = templateattribute(self, 1)(ctrl = ctrl, **kwa)
+        get = lambda x: cast(type, templateattribute(self, x))
+        assert not isinstance(get(0), cast(type, TypeVar))
+        self._bar      = get(0)(ctrl = ctrl, **kwa)
+        self._mainview = get(1)(ctrl = ctrl, **kwa)
 
     def ismain(self, ctrl):
         "sets-up the main view as main"

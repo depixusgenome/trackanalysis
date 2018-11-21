@@ -74,7 +74,7 @@ class BaseSuperController:
     def launchkwargs(cls, **kwa) -> Dict[str, Any]:
         "updates kwargs used for launching the application"
         cnf   = ConfigurationIO(cls)
-        maps  = {'theme': {'appsize': cnf.appsize, 'appname': cnf.appname.capitalize()},
+        maps  = {'theme': {'appsize': cnf.appsize, 'appname': cnf.appname},
                  'config': {'catcherror': DisplayController.CATCHERROR}}
         maps = cnf.readuserconfig(maps, update = True)
 
@@ -178,7 +178,7 @@ class BaseSuperController:
         orders().config(self)
 
     def _getmaps(self):
-        maps = {'theme':  {'appsize': self.APPSIZE, 'appname': self.APPNAME.capitalize()},
+        maps = {'theme':  {'appsize': self.APPSIZE, 'appname': self.APPNAME},
                 'config': {'catcherror': DisplayController.CATCHERROR}}
         keys = {i for i in self.theme.current.keys()
                 if type(self.theme.model(i)).__name__.endswith("Config")}
