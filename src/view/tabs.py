@@ -11,6 +11,7 @@ from bokeh.models        import Panel, Spacer, Tabs
 from utils.inspection    import templateattribute
 from model.plots         import PlotState
 from modaldialog         import dialog
+from modaldialog.view    import AdvancedTab
 from view.base           import BokehView
 from version             import version as _version
 
@@ -19,7 +20,6 @@ class TabsTheme:
     CHANGELOG = "CHANGELOG.html"
     def __init__(self, initial: str, panels: Dict[Type, str], version = 0, startup = ""):
         self.name:    str            = "app.tabs"
-        self.version: int            = version
         self.startup: str            = startup
         self.initial: str            = initial
         self.width:   int            = 600
@@ -28,21 +28,29 @@ class TabsTheme:
         for i, j in panels.items():
             self.titles[j] = getattr(i, 'PANEL_NAME', j.capitalize())
         assert self.initial in self.titles
+        if version == 0:
+            version = '.'.join(_version().split('-')[0].split('.')[:2])
+            numbers = [int(i) for i in version.split('v')[1].split('"')[0].split('.')]
+            self.version: int = 10000*numbers[0]
+            if len(numbers) > 1:
+                self.version += 100*numbers[1]
+                if len(numbers) > 2:
+                    self.version += numbers[2]
+        else:
+            self.version: int = version
 
-    def defaultstartup(self):
+    @classmethod
+    def defaultstartup(cls):
         "extracts default startup message from a changelog"
-        if self.startup != "":
-            return
-
         path = Path(".").absolute()
         for _ in range(4):
-            if (path/self.CHANGELOG).exists():
+            if (path/cls.CHANGELOG).exists():
                 break
             path = path.parent
         else:
-            return
+            return None
 
-        path /= self.CHANGELOG
+        path /= cls.CHANGELOG
         with open(path, "r", encoding="utf-8") as stream:
             version = _version().split('_')[0]
             head    = f'<h2 id="{version}'
@@ -51,23 +59,18 @@ class TabsTheme:
                 if line.startswith(head):
                     break
             else:
-                return
+                return None
 
-            lines   = ""
+            newtab = lambda x: AdvancedTab(x.split('>')[1].split('<')[0].split('_')[1])
+            tabs   = [newtab(line)]
             for line in stream:
-                if line.startswith('<h2 id="') or line.startswith('<h1'):
+                if line.startswith('<h2'):
+                    tabs.append(newtab(line))
+                elif line.startswith('<h1'):
                     break
-                lines += line
-
-            self.startup = lines
-
-            version      = '.'.join(_version().split('-')[0].split('.')[:2])
-            numbers      = [int(i) for i in version.split('v')[1].split('"')[0].split('.')]
-            self.version = 10000*numbers[0]
-            if len(numbers) > 1:
-                self.version += 100*numbers[1]
-                if len(numbers) > 2:
-                    self.version += numbers[2]
+                else:
+                    tabs[-1].body += line # type: ignore
+        return tabs
 
 TThemeType = TypeVar("TThemeType", bound = TabsTheme)
 class TabsView(BokehView, Generic[TThemeType]):
@@ -80,7 +83,6 @@ class TabsView(BokehView, Generic[TThemeType]):
         "Sets up the controller"
         super().__init__(ctrl = ctrl, **kwa)
         mdl          = templateattribute(self, 0)() # type: ignore
-        mdl.defaultstartup()
         self.__theme = ctrl.theme.add(mdl)
         self._panels = [cls(ctrl, **kwa) for cls in self.KEYS]
 
@@ -191,27 +193,21 @@ class TabsView(BokehView, Generic[TThemeType]):
             panel.observe(ctrl)
 
         mdl  = self.__theme
-        msg  = ctrl.theme.get(mdl, 'startup')
         cur  = ctrl.theme.get(mdl, 'version')
         vers = ctrl.theme.get(mdl, 'version', defaultmodel = True)
-        if not msg or cur > vers:
+        if cur > vers:
             return
+        msg = ctrl.theme.get(mdl, 'startup')
+        if msg == "":
+            msg = mdl.defaultstartup()
+            if msg is None:
+                return
 
-        def _observe(**_):
-            @self._doc.add_next_tick_callback
-            def _modal():
-                ctrl.theme.update(mdl, version = vers+1)
-                ctrl.writeuserconfig()
-
-                appname = getattr(ctrl, "APPNAME", "")
-                if appname == "":
-                    appname = type(self).__name__.replace('View', '')
-
-                dialog(self._doc,
-                       title   = appname+" "+_version().split("-")[0],
-                       body    = msg,
-                       buttons = "ok")
-        ctrl.tasks.oneshot("opentrack", _observe)
+        @ctrl.display.observe
+        def _onscriptsdone(**_):
+            ctrl.theme.update(mdl, version = vers+1)
+            ctrl.writeuserconfig()
+            dialog(self._doc, body = msg, buttons = "ok")
 
 def initsubclass(name, keys, tasksclasses = ()):
     "init TabsView subclass"

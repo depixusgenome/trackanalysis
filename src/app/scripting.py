@@ -22,14 +22,19 @@ class Orders(list):
     def __script(self, ctrl, doc = None):
         "creates a function for running the orders"
         nextfcn = getattr(doc, 'add_next_tick_callback', lambda i: i())
-        lst     = list(self)
-        lst.insert(0, lambda x: x.display.handle('guiloaded',
-                                                 x.display.emitpolicy.nothing))
+        lst     = ['guiloaded'] + list(self) + ["scriptsdone"]
+
         def _cmd():
-            if len(lst):
+            if len(lst) == 0:
+                return
+
+            cmd = lst.pop(0)
+            if callable(cmd):
                 with Action(ctrl):
-                    lst.pop(0)(ctrl)
-                nextfcn(_cmd)
+                    cmd(ctrl)
+            else:
+                ctrl.display.handle(cmd, ctrl.display.emitpolicy.nothing)
+            nextfcn(_cmd)
         return _cmd
 
     def run(self, viewcls, doc = None, onload = None):
