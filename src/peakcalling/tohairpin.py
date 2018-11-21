@@ -24,6 +24,11 @@ class HairpinFitter(OptimizationParams):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
+    @property
+    def hasbaseline(self) -> bool:
+        "whether z = 0 is in peaks"
+        return len(self.peaks) > 0 and self.peaks[0] == 0
+
     @staticmethod
     def topeaks(seq:str, oligos:Sequence[str]) -> np.ndarray:
         "creates a peak sequence from a dna sequence and a list of oligos"
@@ -105,7 +110,8 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
         if len(peaks) > 1:
             args  = self.optimconfig(symmetry     = self.symmetry is Symmetry.both,
                                      noise        = self.precision,
-                                     singlestrand = 1. if self.hassinglestrand else 0.)
+                                     singlestrand = 1. if self.hassinglestrand else 0.,
+                                     baseline     = 1. if self.hasbaseline     else 0.)
 
             hpdelta = self.peaks[-2] if len(self.peaks) > 2 and self.pivot == Pivot.top else 0
             hpin    = self.peaks - hpdelta

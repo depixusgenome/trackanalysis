@@ -99,28 +99,39 @@ namespace peakcalling { namespace cost
                            bead2, yvals2, size2,
                            stretch, bias, cf.sigma);
 
+            float sumv = 0.f, dx1 = 0.0f, dx2 = 0.0f;
+            auto  add = [&](int i, float delta)
+            {
+                auto val = (bead2[i]*stretch+bias-delta)/cf.sigma;
+                auto ex  = std::exp(-.5f*val*val);
+                    
+                sumv += 1.0f-ex;
+                ex   *= val/cf.sigma;
+                dx1  += bead2[i]*ex;
+                dx2  += ex;
+            };
+
+            auto finish = [&](float factor)
+            {
+                return std::make_tuple(float(std::get<0>(r1) + sumv*factor),
+                                       float(std::get<1>(r1) + dx1 *factor),
+                                       float(std::get<2>(r1) + dx2 *factor));
+            };
+
             if(cf.singlestrand > 0 && bead1[size1-1] < bead2[size2-1]*stretch+bias)
             {
                 float maxv = bead1[size1-1];
-                float sumv = 0.f, dx1 = 0.0f, dx2 = 0.0f;
-                for(int i = int(size2)-1; i >= 0; --i)
-                {
-                    auto val = bead2[i]*stretch+bias;
-                    if(val <= maxv)
-                        break;
+                for(int i = int(size2)-1; i >= 0 && bead2[i]*stretch+bias > maxv; --i)
+                    add(i, maxv);
+                r1 = finish(cf.singlestrand);
+            }
 
-                    val     = (val-maxv)/cf.sigma;
-                    auto ex = std::exp(-.5f*val*val);
-                        
-                    sumv += 1.0f-ex;
-                    ex   *= val/cf.sigma;
-                    dx1  += bead2[i]*ex;
-                    dx2  += ex;
-                }
-
-                r1 = std::make_tuple(float(std::get<0>(r1) + sumv*cf.singlestrand),
-                                     float(std::get<1>(r1) + dx1*cf.singlestrand),
-                                     float(std::get<2>(r1) + dx2*cf.singlestrand));
+            if(cf.baseline > 0 && bead2[0]*stretch+bias < 0)
+            {
+                sumv = dx1 = dx2 = 0.0f;
+                for(int i = 0, ie = int(size2); i < ie && bead2[i]*stretch+bias < 0.f; ++i)
+                    add(i, 0.f);
+                r1 = finish(cf.baseline);
             }
 
             if(!cf.symmetric)

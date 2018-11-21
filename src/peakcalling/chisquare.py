@@ -29,6 +29,11 @@ class ChiSquare: # pylint: disable=too-many-instance-attributes
         self.convert      = convert
         self.singlestrand = singlestrand
 
+    @property
+    def baseline(self) -> bool:
+        "whether the reference has 0 in its peaks"
+        return len(self.ref) > 0 and self.ref[0] == 0
+
     def update(self, stretch, bias, convert):
         "resets the stretch and bias"
         self.stretch = stretch
@@ -81,38 +86,35 @@ class ChiSquare: # pylint: disable=too-many-instance-attributes
         params = newstretch, newbias
         return params, self.__pairs(*params)
 
-    def __cost(self, pairs, dist):
-        exp, ref = self.exp, self.ref
-        if self.singlestrand:
-            maxv  = (ref[-1]-self.bias)/self.stretch
-            tmp   = exp[np.searchsorted(exp, maxv):]
-            if len(tmp):
-                tmp   = self.stretch*tmp # don't forget to use a copy of the vector!
-                tmp  += self.bias
-                tmp  -= ref[-1]
-                tmp **= 2
-                dist += tmp.sum()/self.window**2
+    def __delta(self, arr, val, stretch, bias):
+        if len(arr) == 0:
+            return 0
+        arr   = stretch*arr # don't forget to use a copy of the vector!
+        arr  += bias
+        arr  -= val
+        arr **= 2
+        return arr.sum()/self.window**2
 
-        if self.symmetry is Symmetry.both:
-            dist += (len(exp)+len(ref)-2.*len(pairs))**2
-            return np.sqrt(dist/(len(exp)+len(ref))) if len(exp)+len(ref) else DEFAULT_BEST
-
-        if self.symmetry is Symmetry.left:
-            dist += (len(ref)-len(pairs))**2
-            return np.sqrt(dist/len(ref)) if len(ref) else DEFAULT_BEST
-
-        dist += (len(exp)-len(pairs))**2
-        return np.sqrt(dist/len(exp)) if len(exp) else DEFAULT_BEST
 
     def __value(self, pairs, stretch, bias) -> Tuple[float, float, float]:
-        if len(pairs) > 1:
-            tmp   = self.exp[pairs[:,1]]
-            tmp  *= stretch
-            tmp  += bias
-            tmp  -= self.ref[pairs[:,0]]
-            tmp **= 2
-            dist  = tmp.sum()/self.window**2
-        else:
-            dist = 0.
+        exp, ref = self.exp, self.ref
+        if len(exp) == 0 or len(ref) == 0:
+            return DEFAULT_BEST, stretch, bias
 
-        return self.__cost(pairs, dist), stretch, bias
+        dist     = 0.
+        if len(pairs) > 1:
+            dist = self.__delta(exp[pairs[:,1]], ref[pairs[:,0]], stretch, bias)
+
+        if self.singlestrand and len(ref):
+            val   = (ref[-1]-bias)/stretch
+            dist += self.__delta(exp[np.searchsorted(exp, val):], val, stretch, bias)
+
+        if self.baseline:
+            val   = (ref[0]-bias)/stretch
+            dist += self.__delta(exp[:np.searchsorted(exp, val)], val, stretch, bias)
+
+        ntheo = (len(exp)+len(ref) if self.symmetry is Symmetry.both else
+                 len(ref)          if self.symmetry is Symmetry.left else
+                 len(exp))
+        nvals = (2 if self.symmetry is Symmetry.both else 1) * len(pairs)
+        return np.sqrt((dist+(ntheo-nvals)**2)/nvals), stretch, bias
