@@ -241,6 +241,7 @@ class DpxModal(Model):
     __implementation__ = "modal.coffee"
     title              = props.String("")
     body               = props.String("")
+    buttons            = props.String("")
     results            = props.Dict(props.String, props.Any)
     submitted          = props.Int(0)
     startdisplay       = props.Int(0)
@@ -270,6 +271,7 @@ class DpxModal(Model):
             callback: Union[Callable, Callback] = None,
             context : Callable[[str], Any]      = None,
             model                               = None,
+            buttons                             = "",
             always                              = False):
         "runs the modal dialog"
         self.__handler = self._build_handler(callback, title, body, model, context)
@@ -278,6 +280,7 @@ class DpxModal(Model):
         self.update(title    = title,
                     body     = self._build_body(body, model),
                     callback = self._build_callback(callback),
+                    buttons  = buttons,
                     results  = {})
         self.__running      = True
         self.startdisplay   = self.startdisplay+1

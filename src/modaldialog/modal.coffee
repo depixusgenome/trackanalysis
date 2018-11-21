@@ -380,12 +380,18 @@ export class DpxModal       extends Model
                     '<form id="dpxbbmform" class="bk-root">'+@body+"</form>"    +
                 "</div>"
 
-        btns  = "<div class='bbm-modal__bottombar bk-root'>"                    +
-                    "<button type='button' class='bk-bs-btn bk-bs-btn-default " +
-                    "dpx-modal-cancel'>Cancel</button>"                         +
-                    "<button type='button' class='bk-bs-btn bk-bs-btn-default " +
-                    "dpx-modal-done'>Apply</button>"                            +
-                "</div>"
+        if @buttons == ""
+            btns  = "<div class='bbm-modal__bottombar bk-root'>"                    +
+                        "<button type='button' class='bk-bs-btn bk-bs-btn-default " +
+                        "dpx-modal-cancel'>Cancel</button>"                         +
+                        "<button type='button' class='bk-bs-btn bk-bs-btn-default " +
+                        "dpx-modal-done'>Apply</button>"                            +
+                    "</div>"
+        else
+            btns  = "<div class='bbm-modal__bottombar bk-root'>"                    +
+                        "<button type='button' class='bk-bs-btn bk-bs-btn-default " +
+                        "dpx-modal-done'>"+@buttons+"</button>"                     +
+                    "</div>"
         return {template: "<fragment>#{title} #{body} #{btns}</fragment>"}
 
     clicktab: (ind) ->
@@ -417,6 +423,7 @@ export class DpxModal       extends Model
     @define {
         title:        [p.String, ""]
         body:         [p.String, ""]
+        buttons:      [p.String, ""]
         results:      [p.Any,    {}]
         submitted:    [p.Number, 0]
         startdisplay: [p.Number, 0]
