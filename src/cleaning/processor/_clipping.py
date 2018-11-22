@@ -30,14 +30,16 @@ class ClippingTask(Task):
         if self.lowfactor is None or self.lowfactor <= 0.:
             return None
         hfs = track.rawprecision(key)
-        return track.phaseposition(self.low,  data)-hfs*self.lowfactor
+        out = track.phaseposition(self.low,  data)-hfs*self.lowfactor
+        return out if np.isfinite(out) else None
 
     def maxthreshold(self, track:Track, key:int, data: np.ndarray) -> Optional[float]:
         "return the min threshold"
         if self.highfactor is None or self.highfactor <= 0.:
             return None
         hfs = track.rawprecision(key)
-        return track.phaseposition(self.high, data)+hfs*self.highfactor
+        out = track.phaseposition(self.high, data)+hfs*self.highfactor
+        return out if np.isfinite(out) else None
 
     def __call__(self, track:Track, key:int, data: np.ndarray):
         maxv = self.maxthreshold(track, key, data)
