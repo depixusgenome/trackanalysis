@@ -263,7 +263,8 @@ class PlotThemeView(PlotTheme):
                 'y_axis_label':     self.ylabel,
                 'plot_width':       self.figsize[0],
                 'plot_height':      self.figsize[1],
-                'sizing_mode':      self.figsize[2]}
+                'sizing_mode':      self.figsize[2],
+                'output_backend':   self.output_backend}
         args.update(kwa)
 
         tools:list = []

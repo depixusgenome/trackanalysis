@@ -39,18 +39,19 @@ class PlotTheme:
     """
     Default plot theme
     """
-    name          = ''
-    ylabel        = 'Z (μm)'
-    yrightlabel   = 'Base number'
-    xtoplabel     = 'Time (s)'
-    xlabel        = 'Frames'
-    figsize       = defaultfigsize()
-    overshoot     =.001
-    toolbar       = dict(sticky   = False,
-                         location = 'above',
-                         items    = 'xpan,wheel_zoom,box_zoom,save',
-                         hide     = True)
-    tooltips: Any = None
+    name           = ''
+    ylabel         = 'Z (μm)'
+    yrightlabel    = 'Base number'
+    xtoplabel      = 'Time (s)'
+    xlabel         = 'Frames'
+    figsize        = defaultfigsize()
+    overshoot      = .001
+    output_backend = 'svg'
+    toolbar        = dict(sticky   = False,
+                          location = 'above',
+                          items    = 'xpan,wheel_zoom,box_zoom,save',
+                          hide     = True)
+    tooltips: Any  = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
