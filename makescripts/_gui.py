@@ -4,7 +4,7 @@
 from pathlib    import Path
 from wafbuilder import copyroot, make
 
-def build_bokehjs(bld, *modules):
+def build_bokehjs(bld, key, *modules):
     "compiles the bokeh js code"
     root = bld.path.ctx.bldnode
     mods = [i.split('.')[0] for i in modules]
@@ -13,10 +13,11 @@ def build_bokehjs(bld, *modules):
     tgt  = copyroot(bld, modules[0]+'.js')
 
     cmd  = str(bld.path.ctx.srcnode.find_resource('makescripts/bokehcompiler.py'))
+    rule = f'{bld.env["PYTHON"][0]} {cmd} '+' '.join(modules)+' -o ${TGT} -k '+key
     bld(source      = srcs,
         name        = modules[0]+':bokeh',
         color       = 'BLUE',
-        rule        = f'{bld.env["PYTHON"][0]} {cmd} '+' '.join(modules)+' -o ${TGT}',
+        rule        = rule,
         target      = tgt,
         cls_keyword = lambda _: 'Bokeh',
         group       = 'bokeh')
@@ -24,11 +25,11 @@ def build_bokehjs(bld, *modules):
 def guimake(viewname, locs, scriptname = None):
     "default make for a gui"
     make(locs)
+    name = locs['APPNAME'] if scriptname is None else scriptname
 
     if 'startscripts' not in locs:
         def startscripts(bld):
             "creates start scripts"
-            name = locs['APPNAME'] if scriptname is None else scriptname
             bld.make_startup_script(name, locs['APPNAME']+'.'+viewname)
         locs['startscripts'] = startscripts
 
@@ -48,7 +49,7 @@ def guimake(viewname, locs, scriptname = None):
             i = i.srcpath()
             if Path(str(i)).name[:2] != '__':
                 modules.append(str(i)[4:-3].replace("/", ".").replace("\\", "."))
-        build_bokehjs(bld, *(i for i in modules if i[:2] != '__'), 'undo')
+        build_bokehjs(bld, name, *(i for i in modules if i[:2] != '__'), 'undo')
 
     locs['build'] = build
 

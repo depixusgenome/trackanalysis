@@ -36,7 +36,8 @@ if __name__ == '__main__':
     @click.argument('modules', nargs = -1)
     @click.option("-o", "--output", type = click.Path(), default = None)
     @click.option("-d", "--dependencies", flag_value = True, default = False)
-    def _main(modules, output, dependencies):
+    @click.option("-k", "--key", default = "")
+    def _main(modules, output, dependencies, key):
         if dependencies:
             string = '\n'.join(finddependencies(*modules))
         else:
@@ -45,7 +46,9 @@ if __name__ == '__main__':
         if output is None:
             print(string)
         else:
-            print(f"/*KEY={Path(output).stem}*/\n"+string,
+            if key == "":
+                key = Path(output).stem
+            print(f"/*KEY={key}*/\n"+string,
                   file = open(output, 'w', encoding='utf-8'))
 
     _main()
