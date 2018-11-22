@@ -486,15 +486,12 @@ class Handler:
         state['secondaries'] = sec
         state['phases']      = kwargs.pop('phases').astype('i4')
 
-    @staticmethod
-    def __instrument(res, kwargs):
-        res['instrument'] = {"type": "picotwist", "name": None}
-        if kwargs is None:
-            return
-        if 'instrument' in kwargs:
+    def __instrument(self, res, kwargs):
+        if kwargs is not None and 'instrument' in kwargs:
             res['instrument'] = kwargs.pop("instrument")
-        elif 'calibrations' not in kwargs:
-            res['instrument']["type"] = "sdi"
+            assert "type" in res['instrument']
+        else:
+            res['instrument'] = {"type": self.instrumenttype(), "name": None}
 
     @staticmethod
     def __fov(res, kwargs):

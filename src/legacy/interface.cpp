@@ -51,7 +51,7 @@ namespace legacy
         if((name.size() > 4)
             && std::equal(name.begin()+name.size()-4, name.end(), ext.begin()))
         {
-            std::ifstream stream(name);
+            std::ifstream stream(name, std::ios_base::in|std::ios_base::binary);
             std::string line;
             const std::string find("-src \"equally spaced reference profile");
             for(int i = 0; i < 10000 && std::getline(stream, line); ++i)
