@@ -82,7 +82,7 @@ class _NDArrayIO(_ItemIO):
     @staticmethod
     def run(val, runner):
         "returns thishe dict to be dumped"
-        if val.dtype == np.object:
+        if val.dtype == getattr(np, 'object'):
             vals = [runner(ite) for ite in val]
             return {TPE: 'npo', CNT: vals}
         return {TPE: 'np'+str(val.dtype), CNT: val.tolist()}
@@ -150,16 +150,14 @@ class Runner:
                 return cls.run(item, self)
 
         dico  = dict()
-        attrs = getattr(item, '__dict__', {}).items()
-        if hasattr(item, '__getstate__'):
-            state = item.__getstate__()
-            if isinstance(state, dict):
-                attrs = state.items()
-            else:
-                attrs = ((STATE, state),)
+        attrs = self.__state(item)
 
         cls = type(item)
         if self.saveall is False:
+            fcn = getattr(item, '__ana_default__', None)
+            if callable(fcn):
+                attrs = fcn(attrs)
+
             for name, val in attrs:
                 if self._isdefault(cls, name, val):
                     continue
@@ -174,6 +172,13 @@ class Runner:
         tpe       = item.__class__
         dico[TPE] = f"{tpe.__module__}.{tpe.__qualname__}"
         return dico
+
+    @staticmethod
+    def __state(item):
+        if hasattr(item, '__getstate__'):
+            state = item.__getstate__()
+            return state.items() if isinstance(state, dict) else ((STATE, state),)
+        return getattr(item, '__dict__', {}).items()
 
     def _isdefault(self, tpe, name, val) -> bool:
         default = getattr(tpe, name, self._Dummy)

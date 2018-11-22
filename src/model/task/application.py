@@ -87,6 +87,16 @@ class TasksConfig(ConfigObject):
     def __getitem__(self, key):
         return getattr(self, InstrumentType(key).name)
 
+    @staticmethod
+    def __config__(cmap):
+        "simplify a config map"
+        for i in {'picotwist', 'sdi'} & set(cmap.maps[0]):
+            left  = cmap.maps[1][i]
+            right = cmap.maps[0][i]
+            for j in set(left) & set(right):
+                if left[j] == right[j]:
+                    right.pop(j)
+
     @property
     def tasks(self) -> Configuration:
         "return the current task list"

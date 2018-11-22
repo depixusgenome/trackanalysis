@@ -22,6 +22,7 @@ class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
     extentphases     = PHASE.initial, PHASE.measure
     pingpongphases   = PHASE.initial, PHASE.measure
     saturationphases = PHASE.initial, PHASE.measure
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -29,6 +30,11 @@ class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
 
     def __eq__(self, other):
         return Task.__eq__(self, other)
+
+    @classmethod
+    def __ana_default__(cls, right):
+        out = cls().__getstate__()
+        return ((i, j) for i, j in right if out[i] != j)
 
     def __getstate__(self):
         state = super().__getstate__()
