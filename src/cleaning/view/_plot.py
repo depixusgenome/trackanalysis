@@ -102,7 +102,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
 
     def __data(self, items, nans) -> Dict[str, np.ndarray]:
         if items is None or len(items) == 0 or not any(len(i) for _, i in items):
-            items = [((0,0), [])]
+            return {i: [] for i in ("t", "z", "cycle", "color")}
 
         order = self._model.cleaning.sorted(self._theme.order)
         size  = max(len(i) for _, i in items)
