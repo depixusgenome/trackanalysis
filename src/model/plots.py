@@ -46,7 +46,7 @@ class PlotTheme:
     xlabel         = 'Frames'
     figsize        = defaultfigsize()
     overshoot      = .001
-    output_backend = 'svg'
+    output_backend = 'canvas'
     toolbar        = dict(sticky   = False,
                           location = 'above',
                           items    = 'xpan,wheel_zoom,box_zoom,save',

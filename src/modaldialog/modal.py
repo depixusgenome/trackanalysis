@@ -100,7 +100,7 @@ class Option(metaclass = ABCMeta):
 
 class ChoiceOption(Option):
     "Converts a text tag to an html check"
-    _PATT = re.compile(r'%\((?P<name>[\w\.\[\]]*)(?P<cols>(?:\|[^:]+\:[^|)]+)*)\)c')
+    _PATT = re.compile(r'%\((?P<name>[\w\.\[\]]*)\)(?P<cols>(?:\|\w+\:[^|{}<>]+)*)\|')
     def converter(self, model, body:str) -> Callable:
         "returns a method which sets values in a model"
         elems = frozenset(i.group('name') for i in self._PATT.finditer(body))

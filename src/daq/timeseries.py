@@ -291,7 +291,7 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
                     info[f'{i}{self._model.display.current}'] = info.pop(i)
             info.pop('time')
             info = {i: j.replace('(','[').replace(')', ']') for i, j in info.items()}
-            opts = "%(leftvar|{})c".format('|'.join(f"{i}:{j}" for i, j in info.items()))
+            opts = "%(leftvar|)|{}|".format('|'.join(f"{i}:{j}" for i, j in info.items()))
             return [['Left y-axis:',  opts]]
 
         def _onclick_cb(attr, old, new):

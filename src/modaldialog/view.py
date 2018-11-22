@@ -322,15 +322,11 @@ class XAxisRangeDescriptor(YAxisRangeDescriptor):
 @dataclass
 class ThemeNameDescriptor(AdvancedDescriptor):
     "defines the theme to use"
-    _LABEL  = ('%({self.attrname}'
-               +'|basic:basic'
-               +'|dark:dark'
-               +'|light_minimal:bokehlight'
-               +'|dark_minimal:bokehdark'
-               +'|caliber:caliber'
-               +'){self.fmt}')
-
-    fmt:      str = "c"
+    fmt:      str = ('|basic:basic'
+                     +'|dark:dark'
+                     +'|light_minimal:bokehlight'
+                     +'|dark_minimal:bokehdark'
+                     +'|caliber:caliber|')
     label:    str = "Plot color theme"
     cnf:      str = "main"
     ctrlname: str = "themename"

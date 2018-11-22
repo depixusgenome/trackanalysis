@@ -91,7 +91,7 @@ class AlignmentModalDescriptor:
     def line(self) -> Tuple[str, str]:
         "return the modal dialog line"
         vals = '|'.join(f'{i}:{j}' for i, j in enumerate(self.__NAMES))
-        return ('Cycle alignment', f' %({self._name}|{vals})c')
+        return ('Cycle alignment', f' %({self._name})|{vals}|')
 
     def getdefault(self,inst)->int:
         "returns default peak finder"
