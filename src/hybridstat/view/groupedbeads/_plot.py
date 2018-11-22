@@ -20,6 +20,7 @@ from .._io                  import setupio
 from ._model                import (GroupedBeadsScatterModel, GroupedBeadsModelAccess,
                                     GroupedBeadsScatterTheme, GroupedBeadsHistModel,
                                     GroupedBeadsHistTheme)
+from ._widget               import GroupedBeadsPlotWidgets
 
 ColumnData = Dict[str, np.ndarray]
 FigData    = Dict[str, ColumnData]
@@ -166,6 +167,7 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
                                        noerase = False,
                                        model   = self._model,
                                        theme   = theme)
+        self._widgets  = GroupedBeadsPlotWidgets(ctrl, self._model)
         self.addto(ctrl)
 
     @property
@@ -176,7 +178,7 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
         "observes the model"
         super().observe(ctrl)
         self._model.setobservers(ctrl)
-        #self._widgets.observe(ctrl)
+        self._widgets.observe(ctrl)
         SequenceAnaIO.observe(ctrl)
 
         @ctrl.display.observe(self._model.sequencemodel.display)
@@ -196,7 +198,15 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
         plots = [getattr(i, '_addtodoc')(ctrl, doc) for i in self._plots]
         loc   = self._ctrl.theme.get(GroupedBeadsScatterTheme, 'toolbar')['location']
         mode  = self.defaultsizingmode()
-        return layouts.gridplot([plots[:1], plots[1:]], **mode, toolbar_location = loc)
+
+        widg  = self._widgets.addtodoc(self, ctrl, doc)
+        order = "discarded", "seq", "oligos", "cstrpath"
+
+        grid       = layouts.GridSpec(2, 3)
+        grid[0,:]  = plots[0]
+        grid[1:,0] = layouts.widgetbox(sum((widg[i] for i in order), []), **mode)
+        grid[1:,1] = plots[1:]
+        return layouts.gridplot(grid, **mode, toolbar_location = loc)
 
     def _reset(self, cache:CACHE_TYPE):
         done = 0
@@ -206,11 +216,10 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
                 done += 1
             finally:
                 pass
-        #  try:
-            #  self._widgets.reset(cache, done != 2)
-            #  done += 1
-        #  finally:
-            #  pass
+        try:
+            self._widgets.reset(cache, done != len(self._plots))
+        finally:
+            pass
 
 class GroupedBeadsPlotView(PlotView[GroupedBeadsPlotCreator]):
     "Peaks plot view"

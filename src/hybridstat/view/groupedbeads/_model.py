@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "See all beads together"
-from typing      import Dict, Optional, List, Tuple, cast
+from typing                 import Dict, Optional, List, Tuple, Set, cast
 import numpy as np
 
-from model.plots        import PlotTheme, PlotModel, PlotDisplay, PlotAttrs
-from utils              import initdefaults
-from .._model           import PeaksPlotModelAccess, PeakSelectorTask, PeaksPlotTheme
-from .._peakinfo        import createpeaks as _createpeaks
+from control.decentralized  import Indirection
+from model.plots            import PlotTheme, PlotModel, PlotDisplay, PlotAttrs
+from utils                  import initdefaults
+from .._model               import PeaksPlotModelAccess, PeakSelectorTask, PeaksPlotTheme
+from .._peakinfo            import createpeaks as _createpeaks
 
 class GroupedBeadsScatterTheme(PlotTheme):
     "grouped beads plot theme"
@@ -66,9 +67,20 @@ class GroupedBeadsHistModel(PlotModel):
     def __init__(self, **_):
         super().__init__()
 
+class GroupedBeadsStore:
+    "info used for grouping beads"
+    def __init__(self):
+        self.name:      str                 = "groupedbeads"
+        self.discarded: Dict[str, Set[int]] = {}
+
 Output = Dict[int, Tuple[List[np.ndarray], Dict[str, np.ndarray]]]
 class GroupedBeadsModelAccess(PeaksPlotModelAccess):
     "task acces to grouped beads"
+    __store = Indirection()
+    def __init__(self, ctrl, addto = False):
+        super().__init__(ctrl, addto = addto)
+        self.__store = GroupedBeadsStore()
+
     def runbead(self) -> Optional[Output]: # type: ignore
         "collects the information already found in different peaks"
         super().runbead()
