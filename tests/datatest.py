@@ -382,13 +382,13 @@ def test_concatenate():
     trk  = concatenatetracks(trk1, trk2)
 
     assert set(trk.data.keys())==(set(trk1.data.keys())|set(trk2.data.keys()))
-    assert all((trk.secondaries.seconds[1:]-trk.secondaries.seconds[:-1])==1)
+    assert all((trk.secondaries.frames[1:]-trk.secondaries.frames[:-1])==1)
     assert all(np.isnan(trk.data[0][-size2:]))
     assert all(~np.isnan(trk.data[0][:size1]))
 
     assert_allclose(trk.phases[:len(trk1.phases)],trk1.phases)
     assert_allclose(trk.phases[len(trk1.phases):],
-                    trk2.phases+trk1.secondaries.seconds[-1]-trk2.secondaries.seconds[0]+1)
+                    trk2.phases+trk1.secondaries.frames[-1]-trk2.secondaries.frames[0]+1)
 
 def test_clone():
     'test whether two Track stack properly'
@@ -412,7 +412,8 @@ def test_clone():
 def test_beadextension():
     "test bead extension"
     trk1 = Track(path = utpath("big_legacy"))
-    assert abs(trk1.beadextension(0) - 0.9456543) < 1e-5
+    assert abs(trk1.beadextension(0) - 0.951788546331226) < 1e-5
 
 if __name__ == '__main__':
+    test_concatenate()
     test_beadextension()

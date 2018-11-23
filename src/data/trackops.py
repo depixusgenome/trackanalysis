@@ -99,14 +99,14 @@ def concatenatetracks(trk:TRACKS, *tracks:TRACKS)-> TRACKS:
     This can be used to resume the recording an interrupted experiment
     """
     def _concatenate(trk1, trk2):
-        shift  = trk1.secondaries.seconds[-1]-trk2.secondaries.seconds[0]+1
+        shift  = trk1.secondaries.frames[-1]-trk2.secondaries.frames[0]+1
         phases = np.vstack([trk1.phases,trk2.phases+shift])
-        time   = np.hstack([trk1.secondaries.seconds,trk2.secondaries.seconds+shift])
+        time   = np.hstack([trk1.secondaries.frames,trk2.secondaries.frames+shift])
         beads  = set(trk1.data.keys()) | set(trk2.data.keys())
 
         values = np.zeros((len(beads),time.size))*np.nan
 
-        sz1    = trk1.secondaries.seconds.size
+        sz1    = trk1.secondaries.frames.size
         for idx,val in enumerate(beads):
             if val in trk1.data.keys():
                 values[idx,:sz1]=trk1.data[val]
