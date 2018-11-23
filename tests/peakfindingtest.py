@@ -102,7 +102,7 @@ def test_randcorrelationalignment():
 
     cstd   = np.array([i.std() for i in cured])
     ostd   = np.array([i.std() for i in orig])
-    assert  all(cstd < ostd/18.)
+    assert  all(cstd < ostd/10.)
 
 def test_histogram():
     "tests histogram creation"
@@ -340,8 +340,8 @@ def test_minbiasalignment():
     for i in range(10):
         stats[:,i]['mean'][:] -= truth[i]
     found = lst[-1](stats)
-    truth = np.array([-0.5248518, -0.42470455, -0.32455826,  0.,  0., 0.,
-                      0.07456262,  0.17470905,  0.27485523,  0.37500241], dtype='f4')
+    truth = np.array([-0.44999883, -0.34998798, -0.24997711,  0., 0., 0.,  0.,
+                      0.24997902,  0.34999132,  0.45000142], dtype='f4')
     assert_allclose(found, truth)
 
 def test_gels():
@@ -373,5 +373,6 @@ def test_gels():
     assert_allclose(found, truth)
 
 if __name__ == '__main__':
-    test_randexpectedvaluealignment()
+    test_correlationalignment()
     test_randcorrelationalignment()
+    test_minbiasalignment()

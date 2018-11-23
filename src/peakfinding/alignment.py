@@ -38,7 +38,7 @@ class PeakCorrelationAlignmentAction:
     def costarray(self, wtab, projector) -> Union[int,np.ndarray]:
         "computes a z-cost array"
         if not self.zcost:
-            return lambda x: (x,)
+            return (lambda x: (x,),)
 
         osamp = projector.exactoversampling
         if wtab.cost[1:] == (self.maxmove, self.zcost, osamp):
