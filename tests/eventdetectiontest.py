@@ -47,33 +47,37 @@ def test_cpp_splits():
     der          = np.array([data[0]-np.mean(data[0:3]),
                              data[0]-np.mean(data[1:4]),
                              (data[0]*2+data[1])/3.-np.mean(data[2:5])]
-                            +[np.mean(data[i-4:i-1])-np.mean(data[i:i+3])
-                              for i in range(3, data.size-3)]
+                            +[np.mean(data[i-3:i])-np.mean(data[i:i+3])
+                              for i in range(3, data.size-2)]
                             +[np.mean(data[-5:-2])-(data[-1]*2+data[-2])/3.,
                               np.mean(data[-4:-1])-data[-1]], dtype = 'f4')
+    der  = np.abs(der)
     der /= np.percentile(der, 75.)+3e-3
     out  = DerivateSplitDetector().grade(data, 3e-3)
-    assert  np.max(np.abs(out-der)) < 2e-5
+    assert  np.max(np.abs(out-der)) < 5e-2
+    assert  np.max(np.abs(out-der/der.max()*out.max())) < 2e-5
 
     gx2  = np.array([np.var(data[max(0,i-2):i+3]) for i in range(data.size)], dtype = 'f4')
     gx2  = np.sqrt(gx2)
     gx2 /= 3e-3 * chi2.ppf(.9, 4)/5
-    out2 = ChiSquareSplitDetector().grade(data, 3e-3)
-    assert_allclose(out2, gx2, rtol = 1e-6, atol = 1e-5)
+    out2 = ChiSquareSplitDetector(gradewindow = 5).grade(data, 3e-3)
+    assert_allclose(out2[2:-2], gx2[2:-2], rtol = 1e-6, atol = 1e-5)
 
     gmu        = np.copy(out)
-    gmu[14:16] = out2[14:16]
-    gmu[42]    = out2[42]
-    gmu[50]    = out2[50]
-    out3       = MultiGradeSplitDetector().grade(data, 3e-3)
+    gmu[13:18] = out2[13:18]
+    gmu[42:44] = out2[42:44]
+    gmu[50:52] = out2[50:52]
+    cnf        = MultiGradeSplitDetector(chisquare = ChiSquareSplitDetector(gradewindow=5),
+                                         minpatchwindow= 3)
+    out3       = cnf.grade(data, 3e-3)
     assert_allclose(out3, gmu)
 
     ints = MultiGradeSplitDetector()(data, 3e-3)
-    assert tuple(tuple(i) for i in ints) == ((0,12), (18, 40), (44,48), (52, 70))
+    assert tuple(tuple(i) for i in ints) == ((0,12), (19, 41), (44,49), (52, 70))
 
     data[1] = data[15] = data[50] = np.NaN
     ints = MultiGradeSplitDetector()(data, 3e-3)
-    assert tuple(tuple(i) for i in ints) == ((0,12), (19, 40), (44,48), (52, 70))
+    assert tuple(tuple(i) for i in ints) == ((0,12), (19, 41), (44,48), (52, 70))
 
 def test_detectsplits():
     "Tests flat stretches detection"
@@ -313,19 +317,19 @@ def test_select():
     "Tests flat stretches filtering"
     det   = lambda  i, j, k: tuple(tuple(_)
                                    for _ in EventSelector(edgelength = i, minlength = j)
-                                   (np.ones(100), np.array(k)))
+                                   (np.ones(100, dtype ='f4'), np.array(k, dtype = 'i4')))
     assert det(0, 0, ((0,0),(1,1)))                 == ((0,0), (1,1))
     assert det(0, 5, ((0,0),(1,1),(5,10)))          == ((5,10),)
     assert det(1, 5, ((0,0),(1,1),(5,10), (20,30))) == ((21,29),)
 
     fcn         = EventSelector(edgelength = 0, minlength = 5)
-    data        = np.ones(50)
+    data        = np.ones(50, dtype = 'f4')
     data[:5]    = np.NaN
     data[10:15] = np.NaN
     data[:5]    = np.NaN
     data[19:20] = np.NaN
 
-    val = fcn(data, np.array(((0,15), (10, 20))))
+    val = fcn(data, np.array(((0,15), (10, 20)), dtype = 'i4'))
     assert [tuple(i) for i in val] == [(0, 15)]
 
 def test_minmaxalign():
@@ -477,4 +481,5 @@ def test_dataframe():
     assert 'avg'   in data
 
 if __name__ == '__main__':
-    test_cpp_splits()
+    test_select()
+    test_minmaxprocessor()

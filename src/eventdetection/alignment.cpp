@@ -7,15 +7,18 @@ namespace eventdetection { namespace alignment {
 namespace {
     using namespace signalfilter::stats;
 
-    template <typename T>
-    info_t _ebincompute(size_t binsize, DataInfo const & data, T && fcn)
+    info_t _ebincompute(size_t binsize, DataInfo const & data, bool ismin)
     {
         info_t out(data.ncycles);
+        auto thr = (ismin ? 1.0f: -1.0f)* std::numeric_limits<float>::max();
+        auto fcn =  ismin ?
+                    [](float a, float b) { return a < b ? a : b; }
+                   :[](float a, float b) { return a < b ? b : a; };
         for(size_t i = 0; i < data.ncycles; ++i)
         {
             auto j    = size_t(data.first[i]), e = size_t(data.last[i]);
             auto ptr  = data.data+j;
-            auto minv = std::numeric_limits<float>::max();
+            auto minv = thr;
             for(; j+binsize < e; j += binsize, ptr += binsize)
                 minv = fcn(minv, nanmedian(std::vector<float>(ptr, ptr+binsize)));
             if(j < e)
@@ -45,12 +48,8 @@ info_t ExtremumAlignment::compute(DataInfo const && data) const
                         [](float const * a, float const *b)
                         { return signalfilter::stats::nanmedian(a, b); });
     else if(binsize >= 2)
-    {
-        if(mode == ExtremumAlignment::min)
-            out = _ebincompute(binsize, data, [](float a, float b) { return a < b ? a : b; });
-        else
-            out = _ebincompute(binsize, data, [](float a, float b) { return a < b ? b : a; });
-    } else if(mode == ExtremumAlignment::min)
+        out = _ebincompute(binsize, data, mode == ExtremumAlignment::min);
+    else if(mode == ExtremumAlignment::min)
         out = _ecompute(data,
                         [](float const * a, float const *b)
                         { return std::min_element(a, b)[0]; });

@@ -320,7 +320,7 @@ void EventSelector::run(float const *data,  ints_t & intervals) const
         size_t i2 = intervals[i].second;
         while(i1+minl <= i2 && !std::isfinite(data[i1]))
             ++i1;
-        while(i1+minl <= i2 && !std::isfinite(data[i2]))
+        while(i1+minl <= i2 && !std::isfinite(data[i2-1]))
             --i2;
         if(i2 < minl+i1)
             continue;
@@ -328,5 +328,6 @@ void EventSelector::run(float const *data,  ints_t & intervals) const
         intervals[j] = {intervals[i].first+elen, intervals[i].second-elen};
         ++j;
     }
+    intervals.resize(j);
 }
 }}
