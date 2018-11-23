@@ -53,9 +53,12 @@ def test_hfsigma():
 def test_nancount():
     u"Tests ForwardBackwardFilter, NonLinearFilter"
     arr = np.arange(10)*1.
-    assert_allclose(nancount(arr, 1), np.zeros(10, dtype = 'i4'))
-    assert_allclose(nancount(arr, 2), np.zeros(10, dtype = 'i4'))
-    assert_allclose(nancount(arr, 3), np.zeros(10, dtype = 'i4'))
+    out = np.zeros(10, dtype = 'i4')
+    assert_allclose(nancount(arr, 1), out)
+    out[-1] = 1
+    assert_allclose(nancount(arr, 2), out)
+    out[-2:] += 1
+    assert_allclose(nancount(arr, 3), out)
 
     assert_allclose(nanthreshold(arr, 1, 1), np.zeros(10, dtype = 'bool'))
     assert_allclose(nanthreshold(arr, 2, 1), np.zeros(10, dtype = 'bool'))
