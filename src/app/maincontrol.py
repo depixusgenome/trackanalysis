@@ -21,9 +21,13 @@ from   .scripting              import orders
 class DisplayController(DecentralizedController):
     "All temporary information related to one application run"
     CATCHERROR = True
+    def __repr__(self):
+        return "DisplayControl"
 
 class ThemeController(DecentralizedController):
     "All static information that should remain from application run to application run"
+    def __repr__(self):
+        return "ThemeControl"
 
 class BaseSuperController:
     """

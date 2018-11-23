@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Decentralized controller"
 import pickle
+from  functools         import partial
 from  collections       import ChainMap
 from  contextlib        import contextmanager
 from  copy              import deepcopy, copy
@@ -348,13 +349,10 @@ class DecentralizedController(Controller):
                         out)
         return out
 
-    def __undo__(self, wrapper):
+    def __undos__(self, wrapper):
         @wrapper
         def _undo_method(control = None, model = None, old = None, **_):
-            assert control.model(model, True) is model or control.model(model) is model
-            control.update(model, defaults = control.model(model) is model, **old)
+            dflt = control.model(model, True) is model
+            return partial(control.update, model, dflt, **old)
 
-        easy = set(i for i, j in self._objects.items() if not hasattr(j, '__undo__'))
-        self.observe(*easy, _undo_method)
-        for i in set(self._objects) - easy:
-            self._objects[i].__undo__(wrapper)
+        self.observe(*self._objects.keys(), _undo_method)

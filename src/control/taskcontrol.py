@@ -162,6 +162,9 @@ class BaseTaskController(Controller):
         self._openers = kwargs.get("openers", None)
         self._savers  = kwargs.get("savers",  None)
 
+    def __repr__(self):
+        return "TaskControl"
+
     @property
     def tasks(self):
         "return self"

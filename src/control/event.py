@@ -51,17 +51,22 @@ class EmitPolicy(Enum):
         if   self is self.outasdict:
             dargs = cast(Dict, args)
             for hdl in allfcns:
+                LOGS.debug("observer %s", hdl)
                 hdl(**dargs, calllater = calllater)
         elif self is self.outastuple:
             for hdl in allfcns:
+                LOGS.debug("observer %s", hdl)
                 hdl(*args, calllater = calllater)
         elif self is self.nothing:
             for hdl in allfcns:
+                LOGS.debug("observer %s", hdl)
                 hdl(calllater = calllater)
         else:
             for hdl in allfcns:
+                LOGS.debug("observer %s", hdl)
                 hdl(*args[0], **args[1], calllater = calllater)
         for i in calllater:
+            LOGS.debug("callater %s", i)
             i()
 
 _CNT = 0
@@ -122,9 +127,9 @@ class Event:
             global _CNT # pylint: disable=global-statement
             _CNT += 1
             policy = EmitPolicy.get(cast(EmitPolicy, policy), args)
-            LOGS.debug("[%d] Handling %s", _CNT, lst)
+            LOGS.debug("[%d] Handling %s (%s)", _CNT, lst, self)
             policy.run(allfcns, args)
-            LOGS.debug("[%d] Handled", _CNT)
+            LOGS.debug("[%d] Handled %s (%s)", _CNT, lst, self)
         return args
 
     def emit(self, *names, returns = EmitPolicy.annotations):
