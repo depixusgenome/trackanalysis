@@ -298,24 +298,25 @@ def test_cleaning_localpop():
 
 def test_subtract(monkeypatch):
     "tests subtractions"
-    import cleaning.beadsubtraction as C
+    import cleaning.processor._beadsubtraction as C
     monkeypatch.setattr(C, '_cleaningcst', lambda *x: None)
 
     agg = SubtractAverageSignal.apply
-    assert_allclose(agg([np.arange(5)]),             np.arange(5))
-    assert_allclose(agg([np.arange(5)]*5),           np.arange(5))
-    assert_allclose(agg([np.arange(5), np.ones(5)]), np.arange(5)*.5+.5)
-    assert_allclose(agg([np.arange(6), np.ones(5)]), list(np.arange(5)*.5+.5)+[5])
+    _   = dict(dtype = 'f4')
+    assert_allclose(agg([np.arange(5, **_)]),             np.arange(5, **_))
+    assert_allclose(agg([np.arange(5, **_)]*5),           np.arange(5, **_))
+    assert_allclose(agg([np.arange(5, **_), np.ones(5, **_)]), np.arange(5, **_)*.5+.5)
+    assert_allclose(agg([np.arange(6, **_), np.ones(5, **_)]), list(np.arange(5, **_)*.5+.5)+[5])
 
-    tmp = Beads(data = {0: np.arange(5), 1: np.ones(5),
-                        2: np.zeros(5),  3: np.arange(5)*1.})
+    tmp = Beads(data = {0: np.arange(5, **_), 1: np.ones(5, **_),
+                        2: np.zeros(5, **_),  3: np.arange(5, **_)*1.})
     cache: dict = {}
     frame = BeadSubtractionProcessor.apply(tmp, cache,
                                            beads = [0, 1],
                                            agg   = SubtractAverageSignal())
     assert set(frame.keys()) == {2, 3}
-    assert_allclose(frame[2], -.5*np.arange(5)-.5)
-    assert_allclose(cache[None],  .5*np.arange(5)+.5)
+    assert_allclose(frame[2], -.5*np.arange(5, **_)-.5)
+    assert_allclose(cache[None],  .5*np.arange(5, **_)+.5)
 
     ca0 = cache[None]
     res = frame[3]
@@ -324,11 +325,12 @@ def test_subtract(monkeypatch):
 
 def test_subtract_med():
     "tests subtractions"
+    _    = dict(dtype = 'f4')
     agg  = lambda x: SubtractMedianSignal.apply([i.astype('f4') for i in x], (0,5))
-    assert_allclose(agg([np.arange(5)]*5),           np.arange(5))
-    assert_allclose(agg([np.arange(5), np.ones(5)]), np.arange(5)*.5+.5)
-    assert_allclose(agg([np.arange(5)]+[np.ones(5)]*2), np.ones(5))
-    assert_allclose(agg([np.arange(6), np.ones(5)]), list(np.arange(5)*.5+.5)+[4.5])
+    assert_allclose(agg([np.arange(5, **_)]*5),           np.arange(5, **_))
+    assert_allclose(agg([np.arange(5, **_), np.ones(5, **_)]), np.arange(5, **_)*.5+.5)
+    assert_allclose(agg([np.arange(5, **_)]+[np.ones(5, **_)]*2), np.ones(5, **_))
+    assert_allclose(agg([np.arange(6, **_), np.ones(5, **_)]), list(np.arange(5, **_)*.5+.5)+[4.5])
 
     tsk             = BeadSubtractionTask(beads = [1,2,3,4])
     tsk.agg.average = True
@@ -385,8 +387,10 @@ def test_view(bokehaction):
         server.change('Cleaning:Filter', 'subtracted', "11,30")
         server.wait()
 
-def test_fixedbeadsorting():
+def test_fixedbeadsorting(monkeypatch):
     "test fixed bead detection"
+    import cleaning.beadsubtraction as B
+    monkeypatch.setattr(B, 'BeadSubtractionTask', BeadSubtractionTask)
     beads  = next(iter(create(TrackReaderTask(path = utpath("fixedbeads.pk"))).run()))
     lst    = FixedBeadDetection()(beads)
     assert len(lst) == 1

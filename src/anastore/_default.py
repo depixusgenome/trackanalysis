@@ -35,6 +35,8 @@ def _v3(data:dict) -> dict:
     return data
 
 def _v4tasks(data:dict) -> dict:
+    if isinstance(data, list):
+        data = {'tasks': [data]}
     cnf = data.get("config", ())
     for  i, j in (("probes", "tasks.oligos"), ("path", "tasks.sequence.path")):
         if j in cnf:
