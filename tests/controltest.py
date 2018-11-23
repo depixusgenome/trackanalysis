@@ -50,28 +50,29 @@ def test_evt():
 
     hdls = [] # type: ignore
 
+    # pylint: disable=unused-argument
     class _Obs:
         @staticmethod
         @events.observe
-        def onevent1(*args, **kwargs):
+        def onevent1(*args, calllater = None, **kwargs):
             assert (args, kwargs) == hdls[-1]
 
         @events.observe
         @staticmethod
-        def onevent2(**kwargs):
+        def onevent2(calllater = None, **kwargs):
             assert kwargs == dict(name = 'e2')
 
         @events.observe('event3')
         @staticmethod
-        def onevent3(arg, **_):
+        def onevent3(arg, calllater = None):
             assert arg == 'e3'
 
     got = []
-    def _got(*args, **kwargs):
+    def _got(*args, calllater = None, **kwargs):
         got.append((args, kwargs))
     events.observe('event4', 'event6', _got)
 
-    def onevent5(*args, **kwargs):
+    def onevent5(*args, calllater = None, **kwargs):
         assert (args, kwargs) == hdls[-1]
 
     events.observe(onevent5)
@@ -537,4 +538,5 @@ def test_decentralized():
     _test(Tata(aval = 2, bval = ""))
 
 if __name__ == '__main__':
-    test_decentralized()
+    test_evt()
+    test_task_expandandcollapse()

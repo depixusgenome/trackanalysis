@@ -474,7 +474,7 @@ class Track:
     def __setstate__(self, values):
         if isinstance(values.get('fov', None), dict):
             fov           = values['fov']
-            fov["beads"]  = {i: Bead(**j) for i, j in fov['beads'].items()}
+            fov["beads"]  = {i: Bead(**j) for i, j in fov.get('beads', {}).items()}
             values['fov'] = FoV(**fov)
 
         if isinstance(values.get('instrument', {}).get("type", None), str):
