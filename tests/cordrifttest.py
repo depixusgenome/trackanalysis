@@ -234,8 +234,6 @@ def _run(coll, stitch, brown):
     task   = DriftProcessor.newtask(filter   = None, precision = 8e-3,
                                     collapse = coll(),
                                     stitch   = stitch())
-    task.events.split.confidence = None
-    task.events.merge.confidence = None
     prof = DriftProcessor.profile(frame, task)
     med  = np.median(prof.value[-task.zero:])
 
@@ -346,4 +344,4 @@ def test_cycleprocess_emptycycles():
     assert ret is not None # check that computations don't crash
 
 if __name__ == '__main__':
-    test_cycleprocess_emptycycles()
+    test_cycleprocess_withalignment()

@@ -103,7 +103,7 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
             self.info  = info
             self.bead  = self.info[1]
             if self.frame.cycles and self.frame.cycles.stop < self.frame.track.ncycles:
-                self.bead = self.bead[:self.frame.track.select(self.frame.cycles.stop, 0)]
+                self.bead = self.bead[:self.frame.track.phase.select(self.frame.cycles.stop, 0)]
 
         def phase(self, phase):
             "return the phases"
