@@ -139,7 +139,7 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
             data = self._fixedbeadsstore.data
             if task in data:
                 info = dict(data)
-                info.pop(task)
+                info.pop(task, None)
                 self._fixedbeadsstore = {'data': info}
 
         @ctrl.theme.observe(self._fixedbeadsconfig)

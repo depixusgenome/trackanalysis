@@ -90,7 +90,7 @@ class RawMixin(ABC):
         self._raw = self.figure(y_range = Range1d,
                                 tools   = self._theme.toolbar['raw'],
                                 name    = 'Cycles:Raw')
-        raw, shape      = self.__data()
+        raw, shape      = self._DEFAULT_DATA
         self._rawsource = ColumnDataSource(data = raw)
 
         self.attrs(self._theme.raw).addto(self._raw, x = 't', y = 'z', source = self._rawsource)

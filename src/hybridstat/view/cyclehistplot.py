@@ -147,7 +147,7 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
         self._errors(cache, _data, _display)
 
     def __setbounds(self, cache, data):
-        if not (self._theme.phasezoom and self._theme.phasezoom[0]):
+        if not (self._theme.phasezoom and self._theme.phasezoom[0] and len(data['z']) > 0):
             self.setbounds(cache, self._fig, data['t'], data['z'])
             return
 
