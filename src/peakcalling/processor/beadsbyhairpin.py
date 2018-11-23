@@ -45,7 +45,7 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
         if pool is None:
             app = partial(cls._unpooled, cnf)
         else:
-            app = partial(cls._pooled, pool, pooldump(data.append(cls.CHILD(cnf))))
+            app = partial(cls._pooled, pool, pooldump(data.append(cls.CHILD(cnf))), cnf)
 
         return partial(cls._apply, app) if toframe is None else cls._apply(app, toframe)
 
@@ -66,16 +66,19 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
                                       match       = match))
         fcn = partial(cls.CHILD.compute, **cnf)
         itr = cast(Iterator[PeakEventsTuple], frame)
-        yield from cls.__output(dict(fcn(i) for i in itr))
+        yield from cls.__output(dict(fcn(i) for i in itr), cnf.get('constraints', {}))
 
     @classmethod
-    def __output(cls, out) -> Iterator[ByHairpinGroup]:
+    def __output(cls, out, cstrs) -> Iterator[ByHairpinGroup]:
         dflt = BeadsByHairpinTask.DEFAULT_FIT().defaultparameters()
         one  = lambda i, j: ByHairpinBead(i[0], i[1], i[2].get(j, dflt), i[3], i[4])
         best = {itm.key: min(itm.distances, key = itm.distances.__getitem__, default = '✗')
                 for itm in out.values()}
         for i, j  in best.items():
-            if out[i].distances[j][0] == DEFAULT_BEST:
+            if getattr(cstrs.get(i, None), 'hairpin', None) == j:
+                # if it's a constraint, keep the user's choice
+                continue
+            if out[i].distances[j][0] == DEFAULT_BEST :
                 best[i] = '✗'
         for hpname in sorted(set(best.values()), key = lambda x: x or chr(255)):
             vals = [one(val, hpname) for key, val in out.items() if best[key] == hpname]
@@ -89,7 +92,8 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
         return []
 
     @classmethod
-    def _pooled(cls, pool, pickled, frame):
-        out        = cls.__output(pooledinput(pool, pickled, frame.data))
+    def _pooled(cls, pool, pickled, frame, cnf):
+        out        = cls.__output(pooledinput(pool, pickled, frame.data),
+                                  cnf.get('constraints', {}))
         frame.data = {i.key: i for i in out}
         return []

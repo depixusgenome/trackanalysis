@@ -98,7 +98,7 @@ class ChiSquare: # pylint: disable=too-many-instance-attributes
 
     def __value(self, pairs, stretch, bias) -> Tuple[float, float, float]:
         exp, ref = self.exp, self.ref
-        if len(exp) == 0 or len(ref) == 0:
+        if len(exp) == 0 or len(ref) == 0 or len(pairs) == 0:
             return DEFAULT_BEST, stretch, bias
 
         dist     = 0.

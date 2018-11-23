@@ -283,4 +283,4 @@ def test_peakiterator():
     assert_allclose([i for _, i in vals], [0., 1./3.], rtol = 1e-3)
 
 if __name__ == '__main__':
-    test_toref()
+    test_constrainedhairpincost()
