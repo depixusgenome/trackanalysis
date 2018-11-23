@@ -61,7 +61,9 @@ def test_emstep():
     rates,params  = EMFITTER.cfit(DATA,rates,params,EMFITTER.emiter,tol=1e-4)
     assert_allclose(params,np.array([[6.099034e-02,1.401e-06,0.,3.75365918e+01],
                                      [7.441417e-02,1.00e-06,0.,1.15579996e+02]]),
-                    rtol=1e-4)
+                    rtol=1e-4, atol = 1e-6)
     # ratio of events assigned to each of the 2 peaks
     assert_allclose(rates,np.array([[0.45054946],
                                     [0.54945054]]))
+if __name__ == '__main__':
+    test_emstep()
