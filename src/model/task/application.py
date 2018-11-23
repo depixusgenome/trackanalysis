@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Deals with global information"
+from enum               import Enum
 from typing             import (Dict, Optional, List, Iterator, Type, Iterable,
                                 Callable, Any, ClassVar, TYPE_CHECKING, cast)
 from copy               import deepcopy
@@ -22,42 +23,42 @@ Configurations = Dict[str, Configuration]
 
 class ConfigurationDescriptor:
     """ configurations """
-    defaults: ClassVar[Configurations] = {i: {} for i in InstrumentType.__members__}
-    _name: str
+    _Type: ClassVar[Type[Enum]] = InstrumentType
+    _instr: str
     def __set_name__(self, _, name):
-        self._name = InstrumentType(name).name
+        self._instr = self._Type(name)
 
     def __get__(self, inst, owner):
-        return (self.defaults if inst is None else inst.__dict__)[self._name]
+        if inst is None:
+            return {i:j for i, j in self._instr.__dict__.items() if i[0] != '_'}
+        return inst.__dict__[self._instr.name]
 
     def __set__(self, inst, val):
-        good = {i: deepcopy(val[i] if i in val else j)
-                for i, j in self.defaults[self._name].items()}
-        good.update({i: j for i, j in val.items() if i not in good})
-        inst.__dict__[self._name] = good
+        good = dict(val)
+        good.update({i: deepcopy(j)
+                     for i, j in self.__get__(None, None).items()
+                     if i not in good})
+        inst.__dict__[self._instr.name] = good
         return good
 
     @classmethod
     def setupdefaulttask(cls, tasktype: Type[Task], name: str = '', **kwa) -> str:
         "add task to the instruments"
-        instruments = {i: kwa.pop(i) for i in set(cls.defaults) & set(kwa)}
-        if not name:
-            name = tasktype.__name__.lower()[:-len('Task')]
+        instruments = {cls._Type(i): kwa.pop(i) for i in set(cls._Type.__members__) & set(kwa)}
+        name        = name if name else tasktype.__name__.lower()[:-len('Task')]
 
-        for instr, cnf in cls.defaults.items():
-            cur = dict(kwa)
-            cur.update(instruments.get(instr, {}))
-            itm = tasktype(**cur)
-            assert itm == cnf.get(name, itm)
-            cnf[name] = itm
+        for instr in cls._Type.__members__.values():
+            itm = tasktype(**dict(kwa, **instruments.get(instr, {})))
+            assert itm == getattr(instr, name, itm)
+            setattr(instr, name, itm)
         return name
 
     @classmethod
     def defaulttaskname(cls, name:str, tasktype: Type[Task]):
         "verify that a task default has been defined"
         name = name if name else tasktype.__name__.lower()[:-len('Task')]
-        for i in cls.defaults.values():
-            assert isinstance(i.get(name, None), tasktype)
+        for i in cls._Type.__members__.values():
+            assert isinstance(getattr(i, name, None), tasktype)
         return name
 
 class InstrumentDescriptor:
@@ -91,11 +92,8 @@ class TasksConfig(ConfigObject):
     def __config__(cmap):
         "simplify a config map"
         for i in {'picotwist', 'sdi'} & set(cmap.maps[0]):
-            left  = cmap.maps[1][i]
-            right = cmap.maps[0][i]
-            for j in set(left) & set(right):
-                if left[j] == right[j]:
-                    right.pop(j)
+            left         = cmap.maps[1][i]
+            cmap.maps[0] = {j: k for j, k in cmap.maps[0][i].items() if left[j] != k}
 
     @property
     def tasks(self) -> Configuration:

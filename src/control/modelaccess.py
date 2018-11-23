@@ -163,28 +163,24 @@ class TaskAccess(TaskPlotModelAccess):
     @property
     def defaultconfigtask(self) -> Task:
         "returns the config task"
-        return (self._ctrl.theme.get("tasks", self.instrument, {}, True)
-                .get(self.configname, None))
+        mdl = self._ctrl.theme.get("tasks", self.instrument, defaultmodel = True)
+        return mdl[self.configname]
 
     @property
     def configtask(self) -> Task:
         "returns the config task"
-        return self._tasksconfig[self.instrument][self.configname]
+        return self._ctrl.theme.get("tasks", self.instrument)[self.configname]
 
     @configtask.setter
     def configtask(self, values: Union[Task, Dict[str,Task]]):
         "returns the config task"
-        instr = self.instrument
-
-        task  = self._tasksconfig[instr][self.configname]
-        kwa   = diffobj(task, values) if isinstance(values, Task) else values
-        kwa   = self._configattributes(kwa)
-        if not kwa:
-            return
-
-        cnf = dict(self._ctrl.theme.get("tasks", instr, {}))
-        cnf[self.configname] = self.__deepcopy(cnf[self.configname], kwa)
-        self._ctrl.theme.update("tasks", **{instr: cnf})
+        kwa = diffobj(self.configtask, values) if isinstance(values, Task) else values
+        kwa = self._configattributes(kwa)
+        if kwa:
+            instr                = self.instrument
+            cnf                  = dict(self._ctrl.theme.get("tasks", instr))
+            cnf[self.configname] = self.__deepcopy(cnf[self.configname], kwa)
+            self._ctrl.theme.update("tasks", **{instr: cnf})
 
     @property
     def task(self) -> Optional[Task]:
