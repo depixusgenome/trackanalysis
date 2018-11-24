@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "The basic architecture"
-from    typing                  import (Tuple, Optional, Type, Sequence, Union, Any,
-                                        Generic, Dict, TypeVar, List, Iterable, cast)
+from    typing                  import (Tuple, Optional, Type, Union, Any, Generic,
+                                        Dict, TypeVar, List, Iterable, cast)
 from    collections             import OrderedDict
 from    abc                     import abstractmethod
 from    contextlib              import contextmanager
@@ -593,17 +593,11 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
     def ismain(self, _):
         "Set-up things if this view is the main one"
 
-    def reset(self, items:Union[bool, Dict[str,Any]]):
+    def reset(self, items:bool):
         "Updates the data"
-        if isinstance(items, bool):
-            if items:
-                self._model.clear()
-
-        elif not self._CLEAR.isdisjoint(cast(Sequence, items)):
+        assert items in (True, False, None)
+        if items:
             self._model.clear()
-
-        elif self._RESET.isdisjoint(cast(Sequence, items)):
-            return
 
         state = self.state
         if   state is PlotState.disabled:
