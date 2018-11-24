@@ -5,6 +5,7 @@ import sys
 from itertools          import repeat
 from pathlib            import Path
 from typing             import List, Optional, Callable, Dict, Tuple
+from subprocess         import run as _run, DEVNULL, PIPE
 from tkinter            import Tk as _Tk
 from tkinter.filedialog import (askopenfilename   as _tkopen,
                                 asksaveasfilename as _tksave)
@@ -108,10 +109,9 @@ class BaseFileDialog:
             if sys.platform.startswith("win"):
                 cls._HAS_ZENITY = False
             else:
-                from subprocess import run, DEVNULL
-                cls._HAS_ZENITY = run([b'zenity', b'--version'],
-                                      stderr = DEVNULL,
-                                      stdout = DEVNULL).returncode == 0
+                cls._HAS_ZENITY = _run([b'zenity', b'--version'],
+                                       stderr = DEVNULL,
+                                       stdout = DEVNULL).returncode == 0
         return cls._HAS_ZENITY
 
     @staticmethod
@@ -133,8 +133,7 @@ class BaseFileDialog:
             lst = (f'{i[0]}(*{i[1]})|*{i[1]}' for i in info.get('filetypes', ()))
             cmd.extend(sum(zip(repeat('--file-filter'), lst), ()))
 
-        from subprocess import run, DEVNULL, PIPE
-        out = run(cmd, stderr = DEVNULL, stdout=PIPE)
+        out = _run(cmd, stderr = DEVNULL, stdout=PIPE)
         if out.returncode != 0:
             return None
         if info.get('multiple', False):

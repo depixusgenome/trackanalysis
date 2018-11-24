@@ -278,7 +278,7 @@ class _ManagedServerLoop:
 
         self.cmd(_quit, andstop = False)
 
-    def load(self, path: Union[Sequence[str], str], andpress = False, rendered = True, **kwa):
+    def load(self, path: Union[Sequence[str], str], andpress = True, rendered = True, **kwa):
         "loads a path"
         import view.dialog  # pylint: disable=import-error
         if rendered is True:
@@ -288,6 +288,7 @@ class _ManagedServerLoop:
         def _tkopen(*_1, **_2):
             return self.path(path)
         self.monkeypatch.setattr(view.dialog, '_tkopen', _tkopen)
+        self.monkeypatch.setattr(view.dialog.BaseFileDialog, '_HAS_ZENITY', False)
         if andpress:
             self.press('Control-o', **kwa)
 

@@ -5,6 +5,12 @@ import {DOMView}        from "core/dom_view"
 export class DpxTestLoadedView extends DOMView
     className: "dpx-test"
 
+    connect_signals: () ->
+        super()
+        console.log("DpxTestLoadedView connect_signals")
+        @connect(@model.properties.event_cnt.change, () => @model._press())
+        @connect(@model.properties.value_cnt.change, () => @model._change())
+
 export class DpxTestLoaded extends Model
     default_view: DpxTestLoadedView
     type: "DpxTestLoaded"
@@ -22,12 +28,6 @@ export class DpxTestLoaded extends Model
 
         oldwarn      = console.warn
         console.warn = () -> self._tostr(oldwarn, 'warn', arguments)
-
-    connect_signals: () ->
-        super()
-        console.log("DpxTestLoadedView connect_signals")
-        @connect(@properties.event_cnt.change, @_press)
-        @connect(@properties.value_cnt.change, @_change)
 
     _tostr: (old, name, args) ->
         old.apply(console, args)
