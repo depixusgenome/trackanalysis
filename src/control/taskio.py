@@ -6,6 +6,8 @@ from pathlib            import Path
 from itertools          import chain
 from copy               import deepcopy
 from model.task         import TrackReaderTask
+from model.task.application import TasksConfig, TasksDisplay, TaskIOTheme
+from control.decentralized  import Indirection
 from data.trackio       import instrumenttype
 from data.tracksdict    import TracksDict
 from utils.logconfig    import getLogger
@@ -61,9 +63,13 @@ class TrackIO(TaskIO):
 
 class ConfigTrackIO(TrackIO):
     "Adds an alignment to the tracks per default"
+    _config = Indirection()
+    _io     = Indirection()
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
-        self._ctrl = ctrl
+        self._ctrl   = ctrl
+        self._config = TasksConfig()
+        self._io     = TaskIOTheme()
 
     def open(self, path:OPEN_T, model:tuple):
         "opens a track file and adds a alignment"
@@ -74,9 +80,9 @@ class ConfigTrackIO(TrackIO):
         items = [tmp[0][0]]
         instr = instrumenttype(items[0])
         if instr is None:
-            instr = self._ctrl.theme.get("tasks", "instrument")
-        cnf = self._ctrl.theme.get("tasks", instr)
-        for name in self._ctrl.theme.get("tasks.io", "tasks"):
+            instr = self._config.instrument
+        cnf = self._config[instr]
+        for name in self._io.tasks:
             task  = cnf.get(name, None)
             if not getattr(task, 'disabled', True):
                 items.append(deepcopy(task))
@@ -86,8 +92,10 @@ class _GrFilesIOMixin:
     "Adds an alignment to the tracks per default"
     EXT: Tuple[str, ...] = TrackIO.EXT+('gr',)
     CGR                  = '.cgr'
+    _display             = Indirection()
     def __init__(self, ctrl):
-        self._ctrl = ctrl
+        self._ctrl    = ctrl
+        self._display = TasksDisplay()
 
     def _open(self, path:OPEN_T, _):
         "opens a track file and adds a alignment"
@@ -108,7 +116,7 @@ class _GrFilesIOMixin:
             return None
 
         if len(trks) == 0:
-            track = self._ctrl.display.get("tasks", "roottask")
+            track = self._display.roottask
             if track is None:
                 raise IOError(u"IOError: start by opening a track file!", "warning")
             trks = topath(getattr(track, 'path'))
@@ -144,7 +152,7 @@ class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
         if mdls is None:
             return None
 
-        task = type(self._ctrl.theme.get("tasks", "tasks").get("extremumalignment", None))
+        task = type(self._config.tasks['extremumalignment'])
         ret  = []
         for mdl in mdls:
             ret.append(tuple(i for i in mdl if not isinstance(i, task)))
