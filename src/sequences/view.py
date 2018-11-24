@@ -156,7 +156,7 @@ class SequenceHoverMixin:
 
     def create(self, fig, mdl, xrng = None):
         "Creates the hover tool for histograms"
-        self.update(framerate = 1./30.,
+        self.update(framerate = 30.,
                     bias      = mdl.bias if mdl.bias is not None else 0.,
                     stretch   = mdl.stretch)
 
@@ -189,7 +189,7 @@ class SequenceHoverMixin:
 
         data = self.__data()
         resets[self.__source].update(data = data)
-        kwa.setdefault('framerate', getattr(self._model.track, 'framerate', 1./30.))
+        kwa.setdefault('framerate', getattr(self._model.track, 'framerate', 30.))
         kwa.setdefault('bias',      self._model.bias)
         kwa.setdefault('stretch',   self._model.stretch)
         resets[self].update(**kwa)

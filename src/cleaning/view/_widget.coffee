@@ -108,8 +108,10 @@ export class DpxCleaning extends Widget
     onchangebounds: () ->
         trng       = @figure.extra_x_ranges['time']
         xrng       = @figure.x_range
-        trng.start = xrng.start/@framerate
-        trng.end   = xrng.end  /@framerate
+        trng.reset_start = xrng.reset_start/@framerate
+        trng.reset_end   = xrng.reset_end/@framerate
+        trng.start       = xrng.start/@framerate
+        trng.end         = xrng.end  /@framerate
 
     @define {
         frozen: [p.Bool, true],

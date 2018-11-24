@@ -66,9 +66,8 @@
             cycles.end = Math.max.apply(Math, src.data['cycles'][ind1..ind2])+1
 
     on_change_raw_bounds: (frng, trng) ->
-        if trng.reset_start? && trng.bounds != null
-            trng.reset_start = trng.bounds[0]
-            trng.reset_end   = trng.bounds[1]
+        trng.reset_start = frng.reset_start/@framerate
+        trng.reset_end   = frng.reset_end/@framerate
         trng.start = frng.start/@framerate
         trng.end   = frng.end  /@framerate
 
