@@ -226,6 +226,17 @@ class CleaningFilterWidget:
 
         return [self.__widget]
 
+    @property
+    def __fixedbeads(self):
+        return intlistsummary([i[-1] for i in self.__model.availablefixedbeads], False)
+
+    def observe(self, ctrl):
+        "observe the controller"
+        @ctrl.display.observe
+        def _onfixedbeads(**_):
+            if ctrl.display.model("cleaning").isactive():
+                self.__widget.fixedbeads = self.__fixedbeads
+
     def reset(self, resets:CACHE_TYPE):
         "resets the widget when opening a new file, ..."
         mdl  = self.__model
@@ -233,11 +244,12 @@ class CleaningFilterWidget:
         if task is None:
             task = mdl.cleaning.configtask
 
-        info = {i: np.around(getattr(task, i), j) for i, j in self.RND.items()}
-        info['framerate'] = getattr(mdl.track, 'framerate', 1./30.)
-        info['subtracted']= ', '.join(str(i) for i in sorted(mdl.subtracted.beads))
-        info['fixedbeads']= intlistsummary([i[-1] for i in mdl.availablefixedbeads],
-                                           False)
+        info = dict(
+            ((i, np.around(getattr(task, i), j)) for i, j in self.RND.items()),
+            framerate  = getattr(mdl.track, 'framerate', 1./30.),
+            subtracted = ', '.join(str(i) for i in sorted(mdl.subtracted.beads)),
+            fixedbeads = self.__fixedbeads
+        )
 
         (self.__widget if resets is None else resets[self.__widget]).update(**info)
 

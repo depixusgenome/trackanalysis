@@ -5,9 +5,6 @@ import {WidgetView, Widget} from "models/widgets/widget"
 export class DpxCleaningView extends WidgetView
     tagName: "div"
 
-    on_change_fixebeads: () ->
-        $(@el).find('#dpx-cl-fixed').html(@model.fixedbeads)
-
     on_change_frozen: () ->
         $(@el).find('.dpx-cl-freeze').prop('disabled', @model.frozen)
 
@@ -25,7 +22,7 @@ export class DpxCleaningView extends WidgetView
             @connect(@model.properties[evt].change,
                      do (event = evt, me = @) -> (val) -> me.on_change_input(event))
         @connect(@model.properties.frozen.change, () => @on_change_frozen())
-        @connect(@model.properties.fixedbeads.change, () => @on_change_fixebeads())
+        @connect(@model.properties.fixedbeads.change, () => @render())
 
     render: () ->
         super()
