@@ -265,26 +265,27 @@ class WidgetMixin(ABC):
     def __init__(self, ctrl, model):
         fix      = FixedBeadDetectionConfig.__name__
         advanced = tab(f"""
-                       ## Fixed Beads
-                       Δz <                                 %({fix}:maxextent).3F
-                       σ[HF] <                              %({fix}:maxhfsigma).3F
-                       φ5 repeatability: max(|z-mean(z)|) < %({fix}:maxdiff).2F
-                       %(BeadSubtractionModalDescriptor:)
+           ## Fixed Beads
+           Δz <                                 %({fix}:maxextent).3F
+           σ[HF] <                              %({fix}:maxhfsigma).3F
+           φ5 repeatability: max(|z-mean(z)|) < %({fix}:maxdiff).2F
+           %(BeadSubtractionModalDescriptor:)
 
-                       ## Cleaning
+           ## Cleaning
 
-                       |z| <                            %(cleaning.maxabsvalue).1F
-                       |dz/dt| <                        %(cleaning.maxderivate).3F
-                       Δz >                             %(cleaning.minextent).3F
-                       Δz <                             %(cleaning.maxextent).3F
-                       σ[HF] >                          %(cleaning.minhfsigma).3F
-                       σ[HF] <                          %(cleaning.maxhfsigma).3F
-                       % good >                         %(cleaning.minpopulation)D
-                       Cycles close if |z(φ1)-z(φ5)| <  %(cleaning.maxdistozero)D
-                       % non-closing cycles <           %(cleaning.maxsaturation)D
-                       %(AlignmentModalDescriptor:)
-                       Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α  %(clipping.lowfactor).1oF
-                       """,
+           |z| <                                 %(cleaning.maxabsvalue).1F
+           |dz/dt| <                             %(cleaning.maxderivate).3F
+           Δz >                                  %(cleaning.minextent).3F
+           Δz <                                  %(cleaning.maxextent).3F
+           σ[HF] >                               %(cleaning.minhfsigma).3F
+           σ[HF] <                               %(cleaning.maxhfsigma).3F
+           % good frames >                       %(cleaning.minpopulation)D
+           Cycles are closed if |z(φ1)-z(φ5)| <  %(cleaning.maxdisttozero)D
+           % non-closing cycles <                %(cleaning.maxsaturation)D
+           <b></b>
+           %(AlignmentModalDescriptor:)
+           Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α, α =  %(clipping.lowfactor).1oF
+           """,
                        accessors = globals(),
                        figure    = CleaningPlotModel,
                        base      = tab.taskwidget)
