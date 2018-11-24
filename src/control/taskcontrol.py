@@ -181,7 +181,7 @@ class BaseTaskController(Controller):
              task   : Union[Type[Task], int],
              noemission = False) -> Optional[Task]:
         "returns a task"
-        ctrl = ProcessorController() if parent is None else self._items[parent]
+        ctrl = self._items[parent] if parent in self._items else ProcessorController()
         return ctrl.task(task, noemission = noemission)
 
     # pylint: disable=no-self-use,unused-argument,function-redefined

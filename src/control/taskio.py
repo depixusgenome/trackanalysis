@@ -152,7 +152,7 @@ class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
         if mdls is None:
             return None
 
-        task = type(self._config.tasks['extremumalignment'])
+        task = type(self._config.tasks.get('extremumalignment', None))
         ret  = []
         for mdl in mdls:
             ret.append(tuple(i for i in mdl if not isinstance(i, task)))

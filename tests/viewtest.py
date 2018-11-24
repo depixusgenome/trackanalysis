@@ -26,14 +26,14 @@ def test_toolbar(bokehaction):
             assert ctrl.theme.get("filedialog", "storage")["open"] == str(track.path[0])
 
         _checknone()
-        server.load('small_legacy')
+        server.load('small_legacy', rendered = False)
         _checkopen()
         server.press('Control-z')
         _checknone()
         server.press('Control-y')
         _checkopen()
 
-        server.load('big_legacy')
+        server.load('big_legacy', rendered = False)
         assert len(curr().path) == 1
         _checkpath('big_legacy')
 
@@ -44,14 +44,15 @@ def test_toolbar(bokehaction):
             assert len(curr().path) == 1
             _checkpath('big_legacy')
 
-        server.load('CTGT_selection')
+        server.load('CTGT_selection', rendered = False)
         assert len(curr().path) == 2
         assert str(curr().path[1]) == server.path('CTGT_selection')
         _checkpath('big_legacy')
 
         _reset()
 
-        server.load('CTGT_selection/test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.cgr')
+        server.load('CTGT_selection/test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.cgr',
+                    rendered = False)
         assert len(curr().path) == 2
         assert str(curr().path[1]) == server.path('CTGT_selection')
         _checkpath('big_legacy')
@@ -59,7 +60,8 @@ def test_toolbar(bokehaction):
         _reset()
 
         server.load(('CTGT_selection/test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.cgr',
-                     'CTGT_selection/Z(t)bd0track10.gr'))
+                     'CTGT_selection/Z(t)bd0track10.gr'),
+                    rendered = False)
         assert len(curr().path) == 2
         assert str(curr().path[1]) == server.path('CTGT_selection/Z(t)bd0track10.gr')
         _checkpath('big_legacy')
@@ -72,7 +74,7 @@ def test_beadtoolbar(bokehaction):
         # pylint: disable=protected-access
         beads = DataSelectionBeadController(server.ctrl)
 
-        server.load('big_legacy')
+        server.load('big_legacy', rendered = False)
         assert frozenset(beads.availablebeads) == frozenset(range(39))
 
         server.change('Main:toolbar', 'discarded', '0,1,3')
@@ -89,10 +91,10 @@ def test_beadtoolbar(bokehaction):
         server.press('Shift-Delete')
         assert frozenset(beads.availablebeads) == frozenset(range(39))-{bead1, bead2}
 
-        server.load('CTGT_selection/Z(t)bd1track10.gr')
+        server.load('CTGT_selection/Z(t)bd1track10.gr', rendered = False)
         assert frozenset(beads.availablebeads) == frozenset((1,))
 
-        server.load('CTGT_selection/Z(t)bd0track10.gr')
+        server.load('CTGT_selection/Z(t)bd0track10.gr', rendered = False)
         assert frozenset(beads.availablebeads) == frozenset((0, 1))
 
         server.change('Main:toolbar', 'discarded', '0')
