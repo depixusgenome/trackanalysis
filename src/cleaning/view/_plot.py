@@ -13,6 +13,7 @@ from    utils.array             import repeat
 from    view.plots              import PlotView, DpxHoverTool, CACHE_TYPE
 from    view.plots.tasks        import TaskPlotCreator
 from    view.colors             import tohex
+from    view.plots.ploterror    import PlotError
 from    control                 import Controller
 
 from    ._model                 import (DataCleaningModelAccess, CleaningPlotModel,
@@ -27,9 +28,10 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
     def compute(cls, frame, info, cache = None, **cnf):
         "returns the result of the beadselection"
         curr = np.copy(info[1])
-        super().compute(frame, (info[0], curr), cache = cache, **cnf)
+        exc  = super().compute(frame, (info[0], curr), cache = cache, **cnf)
         DataCleaning(**cnf).aberrant(info[1], clip = True)
         cache['gui'] = np.isnan(curr)
+        cache['exc'] = exc
 
     @staticmethod
     def nans(mdl, nans):
@@ -42,7 +44,7 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
     @classmethod
     def runbead(cls, mdl):
         "updates the cache in the gui and returns the nans"
-        ctx, items, nans = mdl.runcontext(cls), None, None
+        ctx, items, nans, exc = mdl.runcontext(cls), None, None, None
         with ctx as cycles:
             if cycles is not None:
                 items = list(cycles[mdl.bead, ...])
@@ -50,14 +52,16 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
                 tsk   = mdl.cleaning.task
                 if tsk is not None:
                     nans = ctx.taskcache(tsk).pop('gui', None)
+                    exc  = ctx.taskcache(tsk).pop('exc', None)
 
-        return items, nans
+        return items, nans, exc
 
 class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotModel],
                           WidgetMixin):
     "Building the graph of cycles"
     _model:   DataCleaningModelAccess
     _theme:   CleaningPlotTheme
+    _errors:  PlotError
     __source: ColumnDataSource
     __fig:    Figure
     def __init__(self,  ctrl:Controller) -> None:
@@ -81,6 +85,8 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         axis = LinearAxis(x_range_name = "time", axis_label = self._theme.xtoplabel)
         fig.add_layout(axis, 'above')
 
+        self._errors = PlotError(self.__fig, self._theme)
+
         self._display.addcallbacks(self._ctrl, fig)
 
         mode    = self.defaultsizingmode(width = self._theme.widgetwidth)
@@ -90,11 +96,14 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         return self._keyedlayout(ctrl, fig, left = left)
 
     def _reset(self, cache: CACHE_TYPE):
-        items, nans, disable = None, None, True
+        items, nans, disable, exc = None, None, True, None
         try:
-            items, nans = GuiDataCleaningProcessor.runbead(self._model)
-            disable     = False
+            items, nans, exc = GuiDataCleaningProcessor.runbead(self._model)
+            disable          = False
+        except Exception as err: # pylint: disable=broad-except
+            self._errors.reset(cache, err)
         finally:
+            self._errors.reset(cache, exc)
             data        = self.__data(items, nans)
             self.setbounds(cache, self.__fig, data['t'], data['z'])
             cache[self.__source]['data'] = data

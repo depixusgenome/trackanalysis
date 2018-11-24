@@ -14,7 +14,7 @@ class PlotError:
     def __init__(self, fig, cnt, position = "above"):
         "adds the titles"
         self._fig = fig
-        self._pos = position
+        self._pos = getattr(cnt, 'titleposition', position)
         for _ in range(getattr(cnt, 'ntitles', cnt)):
             self._fig.add_layout(Title(), self._pos)
 
