@@ -17,8 +17,7 @@ def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
         if 'ybounds' in old:
             vals[:2] = [0. if i is None else i for i in model.ybounds]
 
-    with bokehaction.launch('cyclesplot.CyclesPlotView',
-                            'app.toolbar',
+    with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.toolbar',
                             runtime = "browser") as server:
         server.ctrl.display.observe("cycles", _printrng)
         server.load('big_legacy')
@@ -78,39 +77,28 @@ def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
         assert server.widget['Cycles:Bias'].value == approx(-.05, abs = 1e-5)
         server.change('Cycles:Stretch',  'value', 1050.)
         assert server.widget['Cycles:Stretch'].value == approx(1050., abs = 1e-5)
-        #server.press('Control-z')
+        server.press('Control-z')
 
 def test_cyclesplot2(bokehaction):
     "test cyclesplot data actions"
-
-    with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.toolbar') as server:
+    with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.toolbar',
+                            runtime = "browser") as server:
         server.load('big_legacy')
 
         fig  = server.widget['Cycles:Hist']()
-        assert fig.extra_x_ranges['cycles'].end < 40
-        server.change('Cycles:Alignment', 'active', 1)
+        assert fig.extra_x_ranges['cycles'].end > 70
+        server.change('Cycles:Alignment', 'active', 0, rendered = True)
+        assert server.widget['Cycles:Alignment'].active == 0
+        assert fig.extra_x_ranges['cycles'].end < 70
 
-        for _ in range(5):
-            val = fig.extra_x_ranges['cycles'].end
-            if val is not None and val > 70:
-                break
-            server.wait()
+        server.press('Control-z', rendered = True)
         assert server.widget['Cycles:Alignment'].active == 1
         assert fig.extra_x_ranges['cycles'].end > 70
-
-        server.press('Control-z')
-        for _ in range(5):
-            val = fig.extra_x_ranges['cycles'].end
-            if val is not None and val < 40:
-                break
-            server.wait()
-        assert server.widget['Cycles:Alignment'].active == 0
-        assert fig.extra_x_ranges['cycles'].end < 40
 
         rng  = server.widget['Cycles:Raw']().x_range
         vals = rng.start, rng.end
 
-        server.change('Cycles:EventDetection', 'active', [0], browser = False)
+        server.change('Cycles:EventDetection', 'active', [0], browser = False, rendered = True)
         for _ in range(5):
             val = rng.end
             if val is not None and val < 400:
@@ -122,9 +110,8 @@ def test_cyclesplot2(bokehaction):
 
         server.press('Shift-Delete')
         server.wait()
-        server.change('Cycles:Drift', 'value', [0])
-        server.wait()
+        server.change('Cycles:DriftWidget', 'value', [0], rendered = True)
         server.wait()
 
 if __name__ == '__main__':
-    test_cyclesplot(bokehaction(None))
+    test_cyclesplot2(bokehaction(None))

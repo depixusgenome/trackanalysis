@@ -253,8 +253,11 @@ class _ManagedServerLoop:
         from testingcore import path as _testpath
         return _testpath(path)
 
-    def cmd(self, fcn, *args, andstop = True, andwaiting = 2., **kwargs):
+    def cmd(self, fcn, *args, andstop = True, andwaiting = 2., rendered = False, **kwargs):
         "send command to the view"
+        if rendered is True:
+            self.ctrl.display.oneshot("rendered", lambda *_1, **_2: self.wait())
+            andstop = False
         if andstop:
             def _cmd():
                 LOGS.debug("running: %s(*%s, **%s)", fcn.__name__, args, kwargs)
@@ -286,16 +289,12 @@ class _ManagedServerLoop:
     def load(self, path: Union[Sequence[str], str], andpress = True, rendered = True, **kwa):
         "loads a path"
         import view.dialog  # pylint: disable=import-error
-        if rendered is True:
-            self.ctrl.display.observe("rendered", lambda *_1, **_2: self.wait())
-            kwa['andstop'] = False
-
         def _tkopen(*_1, **_2):
             return self.path(path)
         self.monkeypatch.setattr(view.dialog, '_tkopen', _tkopen)
         self.monkeypatch.setattr(view.dialog.BaseFileDialog, '_HAS_ZENITY', False)
         if andpress:
-            self.press('Control-o', **kwa)
+            self.press('Control-o',rendered = rendered, **kwa)
 
     def get(self, clsname, attr):
         "Returns a private attribute in the view"
@@ -338,7 +337,8 @@ class _ManagedServerLoop:
                value: Any,
                browser     = True,
                withpath    = None,
-               withnewpath = None):
+               withnewpath = None,
+               rendered    = False):
         "Changes a model attribute on the browser side"
         if withnewpath is not None or withpath is not None:
             import view.dialog  # pylint: disable=import-error
@@ -358,13 +358,18 @@ class _ManagedServerLoop:
             mdl = next(iter(self.doc.select(model)))
         else:
             mdl = model
+
         if browser:
-            self.cmd(cast(DpxTestLoaded, self.loading).change, mdl, attrs, value)
-        else:
-            assert isinstance(attrs, str)
-            def _cb():
-                setattr(mdl, cast(str, attrs), value)
-            self.cmd(_cb)
+            self.cmd(cast(DpxTestLoaded, self.loading).change, mdl, attrs, value,
+                     rendered = rendered)
+            return
+
+        if rendered:
+            self.ctrl.display.oneshot("rendered", lambda *_1, **_2: self.wait())
+        assert isinstance(attrs, str)
+        @self.cmd
+        def _cb():
+            setattr(mdl, cast(str, attrs), value)
 
     @property
     def widget(self):
