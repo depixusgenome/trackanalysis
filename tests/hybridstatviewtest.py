@@ -19,13 +19,14 @@ from peakfinding.reporting.batch         import createmodels as _pmodels
 from hybridstat.reporting.identification import writeparams
 from hybridstat.reporting.batch          import createmodels as _hmodels
 from hybridstat.view._io                 import ConfigXlsxIO
+from peakcalling.processor.__config__    import FitToHairpinTask
 
 def test_hybridstat_xlsxio():
     "tests xlxs production"
-    itr  = _hmodels(dict(track     = (Path(utfilepath("big_legacy")).parent/"*.trk",
-                                      utfilepath("CTGT_selection")),
-                         sequence  = utfilepath("hairpins.fasta")))
-    mdl  = next(itr)
+    track = Path(utfilepath("big_legacy")).parent/"*.trk", utfilepath("CTGT_selection")
+    itr   = _hmodels(dict(track     = track, # type: ignore
+                          sequence  = utfilepath("hairpins.fasta")))
+    mdl   = next(itr)
 
     for path in Path(gettempdir()).glob("*_hybridstattest*.*"):
         path.unlink()
@@ -81,7 +82,7 @@ def test_peaks_xlsxio():
     assert Path(out).exists()
     assert cnt > 0
 
-def test_peaksplot(bokehaction): # pylint: disable=too-many-statements
+def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-locals
     "test peaksplot"
     vals = [0.]*2
     def _printrng(old = None, model = None, **_):
@@ -115,12 +116,12 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements
         assert all(np.isnan(src.data['distance']))
         assert all(i.strip() == '' for i in src.data['orient'])
         server.change('Cycles:Oligos', 'value', '')
-        server.load('hairpins.fasta')
+        server.load('hairpins.fasta', rendered = False, andpress= False)
         server.change('Cycles:Sequence', 'value', '←')
         assert all(np.isnan(src.data['distance']))
         assert all(i.strip() == '' for i in src.data['orient'])
 
-        server.change('Cycles:Oligos', 'value', 'ctgt')
+        server.change('Cycles:Oligos', 'value', 'ctgt', rendered = True)
         server.wait()
         assert server.widget['Cycles:Oligos'].value == 'ctgt'
         assert not all(np.isnan(src.data['distance']))
@@ -128,7 +129,8 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements
 
         menu = server.widget['Cycles:Sequence'].menu
         lst  = tuple(i if i is None else i[0] for i in list(menu))
-        assert lst == ('GF4', 'GF2', 'GF1', 'GF3', '015', None, 'Select sequence')
+        assert lst == ('₁ GF4', '₂ GF1', '₃ GF2', '₄ GF3', '₅ 015',
+                       None, 'Select a hairpin path')
 
         out = mktemp()+"_hybridstattest100.xlsx"
         writeparams(out, [('GF3', (0,))])
@@ -137,7 +139,8 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements
 
         menu = server.widget['Cycles:Sequence'].menu
         lst  = tuple(i if i is None else i[0] for i in list(menu))
-        assert lst == ('GF3', None, 'Select sequence')
+        assert lst == ('₁ GF3', '✗ 015', '✗ GF1', '✗ GF2', '✗ GF4', None,
+                       'Select a hairpin path')
 
         out = mktemp()+"_hybridstattest101.xlsx"
         import hybridstat.view._widget as widgetmod
@@ -149,12 +152,9 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements
         server.wait()
         assert found[0] == out
         assert Path(out).exists()
-        assert server.ctrl.display.get("hybridstat.peaks", "constraints") is not None
-
-        server.cmd((lambda: setattr(server.widget['Peaks:IDPath'], 'value', "")),
-                   andstop = False)
-        server.wait()
-        assert server.ctrl.display.get("hybridstat.peaks", "constraints") is None
+        tasks = server.ctrl.display.model("tasks")
+        task  = server.ctrl.tasks.task(tasks.roottask, FitToHairpinTask)
+        assert len(task.constraints) == 1
 
 def test_reference(bokehaction):
     "test peaksplot"
@@ -166,7 +166,7 @@ def test_reference(bokehaction):
 
         server.load('100bp_4mer/AACG.pk')
 
-        store = server.ctrl.display.model("Hybridstat.fittoreference")
+        store = server.ctrl.display.model("hybridstat.fittoreference")
         assert server.widget['HS:reference'].value == '-1'
         assert store.reference is None
 
@@ -174,8 +174,8 @@ def test_reference(bokehaction):
         assert server.widget['HS:reference'].value == '0'
         assert store.reference is ref
 
-        server.load('hairpins.fasta')
-        server.change('Cycles:Oligos', 'value', 'ctgt')
+        server.load('hairpins.fasta', andpress = False, rendered = False)
+        server.change('Cycles:Oligos', 'value', 'ctgt', rendered = True)
         server.wait()
 
 def test_hybridstat(bokehaction):
@@ -191,8 +191,7 @@ def test_hybridstat(bokehaction):
         server.load('big_legacy')
 
         for i in range(len(server.widget['Hybridstat:Tabs'].tabs)):
-            server.change('Hybridstat:Tabs', 'active', i)
-            server.wait()
+            server.change('Hybridstat:Tabs', 'active', i, rendered = True)
 
         server.change('Hybridstat:Tabs', 'active', indcleaning)
         server.change('Cleaning:Filter', 'subtracted', "38")

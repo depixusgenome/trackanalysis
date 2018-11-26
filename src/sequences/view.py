@@ -160,7 +160,7 @@ class SequenceHoverMixin:
         return self.renderers[0].data_source
 
     @classmethod
-    def create(cls, ctrl, fig, mdl, xrng = None):
+    def create(cls, ctrl, doc, fig, mdl, xrng = None): # pylint: disable=too-many-arguments
         "Creates the hover tool for histograms"
         theme = ctrl.theme.add(SequenceHoverTheme(), False)
         args  = dict(x                = 'inds',
@@ -184,9 +184,20 @@ class SequenceHoverMixin:
                    renderers    = [fig.circle(**args)])
         fig.add_tools(self)
 
+        done = [False]
         @ctrl.display.observe(SequenceDisplay().name)
         def _onchange(old = None, **_):
-            if 'hpins' in old:
+            if (
+                    done[0]
+                    or 'hpins' not in old
+                    or fig in doc.select({'type': Figure}) and not done[0]
+            ):
+                return
+
+            done[0] = True
+            @doc.add_next_tick_callback
+            def _fcn():
+                done[0] = False
                 # pylint: disable=protected-access
                 self.source.update(data = self.__data(ctrl, mdl))
         return self

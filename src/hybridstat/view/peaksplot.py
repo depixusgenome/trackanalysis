@@ -44,9 +44,9 @@ class PeaksSequenceHover(# pylint: disable=too-many-instance-attributes,too-many
 
 
     @classmethod
-    def create(cls, ctrl, fig, mdl, xrng = None):
+    def create(cls, ctrl, doc, fig, mdl, xrng = None): # pylint: disable=too-many-arguments
         "Creates the hover tool for histograms"
-        self = super().create(ctrl, fig, mdl, xrng = xrng)
+        self = super().create(ctrl, doc, fig, mdl, xrng = xrng)
         jsc = CustomJS(args = {'fig': fig, 'source': self.source},
                        code = 'cb_obj.apply_update(fig, source)')
         self.js_on_change("updating", jsc)
@@ -122,7 +122,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         "returns the figure"
         self.__create_fig()
         rends = self.__add_curves()
-        self.__setup_tools(rends)
+        self.__setup_tools(doc, rends)
 
         self._widgets.advanced.observefigsize(ctrl, self._theme, doc, self._fig)
         return self._keyedlayout(ctrl, self._fig,
@@ -217,12 +217,12 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             self._rends.append((key, val))
         return rends
 
-    def __setup_tools(self, rends):
+    def __setup_tools(self, doc, rends):
         tool = self._fig.select(TapTool)
         if len(tool) == 1:
             tool[0].renderers = rends[::-1]
 
-        self._hover  = PeaksSequenceHover.create(self._ctrl, self._fig, self._model)
+        self._hover  = PeaksSequenceHover.create(self._ctrl, doc, self._fig, self._model)
         self._ticker = SequenceTicker(self._ctrl, self._fig, self._model,
                                       self._model.peaksmodel.theme.yrightlabel, "right")
         self._hover.jsslaveaxes(self._fig, self._src['peaks'])

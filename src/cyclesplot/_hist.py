@@ -70,7 +70,7 @@ class HistMixin(ABC):
                     bottom  = bins[:-1],
                     top     = bins[1:])
 
-    def _createhist(self, data, shape, yrng):
+    def _createhist(self, doc, data, shape, yrng):
         self._hist = self.figure(x_axis_label     = self._theme.histxlabel,
                                  y_axis_location = None,
                                  x_range         = Range1d(0, 5e4),
@@ -101,7 +101,7 @@ class HistMixin(ABC):
 
         self._ticker = SequenceTicker(self._ctrl, self._hist, self._model,
                                       self._model.cycles.theme.yrightlabel, "right")
-        self._hover = DpxHoverModel.create(self._ctrl, self._hist, self._model, 'cycles')
+        self._hover = DpxHoverModel.create(self._ctrl, doc, self._hist, self._model, 'cycles')
         self._hover.slaveaxes(self._hist, self._histsource)
 
     def _oncyclessequence(self, **_):

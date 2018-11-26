@@ -28,10 +28,10 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # t
         HistMixin  .__init__(self, ctrl)
         WidgetMixin.__init__(self, ctrl, self._model)
 
-    def _addtodoc(self, ctrl, _):
+    def _addtodoc(self, ctrl, doc):
         "returns the figure"
         shape = self._createraw()
-        self._createhist(self._rawsource.data, shape, self._raw.y_range)
+        self._createhist(doc, self._rawsource.data, shape, self._raw.y_range)
         self._finishraw(shape)
         parent  = self._keyedlayout(ctrl, self._raw, self._hist)
         widgets = self._createwidget(ctrl)

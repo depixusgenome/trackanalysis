@@ -89,7 +89,7 @@ class IdentificationPeakInfo(PeakInfo):
             dico[key+'bases']          = (zvals - dist[1])*dist[0]
             dico[key+'id']      [good] = tmp[good]
             dico[key+'distance'][good] = (tmp - dico[key+'bases'])[good]
-            dico[key+'orient']  [good] = ['-+ '[ori.get(int(i+0.01), 2)]
+            dico[key+'orient']  [good] = ['-+ '[int(ori.get(int(i+0.01), 2))]
                                           for i in dico[key+'id'][good]]
 
             if key == mdl.sequencekey:
