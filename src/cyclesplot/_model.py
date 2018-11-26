@@ -47,7 +47,7 @@ class CyclesPlotTheme(PlotTheme):
     figsize        = PlotTheme.defaultfigsize(450, 450)
     toolbar        = dict(PlotTheme.toolbar)
     toolbar.update(raw   = 'tap,ypan,ybox_zoom,reset,save,dpxhover',
-                   items = 'ypan,ybox_zoom,reset,save,dpxhover')
+                   items = 'ypan,ybox_zoom,reset,save')
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)

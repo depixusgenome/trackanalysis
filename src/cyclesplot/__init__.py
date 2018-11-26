@@ -30,11 +30,9 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # t
 
     def _addtodoc(self, ctrl, _):
         "returns the figure"
-        fcn = lambda attr, old, new: self._model.newparams(**{attr: new})
-        self._hover.on_change("stretch", fcn)
-        self._hover.on_change("bias",    fcn)
         shape = self._createraw()
         self._createhist(self._rawsource.data, shape, self._raw.y_range)
+        self._finishraw(shape)
         parent  = self._keyedlayout(ctrl, self._raw, self._hist)
         widgets = self._createwidget(ctrl)
         if 'fixed' in self.defaultsizingmode().values():

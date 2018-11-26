@@ -79,12 +79,16 @@ class RawMixin(ABC):
         assert all(len(i) == len(res['z']) for  i in res.values())
         return res, shape
 
-    def __addcallbacks(self):
+    def _finishraw(self, shape):
         fig = self._raw
+        self._hover.createraw(self, fig, self._rawsource, shape, self._theme)
         self._display.addcallbacks(self._ctrl, fig)
         fig.x_range.callback = CustomJS(code = "hvr.on_change_raw_bounds(cb_obj, trng)",
                                         args = dict(hvr  = self._hover,
                                                     trng = fig.extra_x_ranges["time"]))
+        fcn = lambda attr, old, new: self._model.newparams(**{attr: new})
+        self._hover.on_change("stretch", fcn)
+        self._hover.on_change("bias",    fcn)
 
     def _createraw(self):
         self._raw = self.figure(y_range = Range1d,
@@ -95,12 +99,10 @@ class RawMixin(ABC):
 
         self.attrs(self._theme.raw).addto(self._raw, x = 't', y = 'z', source = self._rawsource)
 
-        self._hover.createraw(self._raw, self._rawsource, shape, self._model, self._theme)
         self._raw.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
 
         axis = LinearAxis(x_range_name="time", axis_label = self._theme.xtoplabel)
         self._raw.add_layout(axis, 'above')
-        self.__addcallbacks()
         return shape
 
     def _resetraw(self, cache:CACHE_TYPE):

@@ -1,68 +1,74 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot view"
-from typing                   import Any
-
 import  bokeh.core.properties as     props
-from    bokeh.model           import Model
-from    bokeh.models          import ColumnDataSource, GlyphRenderer, CustomJS, TapTool
+from    bokeh.models          import (ColumnDataSource, CustomJS, TapTool,
+                                      HoverTool, Renderer)
 
 from    sequences.view        import SequenceHoverMixin
 from    view.plots            import DpxHoverTool, PlotAttrsView, themed
 
-class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-instance-attributes
+class DpxHoverModel(HoverTool,  # pylint: disable=too-many-instance-attributes,too-many-ancestors
+                    SequenceHoverMixin):
     "controls keypress actions"
+    maxcount  = props.Int(3)
+    framerate = props.Float(1.)
     shape     = props.Tuple(props.Int, props.Int, default = (0, 0))
     cycle     = props.Int(-1)
-    framerate = props.Float(1.)
     bias      = props.Float(0.)
     stretch   = props.Float(0.)
     updating  = props.String('')
-    _rawsource: ColumnDataSource
-    _rawglyph:  GlyphRenderer
-    _model:     Any
-
+    rawrend   = props.Instance(Renderer)
     impl      = SequenceHoverMixin.impl
     __implementation__ = impl('DpxHoverModel',
                               ('shape: [p.Array, [2,1]],'
-                               'cycle: [p.Int, -1],'),
+                               'cycle: [p.Int, -1],'
+                               'rawrend: [p.Instance, null],'),
                               __file__)
 
     @staticmethod
     def _createrawdata(data, shape):
         return dict(t = data['t'][:shape[1]], z = data['z'][:shape[1]])
 
-    def createraw(self, fig, source, shape, model, theme): # pylint: disable=too-many-arguments
-        "creates the hover tool"
-        self._model = model
-        self.shape  = tuple(shape)
-
+    @staticmethod
+    def __settooltips(fig, theme):
         tooltips = theme.tooltips
         hover    = fig.select(DpxHoverTool)
 
         if tooltips is None or len(tooltips) == 0:
             if len(hover):
                 hover[0].tooltips = None
-        elif len(hover):
-            hover[0].tooltips  = tooltips
-            hover[0].renderers = [fig.renderers[-1]]
-            fig.renderers[-1].selection_glyph        = None
-            fig.renderers[-1].nonselection_glyph     = None
-            fig.renderers[-1].glyph.radius_dimension = 'x'
-            fig.renderers[-1].glyph.radius           = theme.radius
 
+        elif len(hover):
+            name = theme.raw.glyph
+            rend = [i for i in fig.renderers
+                    if hasattr(i, 'glyph') and type(i.glyph).__name__.lower() == name][0]
+            hover[0].tooltips  = tooltips
+            hover[0].renderers = [rend]
+            rend.selection_glyph        = None
+            rend.nonselection_glyph     = None
+            rend.glyph.radius_dimension = 'x'
+            rend.glyph.radius           = theme.radius
+
+    def __settap(self, mdl, fig, source, theme):
         tap  = fig.select(TapTool)
         if tap is not None and len(tap):
-            self._rawsource = ColumnDataSource(self._createrawdata(source.data, shape))
-            sel             = themed(self, theme.selection)
-            self._rawglyph  = PlotAttrsView(sel).addto(fig,  x = 't', y = 'z',
-                                                       source = self._rawsource)
-            args = dict(hvr    = self,
-                        hvrsrc = self._rawsource,
-                        rawsrc = source,
-                        glyph  = self._rawglyph)
-            code = "hvr.launch_hover(rawsrc, hvrsrc, glyph)"
+            src   = ColumnDataSource(self._createrawdata(source.data, self.shape))
+            sel   = themed(mdl, theme.selection)
+            glyph = PlotAttrsView(sel).addto(fig,  x = 't', y = 'z', source = src)
+            args  = dict(hvr    = self,
+                         hvrsrc = src,
+                         rawsrc = source,
+                         glyph  = glyph)
+            code  = "hvr.launch_hover(rawsrc, hvrsrc, glyph)"
+            self.rawrend = glyph
             source.callback = CustomJS(code = code, args = args)
+
+    def createraw(self, mdl, fig, source, shape, theme): # pylint: disable=too-many-arguments
+        "creates the hover tool"
+        self.shape  = tuple(shape)
+        self.__settooltips(fig, theme)
+        self.__settap(mdl, fig, source, theme)
 
     def slaveaxes(self, fig, src):
         "slaves a histogram's axes to its y-axis"
@@ -75,11 +81,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         if len(hover) == 0:
             return
 
-        resets[self]['shape']             = shape
-        if self._rawsource is not None:
-            resets[self._rawglyph]['visible'] = False
-            resets[self._rawsource]['data']   = self._createrawdata(rdata, shape)
-
-    def resethist(self, resets):
-        "updates the tooltips for a new file"
-        self.reset(resets)
+        resets[self]['shape'] = shape
+        if self.rawrend is not None:
+            resets[self.rawrend]['visible']          = False
+            resets[self.rawrend.data_source]['data'] = self._createrawdata(rdata, shape)

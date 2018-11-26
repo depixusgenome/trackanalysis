@@ -7,7 +7,7 @@ import bokeh.core.properties as props
 from bokeh                      import layouts
 from bokeh.plotting             import Figure
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
-                                        Model, TapTool, CustomJS)
+                                        TapTool, HoverTool, CustomJS)
 
 import numpy                    as     np
 
@@ -25,9 +25,12 @@ from ._model                    import (PeaksPlotModelAccess, PeaksPlotTheme,
 from ._widget                   import PeaksPlotWidgets
 from ._io                       import setupio
 
-class PeaksSequenceHover(Model, SequenceHoverMixin):
+class PeaksSequenceHover(# pylint: disable=too-many-instance-attributes,too-many-ancestors
+        HoverTool,
+        SequenceHoverMixin
+):
     "tooltip over peaks"
-    _rends: List
+    maxcount  = props.Int(3)
     framerate = props.Float(1.)
     bias      = props.Float(0.)
     stretch   = props.Float(0.)
@@ -40,19 +43,20 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
                                                  __file__)
 
 
-    def create(self, fig, *args, **kwa):   # pylint: disable=arguments-differ
+    @classmethod
+    def create(cls, ctrl, fig, mdl, xrng = None):
         "Creates the hover tool for histograms"
-        super().create(fig, *args, **kwa)
+        self = super().create(ctrl, fig, mdl, xrng = xrng)
         jsc = CustomJS(args = {'fig': fig, 'source': self.source},
                        code = 'cb_obj.apply_update(fig, source)')
         self.js_on_change("updating", jsc)
+        return self
 
-    def reset(self, resets):                # pylint: disable=arguments-differ
+    def reset(self, resets, ctrl, mdl): # pylint: disable=arguments-differ
         "Creates the hover tool for histograms"
-        dist = self._model.distances
-        super().reset(resets,
-                      biases    = {i: j.bias    for i, j in dist.items()},
-                      stretches = {i: j.stretch for i, j in dist.items()})
+        super().reset(resets, ctrl, mdl,
+                      biases    = {i: j.bias    for i, j in mdl.distances.items()},
+                      stretches = {i: j.stretch for i, j in mdl.distances.items()})
 
     def jsslaveaxes(self, fig, src): # pylint: disable=arguments-differ
         "slaves a histogram's axes to its y-axis"
@@ -69,14 +73,14 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     _fig:    Figure
     _theme:  PeaksPlotTheme
     _errors: PlotError
+    _hover  : PeaksSequenceHover
+    _ticker : SequenceTicker
     def __init__(self, ctrl):
         super().__init__(ctrl, noerase = False)
         self._src: Dict[str, ColumnDataSource] = {}
         self._widgets                          = PeaksPlotWidgets(ctrl, self._model)
-        self._ticker                           = SequenceTicker()
-        self._hover                            = PeaksSequenceHover()
-        self._ticker.init(ctrl)
-        self._hover.init(ctrl)
+        SequenceTicker.init(ctrl)
+        PeaksSequenceHover.init(ctrl)
 
     @property
     def model(self):
@@ -152,7 +156,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             for i, j in dicos.items(): # type: ignore
                 cache[self._src[i]].update(data = j)
 
-            self._hover .reset(cache)
+            self._hover .reset(cache, self._ctrl, self._model)
             self._ticker.reset(cache)
             self._widgets.reset(cache, tmp is None)
 
@@ -218,10 +222,9 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         if len(tool) == 1:
             tool[0].renderers = rends[::-1]
 
-        self._hover.create(self._fig, self._model)
-
-        self._ticker.create(self._ctrl, self._fig, self._model,
-                            self._model.peaksmodel.theme.yrightlabel, "right")
+        self._hover  = PeaksSequenceHover.create(self._ctrl, self._fig, self._model)
+        self._ticker = SequenceTicker(self._ctrl, self._fig, self._model,
+                                      self._model.peaksmodel.theme.yrightlabel, "right")
         self._hover.jsslaveaxes(self._fig, self._src['peaks'])
 
     def __setup_widgets(self, ctrl, doc):

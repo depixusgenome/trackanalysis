@@ -4,7 +4,6 @@ import {GlyphRenderer}            from "models/renderers/glyph_renderer"
 
 export class DpxHoverToolView extends HoverToolView
     _update: ([renderer_view, {geometry}]) ->
-    _update: ([renderer_view, {geometry}]) ->
         if not @model.active
             return
 

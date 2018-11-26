@@ -14,10 +14,9 @@ from   utils.gui            import implementation
 
 from   view.dialog          import FileDialog
 from   view.plots.base      import checksizes, themed
-from   view.plots.bokehext  import DpxHoverTool
 
 from   .                    import marksequence
-from   .modelaccess         import SequenceModel
+from   .modelaccess         import SequenceModel, SequenceDisplay
 
 @dataclass
 class SequenceTickerTheme:
@@ -56,23 +55,22 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 
     __implementation__ = "sequenceticker.coffee"
 
-    def init(self, ctrl):
-        "init private fields"
-        self.__defaults:dict = dict()
-        self.__withbase:list = []
-        self.__theme         = ctrl.theme.add(SequenceTickerTheme(), False)
-
-    @property
-    def axis(self):
-        u"returns the fixed axis"
-        return self.__axis
-
-    def create(self, ctrl, fig, mdl, axlabel, loc = 'right'): # pylint: disable=too-many-arguments
+    def __init__(self, ctrl, # pylint: disable=too-many-arguments
+                 fig     = None,
+                 mdl     = None,
+                 axlabel = None,
+                 loc     = 'right'):
         "Sets the ticks according to the configuration"
+        super().__init__()
+        self.__defaults = dict()
+        self.__withbase = []
+        self.__theme    = ctrl.theme.add(SequenceTickerTheme(), False)
+        if mdl is None:
+            return
+
         self.__model = mdl
         self.__fig   = fig
-        self.__axis  = type(self)()
-        self.__axis.init(ctrl)
+        self.__axis  = type(self)(ctrl)
 
         fig.extra_y_ranges        = {"bases": Range1d(start = 0., end = 1.)}
         fig.add_layout(LinearAxis(y_range_name = "bases",
@@ -97,6 +95,16 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
             gridprops = themed(theme, self.__theme.grid[name])
             self.__withbase['grid_line_'+name]       = gridprops[0]
             self.__withbase['minor_grid_line_'+name] = gridprops[1]
+
+    @staticmethod
+    def init(ctrl):
+        "init private fields"
+        ctrl.theme.add(SequenceTickerTheme(), False)
+
+    @property
+    def axis(self):
+        u"returns the fixed axis"
+        return self.__axis
 
     def reset(self, resets):
         "Updates the ticks according to the configuration"
@@ -134,13 +142,10 @@ class SequenceHoverTheme:
 
 class SequenceHoverMixin:
     "controls keypress actions"
-    __theme:  SequenceHoverTheme
-    __source: ColumnDataSource
-    __tool:   DpxHoverTool
-    _model:   Any
-    def init(self, ctrl):
+    @staticmethod
+    def init(ctrl):
         "initialize"
-        self.__theme = ctrl.theme.add(SequenceHoverTheme(), False)
+        ctrl.theme.add(SequenceHoverTheme(), False)
 
     @staticmethod
     def impl(name, fields, extra = None):
@@ -152,54 +157,57 @@ class SequenceHoverMixin:
     @property
     def source(self):
         "returns the tooltip source"
-        return self.__source
+        return self.renderers[0].data_source
 
-    def create(self, fig, mdl, xrng = None):
+    @classmethod
+    def create(cls, ctrl, fig, mdl, xrng = None):
         "Creates the hover tool for histograms"
-        self.update(framerate = 30.,
-                    bias      = mdl.bias if mdl.bias is not None else 0.,
-                    stretch   = mdl.stretch)
+        theme = ctrl.theme.add(SequenceHoverTheme(), False)
+        args  = dict(x                = 'inds',
+                     y                = 'values',
+                     source           = ColumnDataSource(cls.__data(ctrl, mdl)),
+                     radius           = theme.radius,
+                     radius_dimension = 'y',
+                     line_alpha       = 0.,
+                     fill_alpha       = 0.,
+                     x_range_name     = xrng,
+                     y_range_name     = 'bases')
+        if xrng is None:
+            args.pop('x_range_name')
 
-        hover = fig.select(DpxHoverTool)
-        if len(hover) == 0:
-            return
-        hover.point_policy = self.__theme.policy
-        self._model        = mdl
-        self.__tool        = hover[0]
-        self.__source      = ColumnDataSource(self.__data())
+        self = cls(framerate    = 30.,
+                   bias         = mdl.bias if mdl.bias is not None else 0.,
+                   stretch      = mdl.stretch,
+                   point_policy = theme.policy,
+                   tooltips     = theme.tooltips,
+                   mode         = 'hline',
+                   renderers    = [fig.circle(**args)])
+        fig.add_tools(self)
 
-        args = dict(x                = 'inds',
-                    y                = 'values',
-                    source           = self.__source,
-                    radius           = self.__theme.radius,
-                    radius_dimension = 'y',
-                    line_alpha       = 0.,
-                    fill_alpha       = 0.,
-                    y_range_name     = 'bases')
-        if xrng is not None:
-            args['x_range_name'] = xrng
-        self.__tool.update(tooltips  = self.__theme.tooltips,
-                           mode      = 'hline',
-                           renderers = [fig.circle(**args)])
+        @ctrl.display.observe(SequenceDisplay().name)
+        def _onchange(old = None, **_):
+            if 'hpins' in old:
+                # pylint: disable=protected-access
+                self.source.update(data = self.__data(ctrl, mdl))
+        return self
 
-    def reset(self,  resets, **kwa):
+
+    def reset(self, resets, ctrl, model, **kwa):
         "updates the tooltips for a new file"
-        if self.__tool is None:
-            return
-
-        data = self.__data()
-        resets[self.__source].update(data = data)
-        kwa.setdefault('framerate', getattr(self._model.track, 'framerate', 30.))
-        kwa.setdefault('bias',      self._model.bias)
-        kwa.setdefault('stretch',   self._model.stretch)
+        data = self.__data(ctrl, model)
+        resets[self.source].update(data = data)
+        kwa.setdefault('framerate', getattr(model.track, 'framerate', 30.))
+        kwa.setdefault('bias',      model.bias)
+        kwa.setdefault('stretch',   model.stretch)
         resets[self].update(**kwa)
 
+    @staticmethod
     @checksizes
-    def __data(self):
-        mdl   = self._model
+    def __data(ctrl, mdl):
+        size  = ctrl.theme.get(SequenceHoverTheme(), "oligosize")
         key   = mdl.sequencemodel.currentkey
         oligs = mdl.sequencemodel.currentprobes
-        osiz  = max((len(i) for i in oligs), default = self.__theme.oligosize)
+        osiz  = max((len(i) for i in oligs), default = size)
         dseq  = mdl.sequences(...)
         if len(dseq) == 0:
             return dict(values = [0], inds = [0], text = [''], z = [0])
@@ -273,7 +281,7 @@ class SequencePathWidget:
     def callbacks(self, hover: SequenceHoverMixin, tick1: SequenceTicker):
         "sets-up callbacks for the tooltips and grids"
         if hover is not None:
-            jsc = CustomJS(code = ("if(Object.key(src.data).indexOf(cb_obj.value) > -1)"
+            jsc = CustomJS(code = ("if(Object.keys(src.data).indexOf(cb_obj.value) > -1)"
                                    "{ cb_obj.label     = cb_obj.value;"
                                    "  tick1.key        = cb_obj.value;"
                                    "  tick2.key        = cb_obj.value;"

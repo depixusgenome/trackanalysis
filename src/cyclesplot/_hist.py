@@ -27,10 +27,8 @@ class HistMixin(ABC):
     _hist:       Figure
     def __init__(self, ctrl):
         "sets up this plotter's info"
-        self._ticker = SequenceTicker()
-        self._hover  = DpxHoverModel()
-        self._ticker.init(ctrl)
-        self._hover.init(ctrl)
+        DpxHoverModel.init(ctrl)
+        SequenceTicker.init(ctrl)
 
     @checksizes
     def __data(self, data, shape): # pylint: disable=too-many-locals
@@ -101,16 +99,16 @@ class HistMixin(ABC):
                            axis_label_text_color = rend.glyph.line_color)
         self._hist.add_layout(axis, 'above')
 
-        self._ticker.create(self._ctrl, self._hist, self._model,
-                            self._model.cycles.theme.yrightlabel, "right")
-        self._hover.create(self._hist, self._model, 'cycles')
+        self._ticker = SequenceTicker(self._ctrl, self._hist, self._model,
+                                      self._model.cycles.theme.yrightlabel, "right")
+        self._hover = DpxHoverModel.create(self._ctrl, self._hist, self._model, 'cycles')
         self._hover.slaveaxes(self._hist, self._histsource)
 
     def _oncyclessequence(self, **_):
         if self.isactive():
             with self.resetting() as cache:
                 self._ticker.reset(cache)
-                self._hover.resethist(cache)
+                self._hover.reset(cache, self._ctrl, self._model)
 
 
     def _histobservers(self, ctrl):
@@ -121,7 +119,7 @@ class HistMixin(ABC):
 
         self._ctrl.display.update(self._model.cycles.display,
                                   estimatedbias = estimatebias(hist['bottom'], hist['cycles']))
-        self._hover.resethist(cache)
+        self._hover.reset(cache, self._ctrl, self._model)
         self._ticker.reset(cache)
 
         cache[self._histsource]['data'] = hist
