@@ -471,7 +471,7 @@ class FitParamsWidget:
 
     def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
         "creates the widget"
-        self.__widget = DpxFitParams()
+        self.__widget = DpxFitParams(**self.__data())
 
         @mainview.actionifactive(ctrl)
         def _on_cb(attr, old, new):
@@ -497,12 +497,17 @@ class FitParamsWidget:
 
     def reset(self, resets:CACHE_TYPE):
         "resets the widget when opening a new file, ..."
+        resets[self.__widget].update(self.__data())
+
+    def __data(self):
+        "resets the widget when opening a new file, ..."
         ctrl  = self.__model.identification
         cstrs = ctrl.constraints()
-        resets[self.__widget].update(locksequence = cstrs[0] is not None,
-                                     stretch      = str(cstrs[1]) if cstrs[1] else "",
-                                     bias         = str(cstrs[2]) if cstrs[2] else "",
-                                     frozen       = ctrl.task is None)
+        return dict(locksequence = cstrs[0] is not None,
+                    stretch      = str(cstrs[1]) if cstrs[1] else "",
+                    bias         = str(cstrs[2]) if cstrs[2] else "",
+                    frozen       = ctrl.task is None)
+
 
 class _IdAccessor:
     _LABEL  = '%({self._attrname}){self._fmt}'
@@ -619,8 +624,10 @@ class PeaksPlotWidgets: # pylint: disable=too-many-instance-attributes
         if peaks is None:
             peaks = getattr(mainview, "_src")['peaks']
 
-        wdg   = {i: j.addtodoc(mainview, ctrl, peaks) for i, j in self.__dict__.items()}
-        self.enabler = TaskWidgetEnabler(wdg)
+        wdg    = {i: j.addtodoc(mainview, ctrl, peaks) for i, j in self.__dict__.items()}
+        enable = dict(wdg)
+        enable.pop('fitparams')
+        self.enabler = TaskWidgetEnabler(enable)
         self.cstrpath.callbacks(ctrl, doc)
         if hasattr(mainview, '_hover'):
             self.seq.callbacks(getattr(mainview, '_hover'),

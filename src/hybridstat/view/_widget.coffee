@@ -15,7 +15,7 @@ export class DpxFitParamsView extends WidgetView
             elem.addClass("icon-dpx-unlocked")
 
     on_change_frozen: () ->
-        $(@el).find('.dpx-pk-freeze').prop('disabled', @model.frozen)
+        $(@el).find('.dpx-fp-freeze').prop('disabled', @model.frozen)
 
     on_lock: (evt) ->
         @model.locksequence = !@model.locksequence
@@ -37,7 +37,7 @@ export class DpxFitParamsView extends WidgetView
         for evt in @cl_inputs
             @connect(@model.properties[evt].change,
                      do (event = evt, me = @) -> (val) -> me.on_change_input(event))
-        @connect(@model.properties.frozen.change, () => @on_change_frozen())
+        @connect(@model.properties.frozen.change, () => @render())
 
     render: () ->
         super()
@@ -67,14 +67,14 @@ export class DpxFitParamsView extends WidgetView
     mk_inp: (name, label, ttip) ->
         disabled = if @model.frozen then ' disabled=true' else ''
         return  "<input id='dpx-pk-#{name}' #{ttip}"+
-                    " class='dpx-pk-freeze bk-widget-form-input' type='text' "+
+                    " class='dpx-fp-freeze bk-widget-form-input' type='text' "+
                     " placeholder='#{label}' value='#{@model[name]}'#{disabled}>"
 
     mk_check: (ttip) ->
         disabled = if @model.frozen then ' disabled=true' else ''
         icon     = if @model.locksequence then 'lock' else 'unlocked'
         return "<button type='button' id='dpx-pk-locksequence' #{ttip} "+
-              "class='dpx-cl-freeze bk-bs-btn bk-bs-btn-default'#{disabled}>"+
+              "class='dpx-fp-freeze bk-bs-btn bk-bs-btn-default'#{disabled}>"+
               "<span class='icon-dpx-#{icon}'#{disabled} id='dpx-pk-ls-icon'>Hairpin</span></button>"
 
 export class DpxFitParams extends Widget
