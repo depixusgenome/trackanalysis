@@ -89,6 +89,15 @@ class WidgetAccess:
         self._docs = docs if isinstance(docs, (list, tuple)) else (docs,)
         self._key  = key
 
+    def get(self, value):
+        "finds the first item"
+        if isinstance(value, Model):
+            return value
+        value = ({'name': value} if isinstance(value, str) else
+                 {'type': value} if isinstance(value, type) else
+                 dict(value))
+        return next(iter(self._docs[0].select(value)))
+
     def __getitem__(self, value):
         if isinstance(value, type):
             if self._key is not None:
@@ -323,12 +332,7 @@ class _ManagedServerLoop:
 
     def click(self, model: Union[str,dict,Model], **kwa):
         "Clicks on a button on the browser side"
-        if isinstance(model, str):
-            mdl = next(iter(self.doc.select(dict(name = model))))
-        elif isinstance(model, dict):
-            mdl = next(iter(self.doc.select(model)))
-        else:
-            mdl = model
+        mdl = self.widget.get(model)
         self.change(mdl, 'click', mdl.click+1, **kwa)
 
     def change(self,        # pylint: disable=too-many-arguments
@@ -340,6 +344,7 @@ class _ManagedServerLoop:
                withnewpath = None,
                rendered    = False):
         "Changes a model attribute on the browser side"
+        mdl = self.widget.get(model)
         if withnewpath is not None or withpath is not None:
             import view.dialog  # pylint: disable=import-error
             if withnewpath is not None:
@@ -351,13 +356,6 @@ class _ManagedServerLoop:
                     return self.path(withpath)
                 fcn = _tkopen2
             self.monkeypatch.setattr(view.dialog, '_tkopen', fcn)
-
-        if isinstance(model, str):
-            mdl = next(iter(self.doc.select(dict(name = model))))
-        elif isinstance(model, dict):
-            mdl = next(iter(self.doc.select(model)))
-        else:
-            mdl = model
 
         if browser:
             self.cmd(cast(DpxTestLoaded, self.loading).change, mdl, attrs, value,

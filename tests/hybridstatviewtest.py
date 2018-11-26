@@ -85,6 +85,73 @@ def test_peaks_xlsxio():
     assert Path(out).exists()
     assert cnt > 0
 
+def _t_e_s_t_peaks(server, bkact): # pylint: disable=too-many-statements
+    import hybridstat.view._widget as widgetmod
+    filt = server.widget[widgetmod.DpxFitParams]
+    src  = server.widget['Peaks:List'].source
+    root = server.ctrl.display.get("tasks", "roottask")
+    assert filt.frozen
+    assert all(np.isnan(src.data['distance']))
+    assert all(i.strip() == '' for i in src.data['orient'])
+    server.change('Cycles:Oligos', 'value', 'ctgt')
+    assert all(np.isnan(src.data['distance']))
+    assert all(i.strip() == '' for i in src.data['orient'])
+    assert filt.frozen
+    server.change('Cycles:Oligos', 'value', '')
+    server.load('hairpins.fasta', rendered = False, andpress= False)
+    server.change('Cycles:Sequence', 'value', '←')
+    assert all(np.isnan(src.data['distance']))
+    assert all(i.strip() == '' for i in src.data['orient'])
+    assert filt.frozen
+
+    server.change('Cycles:Oligos', 'value', 'ctgt', rendered = True)
+    server.wait()
+    assert server.widget['Cycles:Oligos'].value == 'ctgt'
+    assert not all(np.isnan(src.data['distance']))
+    assert not all(i.strip() == '' for i in src.data['orient'])
+    assert not filt.frozen
+
+    menu = server.widget['Cycles:Sequence'].menu
+    lst  = tuple(i if i is None else i[0] for i in list(menu))
+    assert lst == ('₁ GF4', '₂ GF1', '₃ GF2', '₄ GF3', '₅ 015',
+                   None, 'Select a hairpin path')
+
+    def _hascstr(yes):
+        task  = server.ctrl.tasks.task(root, FitToHairpinTask)
+        assert len(task.constraints) == yes
+
+    server.change(filt, 'locksequence', True, rendered = True)
+    _hascstr(1)
+
+    server.change(filt, 'locksequence', False, rendered = True)
+    _hascstr(0)
+
+    server.change(filt, 'stretch', "1300", rendered = True)
+    _hascstr(1)
+    server.change(filt, 'stretch', "", rendered = True)
+    _hascstr(0)
+
+    out = mktemp()+"_hybridstattest100.xlsx"
+    writeparams(out, [('GF3', (0,))])
+    server.click('Peaks:IDPath', withpath = out)
+    server.wait()
+
+    menu = server.widget['Cycles:Sequence'].menu
+    lst  = tuple(i if i is None else i[0] for i in list(menu))
+    assert lst == ('₁ GF3', '✗ 015', '✗ GF1', '✗ GF2', '✗ GF4', None,
+                   'Select a hairpin path')
+
+    out = mktemp()+"_hybridstattest101.xlsx"
+    found = [0]
+    def _startfile(path):
+        found[0] = path
+    bkact.setattr(widgetmod, 'startfile', _startfile)
+    server.click('Peaks:IDPath', withnewpath = out)
+    server.wait()
+    assert found[0] == out
+    assert Path(out).exists()
+    _hascstr(1)
+
 def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-locals
     "test peaksplot"
     vals = [0.]*2
@@ -112,52 +179,14 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-
         _press('Alt-ArrowDown',   0.312381, 0.476166)
         _press('Shift-ArrowDown', 0.,       0.)
 
-        src = server.widget['Peaks:List'].source
-        assert all(np.isnan(src.data['distance']))
-        assert all(i.strip() == '' for i in src.data['orient'])
-        server.change('Cycles:Oligos', 'value', 'ctgt')
-        assert all(np.isnan(src.data['distance']))
-        assert all(i.strip() == '' for i in src.data['orient'])
-        server.change('Cycles:Oligos', 'value', '')
-        server.load('hairpins.fasta', rendered = False, andpress= False)
-        server.change('Cycles:Sequence', 'value', '←')
-        assert all(np.isnan(src.data['distance']))
-        assert all(i.strip() == '' for i in src.data['orient'])
+        _t_e_s_t_peaks(server, bokehaction)
 
-        server.change('Cycles:Oligos', 'value', 'ctgt', rendered = True)
-        server.wait()
-        assert server.widget['Cycles:Oligos'].value == 'ctgt'
-        assert not all(np.isnan(src.data['distance']))
-        assert not all(i.strip() == '' for i in src.data['orient'])
-
-        menu = server.widget['Cycles:Sequence'].menu
-        lst  = tuple(i if i is None else i[0] for i in list(menu))
-        assert lst == ('₁ GF4', '₂ GF1', '₃ GF2', '₄ GF3', '₅ 015',
-                       None, 'Select a hairpin path')
-
-        out = mktemp()+"_hybridstattest100.xlsx"
-        writeparams(out, [('GF3', (0,))])
-        server.click('Peaks:IDPath', withpath = out)
-        server.wait()
-
-        menu = server.widget['Cycles:Sequence'].menu
-        lst  = tuple(i if i is None else i[0] for i in list(menu))
-        assert lst == ('₁ GF3', '✗ 015', '✗ GF1', '✗ GF2', '✗ GF4', None,
-                       'Select a hairpin path')
-
-        out = mktemp()+"_hybridstattest101.xlsx"
-        import hybridstat.view._widget as widgetmod
-        found = [0]
-        def _startfile(path):
-            found[0] = path
-        bokehaction.setattr(widgetmod, 'startfile', _startfile)
-        server.click('Peaks:IDPath', withnewpath = out)
-        server.wait()
-        assert found[0] == out
-        assert Path(out).exists()
-        tasks = server.ctrl.display.model("tasks")
-        task  = server.ctrl.tasks.task(tasks.roottask, FitToHairpinTask)
-        assert len(task.constraints) == 1
+def test_cyclehistplot(bokehaction): # pylint: disable=too-many-statements,too-many-locals
+    "test peaksplot"
+    with bokehaction.launch('hybridstat.view.cyclehistplot.CycleHistPlotView',
+                            'app.toolbar') as server:
+        server.load('big_legacy')
+        _t_e_s_t_peaks(server, bokehaction)
 
 def test_reference(bokehaction):
     "test peaksplot"
@@ -209,4 +238,4 @@ def test_hybridstat(bokehaction):
         server.wait()
 
 if __name__ == '__main__':
-    test_hybridstat(bokehaction(None))
+    test_cyclehistplot(bokehaction(None))
