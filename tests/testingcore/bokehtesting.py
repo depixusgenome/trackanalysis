@@ -180,7 +180,7 @@ class _ManagedServerLoop:
             return ctrl
         server.MainView.MainControl.open = classmethod(_open)
 
-        def _close(this, _func_ = server.MainView.close):
+        def _close(this, *_1, _func_ = server.MainView.close, **_):
             self.server = None
             ret = _func_(this)
             return ret
@@ -207,15 +207,17 @@ class _ManagedServerLoop:
         app, launch = self.__getlauncher()
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', '.*inspect.getargspec().*')
-            import app.launcher as _launcher
+            import utils.gui as _gui
             from   app.scripting import addload
+            from   utils.gui     import storedjavascript
+
+            name = inspect.getouterframes(inspect.currentframe())[2].function
             addload("view.static", "modaldialog")
-            old, _launcher.CAN_LOAD_JS = _launcher.CAN_LOAD_JS, False
-            assert len(kwa) == 0 # not handled anymore
+            _gui.storedjavascript = lambda *_: storedjavascript("tests", name)
             try:
                 server = launch(app, **kwa)
             finally:
-                _launcher.CAN_LOAD_JS = old
+                _gui.storedjavascript = storedjavascript
 
         self.__patchserver(server)
         return server
@@ -274,8 +276,10 @@ class _ManagedServerLoop:
     def quit(self):
         "close the view"
         def _quit():
-            self.server.unlisten()
+            server = self.server
+            server.unlisten()
             self.ctrl.close()
+            server.stop()
 
         self.cmd(_quit, andstop = False)
 

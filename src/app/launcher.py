@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updates app manager so as to deal with controllers"
-from pathlib    import Path
 from typing     import Dict, Any
 
 import sys
@@ -18,7 +17,7 @@ from .scripting                 import orders
 from .maincontrol               import createview as _creator
 
 LOGS        = getLogger(__name__)
-CAN_LOAD_JS = True
+CAN_LOAD_JS = "."
 
 class _FunctionHandler(FunctionHandler):
     def __init__(self, view, stop = False):
@@ -97,27 +96,8 @@ class _FunctionHandler(FunctionHandler):
         Seq.from_json = from_json
 
         if CAN_LOAD_JS:
-            from bokeh.util import compiler
-            cache = getattr(compiler, "_bundle_cache")
-            force = False
-            for path in Path(".").glob("*.js"):
-                with open(path, encoding = 'utf-8') as stream:
-                    out = stream.readlines()
-                key = out[0][len("/*KEY="):-len("*/\n")]
-                if key == view.APPNAME.lower():
-                    cache[compiler.calc_cache_key()] = "".join(out[1:])
-                    force                            = True
-                else:
-                    cache[key] = "".join(out[1:])
-
-            key = compiler.calc_cache_key()
-            if key not in cache or force:
-                output = view.APPNAME.lower() + '.js'
-                string = compiler.bundle_all_models()
-                string = f"/*KEY={key}*/\n"+string
-                LOGS.info('caching bokeh js to %s', output)
-                with open(output, "w", encoding = 'utf-8') as stream:
-                    print(string, file=stream)
+            from utils.gui import storedjavascript
+            storedjavascript(CAN_LOAD_JS, view.APPNAME)
 
         def _stop(self, wait=True, __old__ = Server.stop):
             if not getattr(self, '_stopped', False):
