@@ -2,11 +2,13 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
+from typing                     import cast
 from tempfile                   import mktemp, gettempdir
 from pathlib                    import Path
 from pytest                     import approx       # pylint: disable=no-name-in-module
 import numpy as np
 
+from bokeh.models               import Tabs
 from tornado.gen                import sleep
 from tornado.ioloop             import IOLoop
 
@@ -23,7 +25,8 @@ from peakcalling.processor.__config__    import FitToHairpinTask
 
 def test_hybridstat_xlsxio():
     "tests xlxs production"
-    track = Path(utfilepath("big_legacy")).parent/"*.trk", utfilepath("CTGT_selection")
+    path  = cast(Path, utfilepath("big_legacy"))
+    track = Path(path).parent/"*.trk", utfilepath("CTGT_selection")
     itr   = _hmodels(dict(track     = track, # type: ignore
                           sequence  = utfilepath("hairpins.fasta")))
     mdl   = next(itr)
@@ -54,8 +57,8 @@ def test_hybridstat_xlsxio():
 
 def test_peaks_xlsxio():
     "tests xlxs production"
-    itr  = _pmodels(dict(track = (Path(utfilepath("big_legacy")).parent/"*.trk",
-                                  utfilepath("CTGT_selection"))))
+    path = cast(Path, utfilepath("big_legacy"))
+    itr  = _pmodels(dict(track = (Path(path).parent/"*.trk", utfilepath("CTGT_selection"))))
     mdl  = next(itr)
 
     for path in Path(gettempdir()).glob("*_hybridstattest*.*"):
@@ -180,27 +183,29 @@ def test_reference(bokehaction):
 
 def test_hybridstat(bokehaction):
     "test hybridstat"
-    with bokehaction.launch('hybridstat.view', 'app.toolbar') as server:
-        tabs        = server.widget['Hybridstat:Tabs']
-        indcleaning = next(i for i, j in enumerate(tabs.tabs) if j.title == 'Cleaning')
-        indcyc      = next(i for i, j in enumerate(tabs.tabs) if j.title == 'Cycles')
+    with bokehaction.launch('hybridstat.view.HybridStatView', 'app.toolbar') as server:
+        tabs = next(iter(server.doc.select({'type': Tabs})))
         for i in range(len(tabs.tabs)):
-            server.change('Hybridstat:Tabs', 'active', i)
+            server.change(tabs, 'active', i)
+            server.wait()
 
-        server.change('Hybridstat:Tabs', 'active', indcleaning)
+        mdl         = server.ctrl.theme.model("app.tabs")
+        assert list(mdl.titles.values()) == [i.title for i in tabs.tabs]
+        indcleaning = next(i for i, j in enumerate(mdl.titles) if j == 'cleaning')
+        indcyc      = next(i for i, j in enumerate(mdl.titles) if j == 'cycles')
+        server.change(tabs, 'active', indcleaning)
         server.load('big_legacy')
 
-        for i in range(len(server.widget['Hybridstat:Tabs'].tabs)):
-            server.change('Hybridstat:Tabs', 'active', i, rendered = True)
+        for i in range(len(tabs.tabs)):
+            server.change(tabs, 'active', i, rendered = i != indcleaning)
+            if i == indcleaning:
+                server.wait()
 
-        server.change('Hybridstat:Tabs', 'active', indcleaning)
-        server.change('Cleaning:Filter', 'subtracted', "38")
+        server.change(tabs, 'active', indcleaning)
         server.wait()
-
-        server.change('Main:toolbar', 'discarded', '38')
-        server.wait()
-
-        server.change('Hybridstat:Tabs', 'active', indcyc)
+        server.change('Cleaning:Filter', 'subtracted', "38", rendered = True)
+        server.change('Main:toolbar', 'discarded', '38', rendered = True)
+        server.change(tabs, 'active', indcyc)
         server.wait()
 
 if __name__ == '__main__':

@@ -24,7 +24,7 @@ class TabsTheme:
         self.initial: str            = initial
         self.width:   int            = 600
         self.height:  int            = 30
-        self.titles:  Dict[str, str] = {}
+        self.titles:  Dict[str, str] = OrderedDict()
         for i, j in panels.items():
             self.titles[j] = getattr(i, 'PANEL_NAME', j.capitalize())
         assert self.initial in self.titles
@@ -72,15 +72,20 @@ class TabsView(BokehView, Generic[TThemeType]):
     def __init__(self, ctrl = None, **kwa):
         "Sets up the controller"
         super().__init__(ctrl = ctrl, **kwa)
-        mdl          = templateattribute(self, 0)() # type: ignore
-        self.__theme = ctrl.theme.add(mdl)
-        self._panels = [cls(ctrl, **kwa) for cls in self.KEYS]
+        mdl           = templateattribute(self, 0)() # type: ignore
+        self.__theme  = ctrl.theme.add(mdl)
+        self.__panels = [cls(ctrl, **kwa) for cls in self.KEYS]
 
         cur = self.__select(self.__initial())
         for panel in self._panels:
             desc = type(panel.plotter).state
             desc.setdefault(panel.plotter, (PlotState.active if panel is cur else
                                             PlotState.disabled))
+
+    @property
+    def _panels(self):
+        vals = {self.__key(i): i for i in self.__panels}
+        return [vals[i] for i in self.__theme.titles]
 
     def __initial(self):
         "return the initial tab"
