@@ -37,6 +37,9 @@ class DpxKeyEvent(Model):
         self._keys     = KeyCalls()
         self._bindings = KeyStrokes()
 
+    def __contains__(self, val):
+        return val in self._bindings.values() and val in self.keys
+
     def _setkeys(self):
         self.keys = [self._bindings[name] for name in self._keys]
 

@@ -700,7 +700,7 @@ class PlotView(Generic[PlotType], BokehView):
                     name+'yhigh'   : meta+'ArrowUp'}
 
         ctrl.theme.updatedefaults('keystroke',
-                                  reset = 'Shift -',
+                                  reset = 'Shift- ',
                                   **_gesture('pan', 'Alt-'),
                                   **_gesture('zoom', 'Shift-'))
         self._plotter = self.plottype()(ctrl)

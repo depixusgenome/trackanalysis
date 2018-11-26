@@ -33,6 +33,10 @@ class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
                          zoomrate = mdl['zoomrate'],
                          panrate  = mdl['panrate'],
                          **defaultsizingmode(plotter, kwa, ctrl = ctrl))
+
+    def __contains__(self, value):
+        return value in self.keys # pylint: disable=unsupported-membership-test
+
     @classmethod
     def keyedlayout(cls, ctrl, plot, main, *figs, bottom = None, left = None, right = None):
         "sets up a DpxKeyedRow layout"

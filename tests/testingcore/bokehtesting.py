@@ -61,6 +61,7 @@ class DpxTestLoaded(Model):
 
     def press(self, key, model):
         "Sets-up a new keyevent in JS"
+        assert model is None or key in model
         val = '-' if key == '-' else key.split('-')[-1]
         evt = dict(alt   = 'Alt-'     in key,
                    shift = 'Shift-'   in key,
