@@ -29,6 +29,31 @@ def coffee(apath: Union[str,Path], name:Optional[str] = None, **kwa) -> str:
         src = src.replace("$$"+title, val)
     return src.replace('$$', '')
 
+def storedjavascript(inpt, name):
+    "get stored javascript"
+    from bokeh.util import compiler
+    cache = getattr(compiler, "_bundle_cache")
+    force = False
+    name  = name.lower()
+    for path in Path(inpt).glob("*.js"):
+        with open(path, encoding = 'utf-8') as stream:
+            out = stream.readlines()
+        key = out[0][len("/*KEY="):-len("*/\n")]
+        if key == name:
+            cache[compiler.calc_cache_key()] = "".join(out[1:])
+            force                            = True
+        else:
+            cache[key] = "".join(out[1:])
+
+    key = compiler.calc_cache_key()
+    if key not in cache or force:
+        output = (Path(inpt)/name).with_suffix('.js')
+        string = compiler.bundle_all_models()
+        string = f"/*KEY={key}*/\n"+string
+        LOGS.info('caching bokeh js to %s', output)
+        with open(output, "w", encoding = 'utf-8') as stream:
+            print(string, file=stream)
+
 def implementation(apath, *args, extra = None, **kwa):
     "returns the coffeescript implementation"
     path = Path(apath).with_suffix('.coffee')
