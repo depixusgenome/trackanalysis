@@ -10,7 +10,7 @@ def build_bokehjs(bld, key, *modules):
     mods = [i.split('.')[0] for i in modules]
     mods = [j for i, j in enumerate(mods) if j not in mods[:i]]
     srcs = sum((root.ant_glob(i.replace('.', '/')+'/**/*.coffee') for i in mods), [])
-    tgt  = copyroot(bld, modules[0]+'.js')
+    tgt  = copyroot(bld, key+'.js')
 
     cmd  = str(bld.path.ctx.srcnode.find_resource('makescripts/bokehcompiler.py'))
     rule = f'{bld.env["PYTHON"][0]} {cmd} '+' '.join(modules)+' -o ${TGT} -k '+key
