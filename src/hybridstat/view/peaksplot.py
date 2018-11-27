@@ -148,10 +148,8 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
 
         def _reset(tmp):
             dicos = self.__defaults() if tmp is None else tmp
-            if (tmp is not None
-                    and self._model.identification.task is not None
-                    and len(self._model.distances) == 0):
-                self._errors.reset(cache, "Fit unsuccessful!", False)
+            if tmp is not None and self._model.fiterror():
+                self._errors.reset(cache, self._theme.fiterror, False)
 
             for i, j in dicos.items(): # type: ignore
                 cache[self._src[i]].update(data = j)

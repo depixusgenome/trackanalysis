@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View for cleaning data"
+from copy                   import deepcopy
 from typing                 import Dict, List, cast
 
 import numpy as np
@@ -18,7 +19,7 @@ from utils                  import initdefaults
 from view.plots             import PlotView
 from view.plots.ploterror   import PlotError
 from view.plots.tasks       import TaskPlotCreator, CACHE_TYPE
-from ._model                import PeaksPlotModelAccess, createpeaks
+from ._model                import PeaksPlotModelAccess, PeaksPlotTheme, createpeaks
 from ._widget               import PeaksPlotWidgets, PeakListTheme
 from ._io                   import setupio
 
@@ -31,12 +32,12 @@ class CyclePlotTheme(PlotTheme):
     name      = "cyclehist.plot.cycle"
     figsize   = PlotTheme.defaultfigsize(530, 300)
     phasezoom = PHASE.measure, 20
-    xlabel    = 'Time (s)'
-    ylabel    = 'Bases'
+    fiterror  = PeaksPlotTheme.fiterror
+    xlabel    = PlotTheme.xtoplabel
+    ylabel    = PlotTheme.yrightlabel
     ntitles   = 5
     format    = '0.0a'
-    frames    = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'}, 'line', 1.,
-                          alpha=.25)
+    frames    = PlotAttrs(deepcopy(PeaksPlotTheme.count.color), 'line', 1., alpha=.25)
     toolbar   = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,reset,save'
     @initdefaults(frozenset(locals()))
@@ -57,23 +58,17 @@ class HistPlotTheme(PlotTheme):
     """
     cleaning plot theme
     """
-    name     = "cyclehist.plot.hist"
-    figsize  = (1000-CyclePlotTheme.figsize[0],)+CyclePlotTheme.figsize[1:]
-    xlabel   = 'Rate (%)'
-    ylabel   = CyclePlotTheme.ylabel
-    explabel = 'Hybridisations'
-    reflabel = 'Hairpin'
-    formats  = {'bases': '0.0a', 'ref': '0', 'exp': '0.0'}
-    hist     = PlotAttrs(CyclePlotTheme.frames.color, 'line',      1)
-    events   = PlotAttrs(hist.color,                'circle',    3, alpha = .25)
-    peaks    = PlotAttrs(hist.color,                'triangle', 5,  alpha = 0.,
-                         angle = np.pi/2.)
-    pkcolors = dict(dark  = dict(reference = 'bisque',
-                                 missing   = 'red',
-                                 found     = 'black'),
-                    basic = dict(reference = 'bisque',
-                                 missing   = 'red',
-                                 found     = 'gray'))
+    name             = "cyclehist.plot.hist"
+    figsize          = (1000-CyclePlotTheme.figsize[0],)+CyclePlotTheme.figsize[1:]
+    xlabel           = PeaksPlotTheme.xlabel
+    ylabel           = CyclePlotTheme.ylabel
+    explabel         = 'Hybridisations'
+    reflabel         = 'Hairpin'
+    formats          = {'bases': '0.0a', 'ref': '0', 'exp': '0.0'}
+    hist             = deepcopy(PeaksPlotTheme.count)
+    events           = deepcopy(PeaksPlotTheme.eventscount)
+    peaks            = PlotAttrs(hist.color, 'triangle', 5,  alpha = 0., angle = np.pi/2.)
+    pkcolors         = deepcopy(PeaksPlotTheme.pkcolors)
     minzoomz         = .008
     toolbar          = dict(CyclePlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,hover,reset,save'
@@ -137,10 +132,8 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
 
         def _display(items):
             data = self._data(items)
-            if (items is not None
-                    and self._model.identification.task is not None
-                    and len(self._model.distances) == 0):
-                self._errors.reset(cache, "Fit unsuccessful!", False)
+            if items is not None and self._model.fiterror():
+                self._errors.reset(cache, self._theme.fiterror, False)
 
             self.__setbounds(cache, data)
             cache[self._src]['data'] = data

@@ -104,7 +104,8 @@ class PeaksSequencePathWidget(SequencePathWidget):
 
         tmp  = self.__peaks.identification.constraints()[0]
         menu = [i[0] for i in out['menu'][:-2] if tmp is None or i[0] == tmp]
-        menu = sorted(menu, key = lambda i: (dist.get(i, (np.finfo('f4').max,))[0], i))
+        menu = (sorted((i for i in menu if i in dist), key = dist.__getitem__)
+                +sorted(i for i in menu if i not in dist))
 
         def _get(i, j):
             if j in dist:
@@ -507,7 +508,6 @@ class FitParamsWidget:
                     stretch      = str(cstrs[1]) if cstrs[1] else "",
                     bias         = str(cstrs[2]) if cstrs[2] else "",
                     frozen       = ctrl.task is None)
-
 
 class _IdAccessor:
     _LABEL  = '%({self._attrname}){self._fmt}'

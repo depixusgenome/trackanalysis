@@ -46,6 +46,7 @@ class PeaksPlotTheme(PlotTheme):
     figsize         = PlotTheme.defaultfigsize(500, 700)
     xtoplabel       = 'Duration (s)'
     xlabel          = 'Rate (%)'
+    fiterror        = "Fit unsuccessful!"
     ntitles         = 4
     count           = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'}, 'line', 1)
     eventscount     = PlotAttrs(count.color, 'circle', 3)
@@ -584,6 +585,14 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         @ctrl.tasks.observe("addtask", "updatetask", "removetask")
         def _onchangetasks(**_):
             self._poolcompute()
+
+    def fiterror(self) -> bool:
+        "True if not fit was possible"
+        if self.identification.task is None:
+            return False
+        maxv = np.finfo('f4').max
+        dist = self.peaksmodel.display.distances
+        return all(i[0] == maxv or not np.isfinite(i[0]) for i in dist.values())
 
     @staticmethod
     def _poolrun(pipe, procs, refcache, keys):

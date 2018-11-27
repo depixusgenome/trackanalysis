@@ -41,7 +41,7 @@ class PlotTheme:
     """
     name           = ''
     ylabel         = 'Z (μm)'
-    yrightlabel    = 'Base number'
+    yrightlabel    = 'Bases'
     xtoplabel      = 'Time (s)'
     xlabel         = 'Frames'
     figsize        = defaultfigsize()
