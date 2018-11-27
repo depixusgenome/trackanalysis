@@ -370,16 +370,21 @@ def test_message_creation():
     else:
         assert False
 
-def test_view(bokehaction):
+def test_cleaningview(bokehaction):
     "test the view"
     with bokehaction.launch('cleaning.view.CleaningView', 'app.toolbar') as server:
         server.load('big_legacy')
+
+        assert 'config.tasks' not in server.savedconfig
 
         assert server.task(DataCleaningTask).maxhfsigma != 0.002
         server.change('Cleaning:Filter', 'maxhfsigma', 0.002)
         server.wait()
         assert server.widget['Cleaning:Filter'].maxhfsigma == 0.002
         assert server.task(DataCleaningTask).maxhfsigma == 0.002
+
+        cnf = server.savedconfig['config.tasks']['picotwist']['datacleaning']
+        assert cnf.maxhfsigma == 0.002
 
         server.change('Cleaning:Filter', 'subtracted', "11")
         server.wait()
@@ -427,4 +432,4 @@ def test_clippingtask():
     assert np.all(np.isnan(arr[nzer]))
 
 if __name__ == '__main__':
-    test_clippingtask()
+    test_cleaningview(bokehaction(None))

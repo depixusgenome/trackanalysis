@@ -374,6 +374,15 @@ class _ManagedServerLoop:
         "Returns something to access web elements"
         return WidgetAccess(self.doc)
 
+    @property
+    def savedconfig(self):
+        "return the saved config"
+        from app.configuration          import ConfigurationIO
+        import anastore
+        path = ConfigurationIO(self.ctrl).configpath(next(anastore.iterversions('config')))
+        print(path)
+        return anastore.load(path)
+
 class BokehAction:
     "All things to make gui testing easy"
     def __init__(self, mkpatch):

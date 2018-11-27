@@ -6,12 +6,10 @@ import warnings
 from pytest                     import approx       # pylint: disable=no-name-in-module
 
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
-from app.configuration          import ConfigurationIO
 from view.plots                 import DpxKeyedRow
 
 def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
     "test cyclesplot basic stuff"
-    import anastore
     vals = [0.]*2
     def _printrng(old = None, model = None, **_):
         if 'ybounds' in old:
@@ -51,14 +49,13 @@ def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
 
         server.change('Cycles:Oligos', 'value', ' TGGC  , aatt')
         assert server.widget['Cycles:Oligos'].value == 'aatt, tggc'
-        path = ConfigurationIO(server.ctrl).configpath(next(anastore.iterversions('config')))
-        cnf  = anastore.load(path)
+        cnf  = server.savedconfig
         assert cnf['config.sequence']['probes'] == ['aatt', 'tggc']
         assert cnf['config.sequence']['history'] == [['aatt', 'tggc']]
 
         server.change('Cycles:Oligos', 'value', '')
         assert server.widget['Cycles:Oligos'].value == ''
-        cnf = anastore.load(path)
+        cnf  = server.savedconfig
         assert not cnf['config.sequence'].get('probes', None)
         assert cnf['config.sequence']['history'] == [['aatt', 'tggc']]
 
