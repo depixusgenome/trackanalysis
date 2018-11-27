@@ -45,7 +45,7 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
         if pool is None:
             app = partial(cls._unpooled, cnf)
         else:
-            app = partial(cls._pooled, pool, pooldump(data.append(cls.CHILD(cnf))), cnf)
+            app = partial(cls._pooled, cnf, pool, pooldump(data.append(cls.CHILD(cnf))))
 
         return partial(cls._apply, app) if toframe is None else cls._apply(app, toframe)
 
@@ -75,7 +75,7 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
         best = {itm.key: min(itm.distances, key = itm.distances.__getitem__, default = '✗')
                 for itm in out.values()}
         for i, j  in best.items():
-            if getattr(cstrs.get(i, None), 'hairpin', None) == j:
+            if getattr(cstrs.get(i, None), 'hairpin', None) == j or j == '✗':
                 # if it's a constraint, keep the user's choice
                 continue
             if out[i].distances[j][0] == DEFAULT_BEST :
@@ -92,7 +92,7 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
         return []
 
     @classmethod
-    def _pooled(cls, pool, pickled, frame, cnf):
+    def _pooled(cls, cnf, pool, pickled, frame):
         out        = cls.__output(pooledinput(pool, pickled, frame.data),
                                   cnf.get('constraints', {}))
         frame.data = {i.key: i for i in out}

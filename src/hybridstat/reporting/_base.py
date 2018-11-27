@@ -77,7 +77,7 @@ class ChartCreator:
     def _peaks(self, ref:Group, bead:Bead):
         if bead is None:
             if ref.key not in self._parent.config.hairpins:
-                return np.empty(0, dtype = 'f4')
+                return np.zeros(1, dtype = 'f4')
             return self._parent.config.hairpins[ref.key].peaks
         return bead.peaks['zvalue'] # type: ignore
 

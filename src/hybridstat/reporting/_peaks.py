@@ -225,6 +225,8 @@ class PeaksSheet(Reporter):
             if group.key in self.config.hairpins:
                 hpin = self.config.hairpins[group.key]
                 yield from ((group, None, i) for i in range(len(hpin.peaks)))
+            else:
+                yield (group, None, 0)
 
             for bead in group.beads:
                 yield from ((group, bead, i) for i in range(len(bead.peaks)))
@@ -277,8 +279,6 @@ class PeaksSheet(Reporter):
                    fmt   = Reporter.basefmt)
     def _peakref(self, *args) -> Optional[float]:
         "Position of the peak in the reference's frame"
-        if args[0].key not in self.config.hairpins:
-            return None
         return self._pos.position(*args)
 
     @column_method("Distance to Reference",
