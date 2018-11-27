@@ -292,6 +292,7 @@ class PlotThemeView(PlotTheme):
         fig = figure(**self.figargs(**kwa))
         if self.toolbar.get('hide', False):
             fig.toolbar.autohide = True
+        fig.toolbar.logo = None
         return fig
 
 class PlotUpdater(list):
