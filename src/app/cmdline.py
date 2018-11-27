@@ -10,6 +10,9 @@ import glob
 import subprocess
 import random
 import inspect
+import warnings
+
+import numpy as np
 
 import click
 
@@ -253,6 +256,10 @@ def defaultclick(*others):
         fcn = click.option("-c", "--config",
                            multiple   = True,
                            help       = 'Changing the config')(fcn)
+        fcn = click.option("-w", "--wall",
+                           flag_value = True,
+                           default    =  False,
+                           help       = 'sets warnings as errors')(fcn)
 
         for i in others:
             fcn = i(fcn)
@@ -264,6 +271,30 @@ def defaultclick(*others):
         return click.command()(fcn)
     return _wrapper
 
+class Warnings:
+    "sets warnings"
+    def __init__(self):
+        self._old = None
+
+    def set(self, yes: bool):
+        "sets the warnings"
+
+        if yes:
+            warnings.filterwarnings('error', category = RuntimeWarning, message = ".*All-NaN.*")
+            warnings.filterwarnings('error', category = FutureWarning)
+            warnings.filterwarnings('error', category = DeprecationWarning)
+            warnings.filterwarnings('error', category = PendingDeprecationWarning)
+            warnings.filterwarnings('ignore', category = DeprecationWarning,
+                                    message  = '.*generator .* raised StopIteration.*')
+            self._old = np.seterr(all='raise')
+            return
+        old, self._old = self._old, None
+        if old:
+            np.seterr(**old)
+            warnings.resetwarnings()
+
+WARNINGS = Warnings()
+
 @defaultclick(click.option('-b', "--bead",
                            type       = int,
                            default    = None,
@@ -274,8 +305,10 @@ def defaultclick(*others):
                            help       = 'track path, gr path and match'),
               click.argument('files', nargs = -1, type = click.Path()))
 def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
-         gui, config, port, raiseerr, nothreading):
+         gui, config, wall, port, raiseerr, nothreading):
     "Launches an view"
+    if wall:
+        WARNINGS.set(True)
     _files(tracks, files, bead)
     _config(config)
     return defaultmain(view, gui, port, raiseerr, nothreading, "app.toolbar")
