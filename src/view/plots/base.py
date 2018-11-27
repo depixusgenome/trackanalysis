@@ -9,6 +9,7 @@ from    contextlib              import contextmanager
 from    functools               import wraps
 from    time                    import time
 from    threading               import RLock
+import  warnings
 
 import  numpy        as     np
 
@@ -482,22 +483,27 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
             if cache is None:
                 cache = self._OrderedDict()
             yield cache
-            for i, j in cache.items():
-                if self.state != PlotState.resetting:
-                    break
-                try:
-                    upd = getattr(i, 'update', None)
-                    if upd is None:
-                        if callable(j):
-                            j(i)
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore',
+                                        category = DeprecationWarning,
+                                        message  = ".*elementwise == comparison failed;.*")
+                for i, j in cache.items():
+                    if self.state != PlotState.resetting:
+                        break
+                    try:
+                        upd = getattr(i, 'update', None)
+                        if upd is None:
+                            if callable(j):
+                                j(i)
+                            else:
+                                LOGS.warning("incorrect bk update (%s, %s)", i, j)
                         else:
-                            LOGS.warning("incorrect bk update (%s, %s)", i, j)
-                    else:
-                        upd(**j)
-                except ValueError as exc:
-                    raise ValueError(f'Error updating {i} = {j}') from exc
-                except Exception as exc:
-                    raise RuntimeError(f'Error updating {i} = {j}') from exc
+                            upd(**j)
+                    except ValueError as exc:
+                        raise ValueError(f'Error updating {i} = {j}') from exc
+                    except Exception as exc:
+                        raise RuntimeError(f'Error updating {i} = {j}') from exc
         finally:
             if self.state == PlotState.resetting:
                 self.state = old
