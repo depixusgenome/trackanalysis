@@ -66,8 +66,8 @@ class HistPlotTheme(PlotTheme):
     reflabel         = 'Hairpin'
     formats          = {'bases': '0.0a', 'ref': '0', 'exp': '0.0'}
     hist             = deepcopy(PeaksPlotTheme.count)
-    events           = deepcopy(PeaksPlotTheme.eventscount)
-    peaks            = PlotAttrs(hist.color, 'triangle', 5,  alpha = 0., angle = np.pi/2.)
+    events           = PlotAttrs(hist.color, 'circle',   3, alpha = .25)
+    peaks            = PlotAttrs(hist.color, 'triangle', 5, alpha = 0., angle = np.pi/2.)
     pkcolors         = deepcopy(PeaksPlotTheme.pkcolors)
     minzoomz         = .008
     toolbar          = dict(CyclePlotTheme.toolbar)
@@ -269,8 +269,8 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
 
         out['hist'].update(z = zvals, count = cnt)
 
-        pos    = (np.concatenate(itms.positions) -self._model.bias)*self._model.stretch
-        hmin   = (self._model.fittoreference.hmin-self._model.bias)*self._model.stretch
+        pos  = (np.concatenate(itms.positions) -self._model.bias)*self._model.stretch
+        hmin = np.median(cnt)/100
         out['events'].update(z = pos, count = interpolator(zvals, cnt, hmin)(pos))
         return out
 

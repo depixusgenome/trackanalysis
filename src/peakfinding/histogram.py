@@ -294,8 +294,9 @@ def interpolator(xaxis, yaxis = None, miny = 1e-3, **kwa):
     tmp   = np.nonzero(np.abs(np.diff(yaxis)) > miny*1e-2)[0]
     good  = np.union1d(tmp, tmp+1)
 
-    yaxis = yaxis[good]
-    xaxis = xaxis[good]
+    if len(good) > 1:
+        yaxis = yaxis[good]
+        xaxis = xaxis[good]
 
     kwa.setdefault('fill_value',   np.NaN)
     kwa.setdefault('bounds_error', False)
