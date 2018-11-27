@@ -18,7 +18,7 @@ from ._core         import cost as _cost, match as _match # pylint: disable=impo
 class HairpinFitter(OptimizationParams):
     "Class containing theoretical peaks and means for matching them to experimental ones"
     peaks           = np.empty((0,), dtype = 'f4') # type: np.array
-    hassinglestrand = False
+    strandsize      = 0
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -28,6 +28,11 @@ class HairpinFitter(OptimizationParams):
     def hasbaseline(self) -> bool:
         "whether z = 0 is in peaks"
         return len(self.peaks) > 0 and self.peaks[0] == 0
+
+    @property
+    def hassinglestrand(self) -> bool:
+        "whether z = 0 is in peaks"
+        return len(self.peaks) > 0 and self.peaks[-1] == self.strandsize
 
     @staticmethod
     def topeaks(seq:str, oligos:Sequence[str]) -> np.ndarray:
@@ -43,8 +48,9 @@ class HairpinFitter(OptimizationParams):
                  _read(path))
 
         for name, seq in cast(Iterator[Tuple[str,Any]], itr):
-            self = cls(**kwa, peaks = cls.topeaks(seq, oligos))
-            self.hassinglestrand = len(self.peaks) and self.peaks[-1] == len(seq)
+            self = cls(**kwa,
+                       peaks      = cls.topeaks(seq, oligos),
+                       strandsize = len(seq))
             yield (name, self)
 
     @staticmethod
@@ -60,13 +66,15 @@ class HairpinFitter(OptimizationParams):
 
     def withinrange(self, extension) -> bool:
         "return whether the bead extension is within range of the last peak (hairpin size)"
+        if self.strandsize == 0:
+            return True
         if len(self.peaks) == 0:
             return False
         mins = (self.stretch.center or self.defaultstretch) - self.stretch.size
         maxs = (self.stretch.center or self.defaultstretch) + self.stretch.size
         minb = (self.bias.center or 0.) - self.bias.size
         maxb = (self.bias.center or 0.) + self.bias.size
-        return (extension-maxb)*mins < self.peaks[-1] < (extension-minb)*maxs
+        return (extension-maxb)*mins < self.strandsize < (extension-minb)*maxs
 
     def defaultparameters(self):
         "return the default parameters"

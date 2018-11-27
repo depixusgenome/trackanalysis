@@ -109,8 +109,8 @@ class FitToHairpinTask(Task):
         else:
             ifit = cast(HairpinFitter, fit)
             fits = {i: updatecopy(ifit, True,
-                                  peaks           = j.peaks,
-                                  hassinglestrand = j.hassinglestrand)
+                                  peaks      = j.peaks,
+                                  strandsize = j.strandsize)
                     for i, j in ifit.read(path, oligos)}
 
         imatch = (cls.DEFAULT_MATCH() if not match or match is DefaultValue else
@@ -119,8 +119,8 @@ class FitToHairpinTask(Task):
 
         return cls(fit   = fits,
                    match = {key: updatecopy(imatch, True,
-                                            peaks           = value.peaks,
-                                            hassinglestrand = value.hassinglestrand)
+                                            peaks      = value.peaks,
+                                            strandsize = value.strandsize)
                             for key, value in fits.items()})
 
 PeakEvents      = Iterable[PeakFindingOutput]
