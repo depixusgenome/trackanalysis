@@ -234,9 +234,11 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
             xarr  = [0., xarr.max() if len(xarr) else 1.]
 
             pks   = data['peaks']['z']
-            xbnds = data['peaks']['count'][pks > pks[0] + self._theme.minzoomz]
-            xbnds = xbnds[np.isfinite(xbnds)]
-            xbnds = [0., xbnds.max() if len(xbnds) > 1 else 1.]
+            xbnds = np.empty(0, dtype = 'f4')
+            if len(pks) > 1:
+                xbnds = data['peaks']['count'][pks > pks[0] + self._theme.minzoomz]
+                xbnds = xbnds[np.isfinite(xbnds)]
+            xbnds = [0., xbnds.max() if len(xbnds) else 1.]
 
             self.setbounds(cache, self._fig, xarr, data['hist']["z"], xbnds)
 
