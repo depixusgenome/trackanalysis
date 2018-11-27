@@ -35,7 +35,7 @@ class PlotError:
         titles  = [i for i in self._fig.above if isinstance(i, Title)]
         if label:
             if isinstance(label, DataCleaningException):
-                label = str(label.args[0])
+                label = label.args[0].getmessage(percentage = True)
             else:
                 label = str(label)
 

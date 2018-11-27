@@ -73,7 +73,7 @@ class CyclesListTheme:
                ['population', u'% good',      '0.'],
                ['hfsigma',    u'σ[HF]',       '0.0000'],
                ['extent',     u'Δz',          '0.00'],
-               ['pingpong',   u'Σ|dz|',       '0.0'],
+               ['pingpong',   u'∑|dz|',       '0.0'],
                ['saturation', u'Non-closing', ''],
                ['discarded',  u'Discarded',   '']]
 
@@ -280,6 +280,7 @@ class WidgetMixin(ABC):
            σ[HF] >                               %(cleaning.minhfsigma).3F
            σ[HF] <                               %(cleaning.maxhfsigma).3F
            % good frames >                       %(cleaning.minpopulation)D
+           <b> Non-closing cycles</b>
            Cycles are closed if |z(φ1)-z(φ5)| <  %(cleaning.maxdisttozero)D
            % non-closing cycles <                %(cleaning.maxsaturation)D
            <b></b>

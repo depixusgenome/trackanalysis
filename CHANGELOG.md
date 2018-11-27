@@ -189,7 +189,7 @@ Tests were made more stringent:
 * σ[HF] is tested over phases 1 to 5 instead of 5 only
 * the min population is tested over phases 1 to 5 instead of 5 only
 
-A new test was added. It is noted as `Σ|dz|` and does the following:
+A new test was added. It is noted as `∑|dz|` and does the following:
 * computes the absolute value of the derivative of z in time,
 * discards values lower 1e-2 (~ 3 times the usual precision),
 * sums the remaining values.

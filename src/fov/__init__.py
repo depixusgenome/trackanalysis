@@ -11,6 +11,7 @@ from bokeh.plotting         import Figure
 from control                import Controller
 from control.action         import Action
 from control.beadscontrol   import DataSelectionBeadController
+from cleaning.processor     import DataCleaningErrorMessage
 from data                   import BEADKEY
 from model.plots            import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from qualitycontrol.view    import QualityControlModelAccess
@@ -50,11 +51,7 @@ class FoVPlotTheme(PlotTheme):
     calibsize   = 6./16
     calibtools  = 'pan,box_zoom,save'
     tooltips    = '<table>@ttips{safe}</table>'
-    tooltiptype = {'extent'     : 'Δz',
-                   'pingpong'   : 'Σ|dz|',
-                   'hfsigma'    : 'σ[HF]',
-                   'population' : '% good',
-                   'saturation' : 'non-closing'}
+    tooltiptype = dict(DataCleaningErrorMessage.NAMES)
     tooltiprow  = ('<tr>'
                    +'<td>{cycle}</td><td>cycle{plural} with:</td>'
                    +'<td>{type}</td><td>{message}</td>'

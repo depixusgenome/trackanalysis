@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "cleaning the raw data after bead subraction"
-from    typing            import Optional, Dict, Any, List, Tuple, Type
+from    typing            import Optional, Dict, Any, List, Tuple, Type, cast
 from    itertools         import repeat
 from    functools         import partial
 
@@ -43,18 +43,23 @@ class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
 
 class DataCleaningErrorMessage:
     "creates the error message upon request"
+    NAMES = {'saturation': 'non-closing', 'population': '% good',
+             'hfsigma':    'σ[HF]',       'extent':     'Δz',
+             'pingpong':   '∑|dz|'}
     def __init__(self, stats, cnf:Dict[str,Any], # pylint: disable=too-many-arguments
                  tasktype:Type[DataCleaningTask],
                  beadid: BEADKEY,
-                 parents: tuple) -> None:
+                 parents: tuple,
+                 ncycles: int = 0) -> None:
         self.stats    = stats
         self.config   = cnf
         self.tasktype = tasktype
         self.beadid   = beadid
         self.parents  = parents
+        self.ncycles  = ncycles
 
     def __str__(self):
-        return self.message(self.tasktype, self.stats, **self.config)
+        return self.getmessage()
 
     def __getstate__(self):
         state            = dict(self.__dict__)
@@ -82,39 +87,35 @@ class DataCleaningErrorMessage:
                  ('extent',     '> %.2f',   'max'),
                  ('pingpong',   '> %.1f',   'max'))
 
-        vals  = ((get1(i[0], i[-1]), i[0], i[1] % get2(i[0], i[-1])) for i in msg)
-        return [i for i in vals if i[0]]
+        vals       = [[get1(i[0], i[-1]), i[0], i[1] % get2(i[0], i[-1])] for i in msg]
+        if vals[0][0]:
+            cnt        = stats['saturation'].values
+            cnt        = cnt[np.isfinite(cnt)]
+            vals[0][0] = (cnt > get2('maxdisttozero', "")).sum()
+        return [cast(Tuple[Optional[int], str, str], tuple(i)) for i in vals if i[0]]
+
+    def getmessage(self, percentage = False):
+        "returns the message"
+        data = sorted(self.data(), reverse = True)
+        if len(data) == 1 and data[0][0] is None:
+            return 'has less than %s %% valid points' % data[0][-1][1:].strip()
+
+        if percentage and self.ncycles > 0:
+            templ = '{:.0f}% cycles: {} {}'
+            return '\n'.join(templ.format(i[0]/self.ncycles*100, self.NAMES[i[1]], i[2])
+                             for i in data)
+
+        templ = '{} cycles: {} {}'
+        return '\n'.join(templ.format(i[0], self.NAMES[i[1]], i[2]) for i in data)
 
     @classmethod
-    def message(cls, tasktype, stats, **cnf) -> str:
+    def message(cls, tasktype, stats, beadid = None, parents = (), **cnf) -> str:
         "returns a message if the test is invalid"
-        dflt = tasktype()
-        if stats is None:
-            pop = cnf.get('minpopulation', dflt.minpopulation)
-            return 'has less than %d %% valid points' % pop
-
-        stats = {i.name: i  for i in stats}
-        get   = lambda i, j: (len(getattr(stats[i], j)),
-                              cnf.get(j+i, getattr(dflt, j+i)))
-        msg   = ('%d cycles: non-closing > %.0f%%' % get('saturation', 'max'),
-                 '%d cycles: %%good < %.0f%%'      % get('population', 'min'),
-                 '%d cycles: σ[HF] < %.4f'         % get('hfsigma',    'min'),
-                 '%d cycles: σ[HF] > %.4f'         % get('hfsigma',    'max'),
-                 '%d cycles: Δz < %.2f'            % get('extent',     'min'),
-                 '%d cycles: Δz > %.2f'            % get('extent',     'max'),
-                 '%d cycles: Σ|dz| > %.1f'         % get('pingpong',   'max'))
-
-        lines = sorted((-int(i[:i.find(' ')]), i) for i in msg if i[0] != '0')
-        return '\n'.join(i for _, i in lines)
+        ncycles = cnf.pop('ncycles', 0)
+        return cls(stats, cnf, tasktype, beadid, parents).getmessage(ncycles)
 
 class DataCleaningException(ProcessorException):
     "Exception thrown when a bead is not selected"
-    @classmethod
-    def create(cls, stats, cnf, tasktype, beadid, parents): # pylint: disable=too-many-arguments
-        "creates the exception"
-        return cls(DataCleaningErrorMessage(stats, cnf, tasktype, beadid, parents),
-                   'warning')
-
     def __str__(self):
         args = self.args[0] # pylint: disable=unsubscriptable-object
         return f"{args.parents}: {args.beadid}\n{args}"
@@ -125,6 +126,13 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
     @classmethod
     def __get(cls, name, cnf):
         return cnf.get(name, getattr(cls.__DFLT, name))
+
+    @classmethod
+    def __exc(cls, val, cnf, info, frame):
+        "creates the exception"
+        ncy = getattr(frame.track, 'ncycles', 0)
+        msg = DataCleaningErrorMessage(val, cnf, cls.tasktype, info[0], frame.parents, ncy)
+        return DataCleaningException(msg, 'warning')
 
     @classmethod
     def __test(cls, frame, bead, cnf):
@@ -142,12 +150,12 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
         yield sel.saturation(bead, *tmp)
 
     @classmethod
-    def _compute(cls, cnf, frame, info): # pylint: disable=inconsistent-return-statements
+    def _compute(cls, cnf, frame, info):
         info = info[0], np.copy(info[1])
         res  = cls.compute(frame, info, **cnf)
-        if res is None:
-            return info
-        raise res
+        if res is not None:
+            raise res
+        return info
 
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf) -> Optional[DataCleaningException]:
@@ -156,7 +164,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
         if cache is not None:
             val, discard = cache.get(info[0], ('', False))
             if discard:
-                return DataCleaningException.create(val, cnf, cls.tasktype, info, frame.parents)
+                return cls.__exc(val, cnf, info, frame)
             tested       = val != ''
 
         discard = DataCleaning(**cnf).aberrant(info[1])
@@ -178,7 +186,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
         if not (tested or cache is None):
             cache[info[0]] = val, discard
         if discard:
-            return DataCleaningException.create(val, cnf, cls.tasktype, info[0], frame.parents)
+            return cls.__exc(val, cnf, info, frame)
         return None
 
     @classmethod
