@@ -552,7 +552,8 @@ class Track:
         inds = [PHASE.initial, PHASE.pull+1]
         arr  = ibead if isinstance(ibead, np.ndarray) else self.data[ibead]
         bead = np.split(arr, self.phases[:, inds].ravel() - self.phases[0,0])[1::2]
-        return np.nanmedian([np.diff(np.nanpercentile(i, rng))[0] for i in bead])
+        vals = [np.diff(np.nanpercentile(i, rng))[0] for i in bead if np.any(np.isfinite(i))]
+        return np.nanmedian(vals) if len(vals) else np.NaN
 
     def phaseposition(self, phase: int, ibead: Union[BEADKEY, np.ndarray]) -> float:
         """
@@ -561,4 +562,5 @@ class Track:
         inds = [phase, phase+1]
         arr  = ibead if isinstance(ibead, np.ndarray) else self.data[ibead]
         bead = np.split(arr, self.phases[:, inds].ravel() - self.phases[0,0])[1::2]
-        return np.nanmedian([np.nanmedian(bead[i]) for i in range(0, len(bead), 2)])
+        vals = [np.nanmedian(i) for i in bead if np.any(np.isfinite(i))]
+        return np.nanmedian(vals) if len(vals) else np.NaN
