@@ -73,13 +73,9 @@ class IdentificationPeakInfo(PeakInfo):
 
     def values(self, mdl: 'PeaksPlotModelAccess', peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
-        zvals = np.array([i[0] for i in peaks], dtype = 'f4')
-        hybs  = mdl.hybridisations(...).items()
-        if len(hybs) == 0:
-            dist          = mdl.getfitparameters(None)
-            dico['bases'] = (zvals - dist[1])*dist[0]
-            return
-
+        zvals         = np.array([i[0] for i in peaks], dtype = 'f4')
+        dist          = mdl.getfitparameters(None)
+        dico['bases'] = (zvals - dist[1])*dist[0]
         for key, hyb in mdl.hybridisations(...).items():
             dist = mdl.getfitparameters(key)
             tmp  = mdl.identification.attribute('match', key).pair(zvals, *dist)['key']
