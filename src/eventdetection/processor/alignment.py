@@ -148,10 +148,12 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
 
     @classmethod
     def _apply_pull(cls, kwa, frame, info):
-        args = cls.__args(kwa, frame, info, True)
-        bias = args.pull + np.nanpercentile(args.initial-args.pull,
-                                            100.-cls._get(kwa, 'percentile'))
+        args  = cls.__args(kwa, frame, info, True)
+        delta = args.initial-args.pull
+        if not np.any(np.isfinite(delta)):
+            return args.cycles.info
 
+        bias = args.pull + np.nanpercentile(delta, 100.-cls._get(kwa, 'percentile'))
         bad  = cls.__less(args.measure-args.pull, kwa, 'opening')
         bad &= cls.__less(args.initial-args.pull, kwa, 'opening')
         bad |= np.isnan(bias)
