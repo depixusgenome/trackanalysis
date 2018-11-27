@@ -74,6 +74,7 @@ class HistPlotTheme(PlotTheme):
                     basic = dict(reference = 'bisque',
                                  missing   = 'red',
                                  found     = 'gray'))
+    minzoomz         = .008
     toolbar          = dict(CyclePlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,hover,reset,save'
     tooltipmode      = 'hline'
@@ -152,13 +153,22 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
             trk        = self._model.track
             tx1        = trk.phase.duration(..., range(0,pha)).mean()   - delta
             tx2        = trk.phase.duration(..., range(0,pha+1)).mean() + delta
-            xbnds      = [tx1/trk.framerate, tx2/trk.framerate]
-            ybnds      = data['z'][(data['t'] >= xbnds[0]) & (data['t'] <= xbnds[1])]
-        else:
-            xbnds      = []
-            ybnds      = []
 
-        self.setbounds(cache, self._fig, data['t'], data['z'], xbnds, ybnds)
+            xvals      = [fcn(data['t']) for fcn in (np.nanmin, np.nanmax)]
+            xbnds      = [tx1/trk.framerate, tx2/trk.framerate]
+            yvals      = data['z']
+            ybnds      = data['z'][(data['t'] >= xbnds[0]) & (data['t'] <= xbnds[1])]
+
+            task       = self._model.identification.task
+            fit        = getattr(task, 'fit', {}).get(self._model.sequencekey, None)
+            if fit and len(fit.peaks):
+                yvals  = [fcn(yvals) for fcn in (np.nanmin, np.nanmax)]+list(fit.peaks)
+                ybnds  = [fcn(ybnds) for fcn in (np.nanmin, np.nanmax) if len(ybnds)]
+                ybnds += list(fit.peaks)
+        else:
+            xbnds = ybnds = xvals = yvals = []
+
+        self.setbounds(cache, self._fig, xvals, yvals, xbnds, ybnds)
 
     def _data(self, items) -> CurveData:
         if items is None or len(items) == 0 or not any(len(i) for i in items):
@@ -226,23 +236,29 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
             for i, j in data.items():
                 cache[self._src[i]]['data'] = j
 
-            xarr = data['peaks']['count']
-            xarr = xarr[np.isfinite(xarr)]
-            xarr = [0., xarr.max() if len(xarr) else 1.]
-            self.setbounds(cache, self._fig, xarr, data['hist']["z"])
+            xarr  = data['peaks']['count']
+            xarr  = xarr[np.isfinite(xarr)]
+            xarr  = [0., xarr.max() if len(xarr) else 1.]
+
+            pks   = data['peaks']['z']
+            xbnds = data['peaks']['count'][pks > pks[0] + self._theme.minzoomz]
+            xbnds = xbnds[np.isfinite(xbnds)]
+            xbnds = [0., xbnds.max() if len(xbnds) > 1 else 1.]
+
+            self.setbounds(cache, self._fig, xarr, data['hist']["z"], xbnds)
 
             pks = self._model.peaks['bases']
             cache[self._exp]['ticker'] = list(pks[np.isfinite(pks)])
 
             task = self._model.identification.task
             fit  = getattr(task, 'fit', {}).get(self._model.sequencekey, None)
-            if fit is None or len(fit.peaks) <= 2:
+            if fit is None or len(fit.peaks) <= 0:
                 cache[self._ref].update(visible = False)
             else:
                 label = self._model.sequencekey
                 if not label:
                     label = self._theme.reflabel
-                cache[self._ref].update(ticker     = list(fit.peaks[1:-1]),
+                cache[self._ref].update(ticker     = list(fit.peaks),
                                         visible    = True,
                                         axis_label = label)
 
