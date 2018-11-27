@@ -664,7 +664,14 @@ namespace signalfilter { namespace stats
         if(i >= sz)
             return std::numeric_limits<T>::quiet_NaN();
 
+#       ifdef _MSC_VER
+#           pragma warning (push)
+#           pragma warning( disable : 4244 )
+#       endif
         acc_t<bat::mediandeviation> quant;
+#       ifdef _MSC_VER
+#           pragma warning (pop)
+#       endif
         quant((double) dt[i]);
         for(++i; i < sz; ++i)
             if(std::isfinite(dt[i]))

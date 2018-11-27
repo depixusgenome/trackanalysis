@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Toolbar"
+import sys
 import time
 from typing               import Callable, Iterator, Tuple, Any, TYPE_CHECKING
 from itertools            import chain
@@ -249,13 +250,15 @@ class MessagesView:
         else:
             args = text
 
-        val = templ[str(args[1])].format(str(args[0])
+        txt = str(args[0])
+        enc = txt.encode("utf-8") if sys.platform != 'linux' else txt
+        val = templ[str(args[1])].format(txt
                                          .replace('<', '&lt')
                                          .replace('>', '&gt'))
         if args[1] == 'error':
-            LOGS.error(str(args[0]))
+            LOGS.error(enc)
         elif args[1] == 'warning':
-            LOGS.warning(str(args[0]))
+            LOGS.warning(enc)
 
         timeout       = self._theme.timeout
         self._last[0] = val

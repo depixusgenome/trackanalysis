@@ -206,7 +206,7 @@ namespace signalfilter { namespace stats {
             return (*fcn)(inp.size(), inp.data());
 
         auto data = inp.data();
-        int  size = inp.size();
+        int  size = int(inp.size());
 
         pybind11::int_ ii(0), jj(1);
         std::vector<T> meds;

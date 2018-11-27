@@ -11,9 +11,7 @@ namespace {
     {
         info_t out(data.ncycles);
         auto thr = (ismin ? 1.0f: -1.0f)* std::numeric_limits<float>::max();
-        auto fcn =  ismin ?
-                    [](float a, float b) { return a < b ? a : b; }
-                   :[](float a, float b) { return a < b ? b : a; };
+        auto fcn = [ismin](float a, float b) { return ismin == (a < b) ? a : b; };
         for(size_t i = 0; i < data.ncycles; ++i)
         {
             auto j    = size_t(data.first[i]), e = size_t(data.last[i]);
