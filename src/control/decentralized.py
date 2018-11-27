@@ -34,10 +34,16 @@ def _good(model, i, j):
     obj = getattr(model, i, Missing)
     if obj is Missing:
         return False
-    if any(isinstance(k, (pd.DataFrame, np.ndarray)) for k in (j, obj)):
+
+    # pylint: disable=unidiomatic-typecheck
+    if type(obj) != type(j) or (isinstance(obj, dict) and set(obj) != set(j)):
         return True
+
+    if any(isinstance(k, (pd.DataFrame, np.ndarray, dict)) for k in (j, obj)):
+        return pickle.dumps(obj) != pickle.dumps(j)
+
     try:
-        return getattr(model, i) != j
+        return obj != j
     except ValueError:
         return True # numpy error
 
