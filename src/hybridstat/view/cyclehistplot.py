@@ -147,16 +147,16 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
         self._errors(cache, _data, _display)
 
     def __setbounds(self, cache, data):
-        if not (self._theme.phasezoom and self._theme.phasezoom[0] and len(data['z']) > 0):
-            self.setbounds(cache, self._fig, data['t'], data['z'])
-            return
-
-        pha, delta = self._theme.phasezoom
-        trk        = self._model.track
-        tx1        = trk.phase.duration(..., range(0,pha)).mean()   - delta
-        tx2        = trk.phase.duration(..., range(0,pha+1)).mean() + delta
-        xbnds       = [tx1/trk.framerate, tx2/trk.framerate]
-        ybnds      = data['z'][(data['t'] >= xbnds[0]) & (data['t'] <= xbnds[1])]
+        if (self._theme.phasezoom and self._theme.phasezoom[0] and len(data['z']) > 0):
+            pha, delta = self._theme.phasezoom
+            trk        = self._model.track
+            tx1        = trk.phase.duration(..., range(0,pha)).mean()   - delta
+            tx2        = trk.phase.duration(..., range(0,pha+1)).mean() + delta
+            xbnds      = [tx1/trk.framerate, tx2/trk.framerate]
+            ybnds      = data['z'][(data['t'] >= xbnds[0]) & (data['t'] <= xbnds[1])]
+        else:
+            xbnds      = []
+            ybnds      = []
 
         self.setbounds(cache, self._fig, data['t'], data['z'], xbnds, ybnds)
 

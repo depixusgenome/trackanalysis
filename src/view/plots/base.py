@@ -511,6 +511,9 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
     def newbounds(self, axis, arr) -> dict:
         "Sets the range boundaries"
         over  = self._theme.overshoot
+        if len(arr) == 0:
+            return OrderedDict(start  = 0., end = 1., bounds = (0., 1.),
+                               reset_start = 0., reset_end = 1.)
 
         if isinstance(arr, np.ndarray):
             if all(np.isnan(i) for i in arr) or len(arr) == 0:
@@ -522,9 +525,6 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         elif len(arr):
             vmin = min(arr)
             vmax = max(arr)
-        else:
-            vmin = 0.
-            vmax = 1.
 
         delta = max(1e-5, (vmax-vmin))*over*.5
         vmin -= delta
@@ -542,10 +542,11 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         "Sets the range boundaries"
         cache[fig.x_range] = self.newbounds('x', xarr)
         cache[fig.y_range] = self.newbounds('y', yarr)
-        if xinit is None and yinit is None:
-            return
 
-        args: Dict[str, Tuple[Optional[float], Optional[float]]] = {}
+        args: Dict[str, Tuple[Optional[float], Optional[float]]] = {
+            'xinit': (None, None),
+            'yinit': (None, None)
+        }
         if xinit is not None:
             tmp = self.newbounds('x', xinit)
             cache[fig.x_range].update(start = tmp['start'], end = tmp['end'])
