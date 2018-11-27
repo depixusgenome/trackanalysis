@@ -92,8 +92,8 @@ class TasksConfig(ConfigObject):
     def __config__(cmap):
         "simplify a config map"
         for i in {'picotwist', 'sdi'} & set(cmap.maps[0]):
-            left         = cmap.maps[1][i]
-            cmap.maps[0] = {j: k for j, k in cmap.maps[0][i].items() if left[j] != k}
+            left            = cmap.maps[1][i]
+            cmap.maps[0][i] = {j: k for j, k in cmap.maps[0][i].items() if left[j] != k}
 
     @property
     def tasks(self) -> Configuration:
