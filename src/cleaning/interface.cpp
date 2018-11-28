@@ -2,9 +2,11 @@
 #include <type_traits>
 #include <typeinfo>
 #include <pybind11/pybind11.h>
-#define PYBIND11_HAS_VARIANT 0      // remove compile-time warnings
-#define PYBIND11_HAS_EXP_OPTIONAL 0
-#define PYBIND11_HAS_OPTIONAL 0
+#ifndef PYBIND11_HAS_VARIANT
+# define PYBIND11_HAS_VARIANT 0      // remove compile-time warnings
+# define PYBIND11_HAS_EXP_OPTIONAL 0
+# define PYBIND11_HAS_OPTIONAL 0
+#endif
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include "cleaning/datacleaning.h"

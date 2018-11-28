@@ -4,10 +4,24 @@
 #include<iostream>
 #include<float.h>
 #include<math.h>
+#if __GNUC__ == 7 && __GNUC_MINOR__ == 3
+# ifndef __cpp_noexcept_function_type
+#   define __cpp_noexcept_function_type 0
+# endif
+# ifndef __NVCC___WORKAROUND_GUARD
+#   define __NVCC___WORKAROUND_GUARD 0
+#   define __NVCC__ 0
+# endif
+# pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
+# pragma GCC diagnostic ignored "-Wmisleading-indentation"
+#endif
 #include<boost/numeric/ublas/matrix.hpp>
 #include<boost/numeric/ublas/matrix_proxy.hpp>
 #include<boost/numeric/ublas/vector_proxy.hpp>
 #include<boost/numeric/ublas/io.hpp>
+#if __GNUC__ == 7 && __GNUC_MINOR__ == 3
+# pragma GCC diagnostic pop
+#endif
 
 
 namespace peakfinding{
