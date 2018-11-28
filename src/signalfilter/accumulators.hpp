@@ -150,7 +150,7 @@ namespace boost { namespace accumulators {
         {
             using result_type = Sample;
             _MedianDeviation()
-                : _quant(extended_p_square_probabilities = boost::array<double,2>{{1./3., 2./3.}})
+                : _quant(extended_p_square_probabilities = boost::array<result_type,2>{{1./3., 2./3.}})
             {}
             _MedianDeviation(dont_care) : _MedianDeviation() {}
 
@@ -164,7 +164,7 @@ namespace boost { namespace accumulators {
                 return (q1-q0)*.5;
             }
             private:
-                accumulator_set<double, stats<tag::count, tag::extended_p_square_quantile>>
+                accumulator_set<result_type, stats<tag::count, tag::extended_p_square_quantile>>
                                _quant;
         };
 
@@ -638,14 +638,7 @@ namespace signalfilter { namespace stats
     template <typename T>
     inline T mediandeviation(size_t sz, T const * dt)
     {
-#       ifdef _MSC_VER
-#           pragma warning( push )
-#           pragma warning( disable : 4244 )
-#       endif
         acc_t<bat::mediandeviation> quant;
-#       ifdef _MSC_VER
-#           pragma warning (pop)
-#       endif
         for(size_t i = size_t(0); i < sz; ++i)
             quant((double) dt[i]);
         return (T) compute(quant);
@@ -664,14 +657,7 @@ namespace signalfilter { namespace stats
         if(i >= sz)
             return std::numeric_limits<T>::quiet_NaN();
 
-#       ifdef _MSC_VER
-#           pragma warning (push)
-#           pragma warning( disable : 4244 )
-#       endif
         acc_t<bat::mediandeviation> quant;
-#       ifdef _MSC_VER
-#           pragma warning (pop)
-#       endif
         quant((double) dt[i]);
         for(++i; i < sz; ++i)
             if(std::isfinite(dt[i]))
