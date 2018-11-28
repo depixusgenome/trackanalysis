@@ -79,8 +79,16 @@ class PickleIO(_TrackIO):
     @staticmethod
     def open(path:PATHTYPE, **_) -> Dict[Union[str, int], Any]:
         "opens a track file"
-        with open(path, 'rb') as stream:
-            return pickle.load(stream)
+        out = None
+        try:
+            from cleaning.processor import BeadSubtractionTask
+            import cleaning.beadsubtraction as mdl
+            mdl.BeadSubtractionTask = BeadSubtractionTask # type: ignore
+            with open(path, 'rb') as stream:
+                out = pickle.load(stream)
+        finally:
+            del mdl.BeadSubtractionTask # type: ignore
+        return out
 
     @classmethod
     def save(cls, path: PATHTYPE, track: Union[dict, 'Track']):
@@ -89,13 +97,10 @@ class PickleIO(_TrackIO):
         with open(path, 'wb') as stream:
             return pickle.dump(info, stream)
 
-    @staticmethod
-    def instrumenttype(path: str) -> str:
+    @classmethod
+    def instrumenttype(cls, path: str) -> str:
         "return the instrument type"
-        data : dict = {}
-        with open(path, "rb") as stream:
-            data = pickle.load(stream)
-        return data.get('instrument', {'type': 'picotwist'})['type']
+        return cls.open(path).get('instrument', {'type': 'picotwist'})['type']
 
 class LegacyTrackIO(_TrackIO):
     "checks and opens legacy track paths"
