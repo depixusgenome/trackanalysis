@@ -224,6 +224,8 @@ class Event:
             self._fcn  = fcn
 
         def __call__(self, *args, **kwa):
+            if not len(self.__dict__):
+                return None
             assert self in self._hdls[self._name]
             self._hdls[self._name].discard(self)
             fcn = self._fcn

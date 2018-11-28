@@ -402,8 +402,9 @@ class AdvancedWidget:
                 return title, '', val
 
             if '|' in val:
-                opts = val[val.find('(')+1:val.find(')')]
-                disp = dict(i.split(':') for i in opts.split('|')[1:])[str(dfval)]
+                opts = val[val.rfind(')')+1:]
+                dico = dict(i.split(':') for i in opts.split('|') if ':' in i)
+                disp = dico.get(str(dfval), '?')
             else:
                 disp = _format(val, dfval)
 
@@ -427,7 +428,11 @@ class AdvancedWidget:
     def on_click(self):
         "modal dialog for configuration"
         if not self.__widget.disabled:
-            dialog(self.__doc, **self._args())
+            try:
+                dialog(self.__doc, **self._args())
+            except Exception as exc: # pylint: disable=broad-except
+                # make it easier to debug with bokeh
+                self._ctrl.display.update("message", message = exc)
 
     @staticmethod
     def reset(_):

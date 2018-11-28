@@ -279,7 +279,8 @@ class _ManagedServerLoop:
                 fcn(*args, **kwargs)
                 LOGS.debug("done running and not stopping")
         self.doc.add_next_tick_callback(_cmd)
-        self.loop.start()
+        if not self.loop.asyncio_loop.is_running():
+            self.loop.start()
 
     def wait(self, time = 2.):
         "wait some more"
@@ -380,7 +381,6 @@ class _ManagedServerLoop:
         from app.configuration          import ConfigurationIO
         import anastore
         path = ConfigurationIO(self.ctrl).configpath(next(anastore.iterversions('config')))
-        print(path)
         return anastore.load(path)
 
 class BokehAction:

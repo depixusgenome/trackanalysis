@@ -24,7 +24,7 @@ from   ..__config__                        import RampConsensusBeadTask, RampSta
 
 class RampConfig:
     "ramp analysis with name"
-    name      = "ramp.config"
+    name      = "ramp"
     consensus = RampConsensusBeadTask(action    = ("percentile", dict(q = [25, 50, 75])),
                                       normalize = False)
     dataframe = RampStatsTask()
@@ -147,6 +147,7 @@ def observetracks(self: RampPlotModel, ctrl):
             procs = {i: proctype[i](task = getattr(self.config, i)) for i in args}
             cache = ctrl.tasks.processors(root, root)
 
+            ctrl.display.handle({"ramp.pool"}, args = {'start': True, 'isgood': True})
             if stat is status[0]:
                 with ProcessPoolExecutor(2) as pool:
                     subm = {i: wrap_future(pool.submit(_run, cache, j))
@@ -160,6 +161,8 @@ def observetracks(self: RampPlotModel, ctrl):
             if stat is status[0]:
                 status[0] = None
                 ctrl.display.update(self.display, **info)
+            ctrl.display.handle({"ramp.pool"},
+                                args = {'start': False, 'isgood': stat is status[0]})
 
         spawn(_thread)
 

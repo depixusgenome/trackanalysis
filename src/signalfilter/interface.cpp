@@ -233,10 +233,6 @@ pointwise derivate of the signal. The median
 itself is estimated using the P² quantile estimator
 algorithm.)_";
 
-#       ifdef _MSC_VER
-#           pragma warning ( push )
-#           pragma warning ( disable : 4244 )
-#       endif
         mod.def("nancount", [](pybind11::array_t<T> & inp, size_t width)
                     { 
                         pybind11::array_t<int>  arr(inp.size());
@@ -265,9 +261,6 @@ distance to the median for each point.)_";
                     { return nanmediandeviation(inp.size(), inp.data()); }, doc2);
         mod.def("nanmediandeviation", [](pybind11::array_t<T> & inp, pybind11::object rng)
                     { return _nanfcn2(&nanmediandeviation<T>, inp, rng); }, doc);
-#       ifdef _MSC_VER
-#           pragma warning ( pop )
-#       endif
     }
 
     void pymodule(pybind11::module & mod)
