@@ -2,6 +2,10 @@
 Getting Started
 ===============
 
+.. figure:: _images/toolbar.png
+
+    The :program:`CycleApp` application.
+
 .. hint::
     The toolbar is also used to display messages to the user:
 
@@ -115,10 +119,11 @@ shortcuts :kbd:`PageUp` and :kbd:`PageDown` can also be used to move from one
 bead to the next.
 
 Some beads are not worth looking at. The user can discard them from the
-analysis, *reports included* by adding their number to the right-most input in
-the toolbar. It's also possible to switch from discarding to selecting by
-pressing the button (``=`` or ``≠``) to it's left. The current bead can be
-discarded using :kbd:`Del`.
+analysis as well as reports. This is done by adding their number to the
+right-most input in the toolbar.  To discard all bad beads, simply type **bad**
+in the same input.  It's also possible to switch from discarding to selecting
+by pressing the button (``=`` or ``≠``) to it's left. Finally, the current bead
+can be discarded using the shortcut :kbd:`Del`.
 
 The different tabs
 ------------------
