@@ -1,6 +1,9 @@
 =================
 The Field of View
 =================
+
+Background
+==========
  
 .. figure:: _images/fieldofview.png
 
@@ -35,6 +38,9 @@ For each bead, a tooltip is available, displaying further information:
 
 * *pale green* beads display their :math:`\sigma[HF]` and their extent.
 * other beads display the list of warning leading to their given qualification.
+
+Calibration
+===========
 
 Below the field of view, another image is displayed, specific to the current
 bead (in blue). It's either:

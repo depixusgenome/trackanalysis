@@ -13,6 +13,7 @@ Welcome to CycleApp's documentation!
    gettingstarted
    fov
    qc
+   cleaning
 
 
 Indices and tables
