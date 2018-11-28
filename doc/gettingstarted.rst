@@ -117,7 +117,8 @@ bead to the next.
 Some beads are not worth looking at. The user can discard them from the
 analysis, *reports included* by adding their number to the right-most input in
 the toolbar. It's also possible to switch from discarding to selecting by
-pressing the button (``=`` or ``≠``) to it's left.
+pressing the button (``=`` or ``≠``) to it's left. The current bead can be
+discarded using :kbd:`Del`.
 
 The different tabs
 ------------------

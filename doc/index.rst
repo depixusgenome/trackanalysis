@@ -11,6 +11,8 @@ Welcome to CycleApp's documentation!
    :caption: Contents:
 
    gettingstarted
+   fov
+   qc
 
 
 Indices and tables
