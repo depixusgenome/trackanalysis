@@ -401,9 +401,12 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         dist = self.__defaults.fit
         pid  = self.__defaults.match
         cstr = self.__defaults.constraints
-        task = fittohairpintask(mdl.sequencepath,    ols,
-                                mdl.constraintspath, mdl.useparams,
-                                constraints = cstr, fit = dist, match = pid)
+        try:
+            task = fittohairpintask(mdl.sequencepath,    ols,
+                                    mdl.constraintspath, mdl.useparams,
+                                    constraints = cstr, fit = dist, match = pid)
+        except FileNotFoundError:
+            return None
         task.constraints.update(self.__display.constraints.get(self.roottask, {}))
         return task
 
