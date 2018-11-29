@@ -106,11 +106,11 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
     _src:    ColumnDataSource
     _fig:    Figure
     _errors: PlotError
-    def _addtodoc(self, ctrl, *_):
+    def _addtodoc(self, *_):
         self._src  = ColumnDataSource(data = self._data(None))
         self._fig  = self.figure(y_range = Range1d, x_range = Range1d)
         self.addtofig(self._fig, 'frames', x = 't', y = 'z', source = self._src)
-        self._display.addcallbacks(ctrl, self._fig)
+        self.linkmodeltoaxes(self._fig)
         self._fig.add_layout(LinearAxis(axis_label = ""), 'above')
         self._fig.add_layout(LinearAxis(axis_label = ""), 'right')
         self._fig.yaxis.formatter = NumeralTickFormatter(format = self._theme.format)
@@ -188,7 +188,7 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
     _src: Dict[str, ColumnDataSource]
     _exp: LinearAxis
     _ref: LinearAxis
-    def _addtodoc(self, ctrl, *_):
+    def _addtodoc(self,*_):
         "returns the figure"
         self._fig = self.figure(y_range = Range1d, x_range = Range1d)
         self._exp = LinearAxis(axis_label    = self._theme.explabel)
@@ -208,7 +208,7 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
                                   y      = 'bases' if i == 'peaks' else "z",
                                   source = j)
                  for i, j in self._src.items()}
-        self._display.addcallbacks(ctrl, self._fig)
+        self.linkmodeltoaxes(self._fig)
 
         hover = self._fig.select(HoverTool)
         if len(hover) > 0:

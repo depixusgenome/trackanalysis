@@ -82,7 +82,7 @@ class RawMixin(ABC):
     def _finishraw(self, shape):
         fig = self._raw
         self._hover.createraw(self, fig, self._rawsource, shape, self._theme)
-        self._display.addcallbacks(self._ctrl, fig)
+        self.linkmodeltoaxes(fig)
         fig.x_range.callback = CustomJS(code = "hvr.on_change_raw_bounds(cb_obj, trng)",
                                         args = dict(hvr  = self._hover,
                                                     trng = fig.extra_x_ranges["time"]))

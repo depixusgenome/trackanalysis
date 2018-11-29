@@ -3,7 +3,7 @@
 "The basic architecture"
 from copy   import deepcopy
 from enum   import Enum
-from typing import Tuple, Optional, Any, cast
+from typing import Tuple, Optional, Any
 
 from utils  import initdefaults
 
@@ -64,55 +64,15 @@ class PlotDisplay:
     """
     name                = ""
     state               = PlotState.active
-    xinit:   RANGE_TYPE = (None, None)
-    yinit:   RANGE_TYPE = (None, None)
-    xbounds: RANGE_TYPE = (None, None)
-    ybounds: RANGE_TYPE = (None, None)
+    __NONE              = (None, None)
+    xinit:   RANGE_TYPE = __NONE
+    yinit:   RANGE_TYPE = __NONE
+    xbounds: RANGE_TYPE = __NONE
+    ybounds: RANGE_TYPE = __NONE
+    useinit: bool       = False
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
-
-    def addcallbacks(self, ctrl, fig):
-        "adds Range callbacks"
-        updating = [False]
-        def _get(axname):
-            axis = getattr(fig, axname+'_range')
-
-            def _on_cb(attr, old, new):
-                if self.state not in (PlotState.active, PlotState.resetting):
-                    return
-
-                vals = cast(Tuple[Optional[float],...], (axis.start, axis.end))
-                bnds = getattr(self, axname+'init')
-                if None in bnds and axis.bounds is not None:
-                    bnds = axis.bounds
-
-                if None not in bnds:
-                    rng  = 1e-3*(bnds[1]-bnds[0])
-                    vals = tuple(None if abs(i-j) < rng else j
-                                 for i, j in zip(bnds, vals))
-
-                updating[0] = True
-                ctrl.display.update(self, **{axname+'bounds': vals})
-                updating[0] = False
-
-            axis.on_change('start', _on_cb)
-            axis.on_change('end',   _on_cb)
-
-        _get('x')
-        _get('y')
-
-        def _onobserve(old = None, **_):
-            if updating[0]:
-                return
-            for i in {'xbounds', 'ybounds'} & frozenset(old):
-                rng  = getattr(fig, i[0]+'_range')
-                vals = getattr(self, i)
-                bnds = rng.bounds
-                rng.update(start = bnds[0] if vals[0] is None else vals[0],
-                           end   = bnds[1] if vals[1] is None else vals[1])
-        ctrl.display.observe(self, _onobserve)
-        return fig
 
     def isactive(self) -> bool:
         "whether the plot is active"

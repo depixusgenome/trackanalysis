@@ -87,7 +87,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
 
         self._errors = PlotError(self.__fig, self._theme)
 
-        self._display.addcallbacks(self._ctrl, fig)
+        self.linkmodeltoaxes(fig)
 
         mode    = self.defaultsizingmode(width = self._theme.widgetwidth)
         widgets = self._createwidget(ctrl, doc, fig)

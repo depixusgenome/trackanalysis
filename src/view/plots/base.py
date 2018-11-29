@@ -340,6 +340,66 @@ class PlotUpdater(list):
                     out.update(itm[0])
                     cache[i][itm[1]] = cls(**out)
 
+class AxisOberver:
+    "observe an axis"
+    def __init__(self, ctrl, fig: Figure, mdl):
+        self._fig      = fig
+        self._ctrl     = getattr(ctrl, 'display', ctrl)
+        self._mdl: str = getattr(mdl, 'name', mdl)
+        self._updating = False
+
+    def _get(self, name):
+        return self._ctrl.get(self._mdl, name)
+
+    @property
+    def _state(self):
+        return None if self._updating else self._get('state')
+
+    def _onchangeaxis(self, name):
+        if self._state is not PlotState.active:
+            return
+
+        axis  = getattr(self._fig, name+'_range')
+        if None in (axis.reset_end, axis.reset_start):
+            return
+
+        eps   = 1e-3*(axis.reset_end-axis.reset_start)
+        rng   = (axis.start if abs(axis.start-axis.reset_start) > eps else None,
+                 axis.end   if abs(axis.end-axis.reset_end)     > eps else None)
+        out   = {name+'bounds': rng}
+        inits = self._get(name+'init')
+
+        self._updating = True
+        try:
+            if inits != (None, None) and rng == (None, None):
+                out[name+'init'] = axis.reset_start, axis.reset_end
+                axis.update(reset_start = inits[0], reset_end = inits[1])
+            self._ctrl.update(self._mdl, **out)
+        finally:
+            self._updating = False
+
+    def _onobserveaxis(self, old = None, **_):
+        if self._state is not PlotState.active:
+            return
+
+        for i in 'xy':
+            if i+'bounds' in old:
+                vals = self._get(i+'bounds')
+                axis = getattr(self._fig, i+'_range')
+                axis.update(start = axis.reset_start if vals[0] is None else vals[0],
+                            end   = axis.reset_end   if vals[1] is None else vals[1])
+
+    def __call__(self):
+        "adds Range callbacks"
+        def _set(name):
+            fcn  = lambda attr, old, new: self._onchangeaxis(name)
+            axis = getattr(self._fig, name+'_range')
+            axis.on_change('start', fcn)
+            axis.on_change('end',   fcn)
+        _set('x')
+        _set('y')
+        self._ctrl.observe(self._mdl, self._onobserveaxis)
+
 class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=too-many-public-methods
     "Base plotter class"
     _RESET   = frozenset(('bead',))
@@ -599,6 +659,10 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
         self.state = PlotState.active if val else PlotState.disabled
         if val and (old is PlotState.outofdate):
             self.__doreset(self._ctrl)
+
+    def linkmodeltoaxes(self, fig, mdl = None):
+        "add observers between both the figure axes and the model"
+        AxisOberver(self._ctrl, fig, self._display if mdl is None else mdl)()
 
     def ismain(self, _):
         "Set-up things if this view is the main one"
