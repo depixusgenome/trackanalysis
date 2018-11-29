@@ -5,24 +5,12 @@ import {GlyphRenderer}            from "models/renderers/glyph_renderer"
 
 export class NAMEView extends HoverToolView
     _update: ([renderer_view, {geometry}]) ->
-        if not @model.active
-            return
-
-        man  = renderer_view.model.get_selection_manager()
-        tmp  = man.inspectors[renderer_view.model.id]
-        if (renderer_view.model instanceof GlyphRenderer)
-            tmp = renderer_view.model.view.convert_selection_to_subset(tmp)
-
-        if tmp.is_empty()
-            return
-
-        inds = tmp.indices
-        if inds?.length > 1
-            inds.sort((a,b) => a - b)
-            if inds.length > @model.maxcount
-                ind = Math.floor((inds.length - @model.maxcount)*0.5)
-                tmp.indices = inds.slice(ind, ind+@model.maxcount)
-        super([renderer_view, {geometry}])
+        if @model.active
+            super([renderer_view, {geometry}])
+            ttip = @ttmodels[renderer_view.model.id]
+            if ttip.data.length > @model.maxcount
+                ind       = Math.floor((ttip.data.length-@model.maxcount)/2)
+                ttip.data = ttip.data.slice(ind, ind + @model.maxcount)
         return null
 
 export class NAME extends HoverTool
