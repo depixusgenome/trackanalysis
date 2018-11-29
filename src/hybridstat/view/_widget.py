@@ -607,7 +607,7 @@ def advanced(**kwa):
 class PeaksPlotWidgets: # pylint: disable=too-many-instance-attributes
     "peaks plot widgets"
     enabler: TaskWidgetEnabler
-    def __init__(self, ctrl, mdl: PeaksPlotModelAccess, **kwa):
+    def __init__(self, ctrl, mdl: PeaksPlotModelAccess, **kwa) -> None:
         "returns a dictionnary of widgets"
         self.seq       = PeaksSequencePathWidget(ctrl, mdl)
         self.ref       = ReferenceWidget(ctrl, mdl)

@@ -319,7 +319,7 @@ void MultiGradeSplitDetector::grade(float precision, grade_t & grade) const
                 return;
 
             last        = std::min(sz, last);
-            grade_t tmp = data[std::slice(first, last, 1_s)];
+            grade_t tmp = data[std::slice(first, last-first, 1_s)];
             _chi2grade(wlen, rho, tmp);
             _apply( first+hlen, last-hlen,
                     [&grade](size_t i) { return grade[i] >= 1.0f; },

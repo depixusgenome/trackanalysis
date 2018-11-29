@@ -137,7 +137,7 @@ class TaskAccess(TaskPlotModelAccess):
                           tasktype:   Type[Task]               = Task,
                           attrs:      Optional[Dict[str, Any]] = None,
                           side:       str                      = 'LEFT',
-                          configname: str                      = ''):
+                          configname: str                      = '') -> None:
         if tasktype is Task:
             raise KeyError(f"missing tasktype in class signature: {cls}")
         cls.attrs      = () if attrs is None else tuple(attrs.items()) # type: ignore

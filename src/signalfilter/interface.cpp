@@ -266,8 +266,15 @@ distance to the median for each point.)_";
     void pymodule(pybind11::module & mod)
     {
         auto smod       = mod.def_submodule("stats");
+#       ifdef _MSC_VER
+#           pragma warning ( push )
+#           pragma warning ( disable: 4244 )
+#       endif
         _defhfsigma<float>(smod);
         _defhfsigma<double>(smod);
+#       ifdef _MSC_VER
+#           pragma warning ( pop )
+#       endif
     }
 }}
 

@@ -9,7 +9,7 @@ from   typing                    import Optional, Union, Any, Dict, cast
 import anastore
 from   model.__scripting__.track import LocalTasks
 from   ..trackio                 import Handler, _TrackIO # pylint: disable=protected-access
-from   ..trackio                 import PATHTYPES, PATHTYPE
+from   ..trackio                 import PATHTYPES, PATHTYPE, instrumenttype
 from   .track                    import Track
 
 class ScriptAnaIO(_TrackIO):
@@ -21,8 +21,7 @@ class ScriptAnaIO(_TrackIO):
         return cls.checkpath(path, cls.EXT)
 
     @staticmethod
-    def open(path:PATHTYPE, **_) -> Dict[Union[str, int], Any]:
-        "opens a track file"
+    def __open(path):
         mdl = anastore.load(str(path))['tasks'][0]
         cnf = mdl[0].config()
         rep = lambda x: x
@@ -35,7 +34,18 @@ class ScriptAnaIO(_TrackIO):
                                      .replace('//samba.picoseq.org/shared/data',
                                               cast(str, data)))
         cnf['path']  = tuple(rep(i) for i in cnf['path'])
-        cnf          = Handler.todict(Track(**cnf))
+        return mdl, cnf
+
+    @classmethod
+    def instrumenttype(cls, path: str) -> str:
+        "return the instrument type"
+        return instrumenttype(cls.__open(str(path))[1]['path'][0])
+
+    @classmethod
+    def open(cls, path:PATHTYPE, **_) -> Dict[Union[str, int], Any]:
+        "opens a track file"
+        mdl, cnf = cls.__open(path)
+        cnf      = Handler.todict(Track(**cnf))
 
         cnf['tasks'] = LocalTasks()
         cnf['tasks'].load(mdl[1:])

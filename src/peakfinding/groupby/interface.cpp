@@ -39,7 +39,7 @@ namespace peakfinding{
 	OutputPy emrunner(ndarray pydata,
 			  ndarray pyrates,
 			  ndarray pyparams,
-			  unsigned nsteps,
+			  size_t nsteps,
 			  double lowercov,
 			  double tol){
 	    // convert to matrices, run n times, return
@@ -109,7 +109,7 @@ namespace peakfinding{
 
 	void pymodule(py::module &mod){
 	    auto doc = R"_(Runs Expectation Maximization N times)_";
-	    mod.def("emrunner",[](ndarray data,ndarray rates,ndarray params,unsigned nsteps,double lower, double tol)
+	    mod.def("emrunner",[](ndarray data,ndarray rates,ndarray params,size_t nsteps,double lower, double tol)
 	     	    {return emrunner(data,rates,params,nsteps,lower,tol);},doc);
 	    mod.def("normpdf",[](double loc,double var, double pos){return normpdf(loc,var,pos);},
 		    R"_(compute pdf of normal distribution)_");

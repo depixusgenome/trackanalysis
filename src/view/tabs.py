@@ -18,7 +18,7 @@ from version             import timestamp as _timestamp
 class TabsTheme:
     "Tabs Theme"
     CHANGELOG = "CHANGELOG.html"
-    def __init__(self, initial: str, panels: Dict[Type, str], version = 0, startup = ""):
+    def __init__(self, initial: str, panels: Dict[Type, str], version = 0, startup = "") -> None:
         self.name:    str            = "app.tabs"
         self.startup: str            = startup
         self.initial: str            = initial

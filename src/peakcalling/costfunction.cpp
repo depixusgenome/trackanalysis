@@ -88,8 +88,8 @@ namespace peakcalling { namespace cost
                     float sum = std::get<0>(cross);
                     float c   = std::sqrt(std::get<0>(n2)*n1);
                     float x   = sum/c;
-                    return std::make_tuple(1.-x,
-                                           (.5*std::get<1>(n2)*sum/std::get<0>(n2)
+                    return std::make_tuple(1.0f-x,
+                                           (.5f*std::get<1>(n2)*sum/std::get<0>(n2)
                                             -std::get<1>(cross)
                                            )/c,
                                            -std::get<2>(cross)/c);
@@ -99,13 +99,13 @@ namespace peakcalling { namespace cost
                            bead2, yvals2, size2,
                            stretch, bias, cf.sigma);
 
-            float sumv = 0.f, dx1 = 0.0f, dx2 = 0.0f;
+            double sumv = 0., dx1 = 0., dx2 = 0.;
             auto  add = [&](int i, float delta)
             {
                 auto val = (bead2[i]*stretch+bias-delta)/cf.sigma;
                 auto ex  = std::exp(-.5f*val*val);
-                    
-                sumv += 1.0f-ex;
+
+                sumv += 1.0-ex;
                 ex   *= val/cf.sigma;
                 dx1  += bead2[i]*ex;
                 dx2  += ex;
@@ -113,9 +113,9 @@ namespace peakcalling { namespace cost
 
             auto finish = [&](float factor)
             {
-                return std::make_tuple(float(std::get<0>(r1) + sumv*factor),
-                                       float(std::get<1>(r1) + dx1 *factor),
-                                       float(std::get<2>(r1) + dx2 *factor));
+                return std::make_tuple(float(std::get<0>(r1) + float(sumv*factor)),
+                                       float(std::get<1>(r1) + float(dx1 *factor)),
+                                       float(std::get<2>(r1) + float(dx2 *factor)));
             };
 
             if(cf.singlestrand > 0 && bead1[size1-1] < bead2[size2-1]*stretch+bias)

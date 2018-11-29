@@ -70,6 +70,7 @@ class ConfigXlsxIOTheme:
     "ConfigXlsxIOTheme"
     name   = 'hybridstat.configxlsxio'
     start  = ('Report in progress ...', 'normal')
+    end    = ('The report has been created', 'normal')
     errors = {'running': ("Can only create one report at a time", "warning")}
 
 class ConfigXlsxIO(TaskIO):
@@ -103,9 +104,11 @@ class ConfigXlsxIO(TaskIO):
                         return
             if exc is not None:
                 LOGS.exception(exc)
+                self.__msg(exc)
             else:
+                exc = self.__theme.end
+                self.__msg(exc)
                 startfile(path)
-            self.__msg(exc)
 
         model = self.__complete_model(list(models[0]), pksmdl)
         try:
