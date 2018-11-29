@@ -36,10 +36,10 @@ def storedjavascript(inpt, name):
     force = False
     name  = name.lower()
     for path in Path(inpt).glob("*.js"):
-        with open(path, encoding = 'utf-8') as stream:
+        with open(Path(inpt)/path.name, encoding = 'utf-8') as stream:
             out = stream.readlines()
         key = out[0][len("/*KEY="):-len("*/\n")]
-        if key == name:
+        if key.lower() == name:
             cache[compiler.calc_cache_key()] = "".join(out[1:])
             force                            = True
         else:
@@ -189,7 +189,11 @@ def startfile(filepath:str):
         filepath = os.path.abspath(filepath)
         os.chdir(os.path.dirname(filepath))
         # pylint: disable=no-member
-        os.startfile(os.path.split(filepath)[-1]) # type: ignore
+        try:
+            os.startfile(os.path.split(filepath)[-1]) # type: ignore
+        except OSError as exc:
+            if not 'Application not found' in str(exc):
+                raise
         os.chdir(old)
     elif os.name == 'posix':
         subprocess.Popen(('xdg-open', filepath),
