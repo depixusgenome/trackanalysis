@@ -34,12 +34,11 @@ def storedjavascript(inpt, name):
     from bokeh.util import compiler
     cache = getattr(compiler, "_bundle_cache")
     force = False
-    name  = name.lower()
     for path in Path(inpt).glob("*.js"):
         with open(Path(inpt)/path.name, encoding = 'utf-8') as stream:
             out = stream.readlines()
         key = out[0][len("/*KEY="):-len("*/\n")]
-        if key.lower() == name:
+        if key.lower() == name.lower():
             cache[compiler.calc_cache_key()] = "".join(out[1:])
             force                            = True
         else:
@@ -192,9 +191,10 @@ def startfile(filepath:str):
         try:
             os.startfile(os.path.split(filepath)[-1]) # type: ignore
         except OSError as exc:
-            if not 'Application not found' in str(exc):
+            if 'Application not found' not in str(exc):
                 raise
-        os.chdir(old)
+        finally:
+            os.chdir(old)
     elif os.name == 'posix':
         subprocess.Popen(('xdg-open', filepath),
                          stdout = subprocess.DEVNULL,
