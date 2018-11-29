@@ -9,6 +9,7 @@ from    functools               import partial
 from    abc                     import ABCMeta, abstractmethod
 import  re
 import  random
+import  numpy                   as np
 
 import  bokeh.core.properties   as props
 from    bokeh.models            import Model, Callback
@@ -177,8 +178,14 @@ class TextOption(Option):
                 opt += " min=0"
 
             val  = self.getvalue(model, key, None)
-            if val is not None:
+            if val is None:
+                pass
+            elif self._step is None or not np.isscalar(val):
                 opt += ' value="{}"'.format(val)
+            elif isinstance(self._step, int):
+                opt += ' value="{}"'.format(np.around(val, int(self._step)))
+            else:
+                opt += ' value="{}"'.format(np.around(val, int(info[self._step])))
             if info.get('width', None):
                 opt += f' style="width: {info["width"]}px;"'
 
@@ -186,10 +193,7 @@ class TextOption(Option):
             return inpt.format(tpe, key, opt)
 
         tpe = 'text' if self._cnv is str else 'number'
-        if isinstance(self._step, str):
-            fcn = lambda i: _replace(i.groupdict(), tpe)
-        else:
-            fcn = lambda i: _replace(i.groupdict(), tpe)
+        fcn = lambda i: _replace(i.groupdict(), tpe)
         return self._patt.sub(fcn, body)
 
 class CSVOption(Option):
