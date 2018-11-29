@@ -326,15 +326,44 @@ class ThemeNameDescriptor(AdvancedDescriptor):
                      +'|dark:dark'
                      +'|light_minimal:bokehlight'
                      +'|dark_minimal:bokehdark'
-                     +'|caliber:caliber|')
+                     +'|caliber:caliber'
+                     +'|customdark:customdark'
+                     +'|customlight:customlight'
+                     +'|')
     label:    str = "Plot color theme"
     cnf:      str = "main"
     ctrlname: str = "themename"
 
+class ThemeAttributesDescriptor:
+    "Allow setting a theme attribute"
+    def __init__(self, label):
+        self.name  : str = label[label.rfind('%(theme.')+len('%(theme.'):label.rfind(')')]
+        self.label : str = label[:label.rfind('%(')]
+        self.fmt   : str = label[label.rfind(')')+1:]
+        self._attr : str = ""
+
+    def __set_name__(self, _, name):
+        self._attr = name
+
+    def __get__(self, inst, owner):
+        if inst is None:
+            return self
+        out = getattr(inst.doc, self.name, None)
+        if out is not None:
+            return out['value'] if isinstance(out, dict) else out
+        return getattr(inst, '_ctrl').theme.gettheme(inst.doc, self.name)
+
+    def __set__(self, inst, val):
+        getattr(inst, '_ctrl').theme.updatetheme(inst.doc, **{self.name: val})
+
+    def line(self):
+        "return the line to display"
+        return self.label,  f"%({self._attr}){self.fmt}"
+
 class AdvancedWidget:
     "A button to access the modal dialog"
     __widget: Button
-    __doc:    Document
+    doc:      Document
     __action: type
     def __init__(self, ctrl, mdl = None):
         ctrl.theme.updatedefaults('keystroke', advanced = 'Alt-a')
@@ -429,7 +458,7 @@ class AdvancedWidget:
         "modal dialog for configuration"
         if not self.__widget.disabled:
             try:
-                dialog(self.__doc, **self._args())
+                dialog(self.doc, **self._args())
             except Exception as exc: # pylint: disable=broad-except
                 # make it easier to debug with bokeh
                 self._ctrl.display.update("message", message = exc)
@@ -458,7 +487,7 @@ class AdvancedWidget:
 
     def callbacks(self, doc):
         "adding callbacks"
-        self.__doc = doc
+        self.doc = doc
 
     def ismain(self, ctrl):
         "setup for when this is the main show"
@@ -514,11 +543,6 @@ class TabCreator:
             return _mwrapper(type('AdvancedWidget', (cast(type, base),), {}))
         return _mwrapper
 
-    @classmethod
-    def taskattr(cls, akeys:str):
-        "sets a task's attribute"
-        return TaskDescriptor(akeys) # type: ignore
-
     def figure(self, cnf, disp = None, yaxis = True, xaxis = False, **kwa):
         "adds descriptors to a class or returns an advanced tab"
         if disp is None:
@@ -541,9 +565,11 @@ class TabCreator:
         args += list(kwa.items())
         return self("Theme", *text, **dict(args))
 
+    taskattr  : type = TaskDescriptor
     line      : type = AdvancedDescriptor
     widget    : type = AdvancedWidget
     taskwidget: type = AdvancedTaskWidget
+
     @staticmethod
     def title(title):
         "add a title"
@@ -600,9 +626,10 @@ class TabCreator:
                     elem = (tpe(j) if callable(getattr(tpe, '__get__', None)) else
                             cls.line(tpe, j))
                 else:
-                    elem = (j               if "%"  not in j else
-                            cls.line(j)     if "%(" not in j else
-                            cls.taskattr(j) if '.'  in info  else
+                    elem = (j                            if "%"  not in j else
+                            cls.line(j)                  if "%(" not in j else
+                            ThemeAttributesDescriptor(j) if '%(theme.' in info  else
+                            cls.taskattr(j)              if '.'        in info  else
                             cls.line(j))
             else:
                 elem = (cls.taskattr(**j) if isinstance(j, dict)  else

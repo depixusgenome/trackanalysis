@@ -36,6 +36,8 @@ class MainTheme:
     colorblue   : str  = '#6baed6'
     dark        : dict = dflt({"attrs": DARK})
     basic       : dict = dflt({})
+    customdark  : dict = dflt({})
+    customlight : dict = dflt({})
     themename   : str  = 'dark'
 
     @property
@@ -49,5 +51,7 @@ class MainTheme:
             import bokeh.themes as _theme
             if name in ('light', 'dark'):
                 name += '_minimal'
-            return getattr(_theme, '_'+name).json
+            if hasattr(_theme, '_'+name):
+                return getattr(_theme, '_'+name).json
+            return self.dark
         return out

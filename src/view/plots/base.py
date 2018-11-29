@@ -39,7 +39,9 @@ CACHE_TYPE  = Dict[Model, Any]                        # pylint: disable=invalid-
 _CNV  = {'dark_minimal':  'dark',
          'caliber':       'basic',
          'light_minimal': 'basic',
-         'light':         'basic'}
+         'light':         'basic',
+         'customlight':   'basic',
+         'customdark':    'dark'}
 def themed(theme, obj, dflt = '--none--'):
     "return the value for the given theme"
     if not isinstance(obj, dict):
@@ -47,8 +49,8 @@ def themed(theme, obj, dflt = '--none--'):
 
     theme = getattr(theme, "_model",    theme)
     theme = getattr(theme, "themename", theme)
-    return (obj[theme]       if theme in obj              else
-            obj[_CNV[theme]] if dflt == '--none--'        else
+    return (obj[theme]                   if theme in obj              else
+            obj[_CNV.get(theme, 'dark')] if dflt == '--none--'        else
             obj.get(_CNV.get(theme, None), dflt))
 
 def checksizes(fcn):

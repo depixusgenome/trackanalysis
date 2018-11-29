@@ -19,7 +19,8 @@
   max-width: 850px; }
 
 .bbm-modal .dpx-span { width: 100%; }
-.bbm-modal input { width: 80px; }
+.bbm-modal input  { width: 150px; }
+.bbm-modal select { width: 150px; }
 
 .bbm-views {
   width: 100%;

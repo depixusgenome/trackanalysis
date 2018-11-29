@@ -4,9 +4,10 @@
 import sys
 from   typing                  import Dict, Any
 
+import bokeh.models as _models
 from   bokeh.themes            import Theme
 from   bokeh.layouts           import layout
-
+from   bokeh.document          import Document
 
 from   control.event           import EmitPolicy
 from   control.taskcontrol     import TaskController
@@ -28,6 +29,54 @@ class ThemeController(DecentralizedController):
     "All static information that should remain from application run to application run"
     def __repr__(self):
         return "ThemeControl"
+
+    def initializetheme(self, doc:Document):
+        "init the theme"
+        theme = self.model("main").theme
+        if theme:
+            doc.theme = Theme(json = theme)
+
+        @self.observe
+        def _onmain(old = None, ** _):
+            if len({'themename', 'customlight', 'customdark'} & set(old)):
+                theme     = self.model("main").theme
+                doc.theme = Theme(json = theme)
+
+    def updatetheme(self, doc:Document, **values):
+        "change the theme"
+        theme = doc.theme
+        cur   = dict(getattr(theme, '_json')['attrs'], **getattr(theme, '_by_class_cache'))
+        for i, j in values.items():
+            if isinstance(j, dict):
+                cur[i] = dict(cur[i], **j)
+
+            elif i.startswith("font"):
+                for name, attrs in cur.items():
+                    lst = dict((k, j) for k in attrs if k.endswith(i))
+                    if len(lst):
+                        cur[name] = dict(attrs, **lst)
+
+            else:
+                for name, attrs in cur.items():
+                    if hasattr(getattr(_models, name, None), i):
+                        cur[name] = dict(attrs, **{i: j})
+
+        name = 'custom' + ('dark' if 'dark' in self.model("main").themename else 'light')
+        self.update("main", **{name: {"attrs": cur}, 'themename': name})
+
+    @staticmethod
+    def gettheme(doc:Document, attr: str):
+        "return the current value"
+        for i in getattr(doc.theme, '_by_class_cache').values():
+            if len(i) == 0:
+                continue
+
+            val = (i.get(attr, None)        if not attr.startswith('font') else
+                   next((k for j, k in i.items() if j.endswith(attr)), None))
+
+            if val is not None:
+                return val
+        return ""
 
 class BaseSuperController:
     """
@@ -143,15 +192,7 @@ class BaseSuperController:
         if roots is None:
             return
 
-        theme = self.theme.model("main").theme
-        if theme:
-            doc.theme = Theme(json = theme)
-
-        @self.theme.observe
-        def _onmain(old = None, ** _):
-            if 'themename' in old:
-                theme     = self.theme.model("main").theme
-                doc.theme = Theme(json = theme)
+        self.theme.initializetheme(doc)
 
         while isinstance(roots, (tuple, list)) and len(roots) == 1:
             roots = roots[0]
