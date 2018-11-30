@@ -104,19 +104,20 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
 
     def index(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> int:
         "Removes the single strand peak if detected"
-        cycles = self.nonclosingramps(frame, beadid)
-        if len(cycles) < 1 or len(peaks) < 1:
-            return len(peaks)
+        itr = self.__index(frame, beadid, peaks)
+        return len(peaks) if itr is None else next(itr, len(peaks)-1)+1
 
-        ratio  = self.task.percentage*1e-2
-        ssevts = [len(i) for i in self.nonclosingevents(cycles, peaks)]
-        sspeak = (i for i in range(len(peaks)-1, -1, -1)
-                  if sum(len(j) > 0 for j in peaks[i][1])*ratio > ssevts[i])
-        return next(sspeak, len(peaks)-1)+1
+    def detected(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[bool]:
+        """
+        Return whether a singlestrand peak was detected or None when the
+        information is unavailable.
+        """
+        track = getattr(frame, 'track', frame)
+        if track.phase.duration(..., self.task.phase).mean() < self.task.eventstart:
+            return None
 
-    def detected(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> bool:
-        "whether there is a singlestrand peak"
-        return len(peaks) > self.index(frame, beadid, peaks)
+        itr  = self.__index(frame, beadid, peaks)
+        return None if itr is None else (next(itr, None) is not None)
 
     def remove(self, frame:_Track, info:'Output') -> Tuple[BEADKEY, np.ndarray]:
         """
@@ -152,6 +153,18 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
                 beads = frame.track.beads # type: ignore
 
         return cast(Cycles, beads[beadid,:]).withphases(self.task.phase)
+
+    def __index(self, frame, beadid, peaks):
+        if self.task.disabled:
+            return None
+        cycles = self.nonclosingramps(frame, beadid)
+        if len(cycles) < 1 or len(peaks) < 1:
+            return None
+
+        ratio  = self.task.percentage*1e-2
+        ssevts = [len(i) for i in self.nonclosingevents(cycles, peaks)]
+        return (i for i in range(len(peaks)-1, -1, -1)
+                if sum(len(j) > 0 for j in peaks[i][1])*ratio > ssevts[i])
 
 class BaselinePeakTask(Task):
     """

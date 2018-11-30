@@ -9,10 +9,10 @@ import numpy                       as     np
 
 from   control.processor.taskview  import TaskViewProcessor
 from   control.processor.dataframe import DataFrameFactory
-from   data.views                  import BEADKEY, Beads, TaskView
+from   data.views                  import BEADKEY, Beads, TaskView, TrackView
 from   model                       import Task, Level
 from   peakfinding.peaksarray      import Output as PeakFindingOutput, PeaksArray
-from   peakfinding.processor       import PeaksDict
+from   peakfinding.processor       import PeaksDict, SingleStrandTask, SingleStrandProcessor
 from   utils                       import (StreamUnion, initdefaults, updatecopy,
                                            asobjarray, DefaultValue)
 from   ..tohairpin                 import (HairpinFitter, PeakGridFit, Distance,
@@ -65,6 +65,7 @@ class FitToHairpinTask(Task):
     constraints : Constraints       = dict()
     match       : Matchers          = dict()
     pullphaseratio: Optional[float] = .88
+    singlestrand: SingleStrandTask  = SingleStrandTask()
     DEFAULT_FIT                     = PeakGridFit
     DEFAULT_MATCH                   = PeakMatching
     DEFAULT_CONSTRAINTS             = dict(
@@ -171,7 +172,7 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
     def _transform_ids(cls, sel):
         return cls._transform_to_bead_ids(sel)
 
-    def __distances(self, key: BEADKEY, bead: Sequence[float])->Dict[Optional[str], Distance]:
+    def __distances(self, key: BEADKEY, bead: Sequence[float], inp)->Dict[Optional[str], Distance]:
         fits = self.config.fit
         cstr = self.config.constraints.get(key, None)
         hpin = None if cstr is None else fits.get(cast(str, cstr[0]), None)
@@ -180,11 +181,19 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
                 fits = {cast(str, cstr[0]): hpin}
             fits = {i: updatecopy(j, **cstr[1]) for i, j in fits.items()}
 
+        # discard fits that have a hairpin size either too small or too big
         if hpin is None and self.config.pullphaseratio is not None:
             extent = self.beadextension(key)
             if extent is not None:
                 extent *= self.config.pullphaseratio
                 fits    = {i: j for i, j in fits.items() if j.withinrange(extent)}
+
+        # remove the single-strand peak if it could be detected as missing
+        if any(i.hassinglestrand for i in fits.values()):
+            proc = SingleStrandProcessor(task = self.config.singlestrand)
+            if proc.detected(cast(TrackView, self.data), key, inp) is False:
+                fits = {i: updatecopy(j, peaks = j.peaks[:-1]) if j.hassinglestrand else j
+                        for i, j in fits.items()}
 
         return {name: calc.optimize(bead) for name, calc in fits.items()}
 
@@ -214,7 +223,7 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
 
 
         peaks, events = self.__topeaks(inp)
-        dist          = self.__distances(bead, peaks)
+        dist          = self.__distances(bead, peaks, inp)
         return self.__beadoutput(bead, peaks, events, dist)
 
 class FitToHairpinProcessor(TaskViewProcessor[FitToHairpinTask, FitToHairpinDict, BEADKEY]):
