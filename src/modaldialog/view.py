@@ -89,6 +89,8 @@ class TaskDescriptor:
             self.keys = self.keys.split('.')
         if self.keys[0] == 'task':
             self.keys = self.keys[1:]
+        if len(self.keys) == 2 and self.keys[-1] == 'disabled':
+            self.keys = self.keys[:1]
         if len(self.keys) == 1:
             self.fmt = 'b'
 
