@@ -355,15 +355,15 @@ class CollapseByMerging(_CollapseAlg):
         return prof
 
 class DerivateMode(Enum):
-    "Computation modes for the derivate method."
+    "Computation modes for the derivative method."
     median = 'median'
     mean   = 'mean'
 
 class CollapseByDerivate(_CollapseAlg):
     """
-    Behaviour common to all is measured using the distribution of derivates at
+    Behaviour common to all is measured using the distribution of derivatives at
     each time frame. Either the mean or the median is defined as the profile
-    derivate.
+    derivative.
     """
     maxder: float                    = np.inf
     mode:   Union[str, DerivateMode] = 'median'

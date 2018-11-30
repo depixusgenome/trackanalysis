@@ -15,7 +15,7 @@ class IntervalExtension(ABC):
     Extends intervals beyond the computed range up to a limit given by *window*.
 
     This means to remove the range size bias created by using a window to compute
-    derivates.
+    derivatives.
     """
     window = 3
     @initdefaults(frozenset(locals()))
@@ -113,7 +113,7 @@ class IntervalExtensionAroundMean(IntervalExtension):
             |       X
             +----------------------->
     This means to remove the range size bias created by using a window to compute
-    derivates.
+    derivatives.
     """
     @classmethod
     def _test(cls, inds, data, precision, window):
@@ -154,7 +154,7 @@ class IntervalExtensionAroundRange(IntervalExtension):
 
 
     This means to remove the range size bias created by using a window to compute
-    derivates.
+    derivatives.
     """
     @classmethod
     def _test(cls, inds, data, precision, window):

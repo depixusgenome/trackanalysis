@@ -24,10 +24,10 @@ class SingleStrandTask(Task):
 
     A single-strand peaks is characterized as follows:
 
-    * In any cycle, a derivate in `PHASE.rampdown` lower than `delta` is
+    * In any cycle, a derivative in `PHASE.rampdown` lower than `delta` is
     considered a sign that the strand has started closing.
 
-    * If a there are no such derivate then the event starting immediatly
+    * If a there are no such derivative then the event starting immediatly
     (< `eventstart` ) in `PHASE.measure` is defined as *single-strand*ed.
 
     * If a peak has more than `percentage` of its events as *single-strand*ed,
@@ -143,3 +143,28 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
                 beads = frame.track.beads # type: ignore
 
         return cast(Cycles, beads[beadid,:]).withphases(self.task.phase)
+
+class BaselinePeakTask(Task):
+    """
+    Find the peak corresponding to the baseline.
+
+    A baseline peak is characterized as follows:
+
+    * In any cycle, a derivative in `PHASE.rampdown` lower than `delta` is
+    considered a sign that the strand has started closing.
+
+    * If a there are no such derivative then the event starting immediatly
+    (< `eventstart` ) in `PHASE.measure` is defined as *single-strand*ed.
+
+    * If a peak has more than `percentage` of its events as *single-strand*ed,
+    then that peak is a single-strand peak. It and any other above it are
+    discarded.
+    """
+    level       = Level.peak
+    phase       = PHASE.rampdown
+    eventstart  = 5
+    delta       = -0.015
+    percentage  = 50
+    @initdefaults(frozenset(locals()) - {'level'})
+    def __init__(self, **_):
+        super().__init__(**_)

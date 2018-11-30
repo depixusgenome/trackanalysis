@@ -138,7 +138,7 @@ class KnownSigmaEventMerger(StatsEventMerger, PrecisionAlg):
     sigma.
 
     The sigma (precision) is either provided or measured. In the latter case,
-    the estimation used is the median-deviation of the derivate of the data.
+    the estimation used is the median-deviation of the derivative of the data.
     """
     isequal = True
     __DTYPE = np.dtype([('c', 'i4'), ('m', 'f4')])

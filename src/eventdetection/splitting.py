@@ -181,7 +181,7 @@ class PyDerivateSplitDetector(GradedSplitDetector):
     the same normal distribution with a known sigma.
 
     The precision is either provided or measured. In the latter case,
-    the estimation used is the median-deviation of the derivate of the data.
+    the estimation used is the median-deviation of the derivative of the data.
     """
     window                      = 3
     truncate                    = 4
@@ -274,7 +274,7 @@ class MinMaxSplitDetector(GradedSplitDetector):
     *N-1* points by a given margin (precision).
 
     The precision is either provided or measured. In the latter case,
-    the estimation used is the median-deviation of the derivate of the data.
+    the estimation used is the median-deviation of the derivative of the data.
     """
     window                      = 5
     confidence: Optional[float] = 0.1

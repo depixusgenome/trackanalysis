@@ -148,7 +148,7 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
         return Distance(best[0], best[1], delta-(best[2]+hpdelta)/best[1])
 
     def value(self, peaks: np.ndarray, stretch, bias) -> Tuple[float, float, float]:
-        "computes the cost value at a given stretch and bias as well as derivates"
+        "computes the cost value at a given stretch and bias as well as derivatives"
         if len(peaks) == 0:
             return 0., 0., 0.
         hpin  = self.peaks
