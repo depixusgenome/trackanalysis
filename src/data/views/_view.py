@@ -23,7 +23,7 @@ class TrackView(TrackViewConfigMixin, ITrackView):
         super().__init__(**kw)
 
     def _keys(self, sel:Optional[Sequence]) -> Iterable:
-        itr    = iter(self.data.keys())
+        itr    = iter(cast(dict, self.data).keys())
         if sel is not None:
             keys = frozenset(itr)
             itr  = (i for i in sel if i in keys)
@@ -35,7 +35,7 @@ class TrackView(TrackViewConfigMixin, ITrackView):
         if sel is None and isinstance(self.data, dict):
             yield from self.data.items()   # pylint: disable=no-member
         else:
-            yield from ((bead, self.data[bead]) for bead in self.keys(sel))
+            yield from ((bead, cast(dict, self.data)[bead]) for bead in self.keys(sel))
 
     def __copy__(self):
         other = type(self).__new__(type(self))  # type: ignore
@@ -113,6 +113,11 @@ class TrackView(TrackViewConfigMixin, ITrackView):
         if act is not None:
             return act(self, vals)[1]
         return vals[1]
+
+    def phaseposition(self, phase: int, ibead:int) -> Optional[float]:
+        "Return the median position for a given phase"
+        fcn = getattr(self.track, 'phaseposition', None)
+        return fcn(phase, ibead) if callable(fcn) else None # pylint: disable=not-callable
 
     @staticmethod
     def _freeze_type():

@@ -3,7 +3,7 @@
 """
 Find the peak corresponding to a single strand DNA
 """
-from   typing             import TYPE_CHECKING, Union, List, Tuple, cast
+from   typing             import TYPE_CHECKING, Union, Optional, List, Tuple, cast
 from   functools          import partial
 
 import numpy                  as np
@@ -15,8 +15,9 @@ from   data.track         import Track
 from   data.views         import Beads, Cycles, BEADKEY, TrackView
 from   control.processor  import Processor
 if TYPE_CHECKING:
-    from peakfinding.processor.selector import PeaksDict, Output # pylint: disable=unused-import
-    from peakfinding.peaksarray         import PeakListArray     # pylint: disable=unused-import
+    # pylint: disable=unused-import
+    from peakfinding.processor.selector import Output
+    from peakfinding.peaksarray         import PeakListArray
 
 class SingleStrandTask(Task):
     """
@@ -33,9 +34,16 @@ class SingleStrandTask(Task):
     * If a peak has more than `percentage` of its events as *single-strand*ed,
     then that peak is a single-strand peak. It and any other above it are
     discarded.
+
+    :param phase: the phase to use for discovering the single-strand peak
+    :param eventstart: consider only events starting a maximum of 5 frames into
+    the measuring phase
+    :param delta: the δz threshhold indicator of the strand starting to close
+    :param percentage: the min ratio of events in the single-strand peak
+    detected as non-closing.
     """
     level       = Level.peak
-    phase       = PHASE.rampdown
+    phase       = PHASE.rampdown # phase
     eventstart  = 5
     delta       = -0.015
     percentage  = 50
@@ -43,12 +51,13 @@ class SingleStrandTask(Task):
     def __init__(self, **_):
         super().__init__(**_)
 
+_Track = Union[Track, TrackView]
 class SingleStrandProcessor(Processor[SingleStrandTask]):
     """
     Find the peak corresponding to a single strand DNA and remove it
     """
     _DTYPE    = np.dtype([('peaks', 'f4'), ('events', 'O')])
-    def closingindex(self, frame:Union[Track, TrackView], beadid:BEADKEY) -> List[int]:
+    def closingindex(self, frame:_Track, beadid:BEADKEY) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has no break"
         delta   = self.task.delta
         def _greater(arr):
@@ -60,7 +69,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         return np.array([_greater(i) for i in self.__ramp(frame, beadid).values()],
                         dtype = 'i4')
 
-    def nonclosingramps(self, frame:Union[Track, TrackView], beadid:BEADKEY) -> List[int]:
+    def nonclosingramps(self, frame:_Track, beadid:BEADKEY) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has no break"
         delta   = self.task.delta
         def _greater(arr):
@@ -69,7 +78,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
             return len(arr) and np.all(arr > delta)
         return [i[1] for i, j in self.__ramp(frame, beadid) if _greater(j)]
 
-    def closingramps(self, frame: Union[Track, TrackView], beadid:BEADKEY) -> List[int]:
+    def closingramps(self, frame: _Track, beadid:BEADKEY) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has a break"
         delta  = self.task.delta
         def _lesser(arr):
@@ -90,13 +99,8 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         good  = lambda evt: len(evt) and evt[0][0] < start
         return [[i for i in cycles if good(peak[i])] for _, peak in peaks]
 
-    def singlestrandpeakindex(self,
-                              frame: 'PeaksDict',
-                              beadid: BEADKEY,
-                              peaks:  'PeakListArray') -> int:
-        """
-        Removes the single strand peak if detected
-        """
+    def index(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> int:
+        "Removes the single strand peak if detected"
         cycles = self.nonclosingramps(frame, beadid)
         if len(cycles) < 1 or len(peaks) < 1:
             return len(peaks)
@@ -107,30 +111,33 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
                   if sum(len(j) > 0 for j in peaks[i][1])*ratio > ssevts[i])
         return next(sspeak, len(peaks)-1)+1
 
-    def removesinglestrandpeak(self,
-                               frame: 'PeaksDict',
-                               info: 'Output') -> Tuple[BEADKEY, np.ndarray]:
+    def detected(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> bool:
+        "whether there is a singlestrand peak"
+        return len(peaks) > self.index(frame, beadid, peaks)
+
+    def remove(self, frame:_Track, info:'Output') -> Tuple[BEADKEY, np.ndarray]:
         """
         Removes the single strand peak if detected
         """
-        if frame.track.phase.duration(..., self.task.phase).mean() < self.task.eventstart:
+        track = getattr(frame, 'track', frame)
+        if track.phase.duration(..., self.task.phase).mean() < self.task.eventstart:
             return info
 
         peaks  = (info[1]    if isinstance(info[1], np.ndarray) else
                   np.array(list(info[1]), dtype = self._DTYPE))
-        return info[0], peaks[:self.singlestrandpeakindex(frame, info[0], peaks)]
+        return info[0], peaks[:self.index(frame, info[0], peaks)]
 
     @classmethod
     def apply(cls, toframe = None, **kwa):
         "applies the task to a frame or returns a function that does so"
         return (partial(cls.apply, **kwa)       if toframe is None else
-                toframe.withaction(cls(**kwa).removesinglestrandpeak))
+                toframe.withaction(cls(**kwa).remove))
 
     def run(self, args):
         "updates frames"
         args.apply(self.apply(**self.config()))
 
-    def __ramp(self, frame: Union[Track, TrackView], beadid:BEADKEY) -> Cycles:
+    def __ramp(self, frame: _Track, beadid:BEADKEY) -> Cycles:
         "return the cycle indexes for which `PHASE.rampdown` has no break"
         if isinstance(frame, Track):
             beads = cast(Track, frame).beads
@@ -146,25 +153,77 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
 
 class BaselinePeakTask(Task):
     """
-    Find the peak corresponding to the baseline.
+    Find the peak corresponding to the baseline and discards it and all peaks below.
 
-    A baseline peak is characterized as follows:
+    The baseline peak is detected as follows:
 
-    * In any cycle, a derivative in `PHASE.rampdown` lower than `delta` is
-    considered a sign that the strand has started closing.
+    * Only consider peaks within `maxdisttozero` of the median of `PHASE.initial`
+    * Only consider events reaching the end of `PHASE.measure`.
+    * Consider peaks with at least 10% of cycles.
+    * The lowest such of such peaks is the baseline peak
+    * Any peaks below are discarded
 
-    * If a there are no such derivative then the event starting immediatly
-    (< `eventstart` ) in `PHASE.measure` is defined as *single-strand*ed.
-
-    * If a peak has more than `percentage` of its events as *single-strand*ed,
-    then that peak is a single-strand peak. It and any other above it are
-    discarded.
+    :param measurephase: the phase containing all events.
+    :param baselinephase: the phase to use to measure the baseline position
+    :param eventend: only consider events within 5 frames of the end of `PHASE.measure`.
+    :param maxdisttozero: only consider peaks with such a distance from the baseline.
+    :param mineventpercentage: the minimum number of events in the baseline peak
     """
-    level       = Level.peak
-    phase       = PHASE.rampdown
-    eventstart  = 5
-    delta       = -0.015
-    percentage  = 50
+    level              = Level.peak
+    measurephase       = PHASE.measure
+    baselinephase      = PHASE.initial
+    eventend           = 5
+    maxdisttozero      = .015
+    mineventpercentage = 10
+
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
         super().__init__(**_)
+
+class BaselinePeakProcessor(Processor[BaselinePeakTask]):
+    "Find the peak corresponding to the baseline"
+    _DTYPE    = np.dtype([('peaks', 'f4'), ('events', 'O')])
+
+    def index(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[int]:
+        "Removes the single strand peak if detected"
+        if len(peaks) == 0:
+            return None
+
+        task     = self.task
+        baseline = frame.phaseposition(task.baselinephase, beadid)
+        if baseline is None:
+            return None
+
+        baseline += task.maxdisttozero
+        lasts     = getattr(frame, 'track', frame).phase.duration(..., task.measurephase)
+        lasts     = lasts-task.eventend
+        for ind, (peak, evts) in enumerate(peaks):
+            if peak > baseline:
+                break
+
+            nevts = sum(len(i) > 0 and (i[-1]['start']+len(i[-1]['data']) > j)
+                        for i, j in zip(evts, lasts))
+            if nevts > task.mineventpercentage*1e-2*len(evts):
+                return ind
+        return None
+
+    def detected(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> bool:
+        "whether there is a singlestrand peak"
+        return self.index(frame, beadid, peaks) is not None
+
+    def remove(self, frame:_Track, info:'Output') -> Tuple[BEADKEY, np.ndarray]:
+        "Removes the baseline peak if detected"
+        peaks = (info[1] if isinstance(info[1], np.ndarray) else
+                 np.array(list(info[1]), dtype = self._DTYPE))
+        ind   = self.index(frame, info[0], peaks)
+        return (info[0], peaks if ind is None else peaks[ind+1:])
+
+    @classmethod
+    def apply(cls, toframe = None, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        return (partial(cls.apply, **kwa)       if toframe is None else
+                toframe.withaction(cls(**kwa).remove))
+
+    def run(self, args):
+        "updates frames"
+        args.apply(self.apply(**self.config()))

@@ -72,8 +72,8 @@ class GuiSingleStrandProcessor(SingleStrandProcessor):
         self.__init__(self.store, **_)
         return self
 
-    def removesinglestrandpeak(self, frame, info):
-        info                    = super().removesinglestrandpeak(frame, info)
+    def remove(self, frame, info):
+        info                    = super().remove(frame, info)
         self.store[0].maxlength = len(info[1])
         return info
 

@@ -5,12 +5,14 @@ Default configurations for each task
 """
 from model.task.application import setupdefaulttask
 from .                      import (PeakCorrelationAlignmentTask, SingleStrandTask,
-                                    PeakSelectorTask, MinBiasPeakAlignmentTask)
+                                    BaselinePeakTask, PeakSelectorTask,
+                                    MinBiasPeakAlignmentTask)
 setupdefaulttask(PeakCorrelationAlignmentTask)
 setupdefaulttask(MinBiasPeakAlignmentTask)
 setupdefaulttask(SingleStrandTask,
                  picotwist = {'disabled': True},
                  sdi       = {'disabled': False})
+setupdefaulttask(BaselinePeakTask)
 setupdefaulttask(PeakSelectorTask,
                  picotwist = {'rawfactor': 2.0},
                  sdi       = {'rawfactor': 1.0})

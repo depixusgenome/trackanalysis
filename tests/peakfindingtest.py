@@ -20,7 +20,8 @@ from eventdetection.processor    import EventDetectionTask
 from peakfinding.selector        import PeakSelector, EVENTS_DTYPE
 from peakfinding.processor       import (PeakSelectorTask, PeakProbabilityTask,
                                          SingleStrandTask, SingleStrandProcessor,
-                                         MinBiasPeakAlignmentTask, GELSPeakAlignmentTask)
+                                         BaselinePeakTask, MinBiasPeakAlignmentTask,
+                                         GELSPeakAlignmentTask)
 from peakfinding.histogram       import Histogram
 from peakfinding.groupby         import CWTPeakFinder,ZeroCrossingPeakFinder, PeakFlagger
 from peakfinding.alignment       import PeakCorrelationAlignment, PeakExpectedPositionAlignment
@@ -318,6 +319,16 @@ def test_singlestrandpeak():
     out2  = [i for i, _ in next(create(*lst[:-1]).run())[0]]
     assert out1 == out2[:-1]
 
+def test_baselinepeak():
+    "test single strand peak"
+    data  = Experiment(baseline = None, thermaldrift = None).track(seed = 1)
+    track = Track(**data)
+    lst   = (InMemoryTrackTask(track), EventDetectionTask(),
+             PeakSelectorTask(),       BaselinePeakTask())
+    out1  = [i for i, _ in next(create(*lst).run())[0]]
+    out2  = [i for i, _ in next(create(*lst[:-1]).run())[0]]
+    assert out1 == out2[1:]
+
 def test_minbiasalignment():
     "test min bias alignment of peaks"
     data  = Experiment(baseline = None, thermaldrift = None).track(seed = 1)
@@ -373,6 +384,4 @@ def test_gels():
     assert_allclose(found, truth)
 
 if __name__ == '__main__':
-    test_correlationalignment()
-    test_randcorrelationalignment()
-    test_minbiasalignment()
+    test_baselinepeak()
