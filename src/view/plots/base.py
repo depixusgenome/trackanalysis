@@ -360,7 +360,10 @@ class AxisOberver:
             return
 
         axis  = getattr(self._fig, name+'_range')
-        if None in (axis.reset_end, axis.reset_start):
+        if (
+                None in (axis.reset_end, axis.reset_start)
+                or axis.max_interval == axis.min_interval
+        ):
             return
 
         eps   = 1e-3*(axis.reset_end-axis.reset_start)

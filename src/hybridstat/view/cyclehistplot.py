@@ -91,14 +91,6 @@ class HistPlotModel(PlotModel):
     def __init__(self, **_):
         super().__init__()
 
-class CycleHistPlotState:
-    "rh plot state"
-    name  = "cyclehist.state"
-    state = PlotState.active
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
-
 class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
     "Building the graph of cycles"
     _model:  PeaksPlotModelAccess
@@ -276,15 +268,23 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
 
 class _StateDescriptor:
     def __get__(self, inst, owner):
-        return getattr(inst, '_state').state if inst else self
+        if inst is None:
+            return self
+        return getattr(inst, '_ctrl').display.get("cyclehist.plot.hist", 'state')
 
     @staticmethod
     def setdefault(inst, value):
         "sets the default value"
-        getattr(inst, '_ctrl').display.updatedefaults("cyclehist.state", state = PlotState(value))
+        state = PlotState(value)
+        fcn   = getattr(inst, '_ctrl').display.updatedefaults
+        fcn("cyclehist.plot.hist",  state = state)
+        fcn("cyclehist.plot.cycle", state = state)
 
     def __set__(self, inst, value):
-        getattr(inst, '_ctrl').display.update("cyclehist.state", state = PlotState(value))
+        state = PlotState(value)
+        fcn   = getattr(inst, '_ctrl').display.update
+        fcn("cyclehist.plot.hist",  state = state)
+        fcn("cyclehist.plot.cycle", state = state)
 
 class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
     "Creates plots for peaks & cycles"
@@ -293,7 +293,6 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
         super().__init__(ctrl, addto = False)
         self._cycle   = CyclePlotCreator(ctrl,  noerase = False, model = self._model)
         self._hist    = HistPlotCreator(ctrl, noerase = False, model = self._model)
-        self._state   = CycleHistPlotState()
         theme         = PeakListTheme(name = "cyclehist.peak.list", height = 200)
         theme.columns = [i for i in theme.columns if i[0] not in ("z", "skew")]
 
@@ -309,7 +308,6 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
                     accessors = (CyclePlotTheme,),
                     xaxis     = True)
         self._widgets = PeaksPlotWidgets(ctrl, self._model, **args)
-        ctrl.display.add(self._state)
         self.addto(ctrl)
 
     @property
@@ -327,7 +325,7 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
 
         @ctrl.display.observe(self._model.sequencemodel.display)
         def _onchangekey(old = None, **_):
-            if ctrl.display.get("cyclehist.state", "state") is PlotState.active:
+            if self.isactive():
                 root = self._model.roottask
                 if root is not None and {'hpins'} == set(old):
                     self.calllater(lambda: self.reset(False))
