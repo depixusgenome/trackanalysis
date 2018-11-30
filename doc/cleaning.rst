@@ -107,7 +107,7 @@ the reconstruced baseline, but considering a single bead:
    *doctored* values. The overall stability is the median deviation of that:
 
 .. math::
-    \mathrm{stability}(t) = \mathrm{median_deviation}(\mathrm{median_deviation}_{\mathrm{cycles}}
+    \mathrm{stability}(t) = \mathrm{median deviation}(\mathrm{median deviation}_{\mathrm{cycles}}
     (\mathrm{z}(t, \mathrm{cycle})-\mathrm{bias}(\mathrm{cycle})))
 
 To be quite exact, instead of a median deviation, we use the distance from the
@@ -126,15 +126,15 @@ A number of filters allow discarding individual z values:
 
 Most other filters allow discarding badly behaving cycles:
 
-* :math:`\Delta z` allows discarding that stay closed and beads that have too
+* :math:`\Delta z`: allows discarding that stay closed and beads that have too
   long a strand.
-* :math:`\sigma[HF]` allows discarding noisy cycles or those for which
+* :math:`\sigma[HF]`: allows discarding noisy cycles or those for which
   measures were not recorded (z is constant).
-* `% good` allows discarding cycles that have too many missing values.
+* `% good`: allows discarding cycles that have too many missing values.
 
 Finally one filter is performed over all cycles:
 
-* `% non-closing` requires that a minimum number of cycles close entirely
+* `% non-closing`: requires that a minimum number of cycles close entirely
   before reaching the end of phase 5. This will not always happen either
   because of a structural blockage, which should be detectable using ramps, or
   because of one or more oligos binding too long and too often considering the
