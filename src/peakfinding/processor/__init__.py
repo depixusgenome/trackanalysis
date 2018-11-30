@@ -8,5 +8,6 @@ from .alignment     import (PeakCorrelationAlignmentTask, PeakCorrelationAlignme
 from .selector      import PeakSelectorTask, PeakSelectorProcessor, PeaksDict
 from .probabilities import PeakProbabilityProcessor, PeakProbabilityTask
 from .peakfiltering import (SingleStrandTask, SingleStrandProcessor,
-                            BaselinePeakTask, BaselinePeakProcessor)
+                            BaselinePeakTask, BaselinePeakProcessor,
+                            BaselinePeakFilterTask, BaselinePeakFilterProcessor)
 from .dataframe     import PeaksDataFrameFactory

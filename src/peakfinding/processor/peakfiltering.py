@@ -51,12 +51,15 @@ class SingleStrandTask(Task):
     def __init__(self, **_):
         super().__init__(**_)
 
+_DTYPE = np.dtype([('peaks', 'f4'), ('events', 'O')])
+def _topeakarray(arr):
+    return arr if isinstance(arr, np.ndarray) else np.array(list(arr), dtype = _DTYPE)
+
 _Track = Union[Track, TrackView]
 class SingleStrandProcessor(Processor[SingleStrandTask]):
     """
     Find the peak corresponding to a single strand DNA and remove it
     """
-    _DTYPE    = np.dtype([('peaks', 'f4'), ('events', 'O')])
     def closingindex(self, frame:_Track, beadid:BEADKEY) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has no break"
         delta   = self.task.delta
@@ -123,8 +126,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         if track.phase.duration(..., self.task.phase).mean() < self.task.eventstart:
             return info
 
-        peaks  = (info[1]    if isinstance(info[1], np.ndarray) else
-                  np.array(list(info[1]), dtype = self._DTYPE))
+        peaks = _topeakarray(info[1])
         return info[0], peaks[:self.index(frame, info[0], peaks)]
 
     @classmethod
@@ -182,8 +184,6 @@ class BaselinePeakTask(Task):
 
 class BaselinePeakProcessor(Processor[BaselinePeakTask]):
     "Find the peak corresponding to the baseline"
-    _DTYPE    = np.dtype([('peaks', 'f4'), ('events', 'O')])
-
     def index(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[int]:
         "Removes the single strand peak if detected"
         if len(peaks) == 0:
@@ -213,10 +213,34 @@ class BaselinePeakProcessor(Processor[BaselinePeakTask]):
 
     def remove(self, frame:_Track, info:'Output') -> Tuple[BEADKEY, np.ndarray]:
         "Removes the baseline peak if detected"
-        peaks = (info[1] if isinstance(info[1], np.ndarray) else
-                 np.array(list(info[1]), dtype = self._DTYPE))
+        peaks = _topeakarray(info[1])
         ind   = self.index(frame, info[0], peaks)
         return (info[0], peaks if ind is None else peaks[ind+1:])
+
+    @classmethod
+    def apply(cls, toframe = None, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        return (partial(cls.apply, **kwa)       if toframe is None else
+                toframe.withaction(cls(**kwa).remove))
+
+    def run(self, args):
+        "updates frames"
+        args.apply(self.apply(**self.config()))
+
+class BaselinePeakFilterTask(BaselinePeakTask):
+    """
+    Find the peak corresponding to the baseline and discards all peaks below.
+    """
+    if __doc__ is not None:
+        __doc__ = BaselinePeakTask.__doc__.replace("discards it and", "discards")
+
+class BaselinePeakFilterProcessor(Processor[BaselinePeakFilterTask]):
+    "Find the peak corresponding to the baseline"
+    def remove(self, frame:_Track, info:'Output') -> Tuple[BEADKEY, np.ndarray]:
+        "Removes the baseline peak if detected"
+        peaks = _topeakarray(info[1])
+        ind   = BaselinePeakProcessor(self.task).index(frame, info[0], peaks)
+        return (info[0], peaks if ind is None or ind == 0 else peaks[ind:])
 
     @classmethod
     def apply(cls, toframe = None, **kwa):

@@ -15,6 +15,8 @@ TASK_ORDER = ['model.task.RootTask',
               'eventdetection.processor.EventDetectionTask',
               'peakfinding.processor.PeakSelectorTask',
               'peakfinding.processor.SingleStrandTask',
+              'peakfinding.processor.BaselinePeakFilterTask',
+              'peakfinding.processor.BaselinePeakTask',
               'peakcalling.processor.FitToReferenceTask',
               'peakcalling.processor.FitToHairpinTask',
              ]
