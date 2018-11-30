@@ -107,11 +107,14 @@ class ChiSquare: # pylint: disable=too-many-instance-attributes
 
         if self.singlestrand and len(ref):
             val   = (ref[-1]-bias)/stretch
-            dist += self.__delta(exp[np.searchsorted(exp, val):], val, stretch, bias)
+            if val <= exp[-1]:
+                print(dist)
+                dist += self.__delta(exp[np.searchsorted(exp, val):], ref[-1], stretch, bias)
 
         if self.baseline:
             val   = (ref[0]-bias)/stretch
-            dist += self.__delta(exp[:np.searchsorted(exp, val)], val, stretch, bias)
+            if val >= exp[0]:
+                dist += self.__delta(exp[:np.searchsorted(exp, val)], ref[0], stretch, bias)
 
         ntheo = (len(exp)+len(ref) if self.symmetry is Symmetry.both else
                  len(ref)          if self.symmetry is Symmetry.left else
