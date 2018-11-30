@@ -59,10 +59,15 @@ def _v6(data:dict) -> dict:
                   dict(__name__ = 'cleaning.processor.BeadSubtractionTask'))
     return data
 
-__TASKS__   = Patches(_v0task, _v1, _v2, _v3, _v4tasks, _v5, _v6)
+def _v7(data:dict) -> dict:
+    modifyclasses(data, 'peakfinding.processor.singlestrand.SingleStrandTask',
+                  dict(__name__ = 'peakfinding.processor.peakfiltering.SingleStrandTask'))
+    return data
+
+__TASKS__   = Patches(_v0task, _v1, _v2, _v3, _v4tasks, _v5, _v6, _v7)
 
 def _v0cnf(data:dict) -> dict:
     data = _v0task(data)
     data.get('config', {}).pop('precision.max', None)
     return data
-__CONFIGS__ = Patches(_v0cnf, _v1, _v2, _v3, _v5, _v6)
+__CONFIGS__ = Patches(_v0cnf, _v1, _v2, _v3, _v5, _v6, _v7)

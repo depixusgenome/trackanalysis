@@ -83,10 +83,13 @@ class PickleIO(_TrackIO):
         try:
             from cleaning.processor import BeadSubtractionTask
             import cleaning.beadsubtraction as mdl
+            import peakfinding.processor.peakfiltering as mdl2
+            sys.modules["peakfinding.processor.singlestrand"] = mdl2
             mdl.BeadSubtractionTask = BeadSubtractionTask # type: ignore
             with open(path, 'rb') as stream:
                 out = pickle.load(stream)
         finally:
+            del sys.modules["peakfinding.processor.singlestrand"]
             del mdl.BeadSubtractionTask # type: ignore
         return out
 
