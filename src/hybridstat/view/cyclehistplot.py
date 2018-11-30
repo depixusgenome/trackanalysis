@@ -39,7 +39,7 @@ class CyclePlotTheme(PlotTheme):
     format    = '0.0a'
     frames    = PlotAttrs(deepcopy(PeaksPlotTheme.count.color), 'line', 1., alpha=.25)
     toolbar   = dict(PlotTheme.toolbar)
-    toolbar['items'] = 'pan,box_zoom,reset,save'
+    toolbar['items'] = 'pan,box_zoom,wheel_zoom,reset,save'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
@@ -71,7 +71,7 @@ class HistPlotTheme(PlotTheme):
     pkcolors         = deepcopy(PeaksPlotTheme.pkcolors)
     minzoomz         = .008
     toolbar          = dict(CyclePlotTheme.toolbar)
-    toolbar['items'] = 'pan,box_zoom,hover,reset,save'
+    toolbar['items'] = 'pan,box_zoom,wheel_zoom,hover,reset,save'
     tooltipmode      = 'hline'
     tooltippolicy    = 'follow_mouse'
     tooltips         = [(i[1], '@'+i[0]+("{"+i[2]+"}" if i[2] else ""))

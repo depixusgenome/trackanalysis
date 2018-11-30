@@ -5,7 +5,7 @@ import warnings
 from   typing               import Dict, Union, Tuple, List, Any, cast
 
 from   bokeh                import layouts
-from   bokeh.models         import ColumnDataSource, Range1d
+from   bokeh.models         import ColumnDataSource, Range1d, ToolbarBox
 from   bokeh.plotting       import Figure
 import numpy                as     np
 
@@ -217,4 +217,8 @@ class QualityControlPlots:
 
         tmp  = TSamplePlotCreator.fig(getattr(self.tsample, '_theme')).figargs()
         tbar = tmp['toolbar_location']
-        return layouts.gridplot(plots, **mode, toolbar_location = tbar)
+        grid = layouts.gridplot(plots, **mode, toolbar_location = tbar)
+        # pylint: disable=not-an-iterable
+        tbar = next(i for i in grid.children if isinstance(i, ToolbarBox))
+        tbar.toolbar.logo = None
+        return grid

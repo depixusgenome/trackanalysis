@@ -579,10 +579,10 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
 
     def newbounds(self, axis, arr) -> dict:
         "Sets the range boundaries"
-        over  = self._theme.overshoot
         if len(arr) == 0:
-            return OrderedDict(start  = 0., end = 1., bounds = (0., 1.),
-                               reset_start = 0., reset_end = 1.)
+            return dict(start        = 0., end          = 1.,
+                        max_interval = 1., min_interval = 1.,
+                        reset_start  = 0., reset_end    = 1.)
 
         if isinstance(arr, np.ndarray):
             if all(np.isnan(i) for i in arr) or len(arr) == 0:
@@ -595,16 +595,18 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
             vmin = min(arr)
             vmax = max(arr)
 
-        delta = max(1e-5, (vmax-vmin))*over*.5
+        rng   = max(1e-5, (vmax-vmin))
+        delta = rng*self._theme.overshoot*.5
         vmin -= delta
         vmax += delta
 
-        curr = getattr(self._display, f'{axis}bounds', (None, None))
-        attrs: Dict[str, Any] = OrderedDict(bounds = (vmin, vmax))
-        attrs.update(start = vmin if curr[0]  is None else curr[0], # type: ignore
-                     end   = vmax if curr[1]  is None else curr[1],
-                     reset_start = vmin, reset_end = vmax)
-        return attrs
+        curr  = getattr(self._display, f'{axis}bounds', (None, None))
+        return dict(max_interval = rng*(1.+self._theme.boundsovershoot),
+                    min_interval = rng*self._theme.overshoot,
+                    start        = vmin if curr[0]  is None else curr[0], # type: ignore
+                    end          = vmax if curr[1]  is None else curr[1],
+                    reset_start  = vmin,
+                    reset_end    = vmax)
 
     def setbounds(self, cache:CACHE_TYPE, fig, # pylint: disable=too-many-arguments
                   xarr, yarr, xinit = None, yinit = None):

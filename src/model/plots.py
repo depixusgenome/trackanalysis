@@ -46,10 +46,11 @@ class PlotTheme:
     xlabel         = 'Frames'
     figsize        = defaultfigsize()
     overshoot      = .001
+    boundsovershoot= 1.
     output_backend = 'canvas'
     toolbar        = dict(sticky   = False,
                           location = 'above',
-                          items    = 'xpan,wheel_zoom,box_zoom,save',
+                          items    = 'xpan,box_zoom,wheel_zoom,save',
                           hide     = True)
     tooltips: Any  = None
     @initdefaults(frozenset(locals()))
@@ -69,7 +70,6 @@ class PlotDisplay:
     yinit:   RANGE_TYPE = __NONE
     xbounds: RANGE_TYPE = __NONE
     ybounds: RANGE_TYPE = __NONE
-    useinit: bool       = False
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass

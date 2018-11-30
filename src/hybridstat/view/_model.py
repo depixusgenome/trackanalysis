@@ -63,7 +63,7 @@ class PeaksPlotTheme(PlotTheme):
                                         missing         = 'red',
                                         found           = 'gray'))
     toolbar          = dict(PlotTheme.toolbar)
-    toolbar['items'] = 'ypan,ybox_zoom,reset,save,tap'
+    toolbar['items'] = 'ypan,ybox_zoom,ywheel_zoom,reset,save,tap'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)

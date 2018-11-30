@@ -185,7 +185,7 @@ class CleaningPlotTheme(PlotTheme):
                             aberrant   = 'red')
     tooltips         = [(u'(cycle, t, z)', '(@cycle, $~x{1}, $data_y{1.1111})')]
     toolbar          = dict(PlotTheme.toolbar)
-    toolbar['items'] = 'ypan,ybox_zoom,reset,save,dpxhover'
+    toolbar['items'] = 'ypan,ybox_zoom,ywheel_zoom,reset,save,dpxhover'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
