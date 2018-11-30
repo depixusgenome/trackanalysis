@@ -6,6 +6,17 @@
 Welcome to CycleApp's documentation!
 ====================================
 
+What is :program:`CycleApp` for ?
+---------------------------------
+
+This software is for *offline* analyses of hybridization data. By this we mean
+data collected from :program:`SIMDEQ` instruments over one field of view and a
+number of cycles. Theses concept of beads and cycles are central to the
+software. Its main goal is to aggregate information from all cycles into
+characteristics - position, rates and durations - for each blocking position in
+each bead individually. This information can be saved to an excel file for
+further studies.
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:

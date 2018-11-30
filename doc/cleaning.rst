@@ -59,7 +59,83 @@ Subtracting Fixed Beads
 
 Beads are defined as fixed if:
 
-#. Their high frequency noise is low, :math:`\sigma[HF] < 0.006 \mathrm{nm}`.
-#. Their extension :math:`\Delta z < 0.035 \mathrm{nm}`.
-#. Their stability from cycle to cycle, measured as told below.
+#. Their high frequency noise is low, :math:`\sigma[HF] < 6 \mathrm{nm}`.
+#. Their extension :math:`\Delta z < 35 \mathrm{nm}`.
+#. Their stability from cycle to cycle, measured as defined below must be less
+   than :math:`10 \mathrm{nm}`. This stability roughly means that no more than
+   10% of measures can lie farther than :math:`10 \mathrm{nm}` away from other
+   measures.
 
+Beads detected as fixed are listed in the text above the *fixed bead* input.
+They are listed in a prefered order. The user might select 5 from the list and
+use them to subtract the baseline signal.
+
+The baseline is measured using all cycles in all selected beads in the
+following manner:
+
+#. For each bead and cycle independently, a bias is estimated as the median of
+   z values in phase 5.
+#. Theses biases are subtracted from each cycle. This means that all *doctored*
+   cycles on all beads tend to cross the x axis at the same time in phase 5.
+#. For each position :math:`t` in time individually, we estimate the baseline
+   position as the median all *doctored* values at that time:
+
+.. math::
+    \mathrm{baseline}(t) = \mathrm{median}_{\mathrm{beads}}
+    (\mathrm{z}(t, \mathrm{bead})-\mathrm{bias}(\mathrm{cycle}, \mathrm{bead}))
+
+The bias removal means that this reconstructed baseline is not affected by low
+frequency fluctuations occurring over more than the timescale of a cycle. Nor
+is it affected by each bead having it's own baseline mean. Roughly, all that is
+required for the reconstructed baseline to be meaningfull is that at each
+cycle more than 50% of beads behave the same way.
+
+Fixed Bead stability
+--------------------
+
+As stated above, *fixed beads* should all behave the same way. A similar test
+is run over each bead on all cycles. The bead stability is a measure of how
+much all cycles in a bead have the same behaviour. Computations are similar to
+the reconstruced baseline, but considering a single bead:
+
+#. For cycle independently, a bias is estimated as the median of z values in
+   phase 5.
+#. Theses biases are subtracted from each cycle. This means that all *doctored*
+   cycles on all beads tend to cross the x axis at the same time in phase 5.
+#. For each position :math:`t` in time individually, each cycle starting at
+   :math:`t=0`, we estimate the varability as the median deviation of all
+   *doctored* values. The overall stability is the median deviation of that:
+
+.. math::
+    \mathrm{stability}(t) = \mathrm{median_deviation}(\mathrm{median_deviation}_{\mathrm{cycles}}
+    (\mathrm{z}(t, \mathrm{cycle})-\mathrm{bias}(\mathrm{cycle})))
+
+To be quite exact, instead of a median deviation, we use the distance from the
+5th to the 95th percentile.
+
+Data Cleaning
+=============
+
+A number of filters allow discarding individual z values:
+
+* :math:`|z|`: allows discarding measures too far from the baseline (5 µm by
+  default).
+* :math:`|\frac{dz}{dt}|`: allows discarding measures too far
+  from the measure just before or just after. If a bead jumps up by 3 µm and
+  then back down, the measure is discarded.
+
+Most other filters allow discarding badly behaving cycles:
+
+* :math:`\Delta z` allows discarding that stay closed and beads that have too
+  long a strand.
+* :math:`\sigma[HF]` allows discarding noisy cycles or those for which
+  measures were not recorded (z is constant).
+* `% good` allows discarding cycles that have too many missing values.
+
+Finally one filter is performed over all cycles:
+
+* `% non-closing` requires that a minimum number of cycles close entirely
+  before reaching the end of phase 5. This will not always happen either
+  because of a structural blockage, which should be detectable using ramps, or
+  because of one or more oligos binding too long and too often considering the
+  time spent in phase 5.
