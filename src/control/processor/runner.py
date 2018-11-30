@@ -191,7 +191,7 @@ class Runner:
         for var in givars:
             cls.__test(giloc.get(var, None))
 
-    def __call__(self, copy = False):
+    def __call__(self, copy = True):
         "runs over processors"
         first = True
         for proc in self.data:
@@ -255,7 +255,7 @@ def pooledinput(pool, pickled, frame) -> dict:
 
 def run(data:  DATA_TYPE, # pylint: disable=too-many-arguments
         task:  Task                = None,
-        copy                       = False,
+        copy                       = True,
         pool:  ProcessPoolExecutor = None,
         start: Iterator[TrackView] = None,
         level: Level               = Level(0)):
