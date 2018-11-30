@@ -583,6 +583,8 @@ def advanced(**kwa):
          Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α %(clipping.lowfactor).1oF
          %(BeadSubtractionModalDescriptor:)
          %(AlignmentModalDescriptor:)
+         Discard the single strand peak (unless in oligos)  %(SingleStrandConfig:automated)b
+         Detect and discard peaks below the baseline        %(baselinefilter.disabled)b
 
          ## Peaks
 
@@ -590,7 +592,6 @@ def advanced(**kwa):
 
          Min frame count per hybridisation  %(eventdetection.events.select.minlength)D
          Min hybridisations per peak        %(peakselection.finder.grouper.mincount)D
-         Discard the single strand peak (unless in oligos)  %(SingleStrandConfig:automated)b
          Re-align cycles using peaks        %(peakselection.align)b
          Peak kernel size (blank ⇒ auto)    %(peakselection.precision).4oF
          Exhaustive fit algorithm           %(_IdAccessor:alg)b

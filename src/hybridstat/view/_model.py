@@ -35,7 +35,8 @@ from ._peakinfo                 import createpeaks as _createpeaks
 
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from eventdetection.processor.__config__ import EventDetectionTask
-from peakfinding.processor.__config__    import PeakSelectorTask, SingleStrandTask
+from peakfinding.processor.__config__    import (PeakSelectorTask, SingleStrandTask,
+                                                 BaselinePeakFilterTask)
 from peakcalling.processor.__config__    import FitToHairpinTask, FitToReferenceTask
 
 class PeaksPlotTheme(PlotTheme):
@@ -446,6 +447,9 @@ class SingleStrandTaskAccess(TaskAccess, tasktype = SingleStrandTask):
         "resets the model"
         self.update(disabled = not (self.__config.automated and mdl.hassinglestrand))
 
+class BaselinePeakFilterTaskAccess(TaskAccess, tasktype = BaselinePeakFilterTask):
+    "access to the BaselinePeakFilterTask"
+
 # pylint: disable=too-many-instance-attributes
 class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
     "Access to peaks"
@@ -456,6 +460,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         self.eventdetection = EventDetectionTaskAccess(self)
         self.peakselection  = PeakSelectorTaskAccess(self)
         self.singlestrand   = SingleStrandTaskAccess(self)
+        self.baselinefilter = BaselinePeakFilterTaskAccess(self)
         self.fittoreference = FitToReferenceAccess(self)
         self.identification = FitToHairpinAccess(self)
 

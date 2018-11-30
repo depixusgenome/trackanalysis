@@ -17,8 +17,9 @@ from ._core         import cost as _cost, match as _match # pylint: disable=impo
 
 class HairpinFitter(OptimizationParams):
     "Class containing theoretical peaks and means for matching them to experimental ones"
-    peaks           = np.empty((0,), dtype = 'f4') # type: np.array
-    strandsize      = 0
+    peaks      = np.empty((0,), dtype = 'f4') # type: np.array
+    pivot      = Pivot.bottom
+    strandsize = 0
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -90,6 +91,30 @@ class HairpinFitter(OptimizationParams):
         "optimizes the cost function"
         raise NotImplementedError()
 
+    def _applypivot(self, peaks: np.ndarray) -> Tuple[float, np.ndarray, float, np.ndarray]:
+        peaks = np.asarray(peaks, dtype = 'f4')
+        if len(peaks) < 2:
+            return 0., [], 0., []
+
+        delta = (peaks[0] if self.pivot == Pivot.bottom   else
+                 0        if self.pivot == Pivot.absolute else
+                 peaks[-1])
+        peaks = peaks - delta
+        if (not self.hasbaseline) and self.pivot is Pivot.bottom:
+            # pivot.bottom implies that we consider the first experimental
+            # peak to be the baseline. Since we don't use it in the fit, we
+            # remove it
+            peaks = peaks[1:]
+
+        if self.pivot is Pivot.top:
+            hpdelta = self.peaks[-1]
+            hpin    = self.peaks - hpdelta
+        else:
+            hpdelta = 0
+            hpin    = self.peaks
+
+        return delta, peaks, hpdelta, hpin
+
 class GaussianProductFit(HairpinFitter, GriddedOptimization):
     """
     Matching experimental peaks to hairpins using a cost function:
@@ -103,7 +128,6 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
 
         1 - R(X, Y)/sqrt(R(X, X) R(Y, Y))
     """
-    pivot     = Pivot.bottom
     precision = 15.
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -112,24 +136,18 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
 
     def optimize(self, peaks: np.ndarray) -> Distance:
         "optimizes the cost function"
-        peaks = np.asarray(peaks)
-        best  = self._defaultdistance()
-        delta = hpdelta = 0.
+        best = self._defaultdistance()
+        if len(self.peaks) == 0:
+            return best
+
+        delta, peaks, hpdelta, hpin = self._applypivot(peaks)
         if len(peaks) > 1:
             args  = self.optimconfig(symmetry     = self.symmetry is Symmetry.both,
                                      noise        = self.precision,
                                      singlestrand = 1. if self.hassinglestrand else 0.,
                                      baseline     = 1. if self.hasbaseline     else 0.)
 
-            hpdelta = self.peaks[-2] if len(self.peaks) > 2 and self.pivot == Pivot.top else 0
-            hpin    = self.peaks - hpdelta
-
-            delta = (peaks[0] if self.pivot == Pivot.bottom   else
-                     0        if self.pivot == Pivot.absolute else
-                     peaks[-1])
-            peaks = peaks - delta
             bias  = 0. if self.bias.center is None else delta
-
             for vals in self.grid:
                 args.update(min_stretch = vals[0] - self.stretch.step,
                             stretch     = vals[0],
@@ -149,13 +167,9 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
 
     def value(self, peaks: np.ndarray, stretch, bias) -> Tuple[float, float, float]:
         "computes the cost value at a given stretch and bias as well as derivatives"
+        peaks, hpin = self._applypivot(peaks)[1::2]
         if len(peaks) == 0:
             return 0., 0., 0.
-        hpin  = self.peaks
-        delta = (peaks[0] if self.pivot == Pivot.bottom   else
-                 0        if self.pivot == Pivot.absolute else
-                 peaks[-1])
-        peaks = peaks - delta
         if any(isinstance(i, (Sequence, np.ndarray)) for i in (stretch, bias)):
             stretch = np.asarray(stretch)
             bias    = -np.asarray(bias)*stretch
@@ -231,28 +245,26 @@ class PeakGridFit(HairpinFitter):
     symmetry  = Symmetry.left
     def optimize(self, peaks:np.ndarray) -> Distance:
         "computes stretch and bias for potential pairings"
-        peaks = np.asarray(peaks)
-        ref   = self.peaks
-        if len(peaks) < 2 or len(ref) == 0:
-            return self._defaultdistance()
+        best = self._defaultdistance()
+        if len(self.peaks) == 0:
+            return best
+
+        delta, peaks, hpdelta, hpin = self._applypivot(peaks)
+        if len(peaks) < 2:
+            return best
 
         rng   = lambda val: ((val.center if val.center else 0.) - val.size,
                              (val.center if val.center else 0.) + val.size)
         args  = rng(self.stretch)+rng(self.bias)
         centr = sum(args[:2])*.5, sum(args[2:])*.5
 
-        delta = peaks[0] if self.bias.center is None else 0.
-        if delta != 0.:
-            peaks = peaks - delta
-
-        itr  = tuple(i for i in _match.PeakIterator(ref, peaks, *args)) + (centr,)
-        chi  = ChiSquare(ref, peaks, self.window,
-                         symmetry     = self.symmetry,
-                         singlestrand = self.hassinglestrand)
-        cstr = self.constraints()
-        minv = min(chi.update(i[0], i[1], True).optimize(*cstr) for i in itr)
-
-        return Distance(minv[0], minv[1], delta-minv[2]/minv[1])
+        itr   = tuple(i for i in _match.PeakIterator(hpin, peaks, *args)) + (centr,)
+        chi   = ChiSquare(hpin, peaks, self.window,
+                          symmetry     = self.symmetry,
+                          singlestrand = self.hassinglestrand)
+        cstr  = self.constraints()
+        best  = min(chi.update(i[0], i[1], True).optimize(*cstr) for i in itr)
+        return Distance(best[0], best[1], delta-(best[2]+hpdelta)/best[1])
 
     def value(self, peaks:np.ndarray,
               stretch: Union[float, np.ndarray],

@@ -64,7 +64,7 @@ def test_toref_frompeaks():
 def test_ref_peaksgrid():
     "tests peaks grid with a single read"
     bias    = Range(0, 60.*8.8e-4, 60.*8.8e-4)
-    fit     = PeakGridFit(firstpeak = True, lastpeak = True, bias = bias)
+    fit     = PeakGridFit(firstpeak = True, lastpeak = True, bias = bias, pivot = Pivot.absolute)
     for i in product([.96, 1., 1.04], [-.05, 0., .05]):
         arr1 = np.array([.1, .5,  1.])
         arr2 = np.array([.1, .5,  1.])/i[0]+i[1]
