@@ -155,11 +155,11 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         return cast(Cycles, beads[beadid,:]).withphases(self.task.phase)
 
     def __index(self, frame, beadid, peaks):
-        if self.task.disabled:
+        if self.task.disabled or len(peaks) < 1:
             return None
         cycles = self.nonclosingramps(frame, beadid)
-        if len(cycles) < 1 or len(peaks) < 1:
-            return None
+        if len(cycles) < 1:
+            return iter(())
 
         ratio  = self.task.percentage*1e-2
         ssevts = [len(i) for i in self.nonclosingevents(cycles, peaks)]
