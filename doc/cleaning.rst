@@ -220,9 +220,10 @@ default settings will be indicated in parenthesis to the left of the input box.
 
 Fixed Beads
 -----------
+
 * :math:`\Delta z <`: set the maximum extent a bead may have and be considered fixed.
 * :math:`\sigma[HF] <`: set the maximum noise a bead may suffer from an be
-* :math `\phi 5` repeatability: sets how close together to the median cycle
+* :math:`\phi 5` repeatability: sets how close together to the median cycle
   profile 90% of values must sit for a bead to be considered fixed.
 * List of fixed beads used for subtracting the baseline. The list in
   parenthesis is either the list of fixed beads found in the track or the list

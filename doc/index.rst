@@ -25,7 +25,7 @@ further studies.
    fov
    qc
    cleaning
-
+   cycles
 
 Indices and tables
 ==================
