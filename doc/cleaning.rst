@@ -21,6 +21,12 @@ The goal of this tab is to:
    the :math:`z` measures.  The baseline fluctuations can thus be removed by
    subtracting these beads'signal from others.
 
+.. hint::
+
+    Downsampling has no effect on data cleaning or alignment. In consists only
+    in reducing the number of points displayed in the plot. The latter makes
+    displays a little more fluid.
+
 Cleaning Indicators
 ===================
 
@@ -118,11 +124,11 @@ Data Cleaning
 
 A number of filters allow discarding individual z values:
 
-* :math:`|z|`: allows discarding measures too far from the baseline (5 µm by
-  default).
-* :math:`|\frac{dz}{dt}|`: allows discarding measures too far
-  from the measure just before or just after. If a bead jumps up by 3 µm and
-  then back down, the measure is discarded.
+* :math:`|z|`: sets a threshold on outliers. Measures sitting too far from the
+  baseline  are discarded.
+* :math:`|\frac{dz}{dt}|`: allows discarding measures too far from the measure
+  just before or just after. If a bead jumps up by 3 µm and then back down, the
+  measure is discarded.
 
 Most other filters allow discarding badly behaving cycles:
 
@@ -173,6 +179,8 @@ beads reduces Brownian motion the most. In practice, we find that:
   change in the way the oligonucleotide sequence is attached to the surface or
   the bead, or due to secondary structures forming in te sequence.
 
+The *best* alignment
+--------------------
 Empirically, the best cycle alignment is performed by computing the biases per
 cycle as follows:
 
@@ -193,8 +201,51 @@ The user can select the alignment described above or others:
 #. `φ1`: aligning all cycles on phase 1.
 #. `φ3`: aligning all cycles on phase 3.
 
-.. hint::
+Post alignment cleaning
+-----------------------
 
-    Downsampling has no effect on data cleaning or alignment. In consists only
-    in reducing the number of points displayed in the plot. The latter makes
-    displays a little more fluid.
+Some data-cleaning is performed post-alignment: values in phase 5 are discarded
+which sit below the phase 1 values or above phase 3 values. The exact thresholds are:
+
+* low:  :math:`\mathrm{median}_\mathrm{\phi 1}(z)-\sigma[HF] \alpha`
+* high: :math:`\mathrm{median}_\mathrm{\phi 3}(z)`
+
+The value :math:`\alpha` can be set from the *advanced* settings.
+
+Advanced Options
+================
+
+The following settings can be moved by the user. Should that happen, the
+default settings will be indicated in parenthesis to the left of the input box.
+
+Fixed Beads
+-----------
+* :math:`\Delta z <`: set the maximum extent a bead may have and be considered fixed.
+* :math:`\sigma[HF] <`: set the maximum noise a bead may suffer from an be
+* :math `\phi 5` repeatability: sets how close together to the median cycle
+  profile 90% of values must sit for a bead to be considered fixed.
+* List of fixed beads used for subtracting the baseline. The list in
+  parenthesis is either the list of fixed beads found in the track or the list
+  of beads used for subtraction on the reference track, when on has been
+  indicared. In the former case, the list ends with a question mark.
+
+Cleaning
+--------
+
+The first 8 elements are repeats of inputs available in the main window. The
+advantage of having them here is simply to have their default value indicated
+again. The following are additionnal:
+
+* `Cycles are closed if |z(φ1)-z(φ5)| <`: the maximum distance from phase 1
+  that the last values in phase 5 may sit for the cycle to be considered as
+  *closed*.
+* `Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α, α =`: Sets the z distance from phase 1 below
+  which values in phase 5 are discarded.
+
+Theme
+-----
+
+The settings here change only the aspect of the windows. Color themes are
+available which will be applied to plots in all tabs. This tab's plot dimension
+can also be set. Unfortunatly, the change will only occur upon relaunching the
+application.
