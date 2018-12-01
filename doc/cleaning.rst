@@ -131,6 +131,8 @@ Most other filters allow discarding badly behaving cycles:
 * :math:`\sigma[HF]`: allows discarding noisy cycles or those for which
   measures were not recorded (z is constant).
 * `% good`: allows discarding cycles that have too many missing values.
+* :math:`\sum |\frac{dz}{dt}|` allows discarding cycles with values which jump
+  up and down. This filter's parameters cannot be set by the user.
 
 Finally one filter is performed over all cycles:
 
@@ -139,3 +141,60 @@ Finally one filter is performed over all cycles:
   because of a structural blockage, which should be detectable using ramps, or
   because of one or more oligos binding too long and too often considering the
   time spent in phase 5.
+
+The bottom-left table displays filter values for all cycles. In particular, the
+cycles which have been discarded are marked as such in the right-most column.
+
+Plot Colors
+-----------
+
+The plot's :math:`z` values are color-coded as follows:
+
+* Values without problems are blue
+* :math:`\sigma[HF]`: noisy cycles are  gold
+* :math:`\Delta z`: cycles with an incorrect extent are orange
+* Cycles with too few correct values are pink
+* :math:`\sum |\frac{dz}{dt}|`: cycles with too few correct values are pink
+* Non-closing cycles are chocolate.
+* :math:`|z|` and :math:`\frac{dz}{dt}`: outliers are red.
+
+Cycle Alignment
+===============
+
+Because of the baseline's variability, cycles need realigning. We use values
+from phases 1 and 3 to do so. In theory, using phase 3 should provide us with
+best results since this is the phase when the magnets are closest to the beads,
+thus when the magnetic gradient is the harshest, and the pull it exerts on the
+beads reduces Brownian motion the most. In practice, we find that:
+
+* For some cycles, the hairpin doesn't open, in which case z values in phase 3
+  are necessarily small.
+* There can be some variability in the bead's full extent, due either to some
+  change in the way the oligonucleotide sequence is attached to the surface or
+  the bead, or due to secondary structures forming in te sequence.
+
+Empirically, the best cycle alignment is performed by computing the biases per
+cycle as follows:
+
+* Default biases are equal the median of phase 3 for each cycle less the median
+  extent over all cycles. This *normal* cycles will tend to start at 0 and
+  reach the bead's full extent at phase 3.
+* For those *corrected* cycles with both phase 1 and the end of phase 5 not
+  aligning with other cycles (*i.e.* z ≠ 0), we change their bias to the median
+  value in phase 1. Such cycles are those cycles when the bead doesn't open.
+* We discard cycles for which values in phase 7 (magnets at 5 pN) are too far
+  from others. This filter is loose because phase 7 has a very high Brownian
+  motion and values are particularly unstable.
+
+The user can select the alignment described above or others:
+
+#. `∅`: No alignment
+#. `best`: the procedure described above.
+#. `φ1`: aligning all cycles on phase 1.
+#. `φ3`: aligning all cycles on phase 3.
+
+.. hint::
+
+    Downsampling has no effect on data cleaning or alignment. In consists only
+    in reducing the number of points displayed in the plot. The latter makes
+    displays a little more fluid.
