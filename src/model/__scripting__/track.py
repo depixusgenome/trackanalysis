@@ -88,7 +88,8 @@ class LocalTasks:
         changes: Dict[str, Dict[str, Any]] = {}
         if self.tasks:
             cpy = dict(ctrl.get("tasks", name))
-            cpy.update(self.tasks)
+            cnv = getattr(Tasks, '_cnv')(None)
+            cpy.update({cnv.get(i, i): j for i, j in self.tasks.items()})
             changes['tasks'] = {name: cpy, 'instrument': name}
         else:
             changes['tasks'] = {'instrument': name}
