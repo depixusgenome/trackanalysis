@@ -108,7 +108,6 @@ class ChiSquare: # pylint: disable=too-many-instance-attributes
         if self.singlestrand and len(ref):
             val   = (ref[-1]-bias)/stretch
             if val <= exp[-1]:
-                print(dist)
                 dist += self.__delta(exp[np.searchsorted(exp, val):], ref[-1], stretch, bias)
 
         if self.baseline:

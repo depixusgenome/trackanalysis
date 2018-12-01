@@ -113,6 +113,9 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         information is unavailable.
         """
         track = getattr(frame, 'track', frame)
+        if not hasattr(track, 'phase'):
+            return None
+
         if track.phase.duration(..., self.task.phase).mean() < self.task.eventstart:
             return None
 
@@ -199,6 +202,7 @@ class BaselinePeakProcessor(Processor[BaselinePeakTask]):
     "Find the peak corresponding to the baseline"
     def index(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[int]:
         "Removes the single strand peak if detected"
+        peaks = _topeakarray(peaks)
         if len(peaks) == 0:
             return None
 
@@ -220,8 +224,10 @@ class BaselinePeakProcessor(Processor[BaselinePeakTask]):
                 return ind
         return None
 
-    def detected(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> bool:
+    def detected(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[bool]:
         "whether there is a singlestrand peak"
+        if not hasattr(frame, 'phaseposition'):
+            return None
         return self.index(frame, beadid, peaks) is not None
 
     def remove(self, frame:_Track, info:'Output') -> Tuple[BEADKEY, np.ndarray]:
@@ -249,6 +255,14 @@ class BaselinePeakFilterTask(BaselinePeakTask):
 
 class BaselinePeakFilterProcessor(Processor[BaselinePeakFilterTask]):
     "Find the peak corresponding to the baseline"
+    def index(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[int]:
+        "Removes the single strand peak if detected"
+        return BaselinePeakProcessor(task = self.task).index(frame, beadid, peaks)
+
+    def detected(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> bool:
+        "whether there is a singlestrand peak"
+        return self.index(frame, beadid, peaks) is not None
+
     def remove(self, frame:_Track, info:'Output') -> Tuple[BEADKEY, np.ndarray]:
         "Removes the baseline peak if detected"
         peaks = _topeakarray(info[1])

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Adds methods for configuring a TracksView"
 from   inspect          import signature
-from   copy             import copy as shallowcopy
+from   copy             import copy as shallowcopy, deepcopy
 from   itertools        import product
 from   functools        import partial
 from   typing           import (Tuple, Iterable, Union, List, TypeVar, Hashable,
@@ -14,7 +14,8 @@ from   ._dict           import TRACK_VIEW, TransformedTrackView, isint, isellips
 
 def _m_copy(_, item):
     "Copies the data"
-    return item[0], np.copy(item[1])
+    return (item[0],
+            np.copy(item[1]) if isinstance(item[1], np.ndarray) else deepcopy(item[1]))
 
 def _m_torange(sli):
     start, stop, step = sli.start, sli.stop, sli.step
