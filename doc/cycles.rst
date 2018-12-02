@@ -65,6 +65,19 @@ The following alphabet is recognized, allowing for more complex expressions:
 * n or x or .: any
 * !: allows setting the blocking position to the next base, as explained bellow.
 
+Structural Blockings
+^^^^^^^^^^^^^^^^^^^^
+
+Two specific positions can be added to the list:
+
+* '0' is the baseline position. Unless the bead has a majority of non-closing
+  cycles, this should be the biggest peak as the blocking occurs as many times
+  as there are cycles. Such blockings are the last and lowest one in the cycle.
+
+* 'singlestrand' (or '$' for short) is the full extent of the hairpin. Most
+  beads start closing during phase 4. In some cases, they do so during phase 5.
+  If they occur, such blockings are the first and highest one in the cycle.
+
 Blocking Position in the Oligo
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
