@@ -1,3 +1,5 @@
+.. include:: utils.rst
+
 ===================
 The Quality Control
 ===================
@@ -23,11 +25,11 @@ Temperatures
 
 The first three plots show temperatures as a function of cycles. Should
 temperatures change during an experiment, both the bead extension and in fact
-all:math:`z` values as well a hybridization rates and durations will be
+all |z| values as well a hybridization rates and durations will be
 affected. The temperatures are:
 
 #. Sample temperature on the topmost plot. The sensor is placed right on top of
-   the flowcell. On ``picotwist`` instrument in particular, it can be seen to
+   the flowcell. On |PICO| instruments in particular, it can be seen to
    fluctuate periodically as function of the magnet position. This temperature
    in particular should remain as stable as possible.
 
@@ -37,8 +39,8 @@ affected. The temperatures are:
    difficult, or even impossible, the job is for the *Peltiers*.
 
 #. Servo temperature on the bottom third. The sensor is next to the *Peltiers*.
-   In a ``Picotwist`` instrument, this temperature should be extremely stable
-   since it's the one directly regulated by the *Peltiers*. An ``SDI``
+   In a |PICO| instrument, this temperature should be extremely stable
+   since it's the one directly regulated by the *Peltiers*. An |SDI|
    instrument's temperature is also slaved to the sample temperature but at a
    much slowser rate. The effect should be to allow the servo temperature to
    drift in order to stabilize the sample's.
@@ -55,7 +57,7 @@ Bead Extensions
 
 This indicator, displayed on the very bottom plot, is constructed using all
 *ok* beads. That's the ones which are not filtered out through the *Cleaning*
-tab. It attemps to measure directly whether bead extensions, thus the :math:`z`
+tab. It attemps to measure directly whether bead extensions, thus the |z|
 values, thus hybridization positions are stable throughout all cycles or not.
 Should this indicator move by more than :math:`3 nm`, then the plot is outlined
 in red.
@@ -64,14 +66,14 @@ The indicator is constructed as follows:
 
 #. For each bead:
 
-   #. For each cycle, the extension :math:`\Delta z` is measured as the
+   #. For each cycle, the extension |DZ| is measured as the
          difference between the median positions in phase 1 (initial phase with
          magnets pulling at :math:`10 pN`) and phase 3 (opening phase with
          magnets pulling at :math:`>18 pN`).
    #. These extensions will vary from bead to bead depending on the bead
          magnetization and the sequence size. Thus to compare them across all
          beads requires removing a bias, different for each bead. The latter is
-         estimated, individually for each bead, as the median :math:`\Delta z`
+         estimated, individually for each bead, as the median |DZ|
          across all cycles.
 
 #. The resulting normalized extension variations are aggregated across all
@@ -96,10 +98,9 @@ Using settings defined in the *Cleaning* tab, beads can be defined as:
 
 * *bad* if any of the following conditions are met for a majority of cycles:
 
-  * the bead extension :math:`Delta z` is either too low or too high.
-  * the noise from frame to frame (:math:`~ \sigma[HF]`) is too high.
-  * the bead doesn't close, meaning :math:`z` in phase 5 doesn't reach
-    :math:`z` in phase 1.
+  * the bead extension |DZ| is either too low or too high.
+  * the noise from frame to frame (|NOISE|) is too high.
+  * the bead doesn't close, meaning |z| in phase 5 doesn't reach |z| in phase 1.
 
 * *missing* if the bead disappeared prior or during the experiment. This is
   measured by considering one or more of the conditions listed above.

@@ -1,19 +1,23 @@
-=================
-Looking at Cycles
-=================
+.. include:: utils.rst
+
+==============
+The Cycles Tab
+==============
 
 .. figure:: _images/cycles.png
 
     Two plots providing a rough analysis of the situation for one bead. On the
     left are cycles superposed one on the other. On the right are histograms
     indicating the number of cycles (*rate*) and the number of values
-    (*duration*) at a given :math:`z` position.
+    (*duration*) at a given |z| position.
 
 This tab provides information which will be extracted automatically in either
 of the 2 tabs to the left. It exists for historical reasons but also allows
 fitting manually to a hairpin sequence. This might be helpful should
 automations fail. It's still good practice to report such situations if they
 happen too often.
+
+.. _hairpins-oligos:
 
 Hairpins and Oligos
 ===================
@@ -102,9 +106,9 @@ will find a position at 110::
 Setting Stretch & Bias Values
 =============================
 
-The :program:`SIMDEQ` instruments all measure a magnetic bead's altitude. This
+The |SIMDEQ| instruments all measure a magnetic bead's altitude. This
 usually needs to be transformed to a base count. In :program:`CycleApp`, the
-transformation is hypothesized as linear. The *Cycles* tab as well as others
+transformation is hypothesized as linear. The |Cycles| as well as others
 thus use two parameters for conversions:
 
 * The *stretch* is the number of base per µm.
@@ -118,8 +122,10 @@ Thus conversions are:
     n_\mathrm{base} = \mathrm{stretch} (x_\mathrm{µm} - \mathrm{bias})
 
 
-The *Cycles* tab allows manually moving *stretch* and *bias* values. The plots
+The |Cycles| allows manually moving *stretch* and *bias* values. The plots
 are updated to dynamically to reflect those changes.
+
+.. _event-extraction:
 
 Finding Hybridization Events
 ============================

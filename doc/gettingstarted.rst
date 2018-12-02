@@ -1,3 +1,5 @@
+.. include:: utils.rst
+
 ===============
 Getting Started
 ===============
@@ -29,7 +31,7 @@ Data files
 such files contain the raw data. The software will **never change** the
 contents of such a file. Formats are:
 
-* ``.trk``: Track files are raw data files created using any ``SIMDEQ``
+* ``.trk``: Track files are raw data files created using any |SIMDEQ|
   instruments. This is the basic type of file that can be opened by the
   software.
 
@@ -130,24 +132,24 @@ The different tabs
 
 The following tabs are provided:
 
-#. *FoV*: displays the field of view with the beads and some information on the
+#. The |FoV|: displays the field of view with the beads and some information on the
    beads.
-#. *QC*: displays quality control information such as temperatures and global
-   bead behaviour. This is a good tab to check that an experiment went as
-   expected. If a *QC* is particularly outside its normal range of values, its
-   plot is circled in red.
-#. *Cleaning*: provides means for automatically discarding some beads and
+#. The |QC|: displays quality control information such as temperatures and
+   global bead behaviour. This is a good tab to check that an experiment went
+   as expected. If a quality control is particularly outside its normal range
+   of values, its plot is circled in red.
+#. The |Cleaning|: provides means for automatically discarding some beads and
    cleaning the signal from others. This is the starting tab. It's the only one
    to display the *raw* data. This tab allows specifying what a *fixed* and
-   *bad* bead are. Such beads will not display in the tabs to the right of
-   *Cleaning*.
-#. *Cycles*: displays the cleaned data for a single bead and allows *manually*
+   *bad* bead are. Such beads will not display in the tabs to the right of the
+   |Cleaning|.
+#. The |Cycles|: displays the cleaned data for a single bead and allows *manually*
    comparing experimental positions versus hairpin sequences. Only beads
    detected as neither *fixed* nor *bad* will display.
-#. *Peaks*: displays the hybridizations and their characteristics as well as
+#. The |Peaks|: displays the hybridizations and their characteristics as well as
    allowing to automatically fit the positions to hairpin sequences. Only beads
    detected as neither *fixed* nor *bad* will display.
-#. *Cycles & Peaks*: provides the same information as in *Peaks* but with
+#. The |CPeaks|: provides the same information as in *Peaks* but with
    different plots. Only beads detected as neither *fixed* nor *bad* will
    display.
 
@@ -165,8 +167,8 @@ stored on disk. It will automatically be reloaded the next time the software is
 launched. Furthermore, the default value is also added to the display in the
 *advanced* menu.
 
-It's possible to tell whether a data file was created by an ``SDI`` or a
-``Picotwist``. Most settings will come in two version, one for each instrument.
+It's possible to tell whether a data file was created by an |SDI| or a
+|PICO|. Most settings will come in two version, one for each instrument.
 Which settings are used depend on the data file currently on display.
 
 .. hint::

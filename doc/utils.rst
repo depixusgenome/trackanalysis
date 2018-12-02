@@ -1,0 +1,16 @@
+.. |CycleApp| replace:: :program:`CycleApp`
+.. |SDI| replace:: :program:`SDI`
+.. |PICO| replace:: :program:`Picotwist`
+.. |SIMDEQ| replace:: :program:`SIMDEQ`
+.. |FoV| replace:: *FoV* tab
+.. |QC| replace:: *QC* tab
+.. |Cleaning| replace:: *Cleaning* tab
+.. |Cycles| replace:: *Cycles* tab
+.. |Peaks| replace:: *Peaks* tab
+.. |CPeaks| replace:: *Cycles & Peaks* tab
+.. |DZ| replace:: :math:`\Delta z`
+.. |NOISE| replace:: :math:`\sigma[HF]`
+.. |z| replace:: :math:`z`
+.. |dzdt| replace:: :math:`\frac{dz}{dt}`
+.. |absz| replace:: :math:`|z|`
+.. |pingpong| replace:: :math:`\sum |\frac{dz}{dt}|`

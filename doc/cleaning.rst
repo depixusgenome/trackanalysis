@@ -1,10 +1,12 @@
+.. include:: utils.rst
+
 =============
 Data Cleaning
 =============
 
 .. figure:: _images/cleaning.png
 
-    The impact of different signal analysis filters on :math:`z` values for a
+    The impact of different signal analysis filters on |z| values for a
     given bead. The color blue is used for accepted frames, other colors
     indicate that the frame or even the whole cycle has been discarded.
 
@@ -18,7 +20,7 @@ The goal of this tab is to:
    single-strand). Their behavior is mostly consistent from bead to bead and
    reflect fluctuations and drifts in the experimental settings, mostly
    temperatures. In effect, they allow measuring the baseline fluctuation of
-   the :math:`z` measures.  The baseline fluctuations can thus be removed by
+   the |z| measures.  The baseline fluctuations can thus be removed by
    subtracting these beads'signal from others.
 
 .. hint::
@@ -30,11 +32,11 @@ The goal of this tab is to:
 Cleaning Indicators
 ===================
 
-A Noise Indicator, :math:`\sigma[HF]`
+A Noise Indicator, |NOISE|
 -------------------------------------
 
 This indicator is used throughout the software. It tries to measure the
-uncertainty in :math:`z` values without being subject to baseline (low
+uncertainty in |z| values without being subject to baseline (low
 frequency) fluctuations. This is done by:
 
 #. taking the derivative of the signal, :math:`\frac{dz}{dt} = z(t)-z(t-1)`,
@@ -42,10 +44,10 @@ frequency) fluctuations. This is done by:
    :math:`\mathrm{median}_{t}(|\mathrm{median}_{t}(\frac{dz}{dt})-\frac{dz}{dt}|)`,
    a robust form of the standard deviation.
 #. taking the median of these values over all cycles. This last median means
-   that :math:`\sigma[HF]` is not affected by a few missbehaving cycles.
+   that |NOISE| is not affected by a few missbehaving cycles.
 
 
-A Size Indicator, :math:`\Delta z`
+A Size Indicator, |DZ|
 ----------------------------------
 
 The extension is the difference between the initial phase (1) - when magnets
@@ -124,20 +126,20 @@ Data Cleaning
 
 A number of filters allow discarding individual z values:
 
-* :math:`|z|`: sets a threshold on outliers. Measures sitting too far from the
+* |absz|: sets a threshold on outliers. Measures sitting too far from the
   baseline  are discarded.
-* :math:`|\frac{dz}{dt}|`: allows discarding measures too far from the measure
+* |dzdt|: allows discarding measures too far from the measure
   just before or just after. If a bead jumps up by 3 µm and then back down, the
   measure is discarded.
 
 Most other filters allow discarding badly behaving cycles:
 
-* :math:`\Delta z`: allows discarding that stay closed and beads that have too
+* |DZ|: allows discarding that stay closed and beads that have too
   long a strand.
-* :math:`\sigma[HF]`: allows discarding noisy cycles or those for which
+* |NOISE|: allows discarding noisy cycles or those for which
   measures were not recorded (z is constant).
 * `% good`: allows discarding cycles that have too many missing values.
-* :math:`\sum |\frac{dz}{dt}|` allows discarding cycles with values which jump
+* |pingpong| allows discarding cycles with values which jump
   up and down. This filter's parameters cannot be set by the user.
 
 Finally one filter is performed over all cycles:
@@ -154,15 +156,15 @@ cycles which have been discarded are marked as such in the right-most column.
 Plot Colors
 -----------
 
-The plot's :math:`z` values are color-coded as follows:
+The plot's |z| values are color-coded as follows:
 
 * Values without problems are blue
-* :math:`\sigma[HF]`: noisy cycles are  gold
-* :math:`\Delta z`: cycles with an incorrect extent are orange
+* |NOISE|: noisy cycles are  gold
+* |DZ|: cycles with an incorrect extent are orange
 * Cycles with too few correct values are pink
-* :math:`\sum |\frac{dz}{dt}|`: cycles with too few correct values are pink
+* |pingpong| cycles with too few correct values are pink
 * Non-closing cycles are chocolate.
-* :math:`|z|` and :math:`\frac{dz}{dt}`: outliers are red.
+* |absz| and |dzdt|: outliers are red.
 
 Cycle Alignment
 ===============
@@ -221,8 +223,8 @@ default settings will be indicated in parenthesis to the left of the input box.
 Fixed Beads
 -----------
 
-* :math:`\Delta z <`: set the maximum extent a bead may have and be considered fixed.
-* :math:`\sigma[HF] <`: set the maximum noise a bead may suffer from an be
+* |DZ|: set the maximum extent a bead may have and be considered fixed.
+* |NOISE|: set the maximum noise a bead may suffer from an be
 * :math:`\phi 5` repeatability: sets how close together to the median cycle
   profile 90% of values must sit for a bead to be considered fixed.
 * List of fixed beads used for subtracting the baseline. The list in
