@@ -26,6 +26,7 @@ further studies.
    qc
    cleaning
    cycles
+   peaks
 
 Indices and tables
 ==================
