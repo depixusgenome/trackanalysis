@@ -63,6 +63,7 @@ The following alphabet is recognized, allowing for more complex expressions:
 * d: any but c
 * u: t
 * n or x or .: any
+* !: allows setting the blocking position to the next base, as explained bellow.
 
 Blocking Position in the Oligo
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -85,3 +86,62 @@ will find a position at 110::
             :          :
             100        110
 
+Setting Stretch & Bias Values
+=============================
+
+The :program:`SIMDEQ` instruments all measure a magnetic bead's altitude. This
+usually needs to be transformed to a base count. In :program:`CycleApp`, the
+transformation is hypothesized as linear. The *Cycles* tab as well as others
+thus use two parameters for conversions:
+
+* The *stretch* is the number of base per µm.
+* The *bias* is the altitude *in µm* of the first base, i.e. the bead position
+  when the hairpin is fully closed.
+
+Thus conversions are:
+
+.. math::
+
+    n_\mathrm{base} = \mathrm{stretch} (x_\mathrm{µm} - \mathrm{bias})
+
+
+The *Cycles* tab allows manually moving *stretch* and *bias* values. The plots
+are updated to dynamically to reflect those changes.
+
+Finding Hybridization Events
+============================
+
+Hybridization events can be displayed using the bottom-right checkbox. These
+events are found in the following way, for each cycle, looking at phase 5:
+
+#. the phase 5 is split into flat stretches of values:
+
+    #. Using a threshold on the derivative. It is computed here using 6 points,
+       the average of the 3 on the right being subtracted from those on left.
+       The threshold itself is a p-value  on the likeliness of a gaussian
+       distribution producing such a derivative.
+
+    #. The derivative is not efficient when looking at small events (< 6
+       measures). Thus intervals with constantly high derivative values are
+       re-tested for flatness using a Χ².
+
+#. The borders of each flat stretch are expanded when measures are deemed
+   similar enough to the current population of points in the flat stretch.
+
+#. Neighbouring flat stretches are merged together depending on conditions
+   listed below. For each test in turn, the two most likely candidates are
+   merged first, after which the same test is run again until no candidates are
+   found. The tests are, for two neighbouring flat stretches:
+
+    #. Their means deemed are close enough, using a p-value on heteroscedastic
+       gaussian populations.
+
+    #. If 75% or more of both poulations share a same range. This should be
+       similar to the previous test a soon as both populations have more
+       than 10 points.
+
+    #. If the dynamic ranges are similar one to the other. This is again
+       similar to the previous test as soon as populations grow.
+
+These events will be used in subsequent tabs to compute peak positions and
+other characteristics.
