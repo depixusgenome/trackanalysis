@@ -222,14 +222,14 @@ class PeaksStatsWidget:
             self.values[1] = dist[key].stretch
             self.values[2] = dist[key].bias
 
-            task            = mdl.identification.task
-            nfound          = np.isfinite(mdl.peaks[key+'id']).sum()
-            self.values[9]  = f'{nfound}/{len(task.match[key].peaks)}'
-            self.values[10] = PeakGridFit.silhouette(dist, key)
+            task             = mdl.identification.task
+            nfound           = np.isfinite(mdl.peaks[key+'id']).sum()
+            self.values[9]   = f'{nfound}/{len(task.match[key].peaks)}'
+            self.values[10]  = PeakGridFit.silhouette(dist, key)
 
             if nfound > 2:
                 stretch         = dist[key].stretch
-                self.values[10] = (np.nansum(mdl.peaks[key+'distance']**2)
+                self.values[11] = (np.nansum(mdl.peaks[key+'distance']**2)
                                    / ((np.mean(self.values[3]*stretch))**2
                                       * (nfound - 2)))
 
