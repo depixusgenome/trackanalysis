@@ -342,18 +342,43 @@ class PlotUpdater(list):
 
 class AxisOberver:
     "observe an axis"
-    def __init__(self, ctrl, fig: Figure, mdl):
-        self._fig      = fig
-        self._ctrl     = getattr(ctrl, 'display', ctrl)
-        self._mdl: str = getattr(mdl, 'name', mdl)
-        self._updating = False
+    def __init__(self, view, fig: Figure, display = None):
+        self._fig          = fig
+        self._view         = view
+        self._display: str = (getattr(view, '_display') if display is None else display).name
+        self._theme:   str = getattr(view, '_theme').name
+        self._updating     = False
+
+    @property
+    def _ctrl(self):
+        return getattr(self._view, '_ctrl')
 
     def _get(self, name):
-        return self._ctrl.get(self._mdl, name)
+        ctrl = self._ctrl.display
+        return ctrl.model(self._display) if name is None else ctrl.get(self._display, name)
 
     @property
     def _state(self):
         return None if self._updating else self._get('state')
+
+    def _onchangedataaxis(self, name):
+        if self._state is not PlotState.active:
+            return
+
+        axis  = getattr(self._fig, name+'_range')
+        if axis.max_interval == axis.min_interval:
+            return
+
+        eps   = 1e-3*(axis.bounds[1]-axis.bounds[0])
+        rng   = (axis.start if abs(axis.start-axis.bounds[0]) > eps else None,
+                 axis.end   if abs(axis.end-axis.bounds[1])   > eps else None)
+        out   = {name+'bounds': rng}
+
+        self._updating = True
+        try:
+            self._ctrl.display.update(self._display, **out)
+        finally:
+            self._updating = False
 
     def _onchangeaxis(self, name):
         if self._state is not PlotState.active:
@@ -377,7 +402,7 @@ class AxisOberver:
             if inits != (None, None) and rng == (None, None):
                 out[name+'init'] = axis.reset_start, axis.reset_end
                 axis.update(reset_start = inits[0], reset_end = inits[1])
-            self._ctrl.update(self._mdl, **out)
+            self._ctrl.display.update(self._display, **out)
         finally:
             self._updating = False
 
@@ -389,19 +414,103 @@ class AxisOberver:
             if i+'bounds' in old:
                 vals = self._get(i+'bounds')
                 axis = getattr(self._fig, i+'_range')
-                axis.update(start = axis.reset_start if vals[0] is None else vals[0],
-                            end   = axis.reset_end   if vals[1] is None else vals[1])
+                if isinstance(axis, Range1d):
+                    axis.update(start = axis.reset_start if vals[0] is None else vals[0],
+                                end   = axis.reset_end   if vals[1] is None else vals[1])
+                else:
+                    axis.update(start = axis.bounds[0] if vals[0] is None else vals[0],
+                                end   = axis.bounds[1] if vals[1] is None else vals[1])
 
-    def __call__(self):
+    def newbounds(self, axis, arr) -> dict:
+        "Sets the range boundaries"
+        if len(arr) == 0:
+            return dict(start        = 0., end          = 1.,
+                        max_interval = 1., min_interval = 1.,
+                        reset_start  = 0., reset_end    = 1.)
+
+        if isinstance(arr, np.ndarray):
+            if all(np.isnan(i) for i in arr) or len(arr) == 0:
+                vmin = 0.
+                vmax = 1.
+            else:
+                vmin = np.nanmin(arr)
+                vmax = np.nanmax(arr)
+        elif len(arr):
+            vmin = min(arr)
+            vmax = max(arr)
+
+        theme = self._ctrl.theme.model(self._theme)
+        rng   = max(1e-5, (vmax-vmin))
+        delta = rng*theme.overshoot*.5
+        vmin -= delta
+        vmax += delta
+
+        curr  = getattr(self._get(None), f'{axis}bounds', (None, None))
+        return dict(max_interval = rng*(1.+theme.boundsovershoot),
+                    min_interval = rng*theme.overshoot,
+                    start        = vmin if curr[0]  is None else curr[0], # type: ignore
+                    end          = vmax if curr[1]  is None else curr[1],
+                    reset_start  = vmin,
+                    reset_end    = vmax)
+
+    def setbounds(self, cache:CACHE_TYPE, fig, # pylint: disable=too-many-arguments
+                  xarr, yarr, xinit = None, yinit = None):
+        "Sets the range boundaries"
+        cache[fig.x_range] = self.newbounds('x', xarr)
+        cache[fig.y_range] = self.newbounds('y', yarr)
+
+        args: Dict[str, Tuple[Optional[float], Optional[float]]] = {
+            'xinit': (None, None),
+            'yinit': (None, None)
+        }
+        if xinit is not None:
+            tmp = self.newbounds('x', xinit)
+            cache[fig.x_range].update(start = tmp['start'], end = tmp['end'])
+            args['xinit'] = tmp['reset_start'], tmp['reset_end']
+
+        if yinit is not None:
+            tmp  = self.newbounds('y', yinit)
+            cache[fig.y_range].update(start = tmp['start'], end = tmp['end'])
+            args['yinit'] = tmp['reset_start'], tmp['reset_end']
+
+        for i in (fig.x_range, fig.y_range):
+            if not isinstance(i, Range1d):
+                cache[i].pop('reset_start', None)
+                cache[i].pop('reset_end',   None)
+
+        self._ctrl.display.update(self._display, **args)
+
+    def bounds(self, arr):
+        "Returns boundaries for a column"
+        if len(arr) == 0:
+            return 0., 1.
+
+        if isinstance(arr, np.ndarray):
+            good  = arr[np.isfinite(arr)]
+            vmin  = good.min()
+            vmax  = good.max()
+        else:
+            vmin  = min(arr)
+            vmax  = max(arr)
+
+        delta = (vmax-vmin)*self._ctrl.theme.get(self._theme, "overshoot")
+        vmin -= delta
+        vmax += delta
+        return vmin, vmax
+
+    def callbacks(self):
         "adds Range callbacks"
         def _set(name):
-            fcn  = lambda attr, old, new: self._onchangeaxis(name)
             axis = getattr(self._fig, name+'_range')
+            if isinstance(axis, Range1d):
+                fcn  = lambda attr, old, new: self._onchangeaxis(name)
+            else:
+                fcn  = lambda attr, old, new: self._onchangedataaxis(name)
             axis.on_change('start', fcn)
             axis.on_change('end',   fcn)
         _set('x')
         _set('y')
-        self._ctrl.observe(self._mdl, self._onobserveaxis)
+        self._ctrl.display.observe(self._display, self._onobserveaxis)
 
 class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=too-many-public-methods
     "Base plotter class"
@@ -582,74 +691,15 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
 
     def newbounds(self, axis, arr) -> dict:
         "Sets the range boundaries"
-        if len(arr) == 0:
-            return dict(start        = 0., end          = 1.,
-                        max_interval = 1., min_interval = 1.,
-                        reset_start  = 0., reset_end    = 1.)
+        return AxisOberver(self, None).newbounds(axis, arr)
 
-        if isinstance(arr, np.ndarray):
-            if all(np.isnan(i) for i in arr) or len(arr) == 0:
-                vmin = 0.
-                vmax = 1.
-            else:
-                vmin = np.nanmin(arr)
-                vmax = np.nanmax(arr)
-        elif len(arr):
-            vmin = min(arr)
-            vmax = max(arr)
-
-        rng   = max(1e-5, (vmax-vmin))
-        delta = rng*self._theme.overshoot*.5
-        vmin -= delta
-        vmax += delta
-
-        curr  = getattr(self._display, f'{axis}bounds', (None, None))
-        return dict(max_interval = rng*(1.+self._theme.boundsovershoot),
-                    min_interval = rng*self._theme.overshoot,
-                    start        = vmin if curr[0]  is None else curr[0], # type: ignore
-                    end          = vmax if curr[1]  is None else curr[1],
-                    reset_start  = vmin,
-                    reset_end    = vmax)
-
-    def setbounds(self, cache:CACHE_TYPE, fig, # pylint: disable=too-many-arguments
-                  xarr, yarr, xinit = None, yinit = None):
+    def setbounds(self, *args, **kwa):
         "Sets the range boundaries"
-        cache[fig.x_range] = self.newbounds('x', xarr)
-        cache[fig.y_range] = self.newbounds('y', yarr)
-
-        args: Dict[str, Tuple[Optional[float], Optional[float]]] = {
-            'xinit': (None, None),
-            'yinit': (None, None)
-        }
-        if xinit is not None:
-            tmp = self.newbounds('x', xinit)
-            cache[fig.x_range].update(start = tmp['start'], end = tmp['end'])
-            args['xinit'] = tmp['reset_start'], tmp['reset_end']
-
-        if yinit is not None:
-            tmp  = self.newbounds('y', yinit)
-            cache[fig.y_range].update(start = tmp['start'], end = tmp['end'])
-            args['yinit'] = tmp['reset_start'], tmp['reset_end']
-
-        self._ctrl.display.update(self._display, **args)
+        return AxisOberver(self, None).setbounds(*args, **kwa)
 
     def bounds(self, arr):
         "Returns boundaries for a column"
-        if len(arr) == 0:
-            return 0., 1.
-
-        if isinstance(arr, np.ndarray):
-            good  = arr[np.isfinite(arr)]
-            vmin  = good.min()
-            vmax  = good.max()
-        else:
-            vmin  = min(arr)
-            vmax  = max(arr)
-
-        delta = (vmax-vmin)*self._theme.overshoot
-        vmin -= delta
-        vmax += delta
-        return vmin, vmax
+        return AxisOberver(self, None).bounds(arr)
 
     def addtodoc(self, ctrl, doc):
         "returns the figure"
@@ -667,7 +717,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
 
     def linkmodeltoaxes(self, fig, mdl = None):
         "add observers between both the figure axes and the model"
-        AxisOberver(self._ctrl, fig, self._display if mdl is None else mdl)()
+        AxisOberver(self, fig, self._display if mdl is None else mdl).callbacks()
 
     def ismain(self, _):
         "Set-up things if this view is the main one"
