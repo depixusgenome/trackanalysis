@@ -9,6 +9,10 @@ Peaks
     The tab shows the peaks detected on a bead as well as their characteristics
     and whether they can be identified with a theoretical position.
 
+.. figure:: _images/cpeaks.png
+
+    The |CPeaks| shows the same information as in the |Peaks|.
+
 This tab provides automated extraction of hyridization positions and their
 characteristics.  It also allows automatically identifying a bead with a
 specific hairpin and its theoretical hybridization positions.

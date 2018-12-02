@@ -1,8 +1,8 @@
 .. include:: utils.rst
 
-==============
-The Cycles Tab
-==============
+=================
+Looking at Cycles
+=================
 
 .. figure:: _images/cycles.png
 
