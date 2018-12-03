@@ -6,7 +6,7 @@ import os
 from pathlib    import Path
 from itertools  import chain
 from zipfile    import ZipFile
-from shutil     import rmtree, copy2
+from shutil     import rmtree, copy2, move
 import py_compile
 
 from waflib.Build   import BuildContext
@@ -153,6 +153,9 @@ class _CondaApp(BuildContext):
         final = final / "code"
         wafbuilder.os.rename(str(out), str(final))
         self.__copy_gif(final)
+
+        if (path/'doc'/'index.html').exists():
+            move(str(path/"doc"), str(final.parent))
 
         if Path("CHANGELOG.md").exists():
             out = final.parent/"CHANGELOG.md"

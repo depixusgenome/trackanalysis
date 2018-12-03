@@ -35,10 +35,14 @@ def doc(bld):
     "create the doc"
     if 'SPHINX_BUILD' not in bld.env:
         bld.find_program("sphinx-build", var="SPHINX_BUILD", mandatory=False)
+    if getattr(bld.options, 'APP_PATH', None) is None:
+        target = str(bld.bldnode)+"/doc"
+    else:
+        target = str(bld.options.APP_PATH)+"/doc"
     bld(
-        rule   = "${SPHINX_BUILD} ../doc doc",
+        rule   = "${SPHINX_BUILD} "+str(bld.path)+"/doc "+target,
         source = bld.path.ant_glob('doc/**/*.rst') + bld.path.ant_glob('doc/conf.py'),
-        target = bld.path.find_or_declare('doc/index.html')
+        target = bld.path.find_or_declare(target+'/index.html')
     )
 
 class _Doc(BuildContext):
