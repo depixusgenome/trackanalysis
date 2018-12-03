@@ -1,10 +1,10 @@
-.. include:: utils.rst
+.. include:: ../utils.rst
 
 =================
 Looking at Cycles
 =================
 
-.. figure:: _images/cycles.png
+.. figure:: ../_images/cycles.png
 
     Two plots providing a rough analysis of the situation for one bead. On the
     left are cycles superposed one on the other. On the right are histograms

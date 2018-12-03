@@ -1,4 +1,4 @@
-.. include:: utils.rst
+.. include:: ../utils.rst
 
 =================
 The Field of View
@@ -7,7 +7,7 @@ The Field of View
 Background
 ==========
  
-.. figure:: _images/fieldofview.png
+.. figure:: ../_images/fieldofview.png
 
     Field of view from a |PICO|. Colors indicate the tags attached to a
     bead: *ok*, *fixed*, *bad*, *current*, ...

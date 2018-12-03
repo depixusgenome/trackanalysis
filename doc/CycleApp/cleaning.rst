@@ -1,11 +1,11 @@
-.. include:: utils.rst
+.. include:: ../utils.rst
 .. include:: cleaning_utils.rst
 
 =============
 Data Cleaning
 =============
 
-.. figure:: _images/cleaning.png
+.. figure:: ../_images/cleaning.png
 
     The impact of different signal analysis filters on |z| values for a
     given bead. The color blue is used for accepted frames, other colors

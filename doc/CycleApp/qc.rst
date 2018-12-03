@@ -1,10 +1,10 @@
-.. include:: utils.rst
+.. include:: ../utils.rst
 
 ===================
 The Quality Control
 ===================
  
-.. figure:: _images/qc.png
+.. figure:: ../_images/qc.png
 
     Different plots and tables related to quality control. The top 3 plots on
     the left display temperatures. The bottom plot displays the variability in

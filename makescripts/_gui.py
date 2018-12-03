@@ -22,6 +22,47 @@ def build_bokehjs(bld, key, *modules):
         cls_keyword = lambda _: 'Bokeh',
         group       = 'bokeh')
 
+def guimake_js(bld, viewname, modules, scriptname):
+    "create the js"
+    if '.' in viewname:
+        for i in viewname.split('.'):
+            if i[0] == i[0].upper():
+                break
+            modules.append(modules[-1]+'.'+i)
+
+    for i in (bld.path.parent.ant_glob('view/**/*.py')
+              +bld.path.parent.ant_glob('app/**/*.py')):
+        i = i.srcpath()
+        if Path(str(i)).name[:2] != '__':
+            modules.append(str(i)[4:-3].replace("/", ".").replace("\\", "."))
+    build_bokehjs(bld, scriptname, *(i for i in modules if i[:2] != '__'), 'undo')
+
+def guimake_doc(bld, scriptname):
+    "create the doc"
+    if not (
+            'SPHINX_BUILD' in bld.env
+            and (Path(str(bld.srcnode))/"doc"/scriptname).with_suffix(".rst").exists()
+    ):
+        return
+    if getattr(bld.options, 'APP_PATH', None) is None:
+        target = str(bld.bldnode)+"/doc/"+scriptname
+    else:
+        target = str(bld.options.APP_PATH)+"/doc"+scriptname
+
+    rule = (
+        "${SPHINX_BUILD} "+str(bld.srcnode)+"/doc "+target
+        + f" -D master_doc={scriptname} -D project={scriptname}"
+    )
+
+    bld(
+        rule   = rule,
+        source = (
+            bld.path.ant_glob(f'doc/{scriptname}/*.rst')
+            + bld.path.ant_glob('doc/conf.py')
+            + bld.path.ant_glob(f'doc/{scriptname}.rst')),
+        target = bld.path.find_or_declare(target+f'/{scriptname}.html')
+    )
+
 def guimake(viewname, locs, scriptname = None):
     "default make for a gui"
     make(locs)
@@ -37,19 +78,8 @@ def guimake(viewname, locs, scriptname = None):
     def build(bld):
         "build gui"
         old(bld)
-        modules = [locs['APPNAME']]
-        if '.' in viewname:
-            for i in viewname.split('.'):
-                if i[0] == i[0].upper():
-                    break
-                modules.append(modules[-1]+'.'+i)
-
-        for i in (bld.path.parent.ant_glob('view/**/*.py')
-                  +bld.path.parent.ant_glob('app/**/*.py')):
-            i = i.srcpath()
-            if Path(str(i)).name[:2] != '__':
-                modules.append(str(i)[4:-3].replace("/", ".").replace("\\", "."))
-        build_bokehjs(bld, name, *(i for i in modules if i[:2] != '__'), 'undo')
+        guimake_js(bld, viewname, [locs['APPNAME']], name)
+        guimake_doc(bld, name)
 
     locs['build'] = build
 

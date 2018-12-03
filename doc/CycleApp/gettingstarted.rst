@@ -1,10 +1,10 @@
-.. include:: utils.rst
+.. include:: ../utils.rst
 
 ===============
 Getting Started
 ===============
 
-.. figure:: _images/toolbar.png
+.. figure:: ../_images/toolbar.png
 
     The :program:`CycleApp` application.
 

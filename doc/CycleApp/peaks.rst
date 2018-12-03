@@ -1,16 +1,16 @@
-.. include:: utils.rst
+.. include:: ../utils.rst
 .. include:: cleaning_utils.rst
 
 =====
 Peaks
 =====
 
-.. figure:: _images/peaks.png
+.. figure:: ../_images/peaks.png
 
     The tab shows the peaks detected on a bead as well as their characteristics
     and whether they can be identified with a theoretical position.
 
-.. figure:: _images/cpeaks.png
+.. figure:: ../_images/cpeaks.png
 
     The |CPeaks| shows the same information as in the |Peaks|.
 

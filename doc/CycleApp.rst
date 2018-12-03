@@ -23,9 +23,9 @@ further studies.
    :maxdepth: 2
    :caption: Contents:
 
-   gettingstarted
-   fov
-   qc
-   cleaning
-   cycles
-   peaks
+   CycleApp/gettingstarted
+   CycleApp/fov
+   CycleApp/qc
+   CycleApp/cleaning
+   CycleApp/cycles
+   CycleApp/peaks
