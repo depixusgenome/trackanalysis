@@ -235,8 +235,8 @@ class RampHairpinSizeWidget(QCHairpinSizeWidget):
 
 class RampBeadStatusWidget(QCBeadStatusWidget):
     "Table containing beads per status"
-    def __init__(self, ctrl, model, **args):
-        super().__init__(ctrl, model, **args)
+    def __init__(self, ctrl, model):
+        super().__init__(ctrl, model, status = {i: i for i in ("ok", "fixed", "bad")})
         self.__ctrl = ctrl
 
     def _data(self):
