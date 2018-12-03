@@ -66,15 +66,16 @@ The indicator is constructed as follows:
 
 #. For each bead:
 
-   #. For each cycle, the extension |DZ| is measured as the
-         difference between the median positions in phase 1 (initial phase with
-         magnets pulling at :math:`10 pN`) and phase 3 (opening phase with
-         magnets pulling at :math:`>18 pN`).
+   #. For each cycle, the extension |DZ| is measured as the difference between
+      the median positions in phase 1 (initial phase with magnets pulling at
+      :math:`10 pN`) and phase 3 (opening phase with magnets pulling at
+      :math:`>18 pN`).
+
    #. These extensions will vary from bead to bead depending on the bead
-         magnetization and the sequence size. Thus to compare them across all
-         beads requires removing a bias, different for each bead. The latter is
-         estimated, individually for each bead, as the median |DZ|
-         across all cycles.
+      magnetization and the sequence size. Thus to compare them across all
+      beads requires removing a bias, different for each bead. The latter is
+      estimated, individually for each bead, as the median |DZ|
+      across all cycles.
 
 #. The resulting normalized extension variations are aggregated across all
    beads for each cycle:

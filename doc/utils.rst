@@ -1,4 +1,5 @@
 .. |CycleApp| replace:: :program:`CycleApp`
+.. |RampApp| replace:: :program:`RampApp`
 .. |SDI| replace:: :program:`SDI`
 .. |PICO| replace:: :program:`Picotwist`
 .. |SIMDEQ| replace:: :program:`SIMDEQ`
