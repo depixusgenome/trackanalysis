@@ -1,4 +1,5 @@
 .. include:: utils.rst
+.. include:: cleaning_utils.rst
 
 =============
 Data Cleaning
@@ -227,10 +228,7 @@ Fixed Beads
 * |NOISE|: set the maximum noise a bead may suffer from an be
 * :math:`\phi 5` repeatability: sets how close together to the median cycle
   profile 90% of values must sit for a bead to be considered fixed.
-* List of fixed beads used for subtracting the baseline. The list in
-  parenthesis is either the list of fixed beads found in the track or the list
-  of beads used for subtraction on the reference track, when on has been
-  indicared. In the former case, the list ends with a question mark.
+* |SUBTRACTION|
 
 Cleaning
 --------
@@ -242,8 +240,7 @@ again. The following are additionnal:
 * `Cycles are closed if |z(φ1)-z(φ5)| <`: the maximum distance from phase 1
   that the last values in phase 5 may sit for the cycle to be considered as
   *closed*.
-* `Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α, α =`: Sets the z distance from phase 1 below
-  which values in phase 5 are discarded.
+* |CLIPPING| 
 
 Theme
 -----

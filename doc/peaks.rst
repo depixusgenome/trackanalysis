@@ -1,4 +1,5 @@
 .. include:: utils.rst
+.. include:: cleaning_utils.rst
 
 =====
 Peaks
@@ -12,6 +13,11 @@ Peaks
 .. figure:: _images/cpeaks.png
 
     The |CPeaks| shows the same information as in the |Peaks|.
+
+.. hint::
+
+    The |CPeaks| has additional options for configuring the aspect of is plots.
+    These are available throught the advanced options.
 
 This tab provides automated extraction of hyridization positions and their
 characteristics.  It also allows automatically identifying a bead with a
@@ -51,60 +57,13 @@ the reference and other tracks are expected to have a number of peaks in
 common. In other words, all other tracks should also have the same *reference
 oligos* as the reference track.
 
-Extracting Peaks
-================
-
-Peaks are extracted using the hybridization events extracted as specified in
-the |Cycles| (:ref:`event-extraction`). They are aggregated as follows:
-
-#. The cycles are re-aligned using event positions:
-
-    #. One histogram of event positions is created for each cycles.
-    #. These histograms are summed up.
-    #. Each cycle histogram is allowed to move *a little* so as to better
-       overlap the sum of histograms.
-    #. The process is repeated twice using updated alignments.
-
-#. A histogram of all event positions is created using all *re-aligned* cycles.
-#. The histogram's peaks are extracted. If peaks are too close (~ |NOISE|),
-   only the highest one is kept.
-#. Hybridization events are assumed to belong to the closest peak within a
-   maximum range of 5 |NOISE|.
-#. Peaks with too few events are rejected.
-#. All peaks characteristics are then computed using the events belonging to
-   that peaks, including its position.
-
-The histograms themeselves are created by applying a gaussian kernel to the
-event positions. The duration of the event is not taken into account, nor it's
-intrinsic noise. The kernel size is of 1 |NOISE| for an |SDI| instrument and 2
-|NOISE| for a |PICO|.
-
-Peak Characteristics
---------------------
-
-The following characteristics are reported in the table of the |Peaks|.
-
-* :math:`z (\mathrm{µm)}` is the mean position of events in the peak in micrometers.
-* :math:`z (\mathrm{base)}` is the mean position of events in the peak in base number:
-  :math:`z (\mathrm{base}) = \mathrm{stretch} (z (\mathrm{µm}) - \mathrm{bias})`.
-* `Hairpin` is the theoretical position assigned to the peak if any.
-* `Strand` is the strand on which the probe was bound. This can only be
-  reported on peaks for which a hairpin position was found.
-* `Distance` is the distance between experimental and theoretical positions, in
-  number of bases. 
-* `Rate (%)` is the percentage of cycles for which an event was detected for
-  that peak.
-* `Duration (s)` is the average duration of events in that peak.
-* :math:`\sigma (\mathrm{µm})` is the median deviation off all events together.
-* `skew` is the skew computed for that peak. This reports how symmetric the
-  peak seems to be. Perfect symmetry is achieved at 0. Skews can reach a
-  minimum of -1 to a maximum of 1. A skew too far from 0 is a sign that the
-  peak is probably two hybridizations positions close together.
+Bead and Peak Characteristics
+=============================
 
 Bead Characteristics
 --------------------
 
-The following characteristics are also reported:
+The following *bead* characteristics are reported:
 
 * `cycles` is the number of cycles in the track.
 * `stretch` is the stretch factor applied to the peaks:
@@ -140,6 +99,59 @@ The following characteristics are also reported:
   theoretical positions, considering only those experimental peaks with an
   identified theoretical position.
 
+Peak Characteristics
+--------------------
+
+The following characteristics are reported in the table of the |Peaks|.
+
+* :math:`z (\mathrm{µm)}` is the mean position of events in the peak in micrometers.
+* :math:`z (\mathrm{base)}` is the mean position of events in the peak in base number:
+  :math:`z (\mathrm{base}) = \mathrm{stretch} (z (\mathrm{µm}) - \mathrm{bias})`.
+* `Hairpin` is the theoretical position assigned to the peak if any.
+* `Strand` is the strand on which the probe was bound. This can only be
+  reported on peaks for which a hairpin position was found.
+* `Distance` is the distance between experimental and theoretical positions, in
+  number of bases. 
+* `Rate (%)` is the percentage of cycles for which an event was detected for
+  that peak.
+* `Duration (s)` is the average duration of events in that peak.
+* :math:`\sigma (\mathrm{µm})` is the median deviation off all events together.
+* `skew` is the skew computed for that peak. This reports how symmetric the
+  peak seems to be. Perfect symmetry is achieved at 0. Skews can reach a
+  minimum of -1 to a maximum of 1. A skew too far from 0 is a sign that the
+  peak is probably two hybridizations positions close together.
+
+Extracting Peaks
+================
+
+Peaks are extracted using the hybridization events extracted as specified in
+the |Cycles| (:ref:`event-extraction`). They are aggregated as follows:
+
+#. The cycles are re-aligned using event positions. This does improve the cycle
+   alignment unless there are too many peaks. In such a case, the new alignment
+   might erroneously merge two peaks together. The alignment is done as
+   follows:
+
+    #. One histogram of event positions is created for each cycles.
+    #. These histograms are summed up.
+    #. Each cycle histogram is allowed to move *a little* so as to better
+       overlap the sum of histograms.
+    #. The process is repeated twice using updated alignments.
+
+#. A histogram of all event positions is created using all *re-aligned* cycles.
+#. The histogram's peaks are extracted. If peaks are too close (~ |NOISE|),
+   only the highest one is kept.
+#. Hybridization events are assumed to belong to the closest peak within a
+   maximum range of 5 |NOISE|.
+#. Peaks with too few events are rejected.
+#. All peaks characteristics are then computed using the events belonging to
+   that peaks, including its position.
+
+The histograms themeselves are created by applying a gaussian kernel to the
+event positions. The duration of the event is not taken into account, nor it's
+intrinsic noise. The kernel size is of 1 |NOISE| for an |SDI| instrument and 2
+|NOISE| for a |PICO|.
+
 Fitting to a Sequence
 =====================
 
@@ -159,6 +171,14 @@ Fitting experimental peaks to theoretical positions occurs as follows:
 #. If the single-strand peak was added to the list of oligos is detected as
    missing from the experimental data, it is removed from the theoretical peaks
    for that bead only.
+
+#. The baseline peaks is detected. Peaks below it are discarded. It's defined as follows:
+
+    * :math:`z_\mathrm{peak}-z_{\phi_1} < 0.015 \mathrm{\mu m}`: the peaks is
+      close to the baseline as measured in phase1.
+    * the containing at least 10 events
+    * it has the lowest |z| position from amongst all peaks which fit the
+      previous filters.
 
 #. |DZ| is computed and compared to the sequence sizes. Those sequences too
    small or too big are discarded for that bead.
@@ -189,3 +209,38 @@ When the baseline or the single-strand have been added to
 the list oligos, then both the cost function and the chi square fit are
 provided with additional terms for every peak either below the baseline or
 above the single-strand, discouraging such solutions.
+
+Advanced Options
+================
+
+The following settings can be moved by the user. Should that happen, the
+default settings will be indicated in parenthesis to the left of the input box.
+
+
+Cleaning
+--------
+
+* |CLIPPING|
+* |SUBTRACTION|
+* Cycle alignment *prior* to peak extraction
+* `Discard the single strand peak (unless in oligos)` allows automatically
+  detecting and discarding the single-strand peak unless the user added it to
+  the list of oligos.
+* `Detect and discard peaks below the baseline` allows discarding peaks below
+  the baseline peak.
+
+Peaks
+-----
+
+* `Min frame count per hybridisation` is the minimum number of |z| measures per
+  hybridization event.
+* `Min hybridisations per peak` is the number of events per Hybridization
+  position below which it is discarded.
+* `Re-align cycles using peaks` should be unchecked if the density of peaks is
+  too high (> 1/(3|NOISE|)).
+* `Peak kernel size (blank ⇒ auto)` is the kernel width used to create the
+  histogram. This should be higher than |NOISE|. It' currently at 1 |NOISE| for
+  the |SDI| and 2 |NOISE| for the |PICO|.
+* `Exhaustive fit algorithm` allows selecting one or the other fit algorithm.
+* `Max Δ to theoretical peak` sets a threshold on how far an experimental peak
+  can be from to theoretical position for identification.
