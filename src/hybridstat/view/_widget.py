@@ -213,7 +213,7 @@ class PeaksStatsWidget:
             if len(mdl.peaks['z']):
                 self.values[4] = mdl.peaks['sigma']
             self.values[5] = mdl.peaks['skew']
-            self.values[6] = max(0, len(mdl.peaks['z']) - 1)
+            self.values[6] = len(mdl.peaks['z'])
             self.values[7] = 0.     if self.values[6] < 1 else mdl.peaks['count'][1:]/100.
             self.values[8] = np.NaN if self.values[6] < 1 else mdl.peaks['duration'][0]
 

@@ -22,12 +22,12 @@ Hairpins and Oligos
 
 See :ref:`hairpins-oligos` in the |Cycles| for details.
 
-There are some additional information provided by the dropdown menu for
-selecting a sequence. Mainly, the order in which the sequences are provided is
-indicated by subscripted number (₁, ₂, ...). Some sequences are preceeded by a
-`✗`. The latter means that the sequence's length is either to small or too big
-considering the bead's |DZ|. Finally, if a bead's sequence has been locked-in
-in the reference track, it is marked as such when viewing other tracks.
+The order of preference of the sequences is indicated by a subscripted number.
+The sequence which best fits the experimental data is ₁, then ₂, ect...  Some
+sequences are preceeded by a `✗`. The latter means that the sequence's length
+is either to small or too big considering the bead's |DZ|.  Finally, if a
+bead's sequence has been locked-in in the reference track, it is marked as such
+when viewing other tracks.
 
 The Reference Track
 ===================
@@ -80,7 +80,7 @@ intrinsic noise. The kernel size is of 1 |NOISE| for an |SDI| instrument and 2
 |NOISE| for a |PICO|.
 
 Peak Characteristics
-====================
+--------------------
 
 The following characteristics are reported in the table of the |Peaks|.
 
@@ -100,3 +100,92 @@ The following characteristics are reported in the table of the |Peaks|.
   peak seems to be. Perfect symmetry is achieved at 0. Skews can reach a
   minimum of -1 to a maximum of 1. A skew too far from 0 is a sign that the
   peak is probably two hybridizations positions close together.
+
+Bead Characteristics
+--------------------
+
+The following characteristics are also reported:
+
+* `cycles` is the number of cycles in the track.
+* `stretch` is the stretch factor applied to the peaks:
+
+    * If theoretical binding positions have been provided, this is a conversion
+      factor from µm to base count. It should be around 1140 base/µm.
+    * If a reference track is provided without theoretical binding positions,
+      the conversion factor is only for fitting to the reference track. It
+      should be around 1.
+    * If both reference track and binding positions are provided, then the
+      conversion factor is the product of both.
+
+* `bias` is the bias which must be removed to fit the reference track and/or
+  the theoretical binding positions.
+* |NOISE| is the high frequency noise detected on the bead.
+* :math:`\sigma[Peaks]` is the standard deviation of event positions in a peak,
+  averaged over all peaks.
+* `Average skew` is the mean skew computed over all peaks. As explained above,
+  values can go from -1 to 1 and should remain close to 0.
+* `Peaks count` is the number of detected peaks
+* `Events per cycle` is the number of events per cycle on all peaks together,
+  notwithstanding the baseline peak. It's an indicator of the number of cycles
+  *wasted* for lack of any blockings occurring.
+* `Downtime φ₅ (s)` is the average time remaining in a cycle after all
+  blockings notwithstanding the baseline peak are done. It's an indicator of
+  the amount of time *wasted* for lack of any blockings occurring.
+* `Sites found` is the number of theoretical positions for which an
+  experimental peaks was found.
+* `Silhouette` is a indicator of how much better the current sequence fits the
+  data compared  to other sequences. It reaches 1 for best fits and -1 for the
+  worst.
+* `Reduced Χ²` is the chi square of the fit of experimental peaks to
+  theoretical positions, considering only those experimental peaks with an
+  identified theoretical position.
+
+Fitting to a Sequence
+=====================
+
+Fitting experimental peaks to theoretical positions occurs as follows:
+
+#. The single-strand peak is removed from the list of peaks if detected unless:
+
+    * The phase 4 is not a ramp. In that case, the detection algorithm which
+      consists in detecting whether the strand closes during that phase cannot
+      be applied.
+
+    * The user added the single-strand peak to the list of oligos.
+
+    * The user specifically requested that the single-strand peak detection be
+      not performed.
+
+#. If the single-strand peak was added to the list of oligos is detected as
+   missing from the experimental data, it is removed from the theoretical peaks
+   for that bead only.
+
+#. |DZ| is computed and compared to the sequence sizes. Those sequences too
+   small or too big are discarded for that bead.
+
+#. The remaining sequences are used to fit to the data.
+
+Two algorithms are provided to try to fit experimental peaks to theoretical positions:
+
+#. an exhaustive fit considers every two pair of theoretical positions and
+   experimental peaks. For each of those:
+
+    #. it finds an initial stretch and bias using the two pairs.
+    #. Using the stretch and bias, it tries to pair up other theoretical
+       positions to experimental peaks.
+    #. Using all pairs, it finds the best strectch and bias with a linear fit.
+
+#. another type of fit consists in finding the stretch and bias reducing the
+   following cost function, where α is the stretch and β is the bias. For this
+   fit, multiple initial conditions are tested:
+
+.. math::
+
+    \mathrm{F}(x) = \sum_{x \in \mathrm{peaks}, y \in \mathrm{positions}}
+    exp(-\frac{1}{2}(y-\alpha x + \beta)^2/\sigma^2)
+
+
+When the baseline or the single-strand have been added to
+the list oligos, then both the cost function and the chi square fit are
+provided with additional terms for every peak either below the baseline or
+above the single-strand, discouraging such solutions.
