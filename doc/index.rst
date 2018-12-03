@@ -29,10 +29,3 @@ further studies.
    cleaning
    cycles
    peaks
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
