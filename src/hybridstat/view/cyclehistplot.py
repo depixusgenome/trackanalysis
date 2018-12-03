@@ -11,12 +11,12 @@ from bokeh.plotting         import Figure
 from bokeh.models           import (ColumnDataSource, Range1d, LinearAxis,
                                     NumeralTickFormatter, HoverTool)
 from model.level            import PHASE
-from model.plots            import PlotTheme, PlotDisplay, PlotModel, PlotAttrs
+from model.plots            import (PlotTheme, PlotDisplay, PlotModel, PlotAttrs,
+                                    PlotState)
 from peakfinding.histogram  import interpolator
 from sequences.modelaccess  import SequenceAnaIO
 from utils                  import initdefaults
 from view.plots             import PlotView
-from view.plots.base        import stateattr
 from view.plots.ploterror   import PlotError
 from view.plots.tasks       import TaskPlotCreator, CACHE_TYPE
 from ._model                import (PeaksPlotModelAccess, PeaksPlotTheme,

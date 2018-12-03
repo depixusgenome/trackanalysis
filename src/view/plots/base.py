@@ -16,7 +16,7 @@ import  numpy        as     np
 import  bokeh.palettes
 import  bokeh.models.glyphs     as     _glyphs
 from    bokeh.document          import Document
-from    bokeh.models            import Range1d, Model, GlyphRenderer
+from    bokeh.models            import Range1d, Model, GlyphRenderer, DataRange1d
 from    bokeh.plotting          import figure, Figure
 
 from    utils.logconfig         import getLogger
@@ -43,7 +43,7 @@ _CNV  = {'dark_minimal':  'dark',
          'customdark':    'dark'}
 def themed(theme, obj, dflt = '--none--'):
     "return the value for the given theme"
-    if not isinstance(obj, dict):
+    if not isinstance(obj, dict) or set(obj) == {'field', 'transform'}:
         return obj
 
     theme = getattr(theme, "_model",    theme)
@@ -90,6 +90,37 @@ class _StateDescriptor:
         ctrl, mdl = self.__elems(inst)
         ctrl.update(mdl, state = PlotState(value))
 
+class GroupStateDescriptor:
+    "Descriptor for grouping multiple plots"
+    def __init__(self, *models):
+        names = []
+        for i in models:
+            if isinstance(i, type):
+                i = i()
+            names.append(getattr(getattr(i, 'display', i), 'name', i))
+        self._models = tuple(names)
+
+    def __get__(self, inst, owner):
+        if inst is None:
+            return self
+        return getattr(inst, '_ctrl').display.get(self._models[0], 'state')
+
+    def setdefault(self, inst, value):
+        "sets the default value"
+        self.__set(getattr(inst, '_ctrl').display.updatedefaults, value)
+
+    def __set__(self, inst, value):
+        self.__set(getattr(inst, '_ctrl').display.update, value)
+
+    def __call__(self, cls):
+        cls.state = self
+        return cls
+
+    def __set(self, fcn, value):
+        state = PlotState(value)
+        for i in self._models:
+            fcn(i, state = state)
+
 class _ModelDescriptor:
     _name: str
     _ctrl: str
@@ -125,38 +156,6 @@ class _ModelDescriptor:
         if mdl is not None:
             return self.ctrl(inst).update(mdl, **value)
         raise AttributeError(f"no such model: {self._name}")
-
-def stateattr(name: str):
-    "return a state descriptor"
-    class PlotStateDisplay:
-        "cycles & peaks plot state"
-        name = name
-        def __init__(self, state = PlotState.active, **_):
-            self.state = state
-
-    class StateDescriptor:
-        "get the state"
-
-        @staticmethod
-        def setdefault(inst, value):
-            "sets the default value"
-            getattr(inst, '_ctrl').display.updatedefaults(name, state = PlotState(value))
-
-        def __get__(self, inst, owner):
-            getattr(inst, '_ctrl').display.get(name, 'state')
-
-        def __set__(self, inst, value):
-            getattr(inst, '_ctrl').display.update(name, state = PlotState(value))
-
-    def _wrapper(cls):
-        cls.state = StateDescriptor()
-        old       = cls.__init__
-        def __init__(self, ctrl, *args, **kwa):
-            ctrl.display.add(PlotStateDisplay())
-            old(self, *args, **kwa)
-        cls.__init__ = __init__
-        return cls
-    return _wrapper
 
 class PlotAttrsView(PlotAttrs):
     "implements PlotAttrs"
@@ -448,7 +447,7 @@ class AxisOberver:
                 if isinstance(axis, Range1d):
                     axis.update(start = axis.reset_start if vals[0] is None else vals[0],
                                 end   = axis.reset_end   if vals[1] is None else vals[1])
-                else:
+                elif isinstance(axis, DataRange1d):
                     axis.update(start = axis.bounds[0] if vals[0] is None else vals[0],
                                 end   = axis.bounds[1] if vals[1] is None else vals[1])
 
@@ -535,8 +534,10 @@ class AxisOberver:
             axis = getattr(self._fig, name+'_range')
             if isinstance(axis, Range1d):
                 fcn  = lambda attr, old, new: self._onchangeaxis(name)
-            else:
+            elif isinstance(axis, DataRange1d):
                 fcn  = lambda attr, old, new: self._onchangedataaxis(name)
+            else:
+                return
             axis.on_change('start', fcn)
             axis.on_change('end',   fcn)
         _set('x')

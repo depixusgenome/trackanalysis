@@ -198,8 +198,25 @@ class ConfigXlsxIO(TaskIO):
         spawn(_thread)
         return True
 
-def setupio(_):
+def setupio(cls):
     "sets the io up"
+    if isinstance(cls, type):
+        # pylint: disable=protected-access,
+        def advanced(self):
+            "triggers the advanced dialog"
+            self._plotter.advanced()
+
+        def ismain(self, ctrl):
+            "Alignment, ... is set-up by default"
+            self._ismain(ctrl, tasks = self.TASKS,
+                         **setupio(getattr(self._plotter, '_model')))
+
+        cls.TASKS    =  ('extremumalignment', 'clipping', 'eventdetection', # type: ignore
+                         'peakselector', 'singlestrand', 'baselinepeakfilter')
+        cls.advanced = advanced    #type: ignore
+        cls.ismain   = ismain      #type: ignore
+        return cls
+
     name = lambda i: __name__ + '.'+i
     return dict(ioopen = (slice(None, -2),
                           name('PeaksConfigGRFilesIO'),

@@ -23,7 +23,7 @@ class GroupedBeadsScatterTheme(PlotTheme):
     peaks    = PlotAttrs({"dark": 'lightgreen', 'basic': 'darkgreen'}, 'diamond', .1)
     toolbar  = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,reset,save,hover'
-    tooltipmode      = 'cursor'
+    tooltipmode      = 'mouse'
     tooltippolicy    = 'follow_mouse'
     tooltips         = [('Bead', '@bead'),
                         ('Z (base)', '@bases'),
@@ -80,6 +80,19 @@ class GroupedBeadsModelAccess(PeaksPlotModelAccess):
     def __init__(self, ctrl, addto = False):
         super().__init__(ctrl, addto = addto)
         self.__store = GroupedBeadsStore()
+
+    @property
+    def discardedbeads(self) -> List[int]:
+        "return discarded beads for the given sequence"
+        return self.__store.discarded.get(self.sequencekey, [])
+
+    @discardedbeads.setter
+    def discardedbeads(self, values):
+        "sets discarded beads for the given sequence"
+        store = self.__store
+        info  = dict(store.discarded)
+        info[self.sequencekey] = list(values)
+        self._ctrl.display.update(store, discarded = info)
 
     def runbead(self) -> Optional[Output]: # type: ignore
         "collects the information already found in different peaks"

@@ -684,11 +684,9 @@ def resetrefaxis(mdl, reflabel):
     fit  = getattr(task, 'fit', {}).get(mdl.sequencekey, None)
     if fit is None or len(fit.peaks) <= 2:
         return dict(visible = False)
-    else:
-        label = mdl.sequencekey
-        if not label:
-            label = reflabel
-        return dict(ticker     = list(fit.peaks[1:-1]),
-                    visible    = True,
-                    axis_label = label)
-
+    label = mdl.sequencekey
+    if not label:
+        label = reflabel
+    return dict(ticker     = list(fit.peaks[1:-1]),
+                visible    = True,
+                axis_label = label)
