@@ -114,6 +114,11 @@ export class DpxToolbarView extends WidgetView
             quit = "<div class='dpx-col-12'>#{@make_btn('quit', 'Quit', '', '')}</div>"
         else
             quit =''
+        if @model.hasdoc == ""
+            docu = ""
+        else
+            docu = "<button type='button' id='dpx-tb-doc' "+
+                   "class='bk-bs-btn bk-bs-btn-default'>?</button>"
 
         ttips = ['Open an analysis, i.e. ".ana" extension, or a track file and '+
                  'then its ".gr" files',
@@ -137,13 +142,14 @@ export class DpxToolbarView extends WidgetView
                @make_btn('del', @_icon('bin'), ttips[4])+
                "<div id='dpx-tb-message' class='bk-markup'>"+
                    "#{mdl.message}</div>"+
-               "#{quit}"
+               "#{docu}#{quit}"
 
         elem = $(@el)
         elem.html(html)
         elem.find('#dpx-tb-open').click(() => @model.open = @model.open+1)
         elem.find('#dpx-tb-save').click(() => @model.save = @model.save+1)
         elem.find('#dpx-tb-quit').click(() => @model.quit = @model.quit+1)
+        elem.find('#dpx-tb-doc').click(() => @model.doc = @model.doc+1)
         elem.find('#dpx-tb-del') .click(() => @on_discard_current())
         elem.find('#dpx-tb-bead').change(() => @on_bead())
         elem.find('#dpx-tb-discard').change(() => @on_discard())
@@ -177,6 +183,7 @@ export class DpxToolbar extends Widget
         delfile:     [p.Number,  -1],
         filelist:    [p.Array,   []],
         save:        [p.Number,  0],
+        doc:         [p.Number,  0],
         quit:        [p.Number,  0],
         bead:        [p.Number,  -1],
         discarded:   [p.String,  ''],
@@ -185,5 +192,6 @@ export class DpxToolbar extends Widget
         seltype:     [p.Bool,    true],
         message:     [p.String,  ''],
         helpmessage: [p.String, ''],
-        hasquit:     [p.Bool,    false]
+        hasquit:     [p.Bool,    false],
+        hasdoc:     [p.Bool,    false]
     }

@@ -16,7 +16,7 @@ from bokeh.models         import Widget
 from bokeh.io             import curdoc
 
 from utils                import initdefaults
-from utils.gui            import parseints, leastcommonkeys
+from utils.gui            import parseints, leastcommonkeys, startfile
 from utils.logconfig      import getLogger
 from control.taskio       import TaskIO
 from control.beadscontrol import DataSelectionBeadController
@@ -36,6 +36,7 @@ class BeadToolbarTheme:
     quitlabel    = 'Quit'
     opentitle    = 'Open a track or analysis file'
     savetitle    = 'Save an analysis file'
+    docurl       = "doc/index.html"
     placeholder  = '1, 2, ..., bad, ... ?'
     tail         = ', ...'
     @initdefaults(frozenset(locals()))
@@ -130,6 +131,7 @@ class DpxToolbar(Widget):
     frozen      = props.Bool(True)
     open        = props.Int(0)
     save        = props.Int(0)
+    doc         = props.Int(0)
     quit        = props.Int(0)
     bead        = props.Int(-1)
     discarded   = props.String('')
@@ -141,7 +143,9 @@ class DpxToolbar(Widget):
     seltype     = props.Bool(True)
     message     = props.String('')
     helpmessage = props.String('')
+    docurl      = props.String("")
     hasquit     = props.Bool(False)
+    hasdoc      = props.Bool(False)
     def __init__(self, **kwa):
         super().__init__(name = 'Main:toolbar', **kwa)
 
@@ -490,8 +494,14 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         "adds items to doc"
         super().addtodoc(ctrl, doc)
         assert doc is not None
-        tbar   = DpxToolbar(hasquit = getattr(self._ctrl, 'FLEXXAPP', None) is not None,
+        path   = Path("").resolve()/self.__theme.docurl
+        if not path.exists():
+            path = Path("").resolve().parent/self.__theme.docurl
+        tbar   = DpxToolbar(hasquit     = getattr(self._ctrl, 'FLEXXAPP', None) is not None,
+                            hasdoc      = path.exists(),
                             helpmessage = self.__theme.placeholder)
+
+        tbar.on_change("doc", lambda attr, old, new: startfile(str(path)))
 
         def _ontasks(old = None, **_):
             if 'roottask' not in old:
