@@ -36,7 +36,7 @@ class BeadToolbarTheme:
     quitlabel    = 'Quit'
     opentitle    = 'Open a track or analysis file'
     savetitle    = 'Save an analysis file'
-    docurl       = "doc/index.html"
+    docurl       = "doc/"
     placeholder  = '1, 2, ..., bad, ... ?'
     tail         = ', ...'
     @initdefaults(frozenset(locals()))
@@ -497,6 +497,10 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         path   = Path("").resolve()/self.__theme.docurl
         if not path.exists():
             path = Path("").resolve().parent/self.__theme.docurl
+
+        if not path.is_file():
+            path = (path/ctrl.APPNAME/ctrl.APPNAME).with_suffix(".html")
+
         tbar   = DpxToolbar(hasquit     = getattr(self._ctrl, 'FLEXXAPP', None) is not None,
                             hasdoc      = path.exists(),
                             helpmessage = self.__theme.placeholder)

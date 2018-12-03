@@ -114,7 +114,7 @@ export class DpxToolbarView extends WidgetView
             quit = "<div class='dpx-col-12'>#{@make_btn('quit', 'Quit', '', '')}</div>"
         else
             quit =''
-        if @model.hasdoc == ""
+        if !@model.hasdoc
             docu = ""
         else
             docu = "<button type='button' id='dpx-tb-doc' "+
