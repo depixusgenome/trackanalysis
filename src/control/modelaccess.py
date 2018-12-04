@@ -39,7 +39,6 @@ class PlotModelAccess:
 
     def addto(self, ctrl, noerase = False):
         "add to controller"
-        pass
 
 class ReplaceProcessors(CacheReplacement):
     """

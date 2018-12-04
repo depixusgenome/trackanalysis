@@ -43,9 +43,9 @@ class StitchByDerivate(CollapseByDerivate):
             if tmp is not None:
                 prof.value[last:start] += tmp.value[-1]-prof.value[last]
 
-            sli  = slice(max(start-1, 0), stop+1)
-            mins = cast(Iterator[int], (max(sli.start, rng.start) for rng in data))
-            lens = (max(sli.stop-max(sli.start, rng.start), 0) for rng in data)
+            sli  = max(start-1, 0), stop+1
+            mins = cast(Iterator[int], (max(sli[0], rng.start) for rng in data))
+            lens = (max(sli[1]-max(sli[0], rng.start), 0) for rng in data)
             tmp  = der(Range(i, rng.values[i-rng.start:i-rng.start+j])
                        for i, j, rng in zip(mins, lens, data))
 

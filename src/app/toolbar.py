@@ -64,7 +64,6 @@ def toolbarview(tbar, main) -> type:
     "return the view with toolbar"
     class ToolbarView(ViewWithToolbar[getclass(tbar), getclass(main)]): # type: ignore
         "Toolbar view"
-        pass
     return ToolbarView
 
 def createview(main, controls, views):

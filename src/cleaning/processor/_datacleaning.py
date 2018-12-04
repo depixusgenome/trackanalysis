@@ -153,8 +153,8 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
     def _compute(cls, cnf, frame, info):
         info = info[0], np.copy(info[1])
         res  = cls.compute(frame, info, **cnf)
-        if res is not None:
-            raise res
+        if isinstance(res, Exception):
+            raise res # pylint: disable=raising-bad-type
         return info
 
     @classmethod

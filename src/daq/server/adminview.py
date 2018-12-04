@@ -187,7 +187,7 @@ class DAQAdminView:
             def _inform():
                 self._busy = True
                 try:
-                    control.record(True if rec else False, rec)
+                    control.record(bool(rec), rec)
                     control.removebeads()
                     control.addbeads(beads)
                     control.updateprotocol(protocol)

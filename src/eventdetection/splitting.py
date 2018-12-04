@@ -160,7 +160,6 @@ class GradedSplitDetector(SplitDetector):
     @abstractmethod
     def _flatness(self, data : np.ndarray) -> np.ndarray:
         "Computes a flatness characteristic on all indices"
-        pass
 
     @abstractmethod
     def _threshold(self,
@@ -169,7 +168,6 @@ class GradedSplitDetector(SplitDetector):
                    precision : Optional[float]
                   ) -> Optional[float]:
         "Computes a threshold on the flatness characteristic"
-        pass
 
 CONFIDENCE_TYPE = Union[None, float, Threshold] # pylint: disable=invalid-name
 class PyDerivateSplitDetector(GradedSplitDetector):

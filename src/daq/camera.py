@@ -79,7 +79,6 @@ class CameraDisplay:
 
 class DAQCameraModel(DisplayModel[CameraDisplay, CameraTheme]):
     "DAQ Camera model"
-    pass
 
 class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
     "viewing the camera & beads"

@@ -568,12 +568,10 @@ def _savetrack(args):
 @overload
 def savetrack(path: PATHTYPE, track: 'Track') -> 'Track':
     "saves a track"
-    pass
 
 @overload
 def savetrack(path  : PATHTYPE, track : TDICT_T) -> TDICT_T: # type: ignore
     "saves a tracksdict"
-    pass
 
 def savetrack(path  : PATHTYPE,     # pylint: disable=unused-argument,function-redefined
               track : Union['Track', Dict[str,'Track']]

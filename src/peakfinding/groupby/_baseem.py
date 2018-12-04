@@ -93,7 +93,6 @@ class BaseEM(EMFlagger):
     @abstractmethod
     def find(self,**kwa):
         "finds best set of parameters"
-        pass
 
     def __call__(self,**kwa):
         self.kwargs = kwa
