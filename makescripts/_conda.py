@@ -154,7 +154,7 @@ class _CondaApp(BuildContext):
         wafbuilder.os.rename(str(out), str(final))
         self.__copy_gif(final)
 
-        if (path/'doc'/'index.html').exists():
+        if (path/'doc').exists():
             move(str(path/"doc"), str(final.parent))
 
         if Path("CHANGELOG.md").exists():

@@ -47,7 +47,7 @@ def guimake_doc(bld, scriptname):
     if getattr(bld.options, 'APP_PATH', None) is None:
         target = str(bld.bldnode)+"/doc/"+scriptname
     else:
-        target = str(bld.options.APP_PATH)+"/doc"+scriptname
+        target = str(bld.options.APP_PATH)+"/doc/"+scriptname
 
     rule = (
         "${SPHINX_BUILD} "+str(bld.srcnode)+"/doc "+target
