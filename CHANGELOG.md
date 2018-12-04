@@ -2,8 +2,15 @@
 
 ## cycles_v6.3
 
-* 2018-11-30 16:15:27 +0100  (tag: cycles_v6.3.1)
+* 2018-12-04 10:15:27 +0100  (tag: cycles_v6.3.1)
 * 2018-11-22 15:51:52 +0100  (tag: cycles_v6.3)
+
+### Documentation
+
+Documentation was added to both CycleApp and RampApp:
+
+* The changelog should display at every new version.
+* Some documentation is available throught the "?" button in the toolbar.
 
 ### Peaks
 
