@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a dataframe"
+
 from   typing    import Dict, Callable, Any, Iterator, Tuple, KeysView
 from   functools import partial
 import re
@@ -9,7 +10,7 @@ import shelve
 class _DEFAULT:
     pass
 
-class LazyShelf(Dict):
+class LazyShelf(dict):
     """
     Lazy shelf
 

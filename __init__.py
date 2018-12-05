@@ -16,6 +16,6 @@ from .array         import (EventsArray, asdataarrays, asobjarray, asview,
                             EVENTS_DTYPE, EVENTS_TYPE)
 
 Type = TypeVar("Type")
-def dflt(itm: Type) -> Type:
-    "create field with a default factory"
-    return field(default_factory = lambda: deepcopy(itm))
+def dflt(default: Type, **kwa) -> Type:
+    "return a field with default factory"
+    return field(default_factory= lambda: deepcopy(default), **kwa)
