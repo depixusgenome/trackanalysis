@@ -5,35 +5,27 @@ from   typing               import Callable, Optional, cast
 import numpy                as     np
 
 from utils                  import (initdefaults, asobjarray, asdataarrays, asview,
-                                    updatecopy, EVENTS_DTYPE, EventsArray)
+                                    updatecopy, EVENTS_DTYPE, EventsArray,
+                                    dataclass)
 from signalfilter           import PrecisionAlg, PRECISION
 from .alignment             import PeakCorrelationAlignment, PeakPostAlignment
 from .histogram             import Histogram
-from .groupby               import (ByHistogram,PeakFinder)
-from .peaksarray            import (Input, Output, # pylint: disable=unused-import
-                                    PeaksArray, PeakListArray)
+from .groupby               import ByHistogram,PeakFinder
+from .peaksarray            import Input, PeaksArray, PeakListArray
 
+@dataclass
 class PeakSelectorDetails: # pylint: disable=too-many-instance-attributes
     "Information useful to GUI"
     __slots__ = ('positions', 'histogram', 'minvalue', 'binwidth', 'corrections',
                  'peaks', 'events', 'ids')
-    def __init__(self,     # pylint: disable=too-many-arguments
-                 positions:   np.ndarray,
-                 histogram:   np.ndarray,
-                 minvalue:    float,
-                 binwidth:    float,
-                 corrections: np.ndarray,
-                 peaks:       np.ndarray,
-                 events:      EventsArray,
-                 ids:         np.ndarray) -> None:
-        self.positions   = positions
-        self.histogram   = histogram
-        self.minvalue    = minvalue
-        self.binwidth    = binwidth
-        self.corrections = corrections
-        self.peaks       = peaks
-        self.events      = events
-        self.ids         = ids
+    positions:   np.ndarray
+    histogram:   np.ndarray
+    minvalue:    float
+    binwidth:    float
+    corrections: np.ndarray
+    peaks:       np.ndarray
+    events:      EventsArray
+    ids:         np.ndarray
 
     def __iter__(self):
         return iter(getattr(self, i) for i in self.__slots__)

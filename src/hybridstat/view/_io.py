@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "IO for peaksplot"
-from typing                          import (Optional, Tuple, # pylint: disable=unused-import
-                                             Union, List)
+from typing                          import Optional, Tuple, Union, List
 from pathlib                         import Path
 from copy                            import deepcopy
 from concurrent.futures              import ProcessPoolExecutor, ThreadPoolExecutor
@@ -178,7 +177,7 @@ class ConfigXlsxIO(TaskIO):
                                  PeakFindingExcelTask(model     = model,
                                                       **xlscnf))
 
-        error = [None] # type: List[Optional[Exception]]
+        error: List[Optional[Exception]] = [None]
         def _process():
             try:
                 with cls.POOLTYPE() as pool:

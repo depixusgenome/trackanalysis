@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "read-write existing files"
-from    typing          import Optional, Dict, List, Any # pylint: disable=unused-import
+from    typing          import Dict, List
 import  os
 import  re
 import  shutil
@@ -206,11 +206,12 @@ class DataFrame(_DataFrame):
 
         def _itercells(tree):
             recol = re.compile(r"([A-Z]+)(\d+)")
-            # pylint: disable=stop-iteration-return
-            data  = next(item for item in tree if item.tag.endswith("sheetData"))
+            data  = next((item for item in tree if item.tag.endswith("sheetData")), ())
 
             for col in iter(col for row in data for col in row):
                 match = recol.match(col.get("r"))
+                if match is None:
+                    continue
                 irow  = int(match.group(2))
 
                 icol  = getcolindex(match.group(1))-1

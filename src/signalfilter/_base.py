@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Signal Analysis: filters for removing noise"
-# pylint: disable=no-name-in-module,import-error
 from typing         import (Union, Iterator, Iterable, Tuple, Sequence, Optional,
                             overload, cast, TYPE_CHECKING)
 from abc            import ABC
@@ -9,7 +8,7 @@ from abc            import ABC
 import numpy as np
 
 from utils          import initdefaults
-# pylint: disable=import-error
+# pylint: disable=no-name-in-module,import-error
 from ._core.stats   import (hfsigma, mediandeviation, nanhfsigma as _nanhfsigma,
                             nanmediandeviation as _nanmediandeviation)
 
@@ -18,6 +17,14 @@ if TYPE_CHECKING:
     from data.track import Track
     from data.views import TrackView
 
+def _add_doc(other):
+    def _wrapper(fcn):
+        if getattr(fcn, '__doc__', None):
+            fcn._doc__ += "\n\n"+getattr(other, '__doc__', '')
+        return fcn
+    return _wrapper
+
+@_add_doc(hfsigma)
 def nanhfsigma(arr: np.ndarray, ranges = None):
     "hfsigma which takes care of nans."
     arr = np.asarray(arr).ravel()
@@ -25,18 +32,13 @@ def nanhfsigma(arr: np.ndarray, ranges = None):
         arr = np.float32(arr) # type: ignore
     return _nanhfsigma(arr, ranges)
 
-if getattr(nanhfsigma, '__doc__', None):
-    nanhfsigma.__doc__ += "\n\n"+hfsigma.__doc__ # pylint: disable=no-member
-
+@_add_doc(mediandeviation)
 def nanmediandeviation(arr: np.ndarray, ranges = None):
     "mediandeviation which takes care of nans."
     arr = np.asarray(arr).ravel()
     if len(arr) and not np.isscalar(arr[0]):
         arr = np.float32(arr) # type: ignore
     return _nanmediandeviation(arr, ranges)
-
-if getattr(nanmediandeviation, '__doc__', None):
-    nanmediandeviation.__doc__ += "\n\n"+mediandeviation.__doc__ # pylint:disable=no-member
 
 BEADKEY   = Union[str,int]
 DATATYPE  = Union[Sequence[Sequence[np.ndarray]],
@@ -47,7 +49,7 @@ PRECISION = Union[float, Tuple[DATATYPE, int], None]
 
 class PrecisionAlg(ABC):
     "Implements precision extraction from data"
-    precision    = None # type: float
+    precision: Optional[float] = None
     rawfactor    = 1.
     MINPRECISION = .5e-3
     @initdefaults(frozenset(locals()))
@@ -69,7 +71,7 @@ class PrecisionAlg(ABC):
         elif precision is None:
             precision = self.precision
 
-        if np.isscalar(precision) and precision > 0.:
+        if precision is not None and np.isscalar(precision) and precision > 0.:
             return max(self.MINPRECISION, float(precision))
 
         if beadid is not None:

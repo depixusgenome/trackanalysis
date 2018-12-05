@@ -3,15 +3,13 @@
 """
 Extracts information from a report
 """
-from typing                 import (Optional,   # pylint: disable=unused-import
-                                    Sequence, Tuple, List, Union,
-                                    Dict, Callable, cast)
+from typing                 import Optional, Sequence, Tuple, List, Dict, Callable
 from pathlib                import Path
 from openpyxl               import load_workbook
 from excelreports.creation  import writecolumns
 
-ID_TYPE  = Tuple[int,str,Optional[float],Optional[float]] # pylint: disable=invalid-name
-IDS_TYPE = List[ID_TYPE]  # pylint: disable=invalid-name
+IdType  = Tuple[int,str,Optional[float],Optional[float]]
+IdsType = List[IdType]
 
 def _id(row, ibead):
     val = row[ibead].value
@@ -57,9 +55,9 @@ def _add(info, row, ibead, ref):
     info.setdefault(ref, []).append(beadid)
     return None
 
-def _read_summary(rows) -> IDS_TYPE:
-    ids   = [None, None, None, None] # type: List[Optional[int]]
-    names = ('bead', 'reference', 'stretch', 'bias')
+def _read_summary(rows) -> IdsType:
+    ids: List[Optional[int]] = [None, None, None, None]
+    names                    = ('bead', 'reference', 'stretch', 'bias')
     for row in rows:
         for i, cell in enumerate(row):
             cur = str(cell.value).split('(')[0].strip().lower()
@@ -70,18 +68,18 @@ def _read_summary(rows) -> IDS_TYPE:
         if ids.count(None) != 4:
             break
 
-    info: IDS_TYPE = list()
+    info: IdsType = list()
     if ids.count(None) == 0:
-        cnv = (_id, lambda r, i: str(r[i].value), _tofloat, _tofloat) # type: Sequence[Callable]
+        cnv: Sequence[Callable] = (_id, lambda r, i: str(r[i].value), _tofloat, _tofloat)
         for row in rows:
             vals = tuple(fcn(row, idx) for fcn, idx in zip(cnv, ids))
             if None not in vals[:2]:
                 info.append(vals) # type: ignore
     return info
 
-def _read_identifications(rows) -> IDS_TYPE:
-    info = dict() # type: Dict[str,List[int]]
-    inds = []     # type: List[Tuple[int,str]]
+def _read_identifications(rows) -> IdsType:
+    info: Dict[str,List[int]]  = dict()
+    inds: List[Tuple[int,str]] = []
     for row in rows:
         for i, cell in enumerate(row):
             val = str(cell.value)
@@ -94,12 +92,12 @@ def _read_identifications(rows) -> IDS_TYPE:
         for ibead, ref in inds:
             _add(info, row, ibead, ref)
 
-    res = [] # type: IDS_TYPE
+    res = [] # type: IdsType
     for hpin, beads in info.items():
         res.extend((i, hpin, None, None) for i in beads)
     return res
 
-def readparams(fname:str) -> IDS_TYPE:
+def readparams(fname:str) -> IdsType:
     "extracts bead ids and their reference from a report"
     if not Path(fname).exists():
         raise ValueError("Id file path unreachable","warning")
@@ -116,7 +114,7 @@ def readparams(fname:str) -> IDS_TYPE:
 
     for sheetname in wbook.sheetnames:
         return _read_identifications(iter(wbook[sheetname].rows))
-    res = [] # type: IDS_TYPE
+    res: IdsType = []
     return res
 
 def writeparams(fname:str, items: Sequence[Tuple[str,Sequence[int]]]):

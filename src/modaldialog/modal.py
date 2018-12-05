@@ -3,8 +3,7 @@
 """
 Allows creating modals from anywhere
 """
-from    typing                  import (Optional,  # pylint: disable=unused-import
-                                        Callable, Union, Sequence, Any, cast)
+from    typing                  import Optional, Callable, Union, Sequence, Any, cast
 from    functools               import partial
 from    abc                     import ABCMeta, abstractmethod
 import  re
@@ -20,6 +19,7 @@ LOGS  = getLogger()
 class Option(metaclass = ABCMeta):
     "Converts a text tag to an html input"
     NAME = r'%\((?P<name>[\w\.\[\]]*)\)'
+    _cnv = None
     @abstractmethod
     def replace(self, model, body:str) -> str:
         "replaces a pattern by an html tag"
@@ -33,7 +33,7 @@ class Option(metaclass = ABCMeta):
     def _default_empty(self, elems, model, key):
         if elems[key]:
             self.setvalue(model, key, None)
-        elif self._cnv is str: # pylint: disable=no-member
+        elif self._cnv is str:
             self.setvalue(model, key, '')
 
     def _default_apply(self, model, elems, # pylint: disable=too-many-arguments
@@ -252,7 +252,7 @@ class DpxModal(Model):
     callback           = props.Instance(Callback)
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.__handler = None # type: Optional[Callable]
+        self.__handler: Optional[Callable] = None
         self.__running = False
         self.__always  = False
 

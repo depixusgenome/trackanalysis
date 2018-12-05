@@ -14,9 +14,8 @@ from model.task                     import Task, TrackReaderTask
 from control.processor.batch        import BatchTask, BatchProcessor, PathIO
 from peakfinding.reporting.batch    import PeakFindingBatchTemplate
 from peakcalling                    import Range
-from peakcalling.processor          import (BeadsByHairpinTask, # pylint: disable=unused-import
-                                            FitToHairpinTask, DistanceConstraint,
-                                            Constraints)
+from peakcalling.processor          import (BeadsByHairpinTask, FitToHairpinTask,
+                                            DistanceConstraint, Constraints)
 from .processor                     import HybridstatExcelTask
 from .identification                import readparams
 
@@ -25,7 +24,7 @@ def readconstraints(idtask      : FitToHairpinTask,
                     useparams   : bool  = True,
                     constraints : Dict[str, Range] = None) -> FitToHairpinTask :
     "adds constraints to an identification task"
-    cstrs              = {} # type: Constraints
+    cstrs: Constraints = {}
     idtask.constraints = cstrs
     if idpath is None or not Path(idpath).exists():
         return idtask
