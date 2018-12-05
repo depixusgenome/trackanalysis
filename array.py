@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "utils for dealing with arrays"
-from   typing import (Iterable, Optional, # pylint: disable=unused-import
-                      Iterator, Union, Sequence, Tuple, cast)
+from   typing import Iterable, Optional, Iterator, Union, Sequence, Tuple, cast
 import numpy as np
 
 EVENTS_TYPE  = Tuple[int, np.ndarray]                     # pylint: disable=invalid-name
@@ -15,6 +14,7 @@ class EventsArray(np.ndarray):
     * *discarded*: the number of discarded cycles
     """
     # pylint: disable=unused-argument
+    discarded:  int
     _discarded: Union[int,bool] = False
     _dtype                      = EVENTS_DTYPE
     _order                      = None
@@ -29,7 +29,6 @@ class EventsArray(np.ndarray):
     def __array_finalize__(self, obj):
         if obj is None:
             return
-        # pylint: disable=attribute-defined-outside-init
         self.discarded = getattr(obj, 'discarded', False)
 
     def __reduce_ex__(self, arg):
@@ -38,10 +37,10 @@ class EventsArray(np.ndarray):
 
     def __setstate__(self, vals):
         super().__setstate__(vals[0])
-        self.discarded = vals[1] # pylint: disable=attribute-defined-outside-init
+        self.discarded = vals[1]
 
 def _m_asarray(arr:Iterable)-> np.array:
-    tmp = None # type: Optional[Sequence]
+    tmp: Optional[Sequence] = None
     if isinstance(arr, Iterator):
         tmp = tuple(arr)
 
@@ -63,7 +62,7 @@ def _m_asarray(arr:Iterable)-> np.array:
 
 def asobjarray(arr:Iterable, view: type = None, **kwa)->np.ndarray:
     "converts  an Iterable to a np.array"
-    tmp = None # type: Optional[Sequence]
+    tmp: Optional[Sequence] = None
     if isinstance(arr, Iterator):
         tmp = tuple(arr)
 

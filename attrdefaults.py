@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 "utils"
 
-from    typing         import (TypeVar, Iterable, # pylint: disable=unused-import
-                               FrozenSet, Optional, Callable, Sequence, Dict, Any)
+from    typing         import (TypeVar, Iterable, FrozenSet, Optional, Callable,
+                               Sequence, Dict, Any)
 import  inspect
 from    copy           import deepcopy, copy
 from    functools      import wraps
@@ -305,7 +305,7 @@ def addattributes(cls, *_, protected: Dict[str, Any] = None, **kwa):
         setattr(cls, i, j)
     cls.__init__.UPDATER.attrs  += tuple((i, i) for i in kwa)
 
-T = TypeVar('T') # pylint: disable=invalid-name
+Type = TypeVar('Type')
 def fieldnames(obj) -> FrozenSet[str]:
     "Returns attribute and property names of the object"
     dico = frozenset(name
@@ -318,7 +318,7 @@ def fieldnames(obj) -> FrozenSet[str]:
                          and not getattr(tpe, 'fset', '') is None))
     return dico | desc
 
-def _update(cpy: Optional[Callable[[T], T]], obj:T, always:bool, **attrs) -> T:
+def _update(cpy: Optional[Callable[[Type], Type]], obj:Type, always:bool, **attrs) -> Type:
     "Sets field to provided values"
     fields = fieldnames(obj) & frozenset(attrs)
     if cpy is not None and (always or len(fields)):
@@ -331,14 +331,14 @@ def _update(cpy: Optional[Callable[[T], T]], obj:T, always:bool, **attrs) -> T:
                 setattr(obj, name, val)
     return obj
 
-def update(obj:T, **attrs) -> T:
+def update(obj:Type, **attrs) -> Type:
     "Sets field to provided values"
     return _update(None, obj, False, **attrs)
 
-def updatecopy(obj:T, _always_ = False, **attrs) -> T:
+def updatecopy(obj:Type, _always_ = False, **attrs) -> Type:
     "Sets field to provided values on a copied object"
     return _update(copy, obj, _always_, **attrs)
 
-def updatedeepcopy(obj:T, _always_ = False, **attrs) -> T:
+def updatedeepcopy(obj:Type, _always_ = False, **attrs) -> Type:
     "Sets field to provided values on a deepcopied object"
     return _update(deepcopy, obj, _always_, **attrs)
