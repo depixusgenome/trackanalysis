@@ -45,7 +45,6 @@ class GuiPeaksDict(PeaksDict):  # pylint: disable=too-many-ancestors
 
         return tuple(self.config.details2output(dtl))
 
-STORE_T = List[PeakSelectorDetails] # pylint: disable=invalid-name
 class GuiPeakSelectorProcessor(PeakSelectorProcessor):
     "gui version of PeakSelectorProcessor"
     def __init__(self, store, **kwa):

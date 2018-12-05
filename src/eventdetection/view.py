@@ -20,10 +20,10 @@ class WidgetTheme:
     def __init__(self, **kwa):
         pass
 
-T  = TypeVar("T", RadioButtonGroup, CheckboxGroup) # pylint: disable=invalid-name
-class BaseWidget(Generic[T]):
+ButtonT = TypeVar("ButtonT", RadioButtonGroup, CheckboxGroup)
+class BaseWidget(Generic[ButtonT]):
     "Allows aligning the cycles on a given phase"
-    __widget: T
+    __widget: ButtonT
     def __init__(self, ctrl, model, noerase = False, **kwa):
         name        = self.__class__.__name__.lower()
         self._theme = ctrl.theme.add(WidgetTheme(name = name, **kwa), noerase)

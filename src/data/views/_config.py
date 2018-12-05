@@ -10,7 +10,7 @@ from   typing           import (Tuple, Union, List, TypeVar, Hashable,
 import numpy            as     np
 
 from   utils            import isfunction
-from   ._dict           import TRACK_VIEW, TransformedTrackView, isint, isellipsis
+from   ._dict           import TrackViewType, TransformedTrackView, isint, isellipsis
 
 def _m_copy(_, item):
     "Copies the data"
@@ -64,7 +64,7 @@ class TrackViewConfigMixin:
     ```python{chaincode}
     ```
     """
-    data:      Optional[TRACK_VIEW]   = None
+    data:      Optional[TrackViewType]= None
     selected:  Optional[List]         = None
     discarded: Optional[List]         = None
     actions:   List[Callable]         = []
