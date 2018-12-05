@@ -7,12 +7,9 @@ import logging.config
 import logging.handlers
 import os
 try:
-    # setup using bokeh if available
-    import bokeh # pylint: disable=unused-import
+    __import__('bokeh.utils.logconfig')
 except ImportError:
     pass
-else:
-    import bokeh.util.logconfig # pylint: disable=unused-import
 
 PREFIX = 'DEPIXUS_'
 LOGGER = 'depixus'
@@ -29,11 +26,10 @@ def logToFile(path, **kwa):
     if path is None:
         return
 
-    if not Path(path).parent.exists(): # pylint: disable=no-member
-        # pylint: disable=no-member,bare-except
+    if not Path(path).parent.exists():
         try:
             Path(path).parent.mkdir(parents = True, exist_ok = True)
-        except:
+        except IOError:
             getLogger().exception('Could not log to file')
             return
 
