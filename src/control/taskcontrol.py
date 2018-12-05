@@ -18,7 +18,7 @@ from functools       import partial
 from model.task      import Task, RootTask, TaskIsUniqueError
 from .event          import Controller, NoEmission
 from .processor      import Cache, Processor, run as _runprocessors
-from .processor.base import register, CACHE_T
+from .processor.base import register, ProcCache
 from .taskio         import openmodels
 
 if TYPE_CHECKING:
@@ -26,9 +26,9 @@ if TYPE_CHECKING:
     class _Ellipsis:
         pass
 
-_m_none    = type('_m_none', (), {})                # pylint: disable=invalid-name
-_M_PROC_T  = Type[Processor]                        # pylint: disable=invalid-name
-_M_PROCS_T = Union[Iterable[_M_PROC_T], _M_PROC_T]  # pylint: disable=invalid-name
+_none      = type('_none', (), {})
+_Proc      = Type[Processor]
+_Procs     = Union[Iterable[_Proc], _Proc]
 PATHTYPE   = Union[str, Path]
 PATHTYPES  = Union[PATHTYPE,Tuple[PATHTYPE,...]]
 
@@ -59,12 +59,12 @@ class ProcessorController:
             raise NoEmission("Missing task")
         return tsk
 
-    def add(self, task, proctype, index = _m_none):
+    def add(self, task, proctype, index = _none):
         "adds a task to the list"
         TaskIsUniqueError.verify(task, self.model)
         proc = proctype(task)
 
-        if index is _m_none:
+        if index is _none:
             self.model.append(task)
             self.data .append(proc)
         else:
@@ -111,7 +111,7 @@ class ProcessorController:
         return other
 
     @classmethod
-    def create(cls, *models : Task, processors: Union[Dict,_M_PROCS_T,None] = Processor
+    def create(cls, *models : Task, processors: Union[Dict,_Procs,None] = Processor
               ) -> 'ProcessorController':
         "creates a task pair for this model"
         tasks = [] # type: List[Task]
@@ -141,8 +141,8 @@ class ProcessorController:
 
     @classmethod
     def register(cls,
-                 processor: _M_PROCS_T = None,
-                 cache:     CACHE_T    = None,
+                 processor: _Procs     = None,
+                 cache:     ProcCache  = None,
                  force                 = False,
                 ) -> Dict[Type[Task], Type[Processor]]:
         "registers a task processor"
@@ -290,7 +290,7 @@ class BaseTaskController(Controller):
         return dict(controller = self, task = task, model = old)
 
     @Controller.emit
-    def addtask(self, parent:RootTask, task:Task, index = _m_none) -> dict:
+    def addtask(self, parent:RootTask, task:Task, index = _none) -> dict:
         "opens a new file"
         old = tuple(self._items[parent].model)
         self._items[parent].add(task, self.__processors[type(task)], index = index)
@@ -369,7 +369,7 @@ class TaskController(BaseTaskController):
         self.__ctrl = ctrl
 
     def addtask(self, parent:RootTask, task:Task, # pylint: disable=arguments-differ
-                index = _m_none, side = 0):
+                index = _none, side = 0):
         "opens a new file"
         if index == 'auto':
             mdl   = self.__ctrl.theme.model("tasks")

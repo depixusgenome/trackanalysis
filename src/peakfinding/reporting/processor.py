@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"PeakFinding excel reporting processor"
-from   typing               import (Sequence,       # pylint: disable=unused-import
-                                    Dict, Iterator, Union, Optional, Any)
+from   typing               import Optional
 from   pathlib              import Path
 import pickle
 
@@ -21,9 +20,9 @@ from ._peaks                    import PeaksSheet
 
 class PeakFindingExcelTask(Task):
     u"Reporter for PeakFinding"
-    level       = Level.peak
-    path        = ""
-    minduration = None  # type: Optional[int]
+    level                      = Level.peak
+    path                       = ""
+    minduration: Optional[int] = None
 
     @initdefaults(frozenset(locals()) - {'level'},
                   model = lambda self, i: self.frommodel(i))

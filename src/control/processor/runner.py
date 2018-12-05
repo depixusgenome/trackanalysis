@@ -19,7 +19,7 @@ from model              import Task, Level
 from .base              import Processor
 from .cache             import Cache
 
-DATA_TYPE = Union[Cache, Iterable[Processor], bytes] # pylint: disable=invalid-name
+DataType = Union[Cache, Iterable[Processor], bytes]
 class RunnerUtils:
     "Methods used by the runner, set outside so as to be picklable"
     @staticmethod
@@ -54,7 +54,7 @@ class Runner:
     "Arguments used for iterating"
     __slots__ = ('data', 'pool', 'level', 'gen')
     def __init__(self, # pylint: disable=too-many-arguments
-                 data:  DATA_TYPE,
+                 data:  DataType,
                  task:  Task                = None,
                  pool:  ProcessPoolExecutor = None,
                  gen:   Iterator[TrackView] = None,
@@ -253,7 +253,7 @@ def pooledinput(pool, pickled, frame) -> dict:
         res.update(val)
     return res
 
-def run(data:  DATA_TYPE, # pylint: disable=too-many-arguments
+def run(data:  DataType, # pylint: disable=too-many-arguments
         task:  Task                = None,
         copy                       = True,
         pool:  ProcessPoolExecutor = None,

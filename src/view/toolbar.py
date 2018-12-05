@@ -70,7 +70,7 @@ class TrackFileDialog(FileDialog):
         if paths is not None:
             def _toolbaropen():
                 with ctrl.action:
-                    self.__store(paths, True) # pylint: disable=not-callable
+                    self.__store(paths, True)
                     ctrl.tasks.opentrack(paths)
             doc.add_next_tick_callback(_toolbaropen)
 
@@ -119,7 +119,7 @@ class SaveFileDialog(FileDialog):
         if paths is not None:
             def _toolbarsave():
                 with ctrl.action:
-                    self.__store(paths, False) # pylint: disable=not-callable
+                    self.__store(paths, False)
                     ctrl.tasks.savetrack(paths)
             doc.add_next_tick_callback(_toolbarsave)
 

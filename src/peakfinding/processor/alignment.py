@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Tasks related to cycle alignment"
-from   typing               import Dict     # pylint: disable=unused-import
+from   typing               import Dict
 from   functools            import partial
 
-import numpy                as     np       # pylint: disable=unused-import
+import numpy                as     np
 
 from   model                import Task, Level
 from   control.processor    import Processor
 from   signalfilter         import rawprecision
-from   data.views           import BEADKEY  # pylint: disable=unused-import
+from   data.views           import BEADKEY
 from   ..alignment          import (PeakCorrelationAlignment, MinBiasPeakAlignment,
                                     GELSPeakAlignment)
 
@@ -47,11 +47,10 @@ class PeakCorrelationAlignmentProcessor(Processor[PeakCorrelationAlignmentTask])
     @classmethod
     def apply(cls, toframe = None, **cnf):
         "applies the task to a frame or returns a function that does so"
-        # pylint: disable=not-callable
         if toframe is None:
             return partial(cls.apply, **cnf)
-        cache = dict() # type: Dict[BEADKEY, np.ndarray]
-        tsk   = PeakCorrelationAlignment(**cnf)
+        cache: Dict[BEADKEY, np.ndarray] = dict()
+        tsk                              = PeakCorrelationAlignment(**cnf)
         return toframe.new().withaction(partial(cls._action, tsk, cache))
 
     def run(self, args):

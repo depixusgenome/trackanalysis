@@ -171,7 +171,6 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         if self._tool.drag != manual:
             cache[self._tool].update(drag = manual, add = manual)
 
-        # pylint: disable=unsubscriptable-object
         if self.__figsize(ctrl) != self._cam.figsizes:
             ctrl.theme.update("message",
                               NotImplementedError("Please restart the gui", "error"))

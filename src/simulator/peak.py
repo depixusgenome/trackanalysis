@@ -123,7 +123,7 @@ class PeakSimulator:
                           shape   = (len(rngs)-1, 2),
                           strides = (rngs.strides[0],)*2)
 
-        vals = np.float32(np.random.normal(0., self.brownian, rngs[-1,-1]))
+        vals = np.random.normal(0., self.brownian, rngs[-1,-1]).astype("f4")
         for i, sli in enumerate(rngs):
             peaks[i] += vals[sli[0]:sli[1]] # pylint: disable=unsubscriptable-object
 

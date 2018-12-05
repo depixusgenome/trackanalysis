@@ -2,27 +2,21 @@
 # -*- coding: utf-8 -*-
 "Ramps widgets"
 from    copy                    import deepcopy
-from    abc                     import ABC
-from    typing                  import List, TypeVar
+from    typing                  import List
 
 import  numpy                   as     np
 from    scipy.interpolate       import interp1d
-from    dataclasses             import dataclass, field
 import  bokeh.core.properties   as     props
 from    bokeh.models            import (Widget, DataTable, TableColumn,
                                         ColumnDataSource, Slider)
 
+from    utils                   import dataclass, dflt
 from    control.beadscontrol    import TaskWidgetEnabler
 from    view.static             import route
 from    view.plots              import CACHE_TYPE, DpxNumberFormatter
 from    qualitycontrol.view     import QCBeadStatusWidget, QCHairpinSizeWidget
 from    ._model                 import RampPlotModel
 from    ..processor             import RampStatsTask
-
-Type = TypeVar("Type")
-def dflt(default: Type, **kwa) -> Type:
-    "return a field with default factory"
-    return field(default_factory= lambda: deepcopy(default), **kwa)
 
 class DpxRamp(Widget):
     "Interface to filters needed for cleaning"
@@ -242,7 +236,7 @@ class RampBeadStatusWidget(QCBeadStatusWidget):
     def _data(self):
         return self._model.display.status(self._model.tasks.roottask, self.__ctrl)
 
-class WidgetMixin(ABC):
+class RampWidgets:
     "Everything dealing with changing the config"
     __objects : TaskWidgetEnabler
     def __init__(self, ctrl, model):
@@ -252,18 +246,21 @@ class WidgetMixin(ABC):
                               zmag      = RampZMagResultsWidget(ctrl, model),
                               extension = RampHairpinSizeWidget(ctrl, model))
 
-    def _widgetobservers(self, ctrl):
+    def observe(self, ctrl):
+        "observe the controller"
         for widget in self.__widgets.values():
             if hasattr(widget, 'observe'):
                 widget.observe(self, ctrl)
 
-    def _createwidget(self, ctrl):
+    def create(self, ctrl):
+        "add to the gui"
         widgets = {i: j.addtodoc(self, ctrl) for i, j in self.__widgets.items()}
         self.__objects = TaskWidgetEnabler(widgets)
         names   = "filtering", "status", "extension", "zmag", "bead"
         return sum((widgets[i] for i in names), [])
 
-    def _resetwidget(self, cache: CACHE_TYPE, disable: bool):
+    def reset(self, cache: CACHE_TYPE, disable: bool):
+        "resets widgets"
         for ite in self.__widgets.values():
             getattr(ite, 'reset')(cache)
         self.__objects.disable(cache, disable)

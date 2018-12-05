@@ -67,7 +67,7 @@ class ClippingTask(Task):
 class ClippingProcessor(Processor[ClippingTask]):
     "Processor for cleaning the data"
     @staticmethod
-    def action(task, frame, info):
+    def _action(task, frame, info):
         "action of clipping"
         task(frame.track, *info)
         return info
@@ -77,7 +77,7 @@ class ClippingProcessor(Processor[ClippingTask]):
         "applies the task to a frame or returns a method that will"
         if toframe is None:
             return partial(cls.apply, **cnf)
-        return toframe.withaction(partial(cls.action, ClippingTask(**cnf)))
+        return toframe.withaction(partial(cls._action, ClippingTask(**cnf)))
 
     def run(self, args):
         "updates the frames"

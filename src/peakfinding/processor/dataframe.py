@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a dataframe"
-from   typing                      import (Dict, List, # pylint: disable=unused-import
-                                           Tuple, Callable, cast)
+from   typing                      import Dict, List, Tuple, Callable, cast
 from   functools                   import partial
 import numpy                       as     np
 
@@ -102,17 +101,18 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
         self.__np     = [(i, self.getfunction(j)) for i, j in add(isnp)]
         self.__aggs   = [(i, tuple(self.getfunction(k) for k in j))
                          for i, j in add(lambda x: isinstance(x, tuple))]
-        self.__calls  = ([('peakposition', lambda i: i[0])]
-                         + add(callable)
-                         + [(cast(str, i), cast(Callable, method(j)))
-                            for i, j in add(ismeth)]) # type: List[Tuple[str, Callable]]
+        self.__calls: List[Tuple[str, Callable]]  = (
+            [('peakposition', lambda i: i[0])]
+            + add(callable)
+            + [(cast(str, i), cast(Callable, method(j))) for i, j in add(ismeth)]
+        )
         if any(j is not None for j in meas.values()):
             raise ValueError(f'Unrecognized measures {meas}')
 
     # pylint: disable=arguments-differ
     def _run(self, _1, _2, apeaks) -> Dict[str, np.ndarray]:
         peaks  = cast(Tuple[Tuple[float, np.ndarray], ...], tuple(apeaks))
-        meas   = {} # type: Dict[str,np.ndarray]
+        meas: Dict[str,np.ndarray] = {}
         if self.__events:
             self.__eventmeasure(meas, peaks)
             counts = np.array([sum(len(j) > 0 for j in i) for _, i in peaks])
@@ -140,7 +140,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
                      for i, j in self.__attrs})
 
     def __npmeasure(self, meas, peaks, counts):
-        curr = [[] for _ in self.__np] # type: List[List[np.ndarray]]
+        curr: List[List[np.ndarray]] = [[] for _ in self.__np]
         for cnt, (_, pks) in zip(counts, peaks):
             tmp = [np.concatenate(i['data']) for i in pks if len(i)]
             arr = np.concatenate(tmp) if len(tmp) else np.empty(0, dtype = 'f4')
@@ -151,7 +151,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
             meas.update({i: np.concatenate(j) for (i, _), j in zip(self.__np, curr)})
 
     def __aggmeasure(self, meas, peaks, counts):
-        curr = [[] for _ in self.__aggs] # type: List[List[np.ndarray]]
+        curr: List[List[np.ndarray]] = [[] for _ in self.__aggs]
         for cnt, (_, pks) in zip(counts, peaks):
             arrs = [np.concatenate(i['data']) for i in pks if len(i)]
 
@@ -162,7 +162,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
             meas.update({i: np.concatenate(j) for (i, _), j in zip(self.__aggs, curr)})
 
     def __eventmeasure(self, meas, peaks):
-        tmp   = {i: [] for i in self.__events.keys()} # type: Dict[str, List[np.ndarray]]
+        tmp: Dict[str, List[np.ndarray]] = {i: [] for i in self.__events.keys()}
         tmp.update(cycle = [], start = [], length = [])
 
         append = lambda x, y: tmp[x].append(np.array(list(y)))

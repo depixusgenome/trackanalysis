@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Batch creator for peakfinding reports"
-from typing                     import (Optional, Tuple, # pylint: disable=unused-import
-                                        Iterator, Union, Iterable, Sequence, cast)
+from typing                     import Optional, Iterator, Sequence
 
 from copy                       import deepcopy
 from utils                      import initdefaults
@@ -10,17 +9,16 @@ from data.trackio               import checkpath
 from model.task                 import Task, TrackReaderTask
 from control.processor.batch    import BatchTemplate, PathIO, BatchTask, BatchProcessor
 from cordrift.processor         import DriftTask
-from eventdetection.processor   import (EventDetectionTask, # pylint: disable=unused-import
-                                        ExtremumAlignmentTask)
+from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
 from .processor                 import PeakFindingExcelTask
 
 class PeakFindingBatchTemplate(BatchTemplate):
     "Template of tasks to run"
-    alignment = None # type: Optional[ExtremumAlignmentTask]
-    drift     = [DriftTask(onbeads = True)]
-    detection = EventDetectionTask()    # type: Optional[EventDetectionTask]
-    peaks     = PeakSelectorTask()      # type: Optional[PeakSelectorTask]
+    alignment: Optional[ExtremumAlignmentTask] = None
+    drift                                      = [DriftTask(onbeads = True)]
+    detection: Optional[EventDetectionTask]    = EventDetectionTask()
+    peaks:     Optional[PeakSelectorTask]      = PeakSelectorTask()
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)

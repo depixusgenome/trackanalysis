@@ -7,7 +7,7 @@ from typing import Tuple, Optional, Any
 
 from utils  import initdefaults
 
-RANGE_TYPE  = Tuple[Optional[float], Optional[float]] # pylint: disable=invalid-name
+RangeType  = Tuple[Optional[float], Optional[float]]
 
 class PlotState(Enum):
     "plot state"
@@ -63,13 +63,13 @@ class PlotDisplay:
     """
     Default plot display
     """
-    name                = ""
-    state               = PlotState.active
-    __NONE              = (None, None)
-    xinit:   RANGE_TYPE = __NONE
-    yinit:   RANGE_TYPE = __NONE
-    xbounds: RANGE_TYPE = __NONE
-    ybounds: RANGE_TYPE = __NONE
+    name               = ""
+    state              = PlotState.active
+    __NONE             = (None, None)
+    xinit:   RangeType = __NONE
+    yinit:   RangeType = __NONE
+    xbounds: RangeType = __NONE
+    ybounds: RangeType = __NONE
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass

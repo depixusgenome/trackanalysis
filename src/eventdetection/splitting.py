@@ -169,7 +169,7 @@ class GradedSplitDetector(SplitDetector):
                   ) -> Optional[float]:
         "Computes a threshold on the flatness characteristic"
 
-CONFIDENCE_TYPE = Union[None, float, Threshold] # pylint: disable=invalid-name
+ConfidenceType = Union[None, float, Threshold]
 class PyDerivateSplitDetector(GradedSplitDetector):
     """
     Detects flat stretches of value
@@ -181,11 +181,11 @@ class PyDerivateSplitDetector(GradedSplitDetector):
     The precision is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivative of the data.
     """
-    window                      = 3
-    truncate                    = 4
-    shape                       = 'square'
-    erode                       = 1
-    confidence: CONFIDENCE_TYPE = MedianThreshold()
+    window                     = 3
+    truncate                   = 4
+    shape                      = 'square'
+    erode                      = 1
+    confidence: ConfidenceType = MedianThreshold()
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -335,7 +335,7 @@ class MultiGradeAggregation(Enum):
         "applies the strategy"
         return getattr(self.__class__, '_apply_'+self.name)(left, right)
 
-class MultiGradeItem(NamedTuple): # pylint: disable=missing-docstring
+class MultiGradeItem(NamedTuple):
     detector: GradedSplitDetector
     operator: MultiGradeAggregation
 

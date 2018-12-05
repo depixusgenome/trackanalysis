@@ -16,8 +16,10 @@ from   ._raw                import RawMixin
 from   ._hist               import HistMixin
 from   ._widget             import WidgetMixin
 
-class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # type: ignore
-                        HistMixin, RawMixin, WidgetMixin):
+class CyclesPlotCreator( # pylint: disable=too-many-ancestors
+        TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # type: ignore
+        HistMixin, RawMixin, WidgetMixin
+):
     "Displays cycles and their projection"
     _model: CyclesModelAccess
     _hover: DpxHoverModel
@@ -28,7 +30,7 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # t
         HistMixin  .__init__(self, ctrl)
         WidgetMixin.__init__(self, ctrl, self._model)
 
-    def _addtodoc(self, ctrl, doc):
+    def _addtodoc(self, ctrl, doc, *_):
         "returns the figure"
         shape = self._createraw()
         self._createhist(doc, self._rawsource.data, shape, self._raw.y_range)
@@ -51,9 +53,9 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # t
     def ismain(self, ctrl):
         WidgetMixin.ismain(self, ctrl)
 
-    def observe(self, ctrl):
+    def observe(self, ctrl, noerase = True):
         "sets-up model observers"
-        super().observe(ctrl)
+        super().observe(ctrl, noerase)
         self._histobservers(ctrl)
         self._widgetobservers(ctrl)
         ctrl.theme.observe(self._model.cycles.theme,  lambda **_: self.reset(False))

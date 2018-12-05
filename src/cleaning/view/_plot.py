@@ -69,7 +69,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         super().__init__(ctrl, noerase = False)
         WidgetMixin.__init__(self, ctrl, self._model)
 
-    def _addtodoc(self, ctrl, doc):
+    def _addtodoc(self, ctrl, doc, *_):
         self.__source = ColumnDataSource(data = self.__data(None, None))
 
         self.__fig = fig = self.figure(y_range = Range1d,
@@ -153,9 +153,9 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
                     tmp[order[value.max]] = color
         return tmp.ravel()
 
-    def observe(self, ctrl):
+    def observe(self, ctrl, noerase = True):
         "sets-up model observers"
-        super().observe(ctrl)
+        super().observe(ctrl, noerase)
         self._widgetobservers(ctrl)
 
 class CleaningView(PlotView[CleaningPlotCreator]):

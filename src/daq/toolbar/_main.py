@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "bringing togethe toobar components"
 from typing         import Dict, Any, Optional
-import bokeh.layouts as    layouts # pylint: disable=useless-import-alias
+import bokeh.layouts as    _layouts
 
 from utils          import initdefaults
 from view.base      import threadmethod, spawn
@@ -85,7 +85,7 @@ class DAQToolbar:
 
         mods = dict(height      = 50,
                     sizing_mode = ctrl.theme.get('main', 'sizingmode', 'fixed'))
-        return layouts.row([layouts.widgetbox(self._widget, **mods)], **mods)
+        return _layouts.row([_layouts.widgetbox(self._widget, **mods)], **mods)
 
     def observe(self, ctrl):
         "observe the controller"

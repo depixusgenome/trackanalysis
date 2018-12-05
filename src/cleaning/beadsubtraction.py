@@ -138,18 +138,18 @@ class SubtractMedianSignal:
         return (0. if len(signals) == 0 else
                 reducesignals("median", meanrange[0], meanrange[1], signals))
 
-AGG_TYPE = Union[SubtractAverageSignal, # pylint: disable=invalid-name
-                 SubtractMedianSignal,
-                 SubtractWeightedAverageSignal]
-def aggtype(name:str) -> AGG_TYPE:
+AggType = Union[SubtractAverageSignal,
+                SubtractMedianSignal,
+                SubtractWeightedAverageSignal]
+def aggtype(name:str) -> AggType:
     "return an aggregation"
     return (SubtractWeightedAverageSignal if 'weight' in name.lower() else
             SubtractMedianSignal          if 'med'    in name.lower() else
             SubtractAverageSignal)()
 
 
-FIXED_DATA = Tuple[float, float, float, BEADKEY] # pylint: disable=invalid-name
-FIXED_LIST = List[FIXED_DATA]                    # pylint: disable=invalid-name
+FixedData = Tuple[float, float, float, BEADKEY]
+FixedList = List[FixedData]
 class FixedBeadDetection:
     """
     Finds and sorts fixed beads
@@ -224,11 +224,11 @@ class FixedBeadDetection:
                                  **_vals('var', var),
                                  **_vals('sig', sig)))
 
-    def __call__(self, beads: Beads) -> FIXED_LIST:
+    def __call__(self, beads: Beads) -> FixedList:
         """
         Creates a dataframe for all beads in  a track.
         """
-        items: FIXED_LIST = []
+        items: FixedList = []
         sigfcn           = self.__sigs(beads)
         extfast, extslow = self.__exts(beads)
 

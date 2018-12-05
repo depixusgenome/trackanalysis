@@ -39,7 +39,7 @@ class DataFrameFactory(Generic[Frame]):
     @classmethod
     def frametype(cls)-> Type[Frame]:
         "returns the frame type"
-        return cls.__orig_bases__[0].__args__[0] # type: ignore
+        return getattr(cls, '__orig_bases__')[0].__args__[0]
 
     def getfunctions(self) -> Iterator[Tuple[str, Callable]]:
         "returns measures, with string changed to methods from np"

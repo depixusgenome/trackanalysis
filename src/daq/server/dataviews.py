@@ -59,7 +59,7 @@ class DAQServerView(Generic[DATA]):
 
         @ctrl.theme.observe(self._theme.name, f"added{self._theme.name}")
         def _ontheme(**_):
-            ctrl.daq.updatedatamaxlength(**{self._NAME: self._model.maxlength})
+            ctrl.daq.updatedatamaxlength(**{self._NAME: self._theme.maxlength})
 
     def close(self):
         "stop reading the daq"

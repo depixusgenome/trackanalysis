@@ -21,13 +21,13 @@ from    .chisquare                  import ChiSquare
 from    ._base                      import (GriddedOptimization, CobylaParameters,
                                             Distance, Range, Symmetry, Pivot, DEFAULT_BEST)
 
-class HistogramFitData(NamedTuple): # pylint: disable=missing-docstring
+class HistogramFitData(NamedTuple):
     fcn:   interp1d
     xaxis: np.ndarray
     yaxis: np.ndarray
     minv:  float
 
-class ChiSquareData(NamedTuple): # pylint: disable=missing-docstring
+class ChiSquareData(NamedTuple):
     fcn:   interp1d
     xaxis: np.ndarray
     yaxis: np.ndarray

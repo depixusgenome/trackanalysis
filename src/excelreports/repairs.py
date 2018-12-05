@@ -53,7 +53,7 @@ class UpdateableZipFile(ZipFile):
             super(UpdateableZipFile, self).writestr(zinfo_or_arcname,
                                                     byts, compress_type=compress_type)
 
-    def write(self, filename, arcname=None, compress_type=None):
+    def write(self, filename, arcname=None, compress_type=None): # pylint: disable=arguments-differ
         arcname = arcname or filename
         # If the file exits, and needs to be overridden,
         # mark the entry, and create a temp-file for it

@@ -42,13 +42,13 @@ class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess, None]
         self._state   = QCPlotState()
         ctrl.display.add(self._state)
 
-    def observe(self, ctrl):
+    def observe(self, ctrl, noerase = True):
         "observes the model"
-        super().observe(ctrl)
+        super().observe(ctrl, noerase = noerase)
         self._plots  .observe(ctrl)
         self._widgets.observe(self, ctrl)
 
-    def _addtodoc(self, ctrl, doc):
+    def _addtodoc(self, ctrl, doc, *_):
         "returns the figure"
         mode    = self.defaultsizingmode()
         widgets = self._widgets.addtodoc(self, ctrl, mode)

@@ -23,7 +23,7 @@ LOGGER = logging.Logger("CarryOver")
 
 REVERSE = Translator().reversecomplement
 
-class ChronoItem(NamedTuple): # pylint: disable=missing-docstring
+class ChronoItem(NamedTuple):
     time : pd.Timestamp
     key  : str
 

@@ -4,8 +4,7 @@
 from copy             import deepcopy
 from functools        import wraps
 from itertools        import chain
-from typing           import (Iterator, Tuple, Union, Sequence, cast,
-                              Optional, TYPE_CHECKING)
+from typing           import Iterator, Tuple, Sequence, Optional, cast
 
 import numpy          as     np
 
@@ -153,14 +152,3 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
             gen  = asview(cycle, EventsArray,
                           discarded = getattr(cycle, 'discarded', False))
             yield (key, gen)
-
-    if TYPE_CHECKING:
-        # pylint: disable=useless-super-delegation
-        def keys(self, sel = None) -> Iterator[CYCLEKEY]:
-            yield from super().keys(sel)
-
-        def __getitem__(self, keys) -> Union['Events', Sequence[EVENTS_TYPE]]:
-            return cast(Union['Events', Sequence[EVENTS_TYPE]], super().__getitem__(keys))
-
-        def __iter__(self) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
-            yield from super().__iter__()

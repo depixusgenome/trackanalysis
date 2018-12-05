@@ -17,11 +17,10 @@ from    control                 import Controller
 from    ._model                 import (RampPlotModel, RampPlotTheme,
                                         RampPlotDisplay, RampTaskPlotModelAccess,
                                         observetracks)
-from    ._widget                import WidgetMixin
+from    ._widget                import RampWidgets
 
-_DATA_T = Tuple[Dict[str, np.ndarray], ...] # pylint: disable=invalid-name
-class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
-                      WidgetMixin):
+_DataType = Tuple[Dict[str, np.ndarray], ...]
+class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
     "Building the graph of cycles"
     _theme:         RampPlotTheme
     _display:       RampPlotDisplay
@@ -31,12 +30,12 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl, noerase = False)
-        WidgetMixin.__init__(self, ctrl, self._plotmodel)
+        self.__widgets = RampWidgets(ctrl, self._plotmodel)
 
-    def observe(self, ctrl):
+    def observe(self, ctrl, noerase = True):
         "sets-up model observers"
-        super().observe(ctrl)
-        self._widgetobservers(ctrl)
+        super().observe(ctrl, noerase = noerase)
+        self.__widgets.observe(ctrl)
         observetracks(self._plotmodel, ctrl)
 
         @ctrl.display.observe(self._display)
@@ -49,7 +48,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
             if "dataformat" in old:
                 self.reset(False)
 
-    def _addtodoc(self, ctrl, *_):
+    def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument
         self.__src = [ColumnDataSource(data = i) for i in self.__data(None, None)]
         label      = (self._theme.ylabel if self._theme.dataformat != "norm" else
                       self._theme.ylabelnormalized)
@@ -64,7 +63,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
         self.linkmodeltoaxes(fig)
 
         mode = self.defaultsizingmode(width = self._theme.widgetwidth)
-        left = layouts.widgetbox(self._createwidget(ctrl), **mode)
+        left = layouts.widgetbox(self.__widgets.create(ctrl), **mode)
         return self._keyedlayout(ctrl, fig, left = left)
 
     def _reset(self, cache: CACHE_TYPE):
@@ -89,12 +88,12 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel],
             cache[self.__fig.yaxis[0]]["axis_label"] = label
             for i, j in zip(data, self.__src):
                 cache[j]['data'] = i
-            self._resetwidget(cache, disable)
+            self.__widgets.reset(cache, disable)
 
-    def __data(self, cycles, zmag) -> _DATA_T:
-        empty            = np.empty(0, dtype = 'f4')
-        outp: _DATA_T    = tuple({i: empty for i in ("z", "zmag", "zbead")}
-                                 for j in range(3))
+    def __data(self, cycles, zmag) -> _DataType:
+        empty           = np.empty(0, dtype = 'f4')
+        outp: _DataType = tuple({i: empty for i in ("z", "zmag", "zbead")}
+                                for j in range(3))
         outp[2].pop("zbead")
         if cycles is None or len(cycles) == 0:
             return outp

@@ -22,7 +22,7 @@ from   ..tohairpin                 import (HairpinFitter, PeakGridFit, Distance,
                                            PeakMatching, Pivot, PEAKS_TYPE)
 from   .._base                     import Range
 
-class DistanceConstraint(NamedTuple): # pylint: disable=missing-docstring
+class DistanceConstraint(NamedTuple):
     hairpin     : Optional[str]
     constraints : Dict[str, Range]
 
@@ -132,7 +132,7 @@ PeakEvents      = Iterable[PeakFindingOutput]
 PeakEventsTuple = Tuple[BEADKEY, PeakEvents]
 _PEAKS          = Tuple[np.ndarray, PeakListArray]
 Input           = Union[PeaksDict, PeakEvents]
-class FitBead(NamedTuple): # pylint: disable=missing-docstring
+class FitBead(NamedTuple):
     key        : BEADKEY
     silhouette : float
     distances  : Dict[Optional[str], Distance]

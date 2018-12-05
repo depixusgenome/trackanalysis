@@ -113,7 +113,8 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
     def close(self):
         "Removes the controller"
         del self._model
-        del self._ctrl
+        if hasattr(self, '_ctrl'):
+            delattr(self, '_ctrl')
         del self._doc
 
     def ismain(self, _):
@@ -153,18 +154,18 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
         "shortcuts for PlotAttrsView"
         return PlotAttrsView(attrs)
 
-    if SINGLE_THREAD: # pylint: disable=using-constant-test
+    if SINGLE_THREAD:
         # use this for single-thread debugging
         LOGS.info("Running in single-thread mode")
-        def __doreset(self, ctrl, now): # pylint: disable=unused-argument
+        def __doreset(self, ctrl, _):
             start = time()
             with self.resetting() as cache:
                 self._model.reset(ctrl)
                 self._reset(ctrl, cache)
             LOGS.debug("%s.reset done in %.3f", type(self).__qualname__, time() - start)
     else:
-        def __doreset(self, ctrl, now):
-            if now:
+        def __doreset(self, ctrl, _):
+            if _:
                 start = time()
                 with self.resetting() as cache:
                     self._model.reset(ctrl)

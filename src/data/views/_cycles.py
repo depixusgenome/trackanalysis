@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "easy access to cycles"
-from   typing import (TYPE_CHECKING, Iterator, Callable, Optional, Sequence,
-                      Tuple, Dict, Iterable, Union, Any, cast)
+from   typing import (Iterator, Callable, Optional, Tuple, Dict, Iterable, Union,
+                      Any, cast)
 from   copy   import copy as shallowcopy
 import numpy  as     np
 
 from   utils  import initdefaults, isfunction
-from   ._dict import (BEADKEY, CYCLEKEY,       # pylint: disable=unused-import
-                      isellipsis, isint)
+from   ._dict import BEADKEY, CYCLEKEY, isellipsis
 from   ._view import TrackView, ITrackView, Level
 
-_m_NONE  = type('_m_NONE', (), {})             # pylint: disable=invalid-name
+_none  = type('_none', (), {})
 
 class Cycles(TrackView, ITrackView):
     """
@@ -200,11 +199,11 @@ class Cycles(TrackView, ITrackView):
 
     def withphases(self,
                    first:Union[int,Tuple[int,int],None],
-                   last:Union[int,None,type] = _m_NONE) -> 'Cycles':
+                   last:Union[int,None,type] = _none) -> 'Cycles':
         "specifies the phase to extract: None or ... for all"
         if isinstance(first, tuple):
             self.first, self.last = first
-        elif last is _m_NONE:
+        elif last is _none:
             self.first = first
             self.last  = first
         else:
@@ -250,15 +249,3 @@ class Cycles(TrackView, ITrackView):
             return np.max(np.diff(first))
         last = self.track.phase.select(..., self.last+1)
         return np.max(last - first)
-
-    if TYPE_CHECKING:
-        # pylint: disable=useless-super-delegation
-        def __getitem__(self, keys) -> Union['Cycles',np.ndarray]:
-            return super().__getitem__(keys)
-
-        def keys(self,
-                 sel      :Optional[Sequence] = None) -> Iterator[CYCLEKEY]:
-            yield from super().keys(sel)
-
-        def __iter__(self) -> Iterator[Tuple[CYCLEKEY, np.ndarray]]:
-            yield from super().__iter__()

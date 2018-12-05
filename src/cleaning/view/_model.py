@@ -11,7 +11,7 @@ from control.decentralized          import Indirection
 # pylint: disable=unused-import
 from control.modelaccess                 import TaskPlotModelAccess, TaskAccess
 from eventdetection.processor.__config__ import ExtremumAlignmentTask
-from ..beadsubtraction                   import FixedBeadDetection, FIXED_LIST
+from ..beadsubtraction                   import FixedBeadDetection, FixedList
 from ..processor.__config__              import (DataCleaningTask,
                                                  BeadSubtractionTask, ClippingTask)
 
@@ -114,7 +114,7 @@ class FixedBeadDetectionConfig(FixedBeadDetection):
 class FixedBeadDetectionStore:
     "For saving in the right place"
     name                             = "fixedbeads"
-    data: Dict[RootTask, FIXED_LIST] = {}
+    data: Dict[RootTask, FixedList] = {}
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -147,7 +147,7 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
             self._fixedbeadsstore = {'data': {}}
 
     @property
-    def availablefixedbeads(self) -> FIXED_LIST:
+    def availablefixedbeads(self) -> FixedList:
         "returns bead ids for potential fixed beads"
         root = self.roottask
         if root is None:

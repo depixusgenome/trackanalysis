@@ -19,7 +19,7 @@ from   ..toreference                    import ReferenceFit, ChiSquareHistogramF
 from   ..tohairpin                      import HairpinFitter
 from   .._core                          import match as _match # pylint: disable=import-error
 
-class FitData(NamedTuple): # pylint: disable=missing-docstring
+class FitData(NamedTuple):
     data   : Union[HistogramData, Tuple[HistogramData, np.ndarray], HairpinFitter]
     params : Tuple[float, float]
 
@@ -32,9 +32,8 @@ class FitToRefArray(np.ndarray):
     * *discarded*: the number of discarded cycles
     * *params*: the stretch and bias
     """
-    # pylint: disable=unused-argument
-    discarded = False
-    params    = (1., 0.)
+    discarded: bool                = False
+    params:    Tuple[float, float] = (1., 0.)
     _dtype    = np.dtype([('peaks', 'f4'), ('events', 'O')])
     _order    = None
     def __new__(cls, array, **kwa):
@@ -49,7 +48,6 @@ class FitToRefArray(np.ndarray):
     def __array_finalize__(self, obj):
         if obj is None:
             return
-        # pylint: disable=attribute-defined-outside-init
         self.discarded = getattr(obj, 'discarded', False)
         self.params    = getattr(obj, 'params', False)
 
@@ -59,8 +57,8 @@ class FitToRefArray(np.ndarray):
 
     def __setstate__(self, vals):
         super().__setstate__(vals[0])
-        self.discarded = vals[1] # pylint: disable=attribute-defined-outside-init
-        self.params    = vals[2] # pylint: disable=attribute-defined-outside-init
+        self.discarded = vals[1]
+        self.params    = vals[2]
 
 class _FitDataDescriptor:
     def __get__(self, inst, _):
@@ -145,7 +143,9 @@ class FitToReferenceTask(Task):
         "whether this task implies long computations"
         return True
 
-class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
+class FitToReferenceDict( # pylint: disable=too-many-ancestors
+        TaskView[FitToReferenceTask, BEADKEY]
+):
     "iterator over peaks grouped by beads"
     level = Level.bead
     @classmethod

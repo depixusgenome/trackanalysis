@@ -219,7 +219,7 @@ class DetectionFrameCreator(DataFrameCreator):
         "whether there could be a binding on both strands at the same time"
         return group.averageduration.values[0]
 
-class LNAHairpinDataFrameResults(NamedTuple): # pylint: disable=missing-docstring
+class LNAHairpinDataFrameResults(NamedTuple):
     data      : pd.DataFrame
     confusion : pd.DataFrame
     truepos   : int

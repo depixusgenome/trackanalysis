@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Simulates track files"
-from    typing          import (Sequence, Union, # pylint: disable=unused-import
-                                Optional, NamedTuple, Iterable, List,
-                                Callable, Iterator, Any, Tuple, Dict, Type)
+from    typing          import (Sequence, Union, Optional, List,
+                                Callable, Iterator, Any, Tuple, Dict)
 import  random
 from    itertools       import chain
 from    collections     import OrderedDict
@@ -263,7 +262,7 @@ class TrackSimulator:
         return self.track(nbeads, seed).beads
 
     @kwargsdefaults(__KEYS)
-    def bybeadevents(self, nbeads, seed = None) -> Cycles: # pylint: disable=arguments-differ
+    def bybeadevents(self, nbeads, seed = None) -> Cycles:
         "Creates events in a Events object"
         self.seed(seed)
 
@@ -271,7 +270,7 @@ class TrackSimulator:
                       phases = self.phases,
                       key    = 'bybeadeventssimulator')
         def _createall(_):
-            evts = OrderedDict() # type: Dict[Tuple[int,int], np.ndarray]
+            evts: Dict[Tuple[int,int], np.ndarray] = OrderedDict()
             def _createone(cycs, bead):
                 evts.update(((bead, cid), evt) for cid, evt in enumerate(self.__events(cycs)))
                 return (bead, cycs.ravel())

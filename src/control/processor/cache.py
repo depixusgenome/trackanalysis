@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "List of processes and cache"
-from typing         import (Union, Iterable, Sized, List, Tuple, Any, Iterator,
+from typing         import (Union, Iterable, List, Tuple, Any, Iterator,
                             Type, cast)
 from utils          import isfunction
 from model.task     import Task
@@ -70,14 +70,14 @@ class CacheItem:
     cache   = property(lambda self: self.getCache(), setCache)
     proc    = property(lambda self: self._proc)
 
-REP_T = Tuple[int, Processor, Processor] # pylint: disable=invalid-name
+RepType = Tuple[int, Processor, Processor]
 class CacheReplacement:
     """
     Context for replacing processors but keeping their cache
     """
     def __init__(self, cache: 'Cache', *options: Type[Processor]) -> None:
         self.options:  Tuple[Type[Processor],...] = options
-        self.replaced: List[REP_T]                = []
+        self.replaced: List[RepType]              = []
         self.cache:    Cache                      = cache
 
     def taskcache(self, task:Task):
@@ -97,7 +97,7 @@ class CacheReplacement:
         for i, j in enumerate(self.cache):
             val = reg.get(type(j.task), None)
             if val is not None:
-                self.replaced.append(cast(REP_T, (i, val(task = j.task), j)))
+                self.replaced.append(cast(RepType, (i, val(task = j.task), j)))
                 setattr(itms[i], '_proc', self.replaced[-1][1])
         return self.cache
 
@@ -109,7 +109,7 @@ class CacheReplacement:
         for i, _, j in self.replaced:
             setattr(itms[i], '_proc', j)
 
-class Cache(Iterable[Processor], Sized):
+class Cache(Iterable[Processor]):
     "Contains the track and task-created data"
     __slots__ = ('_items',)
     def __init__(self, order: Iterable[Union[CacheItem, Processor, Task]] = None) -> None:

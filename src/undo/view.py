@@ -6,7 +6,7 @@ from view           import View
 
 class UndoView(View):
     'View listing all undos'
-    def __init__(self, ctrl = None, **kwa): # pylint: disable=too-many-locals
+    def __init__(self, ctrl = None, **kwa):
         super().__init__(ctrl = ctrl, **kwa)
         self.__curr = [None]
         ctrl.theme.updatedefaults  ('keystroke',
@@ -29,7 +29,6 @@ class UndoView(View):
         'sets up the observations'
         ctrl.__undos__(self.__wrapper)
 
-        # pylint: disable=unused-variable
         @ctrl.display.observe
         def _onstartaction(recursive = None, **_):
             assert (self.__curr[0] is not None) is recursive

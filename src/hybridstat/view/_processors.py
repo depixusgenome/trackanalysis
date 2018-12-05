@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors for storing gui data"
-from   typing                     import Dict, Tuple, List, Optional, Sequence
+from   typing                     import Tuple, List, Optional, Sequence
 from   copy                       import copy
 
 from   data                       import BEADKEY
@@ -83,7 +83,6 @@ class GuiSingleStrandProcessor(SingleStrandProcessor):
         cnf['store'] = self.store
         return cnf
 
-CACHE_T = Dict[BEADKEY, Tuple[float, float]] # pylint: disable=invalid-name
 class GuiFitToReferenceDict(FitToReferenceDict): # pylint: disable=too-many-ancestors
     "gui version of FitToReferenceDict"
     def __init__(self, *args, **kwa):

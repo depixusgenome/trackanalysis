@@ -22,7 +22,7 @@ HistInputs = Union[Iterable[Iterable[float]],
                    Iterable[float]]
 BiasType   = Union[None, float, np.ndarray]
 
-class HistogramData(NamedTuple): # pylint: disable=missing-docstring
+class HistogramData(NamedTuple):
     histogram:  np.ndarray
     minvalue:   float
     binwidth:   float

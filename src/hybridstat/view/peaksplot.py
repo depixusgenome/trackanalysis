@@ -118,7 +118,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                        count = interpolator(data['z'], data['count'], fit2ref.hmin)(pos))
         return {'': data, 'events': events, 'peaks': self.__peaks(dtl)}
 
-    def _addtodoc(self, ctrl, doc):
+    def _addtodoc(self, ctrl, doc, *_):
         "returns the figure"
         self.__create_fig()
         rends = self.__add_curves()
@@ -128,9 +128,9 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         return self._keyedlayout(ctrl, self._fig,
                                  left = self.__setup_widgets(ctrl, doc))
 
-    def observe(self, ctrl):
+    def observe(self, ctrl, noerase = True):
         "observes the model"
-        super().observe(ctrl)
+        super().observe(ctrl, noerase = noerase)
         self._model.setobservers(ctrl)
         self._widgets.observe(ctrl)
         SequenceAnaIO.observe(ctrl)
@@ -162,7 +162,8 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             cache[self._fig.y_range] = self.newbounds('y', inds)
 
             inds = (inds - self._model.bias)*self._model.stretch
-            cache[self._fig.extra_y_ranges['bases']] = self.newbounds(None, inds)
+            rng  = self._fig.extra_y_ranges['bases'] # pylint: disable=unsubscriptable-object
+            cache[rng] = self.newbounds(None, inds)
 
             _color('peakscount',    'default',  'below')
             _color('peaksduration', 'duration', 'above')

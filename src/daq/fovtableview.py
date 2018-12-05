@@ -82,8 +82,8 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
             if 'fovstarted' in old:
                 self.reset(ctrl)
 
-    def _reset(self, control, _):
-        data                   = control.daq.data
+    def _reset(self, ctrl, cache): # pylint: disable=unused-argument
+        data                   = ctrl.daq.data
         doadd                  = data.fovstarted
         cback, self.__callback = self.__callback, (True if doadd else None)
         if cback is True:
@@ -93,7 +93,7 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
             self._doc.remove_periodic_callback(cback)
 
         if self.__callback is True:
-            self.__callback = self._doc.add_periodic_callback(partial(self.__data, control),
+            self.__callback = self._doc.add_periodic_callback(partial(self.__data, ctrl),
                                                               self._model.period*1e3)
 
     def __data(self, ctrl):

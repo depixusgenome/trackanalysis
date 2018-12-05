@@ -28,7 +28,7 @@ class TaskPlotCreator(PlotCreator[TModelType, PlotModelType]):
         self.observetasks(ctrl)
 
     @abstractmethod
-    def _addtodoc(self, ctrl, doc):
+    def _addtodoc(self, ctrl, doc, *_):
         pass
 
     @abstractmethod

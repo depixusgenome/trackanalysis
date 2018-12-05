@@ -67,7 +67,7 @@ def createpeaks(tracks, *args: Task, fullstats = True, target = None, **kwa):
         data.sort_values('trackorder', inplace = True)
     return data
 
-class HPPositions(NamedTuple): # pylint: disable=missing-docstring
+class HPPositions(NamedTuple):
     seq: str
     target: str
     oligo: str

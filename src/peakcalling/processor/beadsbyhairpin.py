@@ -16,14 +16,14 @@ from .fittohairpin            import (FitToHairpinTask, FitToHairpinProcessor,
 class BeadsByHairpinTask(FitToHairpinTask):
     "Groups beads per hairpin"
 
-class ByHairpinBead(NamedTuple): # pylint: disable=missing-docstring
+class ByHairpinBead(NamedTuple):
     key        : BEADKEY
     silhouette : float
     distance   : Distance
     peaks      : PeaksArray
     events     : PeakFindingOutput
 
-class ByHairpinGroup(NamedTuple): # pylint: disable=missing-docstring
+class ByHairpinGroup(NamedTuple):
     key   : str
     beads : Sequence[ByHairpinBead]
 

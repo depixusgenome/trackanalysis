@@ -14,9 +14,9 @@ class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess, # type: ignore
                                         FoVPlotModel]):
     "Plots a default bead and its FoV"
     _rampdisplay = Indirection()
-    def observe(self, ctrl):
+    def observe(self, ctrl, noerase = True):
         "sets-up model observers"
-        super().observe(ctrl)
+        super().observe(ctrl, noerase = noerase)
         self._rampdisplay = RampPlotDisplay()
 
         @ctrl.display.observe(self._rampdisplay)

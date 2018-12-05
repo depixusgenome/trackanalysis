@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Test control"
 # pylint: disable=import-error,missing-docstring
-from    typing                  import Dict, Callable, cast
+from    typing                  import Callable, cast
 import  numpy
 from    control.event           import Event, EmitPolicy
 from    control.taskcontrol     import TaskController
@@ -429,7 +429,7 @@ def test_decentralized():
             self.aval = _.get('aval', 2)
             self.bval = _.get("bval", "")
 
-    class Tata(Dict):
+    class Tata(dict):
         """
         Model for key bindings
         """

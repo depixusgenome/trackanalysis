@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 'Deals with undos'
-from typing         import Set, Callable # pylint: disable=unused-import
 from control.event  import Controller, NoEmission
 from .model         import UndoModel
 
 class UndoController(Controller):
     'View listing all undos'
-    def __init__(self, **kwa): # pylint: disable=too-many-locals
+    def __init__(self, **kwa):
         super().__init__(**kwa)
         self.__isundoing = False
         self.__model     = kwa.get('undos', UndoModel())

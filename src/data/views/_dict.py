@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Adds easy access to cycles and events"
 from    abc         import abstractmethod, abstractproperty
-from    typing      import Tuple, Union, Iterable, Iterator, TypeVar, cast, Dict, Optional
+from    typing      import Tuple, Union, Iterator, TypeVar, cast, Dict, Optional
 import  numpy as np
 from    model       import Level
 
@@ -10,7 +10,7 @@ _m_ALL   = None, all, Ellipsis, slice(None) # type: tuple
 _m_INTS  = int, cast(type, np.integer)
 _m_KEYS  = int, cast(type, np.integer), str
 _m_INDEX = int, cast(type, np.integer), str, tuple
-_m_NONE  = type('_m_NONE', (), {})          # pylint: disable=invalid-name
+_none    = type('_none', (), {})
 
 def isint(vals):
     "checks whether the argument can be understood as an int"
@@ -24,7 +24,7 @@ BEADKEY  = int
 CYCLEKEY = Tuple[BEADKEY,int]
 ISelf    = TypeVar('ISelf', bound = 'ITrackView')
 
-class ITrackView(Iterable):
+class ITrackView:
     "Class for iterating over data"
     @property
     @abstractproperty
@@ -35,6 +35,10 @@ class ITrackView(Iterable):
     @abstractmethod
     def __getitem__(self:ISelf, val) -> Union[ISelf, np.ndarray]:
         "can return one item or a copy of self with only the selected keys"
+
+    @abstractmethod
+    def __iter__(self) -> Iterator:
+        pass
 
     @abstractmethod
     def keys(self, _1 = None) -> Iterator:

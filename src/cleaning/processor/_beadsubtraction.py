@@ -12,7 +12,7 @@ from   data.views                   import Cycles, Beads
 from   model                        import Task, Level
 from   signalfilter.noisereduction  import Filter
 from   utils                        import initdefaults
-from   ..beadsubtraction            import aggtype, SubtractMedianSignal, AGG_TYPE
+from   ..beadsubtraction            import aggtype, SubtractMedianSignal, AggType
 # pylint: disable=import-error
 from   .._core                      import constant as _cleaningcst
 
@@ -25,7 +25,7 @@ class BeadSubtractionTask(Task):
     """
     filter: Filter    = None
     beads:  List[int] = []
-    agg:    AGG_TYPE  = SubtractMedianSignal()
+    agg:    AggType   = SubtractMedianSignal()
     mindeltavalue     = 1e-6
     mindeltarange     = 3
     level             = Level.none

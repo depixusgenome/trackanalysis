@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Batch creator basics"
-from typing             import (TypeVar, Iterator, Union, Iterable, Sequence,
+from typing             import (TypeVar, Iterator, Union, Sequence,
                                 Type, Optional, cast)
 from pathlib            import Path
 from copy               import deepcopy, copy as shallowcopy
@@ -15,7 +15,7 @@ from data.trackio       import PATHTYPES, PATHTYPE
 from model.task         import RootTask, Task, Level
 from .base              import Processor
 
-class BatchTemplate(Iterable): # pylint: disable=inherit-non-class
+class BatchTemplate:
     "Template of tasks to run"
     def __init__(self, **_):
         super().__init__()

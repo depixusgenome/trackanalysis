@@ -221,7 +221,7 @@ class Baseline(Object):
 
         return signal
 
-class StrandClosingTruth(NamedTuple): # pylint: disable=missing-docstring
+class StrandClosingTruth(NamedTuple):
     duration: np.ndarray
     delta:    np.ndarray
 
@@ -407,7 +407,7 @@ class _SingleStrandBinding:
         else:
             inst.bindings[ind] = val
 
-class BeadTruth(NamedTuple): # pylint: disable=missing-docstring
+class BeadTruth(NamedTuple):
     strandclosing: Optional[StrandClosingTruth]
     events:        Optional[np.ndarray]
     baseline:      Optional[np.ndarray]

@@ -41,7 +41,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
         assert self._plotmodel.display in ctrl.display
         assert self._plotmodel.config in ctrl.theme
 
-    def _addtodoc(self, *_):
+    def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument
         "returns the figure"
         self._fig = self.figure(y_range = Range1d(start = 0., end = 20.),
                                 x_range = Range1d(start = 0., end = 1e2),
@@ -142,8 +142,8 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
                          theme  = ExtensionPlotTheme(),
                          config = ExtensionPlotConfig(), **kwa)
 
-    def _addtodoc(self, *_):
-        fig  = super()._addtodoc(_)
+    def _addtodoc(self, ctrl, doc, *_):
+        fig  = super()._addtodoc(ctrl, doc, *_)
         args = dict(x = 'cycles', width  = self._theme.ybarswidth, source = self._src[-1])
         val  = self.addtofig(fig, 'ybars', top = 'top',    bottom = 'bottom', **args)
         self._rends.append(('ybars', val))

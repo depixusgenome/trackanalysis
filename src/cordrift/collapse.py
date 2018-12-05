@@ -5,7 +5,7 @@ Collapse intervals. The idea is to measure the behaviour common to all
 stretches of data. This should be removed as it's source is either a (thermal,
 electric, ...) drift or a mechanical vibration.
 """
-from    typing          import (Optional, Union, Sized,
+from    typing          import (Optional, Union,
                                 Callable, NamedTuple, Sequence, Iterable,
                                 Tuple, Iterator, cast)
 from    enum            import Enum
@@ -17,7 +17,7 @@ from    signalfilter    import Filter
 
 Range   = NamedTuple('Range', [('start', int), ('values', np.ndarray)])
 
-class Profile(Sized):
+class Profile:
     "A bead profile: the behaviour common to all stretches of data"
     def __init__(self, inter:Union[Sequence[Range], 'Profile', int]) -> None:
         if isinstance(inter, (int, cast(type, np.integer))):

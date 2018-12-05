@@ -88,7 +88,7 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
         trk = self._model.track
         return None if trk is None or trk.fov.image is None else trk.fov
 
-    def _addtodoc(self, *_):
+    def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument
         self._fig = self.figure(name    = 'FoV:Fig',
                                 x_range = Range1d(0, 1),
                                 y_range = Range1d(0, 1))

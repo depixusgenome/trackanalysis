@@ -37,7 +37,7 @@ class PeakSelectorTask(PeakSelector, Task):
         PeakSelector.__init__(self, **kwa)
 
 Output = PeakListArray
-class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
+class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]): # pylint: disable=too-many-ancestors
     """
     * `withmeasure` allows computing whatever one wants on events in a peak. One
     or two functions should be provided:

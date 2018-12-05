@@ -5,10 +5,9 @@ from collections    import deque
 
 class UndoModel:
     u"Model listing all undos"
-    undos = None # type: deque
-    redos = None # type: deque
-    def __init__(self, **kwa): # pylint: disable=too-many-locals
-        super().__init__(**kwa)
+    undos: deque
+    redos: deque
+    def __init__(self, **kwa):
         maxlen     = kwa.get('maxlen', 1000)
         self.undos = kwa.get('undos', deque(maxlen = maxlen))
         self.redos = kwa.get('redos', deque(maxlen = maxlen))

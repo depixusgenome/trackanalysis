@@ -23,7 +23,7 @@ from   ..processor                  import (ExtremumAlignmentTask,
                                             EventDetectionTask)
 from   ..data                       import Events
 
-_RETURN_TYPE = FrozenSet[Tuple[int, int]] # pylint: disable=invalid-name
+_ReturnType = FrozenSet[Tuple[int, int]]
 class Comparator:
     """
     This allows selecting cycles which accept provided conditions.
@@ -87,7 +87,7 @@ class Comparator:
             return ((i, iter((fcn(j[key][ind]),)))  for i, j in evts  if len(j) > ind)
         return ((i, iter(fcn(k) for k in j[key])) for i, j in evts)
 
-    def within(self, aother) -> _RETURN_TYPE:
+    def within(self, aother) -> _ReturnType:
         "Wether there are any/all events within a given range"
         if isinstance(aother, (slice, range)):
             other = aother.start, aother.stop # type: ignore
@@ -104,27 +104,27 @@ class Comparator:
         self.__func = len
         return self
 
-    def __lt__(self, other) -> _RETURN_TYPE:
+    def __lt__(self, other) -> _ReturnType:
         cond = self.__cond
         return frozenset(tuple(i for i, j in self.__vals() if cond(k < other for k in j)))
 
-    def __le__(self, other) -> _RETURN_TYPE:
+    def __le__(self, other) -> _ReturnType:
         cond = self.__cond
         return frozenset(tuple(i for i, j in self.__vals() if cond(k <= other for k in j)))
 
-    def __gt__(self, other) -> _RETURN_TYPE:
+    def __gt__(self, other) -> _ReturnType:
         cond = self.__cond
         return frozenset(tuple(i for i, j in self.__vals() if cond(k > other for k in j)))
 
-    def __ge__(self, other) -> _RETURN_TYPE:
+    def __ge__(self, other) -> _ReturnType:
         cond = self.__cond
         return frozenset(tuple(i for i, j in self.__vals() if cond(k >= other for k in j)))
 
-    def __eq__(self, other) -> _RETURN_TYPE: # type: ignore
+    def __eq__(self, other) -> _ReturnType: # type: ignore
         cond = self.__cond
         return frozenset(tuple(i for i, j in self.__vals() if cond(k == other for k in j)))
 
-    def __ne__(self, other) -> _RETURN_TYPE: # type: ignore
+    def __ne__(self, other) -> _ReturnType: # type: ignore
         cond = self.__cond
         return frozenset(tuple(i for i, j in self.__vals() if cond(k != other for k in j)))
 

@@ -63,10 +63,12 @@ class TabsTheme:
         return tabs
 
 TThemeType = TypeVar("TThemeType", bound = TabsTheme)
-class TabsView(BokehView, Generic[TThemeType]):
+class TabsView(Generic[TThemeType], BokehView):
     "A view with all plots"
     KEYS          : ClassVar[Dict[type, str]]
     TASKS_CLASSES : ClassVar[Tuple[type]]
+    NAME          : ClassVar[str]
+    TASKS         : ClassVar[Tuple[type]]
     _tabs         : Tabs
     __theme       : TabsTheme
     def __init__(self, ctrl = None, **kwa):
@@ -213,6 +215,6 @@ def initsubclass(name, keys, tasksclasses = ()):
         cls.TASKS_CLASSES = tuple(tasksclasses)
         cls.NAME          = name
 
-        cls.TASKS = _fcn(sum((list(i.TASKS) for i in cls.TASKS_CLASSES), []))
+        cls.TASKS         = _fcn(sum((list(i.TASKS) for i in cls.TASKS_CLASSES), []))
         return cls
     return _wrapper

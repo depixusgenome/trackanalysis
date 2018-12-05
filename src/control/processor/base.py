@@ -196,11 +196,11 @@ class Processor(Generic[TaskType]):
         "updates the frames"
         raise NotImplementedError()
 
-CACHE_T = Dict[Type[_tasks.Task], Type[Processor]] # pylint: disable=invalid-name
+ProcCache = Dict[Type[_tasks.Task], Type[Processor]]
 def register(proc: Union[None, Type[Processor], Iterable[Type[Processor]]] = None,
-             force          = False,
-             cache: CACHE_T = None,
-             recursive      = True) -> CACHE_T:
+             force            = False,
+             cache: ProcCache = None,
+             recursive        = True) -> ProcCache:
     "returns a register for a given processor"
     if cache is None:
         cache = {}

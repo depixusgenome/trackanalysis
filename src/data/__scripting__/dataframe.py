@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Adds stuff for dataframes"
-from   typing                      import Dict # pylint: disable=unused-import
+from   typing                      import Dict
 from   copy                        import copy as shallowcopy
 import pandas                      as     pd
 import numpy                       as     np
@@ -45,7 +45,7 @@ def dataframe(self): # pylint: disable=function-redefined
                       dtype = 'i4').T
     starts = np.cumsum([0]+ [np.max(i) for i in durs.T])
 
-    info   = {} # type: Dict[str,np.array]
+    info: Dict[str,np.array] = {}
     for (ibead, icycle), vals in self:
         arr = np.full(starts[-1], np.NaN, dtype = 'f4')
         for i, j in zip(starts, np.split(vals, durs[icycle].cumsum())):

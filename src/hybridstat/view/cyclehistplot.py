@@ -98,7 +98,7 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
     _src:    ColumnDataSource
     _fig:    Figure
     _errors: PlotError
-    def _addtodoc(self, *_):
+    def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument
         self._src  = ColumnDataSource(data = self._data(None))
         self._fig  = self.figure(y_range = Range1d, x_range = Range1d)
         self.addtofig(self._fig, 'frames', x = 't', y = 'z', source = self._src)
@@ -180,7 +180,7 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
     _src: Dict[str, ColumnDataSource]
     _exp: LinearAxis
     _ref: LinearAxis
-    def _addtodoc(self,*_):
+    def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument
         "returns the figure"
         self._fig = self.figure(y_range = Range1d, x_range = Range1d)
         self._exp = LinearAxis(axis_label    = self._theme.explabel)
@@ -314,9 +314,9 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
     def _plots(self):
         return [self._cycle, self._hist]
 
-    def observe(self, ctrl):
+    def observe(self, ctrl, noerase = True):
         "observes the model"
-        super().observe(ctrl)
+        super().observe(ctrl, noerase = noerase)
         self._model.setobservers(ctrl)
         self._widgets.observe(ctrl)
         SequenceAnaIO.observe(ctrl)
@@ -355,7 +355,7 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
         for i in self._plots:
             i.addto(ctrl, noerase=noerase)
 
-    def _addtodoc(self, ctrl, doc):
+    def _addtodoc(self, ctrl, doc, *_):
         "returns the figure"
         plots = [getattr(i, '_addtodoc')(ctrl, doc) for i in self._plots]
         for i in plots[1:]:

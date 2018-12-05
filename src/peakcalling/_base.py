@@ -12,13 +12,13 @@ from   utils        import initdefaults
 
 DEFAULT_BEST = float(np.finfo('f4').max)
 
-class CobylaParameters(NamedTuple): # pylint: disable=missing-docstring
+class CobylaParameters(NamedTuple):
     rhobeg: Optional[Tuple[float,...]]
     rhoend: Optional[Tuple[float,...]]
     maxfun: Optional[float]
     catol:  Optional[float]
 
-class LBFGSParameters(NamedTuple): # pylint: disable=missing-docstring
+class LBFGSParameters(NamedTuple):
     threshold_param_rel: float
     threshold_param_abs: float
     threshold_func_rel:  float
@@ -27,12 +27,12 @@ class LBFGSParameters(NamedTuple): # pylint: disable=missing-docstring
 
 OptimType = Union[CobylaParameters, LBFGSParameters]
 
-class Range(NamedTuple): # pylint: disable=missing-docstring
+class Range(NamedTuple):
     center:  Optional[float]
     size:    float
     step:    float
 
-class Distance(NamedTuple): # pylint: disable=missing-docstring
+class Distance(NamedTuple):
     value:   float
     stretch: float
     bias:    float

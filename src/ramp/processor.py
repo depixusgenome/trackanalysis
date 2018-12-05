@@ -52,7 +52,7 @@ class RampConsensusBeadTask(Task):
             return partial(fcn, **cast(dict, arg[1]), axis = 0)
         raise AttributeError("unknown numpy action")
 
-class RampCycleTuple(NamedTuple): # pylint: disable=missing-docstring
+class RampCycleTuple(NamedTuple):
     bead            : int
     cycle           : int
     zmagcorrelation : float

@@ -33,7 +33,6 @@ from    .bokehext               import DpxKeyedRow, DpxHoverTool
 
 LOGS        = getLogger(__name__)
 ModelType   = TypeVar('ModelType', bound = PlotModelAccess)
-RANGE_TYPE  = Tuple[Optional[float], Optional[float]] # pylint: disable=invalid-name
 CACHE_TYPE  = Dict[Model, Any]                        # pylint: disable=invalid-name
 
 _CNV  = {'dark_minimal':  'dark',
@@ -739,7 +738,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
             with self.resetting():
                 self._model.reset()
 
-    if SINGLE_THREAD: # pylint: disable=using-constant-test
+    if SINGLE_THREAD:
         # use this for single-thread debugging
         LOGS.info("Running in single-thread mode")
         def __doreset(self, ctrl):
@@ -807,7 +806,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                 self.reset(False)
 
     @abstractmethod
-    def _addtodoc(self, ctrl, doc):
+    def _addtodoc(self, ctrl, doc, *_):
         "creates the plot structure"
 
     @abstractmethod

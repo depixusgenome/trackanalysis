@@ -5,7 +5,7 @@ from   inspect          import signature
 from   copy             import copy as shallowcopy, deepcopy
 from   itertools        import product
 from   functools        import partial
-from   typing           import (Tuple, Iterable, Union, List, TypeVar, Hashable,
+from   typing           import (Tuple, Union, List, TypeVar, Hashable,
                                 Callable, Optional, cast)
 import numpy            as     np
 
@@ -26,7 +26,7 @@ def _m_torange(sli):
 _m_INDEX = int, cast(type, np.integer), str, tuple
 
 CSelf = TypeVar('CSelf',  bound = 'TrackViewConfigMixin')
-class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name,inherit-non-class
+class TrackViewConfigMixin:
     """
     This object provides a view on all {views} as well as *time* and *magnet altitude*.
     {datadescr}

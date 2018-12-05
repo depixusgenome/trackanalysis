@@ -21,12 +21,12 @@ from    legacy             import (readtrack, readgr, fov as readfov,
                                    instrumenttype  as _legacyinstrumenttype)
 
 if TYPE_CHECKING:
-    # pylint: disable=unused-import,invalid-name
+    # pylint: disable=unused-import
     from data.track      import Track
     from data.tracksdict import TracksDict
-    TDICT_T = TypeVar('TDICT_T', bound = 'TracksDict')
+    DictType = TypeVar('DictType', bound = 'TracksDict')
 else:
-    TDICT_T = 'TracksDict'
+    DictType = 'TracksDict'
 
 PATHTYPE  = Union[str, Path]
 PATHTYPES = Union[PATHTYPE,Tuple[PATHTYPE,...]]
@@ -570,7 +570,7 @@ def savetrack(path: PATHTYPE, track: 'Track') -> 'Track':
     "saves a track"
 
 @overload
-def savetrack(path  : PATHTYPE, track : TDICT_T) -> TDICT_T: # type: ignore
+def savetrack(path  : PATHTYPE, track : DictType) -> DictType: # type: ignore
     "saves a tracksdict"
 
 def savetrack(path  : PATHTYPE,     # pylint: disable=unused-argument,function-redefined

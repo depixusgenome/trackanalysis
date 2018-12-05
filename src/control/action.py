@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "allows fencing multiple events between 2 *startaction* and *stopaction* events"
 
-from typing             import Callable, Union, Optional, Tuple # pylint: disable=unused-import
+from typing             import Callable, Union, Optional, Tuple
 from pathlib            import Path
 from functools          import wraps
 from inspect            import signature
@@ -194,7 +194,7 @@ class ActionDescriptor:
             # called as a class attribute: to be used as a decorator
             return self
 
-        calls = None # type: Optional[Tuple]
+        calls: Optional[Tuple] = None
         if LOGS.getEffectiveLevel() == logging.DEBUG:
             # called as an instance attribute:
             # can be used as a context or a decorator

@@ -3,9 +3,9 @@
 """
 Adds a dictionnaries to access tracks, experiments, ...
 """
-from typing             import (KeysView, List, Dict, Any, # pylint: disable=unused-import
-                                Iterator, Tuple, TypeVar, Union, Set, Optional,
-                                Pattern, Sequence, Callable, cast)
+from typing             import (KeysView, List, Dict, Any, Iterator, Tuple,
+                                TypeVar, Union, Set, Optional, Pattern, Sequence,
+                                Callable, cast)
 from pathlib            import Path
 from concurrent.futures import ThreadPoolExecutor
 from copy               import copy as shallowcopy
@@ -131,7 +131,7 @@ class TracksDict(dict):
             val = str(next(iter(val)))
 
         if isinstance(val, (tuple, list, set)):
-            state = dict(path = [str(i) for i in val]) # type: Dict[str, Any]
+            state: Dict[str, Any] = dict(path = [str(i) for i in val])
         elif isinstance(val, (str, Path)):
             state = dict(path = str(val))
         elif isinstance(val, dict):

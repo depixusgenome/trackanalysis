@@ -11,16 +11,16 @@ from control.decentralized  import Indirection
 from data.trackio       import instrumenttype
 from data.tracksdict    import TracksDict
 from utils.logconfig    import getLogger
-LOGS   = getLogger(__name__)
-PATH_T = Union[str, Path] # pylint: disable=invalid-name
-OPEN_T = Union[PATH_T, Iterable[PATH_T], Dict[str, str]] # pylint: disable=invalid-name
+LOGS     = getLogger(__name__)
+PathType = Union[str, Path]
+OpenType = Union[PathType, Iterable[PathType], Dict[str, str]]
 class TaskIO:
     u"base class for opening files"
     def __init__(self, *_):
         pass
 
     # pylint: disable=no-self-use,unused-argument
-    def open(self, path:OPEN_T, model:tuple):
+    def open(self, path:OpenType, model:tuple):
         u"opens a file"
         return None
 
@@ -38,17 +38,17 @@ class TaskIO:
         itms = list(chain.from_iterable(i.EXT for i in cls.__get(ctrl, attr)[::-1]))
         return '|'.join(j for i, j in enumerate(itms) if j not in itms[:i])
 
-def topath(path:Union[PATH_T, Iterable[PATH_T]]) -> Tuple[Path, ...]:
+def topath(path:Union[PathType, Iterable[PathType]]) -> Tuple[Path, ...]:
     "converts the argument to a tuple of paths"
     return cast(Tuple[Path, ...],
                 ((Path(path),) if isinstance(path, str)    else
                  (path,)       if isinstance(path, Path)   else
-                 tuple(Path(i) for i in cast(Iterable[PATH_T], path))))
+                 tuple(Path(i) for i in cast(Iterable[PathType], path))))
 
 class TrackIO(TaskIO):
     "Deals with reading a track file"
     EXT: Tuple[str, ...] = ('trk',)
-    def open(self, path:OPEN_T, model:tuple):
+    def open(self, path:OpenType, model:tuple):
         "opens a track file"
         if len(model):
             raise NotImplementedError()
@@ -71,7 +71,7 @@ class ConfigTrackIO(TrackIO):
         self._config = TasksConfig()
         self._io     = TaskIOTheme()
 
-    def open(self, path:OPEN_T, model:tuple):
+    def open(self, path:OpenType, model:tuple):
         "opens a track file and adds a alignment"
         tmp = TrackIO.open(self, path, model)
         if not tmp or not tmp[0]:
@@ -97,7 +97,7 @@ class _GrFilesIOMixin:
         self._ctrl    = ctrl
         self._display = TasksDisplay()
 
-    def _open(self, path:OPEN_T, _):
+    def _open(self, path:OpenType, _):
         "opens a track file and adds a alignment"
         if isinstance(path, dict):
             return None
@@ -129,7 +129,7 @@ class GrFilesIO(TrackIO, _GrFilesIOMixin):
         TrackIO.__init__(self, *_)
         _GrFilesIOMixin.__init__(self, *_)
 
-    def open(self, path:OPEN_T, _:tuple):
+    def open(self, path:OpenType, _:tuple):
         if isinstance(path, dict):
             return None
 
@@ -143,7 +143,7 @@ class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
         ConfigTrackIO.__init__(self, *_)
         _GrFilesIOMixin.__init__(self, *_)
 
-    def open(self, path:OPEN_T, _:tuple):
+    def open(self, path:OpenType, _:tuple):
         path = self._open(path, _)
         if path is None:
             return None

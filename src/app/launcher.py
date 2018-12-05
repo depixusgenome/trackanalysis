@@ -85,8 +85,8 @@ class _FunctionHandler(FunctionHandler):
     @staticmethod
     def __monkeypatch_bokeh(view):
         from bokeh.core.properties import Seq
-        # pylint: disable=missing-docstring
         def from_json(self, json, models=None, __old__ = Seq.from_json):
+            "parse docstring"
             if isinstance(json, dict):
                 json = {int(i): j for i, j in json.items()}
                 keys = sorted(json)

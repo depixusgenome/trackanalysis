@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "All view pieces are brought together"
-import bokeh.layouts as     layouts # pylint: disable=useless-import-alias
+import bokeh.layouts as     _layouts
 from .beadstableview import BeadsTableView
 from .camera         import DAQCameraView
 from .fovtableview   import FoVTableView
@@ -33,6 +33,6 @@ class MainView:
         assert all(len(i) == 1 for i in itms.values())
 
         mod  = dict(sizing_mode = ctrl.theme.get('main', 'sizingmode', 'fixed'))
-        row  = layouts.row([itms['beads'][0], itms["fov"][0]], **mod)
-        col  = layouts.column([itms['series'][0], row], **mod)
-        return [layouts.row([col, itms['cam'][0]], **mod)]
+        row  = _layouts.row([itms['beads'][0], itms["fov"][0]], **mod)
+        col  = _layouts.column([itms['series'][0], row], **mod)
+        return [_layouts.row([col, itms['cam'][0]], **mod)]
