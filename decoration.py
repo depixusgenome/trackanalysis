@@ -155,11 +155,11 @@ def escapenans(*arrays: np.ndarray, reset = True):
         return _wrap
     return _escapenans(*arrays, reset = reset)
 
-T = TypeVar("T") # pylint: disable=invalid-name
-class CachedIO(Generic[T]): # pylint: disable=unsubscriptable-object
+Type = TypeVar("Type")
+class CachedIO(Generic[Type]):
     "Caches io output"
     def __init__(self,
-                 reader: Callable[..., T],
+                 reader: Callable[..., Type],
                  cache:  Optional[Dict[pathlib.Path, Tuple[int, Any]]] = None,
                  size:   int                                           = 10
                 ) -> None:
@@ -183,7 +183,7 @@ class CachedIO(Generic[T]): # pylint: disable=unsubscriptable-object
         else:
             self.__cache.clear()
 
-    def __call__(self, *args, **kwa) -> Optional[T]:
+    def __call__(self, *args, **kwa) -> Optional[Type]:
         "reads and caches a file"
         path = pathlib.Path(self.__ppos.path(args, kwa)).resolve()
         if not path.exists():               # pylint: disable=no-member
