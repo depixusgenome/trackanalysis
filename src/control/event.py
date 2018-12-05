@@ -189,7 +189,7 @@ class Event:
         if len(anames) == 1:
             if hasattr(anames[0], 'items'):
                 kwargs.update(cast(dict, anames[0]))
-                names = tuple() # type: Sequence[Any]
+                names: Sequence[Any] = tuple()
             elif isinstance(anames[0], (list, tuple)):
                 names = anames[0]
             else:
