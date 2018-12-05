@@ -1,27 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=broad-except
 """
 Used for scripting: something similar to matplotlib's pyplot.
 """
 import sys
-# pylint: disable=unused-import
-from   itertools import chain, product, repeat
-from   functools import wraps, partial
-from   pathlib   import Path
-
-import pickle
 import inspect
-import re
-import numpy                 as np
-import pandas                as pd
 
+locals().update({i: getattr(__import__('functools'), i)
+                 for i in ('partial', 'wraps')})
+locals().update({i: getattr(__import__('itertools'), i)
+                 for i in ('chain', 'product', 'repeat')},
+                re      = __import__('re'),
+                pickle  = __import__('pickle'),
+                np      = __import__('numpy'),
+                pd      = __import__('pandas'),
+                Path    = __import__('pathlib').Path
+               )
 try:
-    import matplotlib.pyplot as plt     # pylint: disable=import-error
+    locals()['plt'] = __import__('matplotlib.pyplot')
 except ImportError:
     pass
 
 _STACK = [i.filename for i in inspect.stack()]
-ISJUP  = False
+ISJUP  = [False]
 
 def _isjupyter() -> bool:
     "whether the import occurs from a jupyter session"
@@ -45,13 +47,11 @@ def test():
     assert False, stack[-1]
 
 def _configure_hv(hvmod, locs):
-    # pylint: disable=import-error,bare-except,unused-import,unused-variable
     exts = []
     try:
-        import bokeh.io as _io
-        _io.output_notebook()
+        __import__('bokeh.io').io.output_notebook()
         exts.append('bokeh')
-    except:
+    except Exception:
         pass
 
     if 'matplotlib.pyplot' in sys.modules:
@@ -66,8 +66,7 @@ def _configure_hv(hvmod, locs):
 
         try:
             import holoviews  as     hv
-            from   IPython    import get_ipython # pylint: disable=import-error
-            get_ipython().magic('output size=150')
+            __import__('IPython').get_ipython().magic('output size=150')
 
             opts  = locs.get("HV_OPTS", {})
             width = opts.get("width", 700)
@@ -80,22 +79,21 @@ def _configure_hv(hvmod, locs):
                     string = string.replace("]",  f"] (box_color='{bcolor}') ")
                 hv.opts(string)
             hv.opts(f'Table[width={width}]')
-        except:
+        except Exception:
             pass
 
 def _configure_jupyter():
-    # pylint: disable=import-error,bare-except
     try:
-        from IPython              import get_ipython
-        shell = get_ipython()
+        shell = __import__('IPython').get_ipython()
         if 'autoreload' not in shell.extension_manager.loaded:
             shell.magic('load_ext autoreload')
             shell.magic('autoreload 2')
             shell.magic('matplotlib inline')
 
-            from IPython.core.display import display as _display, HTML
-            _display(HTML("<style>.container { width:100% !important; }</style>"))
-    except:
+            _display = __import__('IPython.core.display').core.display.display
+            html     = __import__('IPython.core.display').core.display.HTML
+            _display(html("<style>.container { width:100% !important; }</style>"))
+    except Exception:
         pass
 
 def importlibs(locs, *names):
@@ -117,8 +115,7 @@ def importjupyter(locs, *names):
         except ImportError:
             return
 
-        global ISJUP # pylint: disable=global-statement
-        ISJUP         = True
+        ISJUP[0]      = True
         locs['hv']    = hv
         locs['hvops'] = hvops
         locs['dropdown'] = dropdown
@@ -141,14 +138,14 @@ def run(locs, direct, star, jupyter):
     if getattr(locs.get('run', None), '__module__', None) == __name__:
         locs.pop('run')
 
-    # pylint: disable=no-member
-    getLogger("").info('%s%s', version.version(), " for jupyter" if ISJUP else "")
+    getLogger("").info('%s%s', version.version(), " for jupyter" if ISJUP[0] else "")
     if 'TUTORIAL' in locs:
         if _isjupyter():
             def tutorial():
                 "clues for the beginner"
-                from IPython.display import display, Markdown # pylint: disable=import-error
-                display(Markdown(locs['TUTORIAL']))
+                display = __import__('IPython.display').display
+                mkdown  = __import__('IPython.display').Markdown
+                display(mkdown(locs['TUTORIAL']))
             locs['tutorial'] = tutorial
         else:
             def tutorial():
