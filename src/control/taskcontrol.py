@@ -312,19 +312,15 @@ class BaseTaskController(Controller):
         return dict(controller = self, parent = parent, task = tsk, old = old)
 
     @overload
-    def cleardata(self, # pylint: disable=unused-argument,no-self-use
-                  parent: '_Ellipsis',
-                  task: Task = None) -> dict:
+    def cleardata(self, parent: '_Ellipsis', task: Task = None) -> dict:
         "clears all cache"
 
     @overload
-    def cleardata(self, # pylint: disable=unused-argument,no-self-use,function-redefined
-                  parent: RootTask,
-                  task:   Task = None) -> dict:
+    def cleardata(self, parent: RootTask, task: Task = None) -> dict:
         "clears parent cache starting at *task*"
 
     @Controller.emit
-    def cleardata(self, parent, task = None) -> dict: # pylint: disable=function-redefined
+    def cleardata(self, parent, task = None) -> dict:
         "clears all data"
         if parent is Ellipsis:
             self._items.clear()

@@ -246,8 +246,7 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
 
     # pylint: disable=arguments-differ
     def _run(self, frame, key, peaks) -> Dict[str, np.ndarray]:
-        # pylint: disable=protected-access
-        meas   = self.__parent._run(frame, key, peaks)
+        meas   = getattr(self.__parent, '_run')(frame, key, peaks)
         arr    = np.full(len(meas['peakposition']), np.NaN, dtype = 'f4')
         meas['referenceposition'] = arr
         if self.__stretch:

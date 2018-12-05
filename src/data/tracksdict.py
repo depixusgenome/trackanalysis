@@ -151,9 +151,7 @@ class TracksDict(dict):
     def __setitem__(self, key, val):
         return self._set(key, val)
 
-    def __getitem__(self: TDictType, # pylint: disable=function-redefined
-                    key: Union[List,Any]
-                   ) -> Union[TDictType, TrackType]:
+    def __getitem__(self: TDictType, key: Union[List,Any]) -> Union[TDictType, TrackType]:
         if isellipsis(key):
             return shallowcopy(self)
 

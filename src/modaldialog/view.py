@@ -102,8 +102,7 @@ class TaskDescriptor:
         self.attrname = name
 
     def __model(self, obj):
-        # pylint: disable=protected-access
-        return getattr(obj._model, self.keys[0]) # pylint: disable=protected-access
+        return getattr(getattr(obj, '_model'), self.keys[0])
 
     def get(self, obj, wherefrom = "default"):
         """
@@ -138,7 +137,7 @@ class TaskDescriptor:
         return self if obj is None else self.get(obj, 'model')
 
     def __set__(self, obj, val):
-        outp = obj._get_output() # pylint: disable=protected-access
+        outp = getattr(obj, '_get_output')()
         if len(self.keys) == 1:
             outp.setdefault(self.keys[0], {})['disabled'] = not val
             return

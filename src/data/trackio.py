@@ -572,8 +572,7 @@ def savetrack(path: PATHTYPE, track: 'Track') -> 'Track':
 def savetrack(path  : PATHTYPE, track : DictType) -> DictType: # type: ignore
     "saves a tracksdict"
 
-def savetrack(path  : PATHTYPE,     # pylint: disable=unused-argument,function-redefined
-              track : Union['Track', Dict[str,'Track']]
+def savetrack(path  : PATHTYPE, track : Union['Track', Dict[str,'Track']]
              ) -> Union['Track', Dict[str,'Track']]:
     "Saves a track"
     if isinstance(track, (str, Path)):
