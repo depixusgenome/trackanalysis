@@ -158,7 +158,7 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
 
                 try:
                     out = self._optimize(hpin, peaks, args)
-                except: # pylint: disable=bare-except
+                except Exception: # pylint: disable=broad-except
                     continue
                 else:
                     if out[0] < best[0]:
@@ -524,7 +524,7 @@ class PeakMatching(HairpinFitter, PointwiseOptimization):
                 args.update(rng('bias',    -vals[0]*vals[1], self.bias.step*vals[0]))
                 try:
                     out = _match.optimize(hpin, peaks, **args)
-                except: # pylint: disable=bare-except
+                except Exception: # pylint: disable=broad-except
                     continue
                 else:
                     if out[0] < best[0]:

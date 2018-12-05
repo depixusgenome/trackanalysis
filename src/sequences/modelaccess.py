@@ -73,7 +73,7 @@ class SequenceModel:
             return True
         try:
             seqs = dict(_readsequence(path))
-        except: # pylint: disable=bare-except
+        except IOError:
             return True
 
         if len(seqs) > 0:
@@ -118,7 +118,7 @@ class SequenceAnaIO:
         elif 'path' in seq and 'sequences' not in seq:
             try:
                 seq['sequences'] = dict(_readsequence(seq['path']))
-            except: # pylint: disable=bare-except
+            except IOError:
                 seq.pop('path')
 
         if seq:

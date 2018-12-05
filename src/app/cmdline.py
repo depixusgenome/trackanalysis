@@ -76,7 +76,7 @@ def _from_module(view):
         val = _without_cls(view, name)
         if val is not None:
             return val
-    except: # pylint: disable=bare-except
+    except Exception: # pylint: disable=broad-except
         pass
 
     try:
