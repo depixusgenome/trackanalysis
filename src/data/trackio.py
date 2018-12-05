@@ -564,7 +564,6 @@ def _savetrack(args):
     setattr(new, '_path', args[1])
     return args[0], new
 
-# pylint: disable=unused-argument,function-redefined
 @overload
 def savetrack(path: PATHTYPE, track: 'Track') -> 'Track':
     "saves a track"

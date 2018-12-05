@@ -175,7 +175,7 @@ class Secondaries:
         return self.__value(name) if name.startswith("T") else self.data[name]
 
     def __value(self, name):
-        val = self.__track._secondaries # pylint: disable=protected-access
+        val = getattr(self.__track, '_secondaries')
         if val is None or name not in val:
             return None
         arr           = np.copy(val[name])
@@ -509,7 +509,6 @@ class Track:
     _path:        Optional[PATHTYPES] = None
     _axis                             = Axis.Zaxis
 
-    # pylint: disable=unused-argument,function-redefined,no-self-use
     @overload
     def rawprecision(self, ibead: int) -> float:
         "Obtain the raw precision for a given bead"

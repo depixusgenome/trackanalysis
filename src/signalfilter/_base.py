@@ -102,7 +102,6 @@ class PrecisionAlg(ABC):
 
         raise AttributeError('Could not extract precision: no data or set value')
 
-    # pylint: disable=unused-argument,function-redefined
     @overload
     @staticmethod
     def rawprecision(track:Union['TrackView', 'Track'], ibead: int) -> float:
@@ -177,7 +176,6 @@ class CppPrecisionAlg:
 
         raise AttributeError('Could not extract precision: no data or set value')
 
-    # pylint: disable=unused-argument,function-redefined
     @overload
     @staticmethod
     def rawprecision(track:Union['TrackView', 'Track'], ibead: int) -> float:

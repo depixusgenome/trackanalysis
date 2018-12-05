@@ -184,7 +184,6 @@ class BaseTaskController(Controller):
         ctrl = self._items[parent] if parent in self._items else ProcessorController()
         return ctrl.task(task, noemission = noemission)
 
-    # pylint: disable=no-self-use,unused-argument,function-redefined
     @overload
     def track(self, parent: None) -> None:
         "returns None"
