@@ -3,8 +3,8 @@
 """
 Stiches profiles together when some points are lacking.
 """
-from    typing          import (Optional, Union, # pylint: disable=unused-import
-                                Callable, Sequence, Iterable, Iterator, cast)
+from    typing          import (Optional, Union, Callable, Sequence, Iterable,
+                                Iterator, cast)
 
 import  numpy as np
 from    numpy.lib.stride_tricks import as_strided

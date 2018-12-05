@@ -88,7 +88,6 @@ class BatchProcessor(Processor[BTaskType]):
         "iterates through all instanciated models"
         tsk = cast(Type[BatchTask], cls.tasktype)
         if template is None:
-            # pylint: disable=stop-iteration-return
             template = next((i for i in paths if isinstance(i, tsk.templatetype())), None)
             paths    = tuple(i for i in paths if not isinstance(i, tsk.templatetype()))
 

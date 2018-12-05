@@ -13,19 +13,6 @@ import numpy as np
 from utils   import initdefaults
 from .._core import emlogscore  # pylint: disable = import-error
 
-# def lnormpdf(loc,var,pos):
-#     return -0.5(pos-loc)**2/var # + cst
-
-# def lexppdf(loc,scale,pos):
-#     return -np.inf if loc>pos else (loc-pos)/scale-np.log(scale)
-
-# # use cholesky here, when multidimensional space
-# def gaussianloglikeli(data,rates,params):
-#     return 0.
-
-# def exponloglikeli(data,rates,params):
-#     return 0.
-
 class ExpectationMaximization:
     "Expectation Maximization class"
     tol    = 1e-6 # loglikelihood tolerance
@@ -107,15 +94,6 @@ class ExpectationMaximization:
         params = cls.getparamswithtime(data,lresp,lowercov)
         return rates, params
 
-    # @staticmethod
-    # def getllikelihood(data,rates,params):
-    #     """
-    #     this is the tricky bit
-    #     spatial component of llikelihood can be done using Cholesky
-    #     bu not the time component
-    #     """
-    #     return gaussianloglikeli(data,rates,params)+exponloglikeli(data,rates,params)
-
     @classmethod
     def oneemstep(cls,
                   data:np.ndarray,
@@ -133,10 +111,6 @@ class ExpectationMaximization:
                 rates:np.ndarray,
                 params:np.ndarray):
         "performs n emsteps"
-        # prevllike = self.getllikelihood(data,rates,params)
-        for i in range(self.emiter): # pylint:disable = unused-variable
-            rates,params = self.oneemstep(data,rates,params,self.precision**2)
-            # llike        = self.getllikelihood(data,rates,params)
-            # if llike-prevllike<self.tol:
-            #     break
+        for _ in range(self.emiter):
+            self.oneemstep(data,rates,params,self.precision**2)
         return rates,params

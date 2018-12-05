@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=too-many-ancestors
 "Basic bokeh models for dealing with it's idiosyncraties"
 from itertools               import product
 
@@ -11,7 +12,7 @@ import  bokeh.core.properties   as     props
 
 from    ..base                  import defaultsizingmode
 
-class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
+class DpxKeyedRow(Row):
     "define div with tabIndex"
     fig                = props.Instance(Figure)
     toolbar            = props.Instance(Model)
@@ -70,11 +71,11 @@ class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
 
         return layouts.row([left, layouts.column([keyed, bottom], **kwa)], **kwa)
 
-class DpxHoverTool(HoverTool): # pylint: disable=too-many-ancestors
+class DpxHoverTool(HoverTool):
     "sorts indices before displaying tooltips"
     maxcount           = props.Int(5)
     __implementation__ = "hovertool.coffee"
 
-class DpxNumberFormatter(NumberFormatter): # pylint: disable=too-many-ancestors
+class DpxNumberFormatter(NumberFormatter):
     "Deals with Nones correctly"
     __implementation__ = "numberformatter.coffee"

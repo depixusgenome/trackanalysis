@@ -6,11 +6,10 @@ from    typing      import (Optional, Tuple, Union, Any, Sequence, TypeVar,
                             Iterable, Iterator, Generator, Type, cast)
 import  numpy as np
 
-from    utils       import initdefaults, isfunction
+from    utils       import initdefaults, isfunction, NoArgs
 from    model       import Level
 from    ._config    import TrackViewConfigMixin
-from    ._dict      import (ITrackView, # pylint: disable=protected-access
-                            isellipsis, _m_NONE)
+from    ._dict      import ITrackView, isellipsis
 
 _m_KEYS  = int, cast(type, np.integer), str
 TSelf    = TypeVar('TSelf', bound = 'TrackView')
@@ -100,9 +99,9 @@ class TrackView(TrackViewConfigMixin, ITrackView):
         "returns the values only"
         yield from (i for _, i in self.__iter__())
 
-    def get(self, key, default = _m_NONE):
+    def get(self, key, default = NoArgs):
         "get an item"
-        if default is _m_NONE:
+        if default is NoArgs:
             vals = next(self._iter(sel = [key]))
         else:
             vals = next(self._iter(sel = [key]), default)

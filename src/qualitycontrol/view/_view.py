@@ -52,7 +52,7 @@ class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess, None]
         "returns the figure"
         mode    = self.defaultsizingmode()
         widgets = self._widgets.addtodoc(self, ctrl, mode)
-        grid    = self._plots.addtodoc(doc, mode)
+        grid    = self._plots.addtodoc(self._ctrl, doc, mode)
         return layouts.row(grid, widgets)
 
     def _reset(self, cache:CACHE_TYPE):

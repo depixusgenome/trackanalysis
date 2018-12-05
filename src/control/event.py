@@ -69,7 +69,7 @@ class EmitPolicy(Enum):
             LOGS.debug("callater %s", i)
             i()
 
-_CNT = 0
+_CNT         = [0]
 _COMPLETIONS = Dict[Callable, Set[Callable]]
 _HANDLERS    = Dict[str, Union[Set[Callable], _COMPLETIONS]]
 class Event:
@@ -124,12 +124,11 @@ class Event:
         "Call handlers only once: collect them all"
         allfcns = self.getobservers(lst)
         if len(allfcns):
-            global _CNT # pylint: disable=global-statement
-            _CNT += 1
+            _CNT[0] += 1
             policy = EmitPolicy.get(cast(EmitPolicy, policy), args)
-            LOGS.debug("[%d] Handling %s (%s)", _CNT, lst, self)
+            LOGS.debug("[%d] Handling %s (%s)", _CNT[0], lst, self)
             policy.run(allfcns, args)
-            LOGS.debug("[%d] Handled %s (%s)", _CNT, lst, self)
+            LOGS.debug("[%d] Handled %s (%s)", _CNT[0], lst, self)
         return args
 
     def emit(self, *names, returns = EmitPolicy.annotations):

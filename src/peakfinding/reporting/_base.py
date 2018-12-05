@@ -14,7 +14,7 @@ from excelreports.creation  import Reporter as _Reporter, column_method, FILEOBJ
 from data.views             import Beads
 from data.track             import Track, BEADKEY
 from signalfilter           import rawprecision
-from ..selector             import Output as PeakOutput
+from ..peaksarray           import Output as PeakOutput
 
 class ChartCreator:
     "Creates charts"

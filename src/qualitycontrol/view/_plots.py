@@ -207,9 +207,9 @@ class QualityControlPlots:
             for plot in self.__dict__.values():
                 plot.delegatereset(bkmodels)
 
-    def addtodoc(self, doc, mode):
+    def addtodoc(self, ctrl, doc, mode):
         "returns the plot grid"
-        plots   = [[getattr(i, '_addtodoc')(doc)] for i in self.__dict__.values()]
+        plots   = [[getattr(i, '_addtodoc')(ctrl, doc)] for i in self.__dict__.values()]
         for i in plots[1:]:
             i[0].x_range = plots[0][0].x_range
         for i in plots[:-1]:

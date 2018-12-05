@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# pylint: disable=missing-docstring,function-redefined,unused-argument
 """
 Operations on tracks
 """
 from    copy        import copy as shallowcopy, deepcopy
-from    typing      import Union, Tuple, List, Optional, TypeVar, cast
+from    typing      import Union, Tuple, List, TypeVar, cast
 from    pathlib     import Path
 
 import  numpy       as     np
@@ -16,7 +15,7 @@ from   .views       import BEADKEY
 
 TRACKS = TypeVar('TRACKS', Track, TracksDict)
 
-def _applytodict(fcn, trk, args, kwa) -> Optional[TracksDict]:
+def _applytodict(fcn, trk, args, kwa) -> TracksDict:
     cpy = shallowcopy(trk)
     for i, j in cpy.items():
         cpy[i] = fcn(j, *args, **kwa)
@@ -158,4 +157,4 @@ def trackname(track:Track) -> str:
         return track.key
 
     path = track.path
-    return Path(path if isinstance(path, (str, Path)) else path[0]).stem
+    return Path(path[0] if isinstance(path, (list, tuple)) else path).stem

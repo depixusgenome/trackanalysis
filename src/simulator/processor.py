@@ -12,19 +12,19 @@ from data.views         import TrackView
 from .track             import TrackSimulator
 from .bindings          import Experiment
 
-class _SimulatorTask(TrackSimulator):
+class _SimulatorTask(TrackSimulator, RootTask):
     u"Class indicating that a track file should be added to memory"
     nbeads: int           = 1
     seed:   Optional[int] = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
-        super().__init__(**kwa)
-        RootTask.__init__(self, **kwa) # pylint: disable=non-parent-init-called
+        TrackSimulator.__init__(self, **kwa)
+        RootTask      .__init__(self, **kwa)
 
-class TrackSimulatorTask(_SimulatorTask, RootTask):
+class TrackSimulatorTask(_SimulatorTask):
     u"Class that creates fake track data each time it is called upon"
 
-class EventSimulatorTask(_SimulatorTask, RootTask):
+class EventSimulatorTask(_SimulatorTask):
     u"Class that creates fake event data each time it is called upon"
     ncycles: int = 20
     levelou      = Level.event

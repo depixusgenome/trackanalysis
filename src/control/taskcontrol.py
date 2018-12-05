@@ -378,7 +378,6 @@ class TaskController(BaseTaskController):
 
     def __undos__(self, wrapper):
         "observes all undoable user actions"
-        # pylint: disable=unused-variable
         observe = lambda x: self.observe(wrapper(x))
 
         @observe

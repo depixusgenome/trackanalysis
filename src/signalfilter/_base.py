@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 def _add_doc(other):
     def _wrapper(fcn):
         if getattr(fcn, '__doc__', None):
-            fcn._doc__ += "\n\n"+getattr(other, '__doc__', '')
+            fcn.__doc__ += "\n\n"+getattr(other, '__doc__', '')
         return fcn
     return _wrapper
 
