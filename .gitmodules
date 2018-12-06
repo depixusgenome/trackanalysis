@@ -4,6 +4,3 @@
 [submodule "linting"]
 	path = linting
 	url = http://gitlab.picoseq.org/build-system/linting.git
-[submodule "src/utils"]
-	path = src/utils
-	url = https://gitlab.picoseq.org/analysis/libutils.git
