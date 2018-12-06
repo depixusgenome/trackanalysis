@@ -63,4 +63,4 @@ class KernelConvolution:
     def __call__(self, **kwa) -> Callable[[np.ndarray], np.ndarray]:
         kern = self.kernel(**kwa)
         rng  = kwa.get('range', self.range)
-        return lambda x: np.float32(fftconvolve(x, kern, rng)) # type: ignore
+        return lambda x: fftconvolve(x, kern, rng).astype('f4')
