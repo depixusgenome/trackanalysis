@@ -82,16 +82,16 @@ class GroupedBeadsModelAccess(PeaksPlotModelAccess):
         self.__store = GroupedBeadsStore()
 
     @property
-    def discardedbeads(self) -> List[int]:
+    def discardedbeads(self) -> Set[int]:
         "return discarded beads for the given sequence"
-        return self.__store.discarded.get(self.sequencekey, [])
+        return self.__store.discarded.get(self.sequencekey, set())
 
     @discardedbeads.setter
     def discardedbeads(self, values):
         "sets discarded beads for the given sequence"
         store = self.__store
         info  = dict(store.discarded)
-        info[self.sequencekey] = list(values)
+        info[self.sequencekey] = set(values)
         self._ctrl.display.update(store, discarded = info)
 
     def runbead(self) -> Optional[Output]: # type: ignore
@@ -122,6 +122,8 @@ class GroupedBeadsModelAccess(PeaksPlotModelAccess):
             itms      = tuple(tsk.details2output(cache[bead][1]))
             out[bead] = ([], _createpeaks(self, itms))
             for _, evts in itms:
-                evts = [np.nanmean(np.concatenate(i['data'])) for i in evts]
+                evts = [np.nanmean(np.concatenate(i['data']))
+                        for i in evts if len(i['data'])]
                 out[bead][0].append(np.array(evts, dtype = 'f4'))
+            out[bead][0] = np.concatenate(out[bead][0]) if len(out[bead][0]) else []
         return out

@@ -405,7 +405,7 @@ class PeakIDPathWidget:
         self.__dlg = FileDialog(ctrl, storage = 'constraints.path', filetypes = '*|xlsx')
 
     def addtodoc(self, mainview, ctrl, # type: ignore # pylint: disable=arguments-differ
-                 _) -> List[Widget]:
+                 *_) -> List[Widget]:
         "creates the widget"
         self.__widget = PathInput(width       = self.__theme.width,
                                   placeholder = self.__theme.placeholder,

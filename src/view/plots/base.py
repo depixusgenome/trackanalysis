@@ -486,8 +486,10 @@ class AxisOberver:
     def setbounds(self, cache:CACHE_TYPE, fig, # pylint: disable=too-many-arguments
                   xarr, yarr, xinit = None, yinit = None):
         "Sets the range boundaries"
-        cache[fig.x_range] = self.newbounds('x', xarr)
-        cache[fig.y_range] = self.newbounds('y', yarr)
+        if xarr is not None:
+            cache[fig.x_range] = self.newbounds('x', xarr)
+        if yarr is not None:
+            cache[fig.y_range] = self.newbounds('y', yarr)
 
         args: Dict[str, Tuple[Optional[float], Optional[float]]] = {
             'xinit': (None, None),

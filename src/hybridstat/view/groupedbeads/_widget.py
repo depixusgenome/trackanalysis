@@ -55,6 +55,7 @@ class DiscardedBeadsInput:
 
         self.__widget.on_change('discarded',   _ondiscarded_cb)
         self.__widget.on_change('accepted',    _onaccepted_cb)
+        return [self.__widget]
 
     def reset(self, cache):
         "resets the widget upon opening a new file, ..."
@@ -62,7 +63,7 @@ class DiscardedBeadsInput:
 
     def __data(self):
         disc   = self.__model.discardedbeads
-        bdctrl = DataSelectionBeadController(self.__model)
+        bdctrl = DataSelectionBeadController(getattr(self.__model, '_ctrl'))
         acc    = set(bdctrl.allbeads) - disc
         return  dict(accepted  = ', '.join(str(i) for i in sorted(acc)),
                      discarded = ', '.join(str(i) for i in sorted(disc)))
@@ -82,7 +83,7 @@ class GroupedBeadsPlotWidgets:
         wdg = {i: j.addtodoc(mainview, ctrl) for i, j in self.__dict__.items()}
         self.enabler = TaskWidgetEnabler(wdg)
         self.cstrpath.callbacks(ctrl, doc)
-        return wdg, self.enabler
+        return wdg
 
     def observe(self, ctrl):
         "oberver"

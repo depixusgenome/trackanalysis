@@ -7,7 +7,8 @@ import numpy as np
 from bokeh                  import layouts
 from bokeh.plotting         import Figure
 from bokeh.models           import (ColumnDataSource, Range1d, FactorRange,
-                                    NumeralTickFormatter, HoverTool, LinearAxis)
+                                    NumeralTickFormatter, HoverTool, LinearAxis,
+                                    ToolbarBox)
 from bokeh.transform        import jitter
 
 from sequences.modelaccess  import SequenceAnaIO
@@ -63,6 +64,7 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
 
         def _display(items):
             data  = self._data(items)
+            print(data)
             beads = [str(i) for i in sorted(set(data['events']['bead']))]
             cache[self._fig.x_range].update(factors = beads,
                                             start   = -.5,
@@ -85,8 +87,10 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
             for i, j in ((i, _[itr]) for i, _ in items.items()):
                 if isinstance(j, dict):
                     for k in cols:
-                        info[k].append(j[k])
+                        if k != 'bead':
+                            info[k].append(j[k])
                 else:
+                    print("****", j)
                     info["bases"].append(j)
                 info['bead'].append(np.full(len(info["bases"][-1]), str(i), dtype='<U3'))
             return {i: np.concatenate(j) if len(j) else [] for i, j in info.items()}
@@ -215,12 +219,13 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
 
         widg  = self._widgets.addtodoc(self, ctrl, doc)
         order = "discarded", "seq", "oligos", "cstrpath"
+        wbox  = layouts.widgetbox(sum((widg[i] for i in order), []), **mode)
 
-        grid       = layouts.GridSpec(2, 3)
-        grid[0,:]  = plots[0]
-        grid[1:,0] = layouts.widgetbox(sum((widg[i] for i in order), []), **mode)
-        grid[1:,1] = plots[1:]
-        return layouts.gridplot(grid, **mode, toolbar_location = loc)
+        hists = layouts.gridplot([plots[1:]], **mode, toolbar_location = loc)
+        # pylint: disable=not-an-iterable
+        tbar  = next(i for i in hists.children if isinstance(i, ToolbarBox))
+        tbar.toolbar.logo = None
+        return layouts.layout([[plots[0]], [wbox, hists]], **mode)
 
     def _reset(self, cache:CACHE_TYPE):
         done = 0

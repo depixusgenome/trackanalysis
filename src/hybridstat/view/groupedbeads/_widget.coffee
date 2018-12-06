@@ -2,7 +2,7 @@ import * as p           from "core/properties"
 
 import {WidgetView, Widget} from "models/widgets/widget"
 
-export class DpxDiscardedBeads extends WidgetView
+export class DpxDiscardedBeadsView extends WidgetView
     tagName: "div"
 
     on_discard: () ->
