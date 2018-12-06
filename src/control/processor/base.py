@@ -66,7 +66,7 @@ class Processor(Generic[TaskType]):
     @classmethod
     def canregister(cls):
         "allows discarding some specific processors from automatic registration"
-        if cls.__abstractmethods__ or cls.__name__.startswith('Gui'):
+        if getattr(cls, '__abstractmethods__', None) or cls.__name__.startswith('Gui'):
             return False
         return not isinstance(cls.tasktype, cast(type, TypeVar))
 
