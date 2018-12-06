@@ -341,6 +341,7 @@ class ThemeAttributesDescriptor:
         self.name  : str = label[label.rfind('%(theme.')+len('%(theme.'):label.rfind(')')]
         self.label : str = label[:label.rfind('%(')]
         self.fmt   : str = label[label.rfind(')')+1:]
+        self.items : list= []
         self._attr : str = ""
 
     def __set_name__(self, _, name):
@@ -350,7 +351,12 @@ class ThemeAttributesDescriptor:
         if inst is None:
             return self
         out = getattr(inst.doc, self.name, None)
-        if out is not None:
+        if out is None:
+            for i in self.items:
+                out = getattr(i, self.name, None)
+                if out is not None:
+                    break
+        if  out is not None:
             return out['value'] if isinstance(out, dict) else out
         return getattr(inst, '_ctrl').theme.gettheme(inst.doc, self.name)
 

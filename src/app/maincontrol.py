@@ -76,7 +76,7 @@ class ThemeController(DecentralizedController):
 
             if val is not None:
                 return val
-        return ""
+        return None
 
 class BaseSuperController:
     """

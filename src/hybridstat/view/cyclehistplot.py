@@ -361,6 +361,11 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
         for i in plots[1:]:
             i.y_range = plots[0].y_range
             i.yaxis[0].update(axis_label = "", major_label_text_font_size = '0pt')
+
+        # add a grid to the advanced menu because some themes are missing
+        # a grid_line_alpha attribute
+        type(self._widgets.advanced).theme1.items.append(plots[0].grid[0])
+
         plots[0].yaxis[1].major_label_text_font_size = '0pt'
         wdg, enabler = self._widgets.addtodoc(self, ctrl, doc,
                                               peaks = getattr(self._hist, '_src')['peaks'])

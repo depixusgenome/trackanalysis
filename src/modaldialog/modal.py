@@ -180,7 +180,7 @@ class TextOption(Option):
             val  = self.getvalue(model, key, None)
             if val is None:
                 pass
-            elif self._step is None or not np.isscalar(val):
+            elif self._step is None or not isinstance(val, (int, float, bool)):
                 opt += ' value="{}"'.format(val)
             elif isinstance(self._step, int):
                 opt += ' value="{}"'.format(np.around(val, int(self._step)))
