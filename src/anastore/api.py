@@ -123,6 +123,8 @@ def isana(path: Union[str, Path]):
         with open(path, 'r', encoding = 'utf-8') as stream:
             line = stream.read(100).replace('\n', '').replace(' ', '')
             return line[:len(const)] == const
+    except UnicodeError:
+        return False
     except IOError:
         return False
 
