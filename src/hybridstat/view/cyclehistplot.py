@@ -37,7 +37,8 @@ class CyclePlotTheme(PlotTheme):
     ylabel    = PlotTheme.yrightlabel
     ntitles   = 5
     format    = '0.0a'
-    frames    = PlotAttrs(deepcopy(PeaksPlotTheme.count.color), 'line', 1., alpha=.25)
+    frames    = PlotAttrs({'basic': 'lightgray', 'dark': 'darkgray'}, 'line', 1., alpha=.25)
+    points    = PlotAttrs(deepcopy(PeaksPlotTheme.count.color), 'circle', 1, alpha=.5)
     toolbar   = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,wheel_zoom,reset,save'
     @initdefaults(frozenset(locals()))
@@ -102,6 +103,7 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
         self._src  = ColumnDataSource(data = self._data(None))
         self._fig  = self.figure(y_range = Range1d, x_range = Range1d)
         self.addtofig(self._fig, 'frames', x = 't', y = 'z', source = self._src)
+        self.addtofig(self._fig, 'points', x = 't', y = 'z', source = self._src)
         self.linkmodeltoaxes(self._fig)
         self._fig.add_layout(LinearAxis(axis_label = ""), 'above')
         self._fig.add_layout(LinearAxis(axis_label = ""), 'right')
