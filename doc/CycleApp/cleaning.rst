@@ -68,8 +68,9 @@ Subtracting Fixed Beads
 
 Beads are defined as fixed if:
 
-#. Their high frequency noise is low, :math:`\sigma[HF] < 6 \mathrm{nm}`.
+#. Their high frequency noise is low, :math:`0.1 \mathrm{nm} < \sigma[HF] < 6 \mathrm{nm}`.
 #. Their extension :math:`\Delta z < 35 \mathrm{nm}`.
+#. The number of drops in phase 5 :math:`\(\sum\frac{dz}{dt} < 10 \mathrm{nm}\) < 0.1 cycles`.
 #. Their stability from cycle to cycle, measured as defined below must be less
    than :math:`10 \mathrm{nm}`. This stability roughly means that no more than
    10% of measures can lie farther than :math:`10 \mathrm{nm}` away from other
