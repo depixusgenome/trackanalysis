@@ -16,4 +16,6 @@ std::vector<float> phasebaseline(std::string txt,
 std::vector<float> phasebaseline(std::string txt,
                                  std::vector<data_t> const & signals,
                                  size_t cnt, int const * ix1,  int const * ix2);
+std::vector<int>   dzcount(float, size_t, float const *, int const *, int const *);
+size_t             dztotalcount(float, size_t, float const *, int const *, int const *);
 }}

@@ -196,6 +196,40 @@ namespace cleaning { namespace beadsubtraction {
         return pyout;
     }
 
+    ndarray<int>  pydzcount(float threshold,
+                            ndarray<float> pydata,
+                            ndarray<int>   pyi1,
+                            ndarray<int>   pyi2)
+    {
+        ndarray<int> pyout(pyi1.size());
+        auto ptr(pyout.mutable_data());
+        std::fill(ptr, ptr+pyi1.size(), 0);
+
+#       define PY_DZCOUNT_INPT                      \
+        int const    * i1   = pyi1.data();          \
+        int const    * i2   = pyi2.data();          \
+        size_t         sz   = pyi1.size();          \
+        float const  * data = pydata.data();        \
+        if(pydata.size() == 0 || pyi1.size() == 0)  \
+            return pyout;                           \
+        py::gil_scoped_release _;
+
+        PY_DZCOUNT_INPT
+        auto out = dzcount(threshold, sz, data, i1, i2);
+        std::copy(out.begin(), out.end(), ptr);
+        return pyout;
+    }
+
+    size_t  pydzcount2(float dzthr,
+                       ndarray<float> pydata,
+                       ndarray<int>   pyi1,
+                       ndarray<int>   pyi2)
+    {
+        size_t pyout = 0u;
+        PY_DZCOUNT_INPT
+        return dztotalcount(dzthr, sz, data, i1, i2);
+    }
+
     void pymodule(py::module & mod)
     {
         using namespace py::literals;
@@ -204,6 +238,11 @@ namespace cleaning { namespace beadsubtraction {
         mod.def("reducesignals", reducesignal3);
         mod.def("phasebaseline", pyphasebaseline);
         mod.def("phasebaseline", pyphasebaseline1);
+
+        auto doc = R"_(Return an array with the number of frames with to low a derivative.)_";
+        mod.def("dzcount", pydzcount,  doc);
+        doc = R"_(Return the number of frames with to low a derivative.)_";
+        mod.def("dztotalcount", pydzcount2, doc);
     }
 }}
 

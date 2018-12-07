@@ -14,7 +14,7 @@ from   signalfilter                 import nanhfsigma
 from   utils                        import initdefaults
 from   .datacleaning                import AberrantValuesRule, HFSigmaRule, ExtentRule
 from   ._core                       import (reducesignals, # pylint: disable=import-error
-                                            phasebaseline)
+                                            phasebaseline, dztotalcount)
 
 class SubtractAverageSignal:
     """
@@ -150,11 +150,35 @@ def aggtype(name:str) -> AggType:
 
 FixedData = Tuple[float, float, float, BEADKEY]
 FixedList = List[FixedData]
+class MeasureDropsRule():
+    """
+    Threshold on the number of cycles with frames in PHASE.measure such that:
+
+        dz/dt < -mindzdt
+    """
+    phase    = PHASE.measure
+    maxdrops = 10
+    mindzdt  = 1.5e-2
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def measure(self, track, bead, data) -> int:
+        "return the number of stairs in PHASE.measure"
+        ph1 = track.phase.select(..., self.phase)
+        ph2 = track.phase.select(..., self.phase+1)
+        return dztotalcount(-self.mindzdt, data, ph1, ph2)
+
+    def test(self, track, bead, data) -> bool:
+        "tests the number of cycles with too many stairs"
+        return self.measure(track, bead, data) > self.maxdrops*track.ncycles//100
+
 class FixedBeadDetection:
     """
     Finds and sorts fixed beads
     """
     abberrant     = AberrantValuesRule()
+    drops         = MeasureDropsRule()
     percentiles   = 5., 95.
     threshold     = 95.
     maxdiff       = .01
@@ -204,8 +228,9 @@ class FixedBeadDetection:
         ext: Tuple[List[float],...] = ([], [] ,[])
         var: Tuple[List[float],...] = ([], [] ,[])
         sig: Tuple[List[float],...] = ([], [] ,[])
-        pop: List[float]            = []
-        isgood: List[bool] = []
+        pop:    List[float] = []
+        drops:  List[float] = []
+        isgood: List[bool]  = []
         def _append(vals, itms):
             itms[0].append(np.nanmean(vals))
             itms[1].append(np.nanstd (vals))
@@ -218,6 +243,7 @@ class FixedBeadDetection:
             for _, data in beads:
                 cycs = self.__cycles(beads, data)
                 pop.append(self.population(cycs))
+                drops.append(self.drops.measure(cycs.track, _, cast(dict, cycs.data)[0]))
                 _append(self.extents(cycs), ext)
                 _append(np.diff(self.cyclesock(cycs), axis = 0).ravel(), var)
                 _append([nanhfsigma(i) for i in cycs.values()], sig)
@@ -231,6 +257,7 @@ class FixedBeadDetection:
         return pd.DataFrame(dict(bead = list(beads.keys()),
                                  good = isgood,
                                  pop  = pop,
+                                 drops= drops,
                                  **_vals('ext', ext),
                                  **_vals('var', var),
                                  **_vals('sig', sig)))
@@ -254,6 +281,9 @@ class FixedBeadDetection:
 
                 cycs   = self.__cycles(beads, data)
                 if self.population(cycs) < self.minpopulation:
+                    continue
+
+                if self.drops.test(cycs.track, beadid, cast(dict, cycs.data)[0]):
                     continue
 
                 ext    = extslow(cycs)

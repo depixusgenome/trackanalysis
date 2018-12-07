@@ -235,4 +235,35 @@ std::vector<float> stddevsignal(std::vector<data_t> const & signals, size_t i1, 
                    [](auto & x)  
                    {  return std::sqrt(compute<bat::variance>(x.size(), x.data())); });
 }
+
+std::vector<int> dzcount(float         dzthreshold,
+                         size_t        ncycles,
+                         float const * data,
+                         int const *   first,
+                         int const *   last)
+{
+    std::vector<int> out(ncycles);
+    for(size_t i = 0; i < ncycles; ++i)
+    {
+        auto & cnt  = out[i];
+        for(auto pos = first[i], e = last[i]-2; pos < e; ++pos)
+            if((data[pos+2]+data[pos+1])*.5 < data[pos] + dzthreshold)
+                ++cnt;
+    }
+    return out;
+}
+
+size_t      dztotalcount(float         dzthreshold,
+                         size_t        ncycles,
+                         float const * data,
+                         int const *   first,
+                         int const *   last)
+{
+    size_t cnt = 0u;
+    for(size_t i = 0; i < ncycles; ++i)
+        for(auto pos = first[i], e = last[i]-2; pos < e; ++pos)
+            if((data[pos+2]+data[pos+1])*.5 < data[pos] + dzthreshold)
+                ++cnt;
+    return cnt;
+}
 }}
