@@ -130,7 +130,7 @@ class SafeDataFrameProcessor(Processor[DataFrameTask]):
         rem = [DataFrameFactory]
         while len(rem):
             cur = rem.pop()
-            if not getattr(cur, '__abstractmethods__'):
+            if not getattr(cur, '__abstractmethods__', None):
                 yield cur
             rem.extend(i for i in cur.__subclasses__() if issubclass(i, DataFrameFactory))
 

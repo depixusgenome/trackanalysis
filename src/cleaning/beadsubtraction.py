@@ -154,14 +154,16 @@ class FixedBeadDetection:
     """
     Finds and sorts fixed beads
     """
-    abberrant    = AberrantValuesRule()
-    percentiles  = 5., 95.
-    threshold    = 95.
-    maxdiff      = .01
-    diffphases   = PHASE.initial, PHASE.measure
-    maxhfsigma   = .006
-    maxextent    = .035
-    extentphases = PHASE.initial, PHASE.pull
+    abberrant     = AberrantValuesRule()
+    percentiles   = 5., 95.
+    threshold     = 95.
+    maxdiff       = .01
+    diffphases    = PHASE.initial, PHASE.measure
+    minhfsigma    = 1e-4
+    maxhfsigma    = .006
+    maxextent     = .035
+    minpopulation = 80.
+    extentphases  = PHASE.initial, PHASE.pull
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
@@ -188,13 +190,21 @@ class FixedBeadDetection:
 
         return np.nanpercentile(vals, self.percentiles, axis=0)
 
+    @staticmethod
+    def population(cycs) -> float:
+        "return the percentage of finite values"
+        vals = sum(np.isfinite(i).sum() for i in cycs.values())
+        cnt  = sum(len(i) for i in cycs.values())
+        return vals/max(1,cnt)*100.
+
     def dataframe(self, beads: Beads) -> pd.DataFrame:
         """
         Creates a dataframe for all beads in  a track.
         """
-        ext: Tuple[List[float],...]    = ([], [] ,[])
-        var: Tuple[List[float],...]    = ([], [] ,[])
-        sig: Tuple[List[float],...]    = ([], [] ,[])
+        ext: Tuple[List[float],...] = ([], [] ,[])
+        var: Tuple[List[float],...] = ([], [] ,[])
+        sig: Tuple[List[float],...] = ([], [] ,[])
+        pop: List[float]            = []
         isgood: List[bool] = []
         def _append(vals, itms):
             itms[0].append(np.nanmean(vals))
@@ -204,22 +214,23 @@ class FixedBeadDetection:
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore',
                                     category = RuntimeWarning,
-                                    message  = '.*All-NaN slice encountered.*')
-            warnings.filterwarnings('ignore',
-                                    category = RuntimeWarning,
-                                    message  = '.*Mean of empty slice.*')
+                                    message  = '.*slice.*')
             for _, data in beads:
                 cycs = self.__cycles(beads, data)
+                pop.append(self.population(cycs))
                 _append(self.extents(cycs), ext)
                 _append(np.diff(self.cyclesock(cycs), axis = 0).ravel(), var)
                 _append([nanhfsigma(i) for i in cycs.values()], sig)
-                isgood.append(ext[-1][-1] < self.maxextent
-                              and var[-1][-1] < self.maxdiff
-                              and sig[-1][-1] < self.maxhfsigma)
+                isgood.append(
+                    ext[-1][-1] < self.maxextent
+                    and var[-1][-1] < self.maxdiff
+                    and not (self.minhfsigma <= sig[-1][-1] <= self.maxhfsigma)
+                )
 
         _vals = lambda i, j: {i+k: l for k, l in zip(('mean', 'std', 'percentile'), j)}
         return pd.DataFrame(dict(bead = list(beads.keys()),
                                  good = isgood,
+                                 pop  = pop,
                                  **_vals('ext', ext),
                                  **_vals('var', var),
                                  **_vals('sig', sig)))
@@ -237,10 +248,13 @@ class FixedBeadDetection:
                                     category = RuntimeWarning,
                                     message  = '.*All-NaN slice encountered.*')
             for beadid, data in beads:
-                if extfast(data) or beads.track.rawprecision(beadid) > self.maxhfsigma:
+                hfs = beads.track.rawprecision(beadid)
+                if extfast(data) or not self.minhfsigma <= hfs <= self.maxhfsigma:
                     continue
 
                 cycs   = self.__cycles(beads, data)
+                if self.population(cycs) < self.minpopulation:
+                    continue
 
                 ext    = extslow(cycs)
                 height = np.nanpercentile(ext, self.threshold)
@@ -253,7 +267,7 @@ class FixedBeadDetection:
                     continue
 
                 sigv = np.nanpercentile(sigfcn(cycs), self.threshold)
-                if sigv > self.maxhfsigma:
+                if not self.minhfsigma <= sigv <= self.maxhfsigma:
                     continue
 
                 delta = np.nanpercentile(np.diff(self.cyclesock(cycs), axis = 0).ravel(),
@@ -268,10 +282,11 @@ class FixedBeadDetection:
         return beads[:, ...].withdata({0: data})
 
     def __sigs(self, beads: Beads) -> Callable[[Cycles], np.ndarray]:
-        phases  = beads.track.phase.select
-        getsigs = HFSigmaRule(maxhfsigma=self.maxhfsigma).hfsigma
-        sigph   = tuple(phases(..., i) for i in (PHASE.initial, PHASE.measure+1))
-        return lambda x: getsigs(cast(Dict, x.data)[0], *sigph).values
+        phases = beads.track.phase.select
+        sigs   = HFSigmaRule(minhfsigma = self.minhfsigma,
+                             maxhfsigma = self.maxhfsigma).hfsigma
+        sigph  = tuple(phases(..., i) for i in (PHASE.initial, PHASE.measure+1))
+        return lambda x: sigs(cast(Dict, x.data)[0], *sigph).values
 
     def __exts(self, beads: Beads) -> Tuple[Callable[[Cycles], bool],
                                             Callable[[Cycles], np.ndarray]]:
