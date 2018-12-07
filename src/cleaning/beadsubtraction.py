@@ -157,7 +157,7 @@ class MeasureDropsRule():
         dz/dt < -mindzdt
     """
     phase    = PHASE.measure
-    maxdrops = 10
+    maxdrops = 100
     mindzdt  = 1.5e-2
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -181,7 +181,7 @@ class FixedBeadDetection:
     drops         = MeasureDropsRule()
     percentiles   = 5., 95.
     threshold     = 95.
-    maxdiff       = .01
+    maxdiff       = .015
     diffphases    = PHASE.initial, PHASE.measure
     minhfsigma    = 1e-4
     maxhfsigma    = .006
