@@ -170,22 +170,12 @@ class TextOption(Option):
         def _replace(info, tpe):
             key = info['name']
             assert len(key), "keys must have a name"
-            opt  = (''                        if self._step is None          else
-                    'step='+str(self._step)   if isinstance(self._step, int) else
-                    'step=0.'+'0'*(int(info[self._step])-1)+'1')
 
+            opt = self.__step(info)
             if info.get("fmt", "s").upper() == info.get("fmt", "s"):
                 opt += " min=0"
 
-            val  = self.getvalue(model, key, None)
-            if val is None:
-                pass
-            elif self._step is None or not isinstance(val, (int, float, bool)):
-                opt += ' value="{}"'.format(val)
-            elif isinstance(self._step, int):
-                opt += ' value="{}"'.format(np.around(val, int(self._step)))
-            else:
-                opt += ' value="{}"'.format(np.around(val, int(info[self._step])))
+            opt += self.__value(model, key, info)
             if info.get('width', None):
                 opt += f' style="width: {info["width"]}px;"'
 
@@ -195,6 +185,25 @@ class TextOption(Option):
         tpe = 'text' if self._cnv is str else 'number'
         fcn = lambda i: _replace(i.groupdict(), tpe)
         return self._patt.sub(fcn, body)
+
+    def __step(self, info) -> str:
+        return (
+            ''                        if self._step is None          else
+            'step='+str(self._step)   if isinstance(self._step, int) else
+            ''                        if info[self._step] is None    else
+            'step=0.'+'0'*(int(info[self._step])-1)+'1'
+        )
+
+    def __value(self, model, key, info) -> str:
+        val = self.getvalue(model, key, None)
+        if val in (None, ""):
+            return ""
+
+        if isinstance(self._step, int):
+            val = np.around(val, int(self._step))
+        elif info.get(self._step, None) is not None:
+            val = np.around(val, int(info[self._step]))
+        return ' value="{}"'.format(val)
 
 class CSVOption(Option):
     "Converts a text tag to an html text input"

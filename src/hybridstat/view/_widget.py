@@ -572,38 +572,33 @@ class _PeakDescriptor:
 
 def advanced(**kwa):
     "create the advanced button"
-    fig = (tab.figure(PeaksPlotTheme, PeaksPlotDisplay) if len(kwa) == 0 else
-           tab.figure(**kwa))
     msg = ("<b>To fit to the baseline (singlestrand) peak, add '0'"
            " ('singlestrand') to the oligos.<b>")
+    return tab(
+        f"""
+        ## Cleaning
 
-    @tab(f"""
-         ## Cleaning
+        Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α %(clipping.lowfactor).1oF
+        %(BeadSubtractionModalDescriptor:)
+        %(AlignmentModalDescriptor:)
+        Discard the single strand peak (unless in oligos)  %(SingleStrandConfig:automated)b
+        Detect and discard peaks below the baseline        %(baselinefilter.disabled)b
 
-         Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α %(clipping.lowfactor).1oF
-         %(BeadSubtractionModalDescriptor:)
-         %(AlignmentModalDescriptor:)
-         Discard the single strand peak (unless in oligos)  %(SingleStrandConfig:automated)b
-         Detect and discard peaks below the baseline        %(baselinefilter.disabled)b
+        ## Peaks
 
-         ## Peaks
+        {msg}
 
-         {msg}
-
-         Min frame count per hybridisation  %(eventdetection.events.select.minlength)D
-         Min hybridisations per peak        %(peakselection.finder.grouper.mincount)D
-         Re-align cycles using peaks        %(peakselection.align)b
-         Peak kernel size (blank ⇒ auto)    %(peakselection.precision).4oF
-         Exhaustive fit algorithm           %(_IdAccessor:alg)b
-         Max Δ to theoretical peak          %(_IdAccessor:window)d
-         """,
-         accessors = globals()
-        )
-    @fig
-    class AdvancedWidget(tab.taskwidget): # type: ignore
-        "access to the modal dialog"
-
-    return AdvancedWidget
+        Min frame count per hybridisation  %(eventdetection.events.select.minlength)D
+        Min hybridisations per peak        %(peakselection.finder.grouper.mincount)D
+        Re-align cycles using peaks        %(peakselection.align)b
+        Peak kernel size (blank ⇒ auto)    %(peakselection.precision).4oF
+        Exhaustive fit algorithm           %(_IdAccessor:alg)b
+        Max Δ to theoretical peak          %(_IdAccessor:window)d
+        """,
+        accessors = globals(),
+        figure    = kwa if kwa else (PeaksPlotTheme, PeaksPlotDisplay),
+        base      = tab.taskwidget
+    )
 
 class PeaksPlotWidgets: # pylint: disable=too-many-instance-attributes
     "peaks plot widgets"

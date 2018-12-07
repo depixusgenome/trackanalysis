@@ -468,6 +468,7 @@ class AdvancedWidget:
                 dialog(self.doc, **self._args())
             except Exception as exc: # pylint: disable=broad-except
                 # make it easier to debug with bokeh
+                LOGS.exception(exc)
                 self._ctrl.display.update("message", message = exc)
 
     @staticmethod
