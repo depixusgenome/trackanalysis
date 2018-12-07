@@ -170,8 +170,11 @@ class CleaningPlotTheme(PlotTheme):
     cleaning plot theme
     """
     name             = "cleaning.theme"
+    lines            = PlotAttrs({'basic': 'lightgray', 'dark': 'darkgray'},
+                                 'line', 1, alpha   = .3)
     points           = PlotAttrs('color',  'circle', 1, alpha   = .5)
     figsize          = PlotTheme.defaultfigsize(500, 700)
+    maxfixedbeads    = 15
     widgetwidth      = 470
     ntitles          = 5
     order            = ('aberrant', 'hfsigma', 'extent', 'population',

@@ -75,6 +75,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         self.__fig = fig = self.figure(y_range = Range1d,
                                        x_range = Range1d,
                                        name    = 'Clean:Cycles')
+        self.addtofig(fig, 'lines', x = 't', y = 'z', source = self.__source)
         glyph = self.addtofig(fig, 'points', x = 't', y = 'z', source = self.__source)
         hover = fig.select(DpxHoverTool)
         if hover:
@@ -114,7 +115,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
             return {i: [] for i in ("t", "z", "cycle", "color")}
 
         order = self._model.cleaning.sorted(self._theme.order)
-        size  = max(len(i) for _, i in items)
+        size  = max(len(i) for _, i in items)+5
         val   = np.full((len(items), size), np.NaN, dtype = 'f4')
         for (_, i), j in items:
             val[order[i],:len(j)] = j

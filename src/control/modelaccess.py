@@ -22,7 +22,12 @@ class PlotModelAccess:
     "Default plot model"
     def __init__(self, model:Union[Controller, 'PlotModelAccess']) -> None:
         self._model = model
-        self._ctrl  = getattr(model, '_ctrl', model)
+        self._ctrl  = getattr(model, 'ctrl', model)
+
+    @property
+    def ctrl(self):
+        "return the controller"
+        return self._ctrl
 
     def clear(self):
         "clears the model's cache"

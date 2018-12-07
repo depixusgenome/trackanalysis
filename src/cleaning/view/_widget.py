@@ -228,7 +228,9 @@ class CleaningFilterWidget:
 
     @property
     def __fixedbeads(self):
-        return intlistsummary([i[-1] for i in self.__model.availablefixedbeads], False)
+        maxi = self.__model.ctrl.theme.get("cleaning.theme", "maxfixedbeads")
+        lst  = [i[-1] for i in self.__model.availablefixedbeads]
+        return intlistsummary(lst, False, maxi)
 
     def observe(self, ctrl):
         "observe the controller"

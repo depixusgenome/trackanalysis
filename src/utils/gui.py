@@ -220,7 +220,7 @@ def parseints(new:str) -> Set[int]:
                 continue
     return vals
 
-def intlistsummary(beads: Sequence[int], ordered = True) -> str:
+def intlistsummary(beads: Sequence[int], ordered = True, maxi = None) -> str:
     """
     return a string with values in *beads*.
 
@@ -230,8 +230,14 @@ def intlistsummary(beads: Sequence[int], ordered = True) -> str:
     beads = list(beads)
     if len(beads) == 0:
         return ""
+
+    short = '...' if maxi and len(beads) > maxi else ''
+    if short:
+        beads = beads[:maxi]
+
     if ordered:
         beads = np.sort(beads)
+
         txt   = ""
         last  = 0
         i     = 1
@@ -246,8 +252,8 @@ def intlistsummary(beads: Sequence[int], ordered = True) -> str:
             txt += ", "+str(beads[last])
         else:
             txt += f", {beads[last]}{', ' if last == len(beads)-2 else ' → '}{beads[-1]}"
-        return txt[2:]
-    return ', '.join(str(i) for i in beads)
+        return txt[2]+short
+    return ', '.join(str(i) for i in beads)+short
 
 def leastcommonkeys(info, tail = ', ...') -> Dict[str, str]:
     "return simpler names for a list of track files"
