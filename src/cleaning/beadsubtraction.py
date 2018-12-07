@@ -163,15 +163,15 @@ class MeasureDropsRule():
     def __init__(self, **_):
         pass
 
-    def measure(self, track, bead, data) -> int:
+    def measure(self, track, data) -> int:
         "return the number of stairs in PHASE.measure"
         ph1 = track.phase.select(..., self.phase)
         ph2 = track.phase.select(..., self.phase+1)
         return dztotalcount(-self.mindzdt, data, ph1, ph2)
 
-    def test(self, track, bead, data) -> bool:
+    def test(self, track, data) -> bool:
         "tests the number of cycles with too many stairs"
-        return self.measure(track, bead, data) > self.maxdrops*track.ncycles//100
+        return self.measure(track, data) > self.maxdrops*track.ncycles//100
 
 class FixedBeadDetection:
     """
@@ -243,7 +243,7 @@ class FixedBeadDetection:
             for _, data in beads:
                 cycs = self.__cycles(beads, data)
                 pop.append(self.population(cycs))
-                drops.append(self.drops.measure(cycs.track, _, cast(dict, cycs.data)[0]))
+                drops.append(self.drops.measure(cycs.track, cast(dict, cycs.data)[0]))
                 _append(self.extents(cycs), ext)
                 _append(np.diff(self.cyclesock(cycs), axis = 0).ravel(), var)
                 _append([nanhfsigma(i) for i in cycs.values()], sig)
@@ -283,7 +283,7 @@ class FixedBeadDetection:
                 if self.population(cycs) < self.minpopulation:
                     continue
 
-                if self.drops.test(cycs.track, beadid, cast(dict, cycs.data)[0]):
+                if self.drops.test(cycs.track, cast(dict, cycs.data)[0]):
                     continue
 
                 ext    = extslow(cycs)
