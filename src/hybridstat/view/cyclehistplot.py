@@ -364,7 +364,8 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
 
         # add a grid to the advanced menu because some themes are missing
         # a grid_line_alpha attribute
-        type(self._widgets.advanced).theme1.items.append(plots[0].grid[0])
+        attr = getattr(type(self._widgets.advanced), 'theme1')
+        attr.items.append(plots[0].grid[0])
 
         plots[0].yaxis[1].major_label_text_font_size = '0pt'
         wdg, enabler = self._widgets.addtodoc(self, ctrl, doc,
