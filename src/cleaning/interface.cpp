@@ -480,7 +480,7 @@ A value at position *n* is aberrant if any:
                .def("aberrant",
                     [](CLS const & self, ndarray<float> & arr, bool clip)
                     { self.apply(arr.size(), arr.mutable_data(), clip); },
-                    py::arg("beaddata"), py::arg("clip") = true);
+                    py::arg("beaddata"), py::arg("clip") = false);
             _defaults(cls);
         }
 
