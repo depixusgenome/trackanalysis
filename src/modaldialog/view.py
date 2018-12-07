@@ -522,21 +522,28 @@ class AdvancedTaskWidget(AdvancedWidget):
 
 class TabCreator:
     "create tabs"
-    def __call__(self, *args,
-                 accessors: Union[Dict[str, Any], Sequence[type]] = (),
-                 figure                                           = False,
-                 base:      Union[None, str, type]                = None,
-                 **kwa):
+    def __call__(self, *args, **kwa):
+        return self.parse(*args, **kwa)
+
+    @classmethod
+    def parse(cls, *args,
+              accessors: Union[Dict[str, Any], Sequence[type]] = (),
+              figure                                           = False,
+              base:      Union[None, str, type]                = None,
+              **kwa):
         "adds descriptors to a class or returns an advanced tab"
-        title, args, inds = self.__splitargs(args)
+        title, args, inds = cls.__splitargs(args)
         def _create(elems):
             first     = next((i for i in elems if isinstance(i, bool)), True)
-            tit, itms = self.__parseargs(title, accessors, elems)
+            tit, itms = cls.__parseargs(title, accessors, elems)
             itms.extend(kwa.items())
-            return self.__createwrapper(tit, first, itms)
+            return cls.__createwrapper(tit, first, itms)
 
-        wraps  = [_create(args[inds[i]:inds[i+1]]) for i in range(len(inds)-1)]
-        wraps += self.__addfigure(figure) + self.__addtitle(args)
+        if len(args) == 0 and kwa:
+            wraps = [_create([])]
+        else:
+            wraps  = [_create(args[inds[i]:inds[i+1]]) for i in range(len(inds)-1)]
+        wraps += cls.__addfigure(figure) + cls.__addtitle(args)
         wraps  = wraps[::-1]
 
         def _mwrapper(cls):
@@ -545,12 +552,13 @@ class TabCreator:
             return cls
 
         if isinstance(base, str):
-            base = getattr(self, base)
+            base = getattr(cls, base)
         if isinstance(base, type):
             return _mwrapper(type('AdvancedWidget', (cast(type, base),), {}))
         return _mwrapper
 
-    def figure(self, cnf, disp = None, yaxis = True, xaxis = False, **kwa):
+    @classmethod
+    def figure(cls, cnf, disp = None, yaxis = True, xaxis = False, **kwa):
         "adds descriptors to a class or returns an advanced tab"
         if disp is None:
             if hasattr(cnf, 'display') and hasattr(cnf, 'theme'):
@@ -570,7 +578,7 @@ class TabCreator:
                      ('_ymax',  YAxisRangeDescriptor(disp))]
         text  = (kwa.pop('text'),) if 'text' in kwa  else ()
         args += list(kwa.items())
-        return self("Theme", *text, **dict(args))
+        return cls.parse("Theme", *text, **dict(args))
 
     taskattr  : type = TaskDescriptor
     line      : type = AdvancedDescriptor
@@ -660,7 +668,7 @@ class TabCreator:
             old = getattr(cls, '_body')
             def _body(self) -> AdvancedWidgetBody:
                 cur   = old(self)
-                lines = (i.line() if hasattr(i, 'line') else (i, '') for _, i in lst)
+                lines = [i.line() if hasattr(i, 'line') else (i, '') for _, i in lst]
                 mine  = AdvancedTab(title, *lines)
                 return (mine, *cur) if first else (*cur, mine)
             setattr(cls, '_body', _body)
@@ -671,13 +679,14 @@ class TabCreator:
             return cls
         return _wrapper
 
-    def __addfigure(self, figure):
+    @classmethod
+    def __addfigure(cls, figure):
         if isinstance(figure, dict):
-            return [self.figure(**figure)]
+            return [cls.figure(**figure)]
         if isinstance(figure, (list, tuple)):
-            return [self.figure(*figure)]
+            return [cls.figure(*figure)]
         if figure not in (False, None):
-            return [self.figure(figure)]
+            return [cls.figure(figure)]
         return []
 
     @classmethod
