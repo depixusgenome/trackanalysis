@@ -215,7 +215,7 @@ def poolchunk(items, nproc, iproc):
     sli      = slice(istart, istop)
     return items[sli] if hasattr(items, '__getitem__') else sli
 
-def _m_multi(cnf, iproc) -> dict:
+def _m_multi(cnf, safe, iproc) -> dict:
     runner  = Runner(**cnf)
     parents = cnf.get('parents', tuple())
     frame   = next((i for i in runner() if i.parents == parents), None)
@@ -223,11 +223,20 @@ def _m_multi(cnf, iproc) -> dict:
         return {}
 
     nproc = cnf['nproc']
-    res   = ((i, frame[i]) for i in poolchunk(frame.keys(), nproc, iproc))
+    if safe:
+        out = {}
+        for i in poolchunk(frame.keys(), nproc, iproc):
+            try:
+                out[i] = frame[i]
+            except Exception as exc: # pylint: disable=broad-except
+                out[i] = exc
+        return out
+
+    res = ((i, frame[i]) for i in poolchunk(frame.keys(), nproc, iproc))
     return {i: tuple(j) if isinstance(j, Iterator) else j for i, j in res}
 
 pooldump = pickle.dumps  # pylint: disable=invalid-name
-def pooledinput(pool, pickled, frame) -> dict:
+def pooledinput(pool, pickled, frame, safe = False) -> dict:
     "returns a dictionary with all input"
     data = pickle.loads(pickled) if isinstance(pickled, bytes) else pickled
     if pool is None or not any(i.isslow() for i in data):
@@ -249,7 +258,7 @@ def pooledinput(pool, pickled, frame) -> dict:
 
     cnf.update(nproc = pool.nworkers, parents = frame.parents) # type: ignore
     res   = {} # type: dict
-    for val in pool.map(partial(_m_multi, cnf), range(cnf['nproc'])):
+    for val in pool.map(partial(_m_multi, cnf, safe), range(cnf['nproc'])):
         res.update(val)
     return res
 

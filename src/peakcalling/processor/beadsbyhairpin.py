@@ -72,6 +72,7 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
     def __output(cls, out, cstrs) -> Iterator[ByHairpinGroup]:
         dflt = BeadsByHairpinTask.DEFAULT_FIT().defaultparameters()
         one  = lambda i, j: ByHairpinBead(i[0], i[1], i[2].get(j, dflt), i[3], i[4])
+        out  = {i: j for i, j in out.items() if not isinstance(j, Exception)}
         best = {itm.key: min(itm.distances, key = itm.distances.__getitem__, default = '✗')
                 for itm in out.values()}
         for i, j  in best.items():
@@ -93,7 +94,7 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
 
     @classmethod
     def _pooled(cls, cnf, pool, pickled, frame):
-        out        = cls.__output(pooledinput(pool, pickled, frame.data),
+        out        = cls.__output(pooledinput(pool, pickled, frame.data, safe = True),
                                   cnf.get('constraints', {}))
         frame.data = {i.key: i for i in out}
         return []
