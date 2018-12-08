@@ -19,8 +19,10 @@ class GroupedBeadsScatterTheme(PlotTheme):
     reflabel = 'Hairpin'
     ntitles  = 5
     format   = '0.0'
-    events   = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'},   'circle', .1)
-    peaks    = PlotAttrs({"dark": 'lightgreen', 'basic': 'darkgreen'}, 'diamond', .1)
+    events   = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'},   'circle',
+                         3, alpha = .5)
+    peaks    = PlotAttrs({"dark": 'lightgreen', 'basic': 'darkgreen'}, 'diamond',
+                         8, alpha = .5)
     toolbar  = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,reset,save,hover'
     tooltipmode      = 'mouse'
@@ -94,6 +96,17 @@ class GroupedBeadsModelAccess(PeaksPlotModelAccess):
         info[self.sequencekey] = set(values)
         self._ctrl.display.update(store, discarded = info)
 
+    def _defaultfitparameters(self, bead, itm) -> Tuple[float, float]:
+        "return the stretch  & bias for the current bead"
+        if itm[0] and itm[0].distances:
+            return min(itm[0].distances.values())[1:]
+        out = self.identification.constraints(bead)[1:]
+        if out[0] is None:
+            out = self.peaksmodel.config.estimatedstretch, out[1]
+        if out[1] is None:
+            out = out[0], itm[1].peaks[0]
+        return cast(Tuple[float, float], out)
+
     def runbead(self) -> Optional[Output]: # type: ignore
         "collects the information already found in different peaks"
         super().runbead()
@@ -105,25 +118,32 @@ class GroupedBeadsModelAccess(PeaksPlotModelAccess):
         if len(cache) == 0:
             return None
 
-        seq = self.sequencekey
-        if seq is None:
-            beads = set(cache)
-        else:
-            beads = set()
-            best  = lambda y: max(y, default = None, key = lambda x: y[x][0])
-            beads = {i for i, (j, _) in cache.items() if best(j.distances) == seq}
+        seq   = self.sequencekey
+        beads = {i: self._defaultfitparameters(i, j)
+                 for i, j in cache.items() if j[1] is not None}
+        if seq is not None and self.oligos:
+            best  = lambda y: min(y, default = None, key = lambda x: y[x][0])
+            beads = {i: beads[i]
+                     for i, (j, _) in cache.items()
+                     if best(getattr(j, 'distances', [])) == seq}
 
         if len(beads) == 0:
             return None
 
         tsk         = cast(PeakSelectorTask, self.peakselection.task)
         out: Output = {}
-        for bead in beads:
+        print(beads)
+        for bead, params in beads.items():
             itms      = tuple(tsk.details2output(cache[bead][1]))
-            out[bead] = ([], _createpeaks(self, itms))
+            out[bead] = [], _createpeaks(self, itms)
             for _, evts in itms:
                 evts = [np.nanmean(np.concatenate(i['data']))
                         for i in evts if len(i['data'])]
                 out[bead][0].append(np.array(evts, dtype = 'f4'))
-            out[bead][0] = np.concatenate(out[bead][0]) if len(out[bead][0]) else []
+
+            if len(out[bead][0]):
+                evts = (np.concatenate(out[bead][0])-params[1])*params[0]
+            else:
+                evts = []
+            out[bead] = evts, out[bead][1]
         return out

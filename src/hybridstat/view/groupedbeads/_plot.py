@@ -33,7 +33,8 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
     _fig:    Figure
     _ref:    LinearAxis
     _errors: PlotError
-    def _addtodoc(self, *_):
+    def create(self):
+        "add to doc"
         self._src = {i: ColumnDataSource(data = j) for i, j in self._data(None).items()}
         self._fig = self.figure(y_range = Range1d, x_range = FactorRange())
         self._ref = LinearAxis(axis_label = self._theme.reflabel,
@@ -41,7 +42,7 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
         self._fig.add_layout(self._ref, 'right')
 
         jtr       = jitter("bead", range = self._fig.x_range, width = .75)
-        self.addtofig(self._fig, "events", x = jtr,    y = 'bases',
+        self.addtofig(self._fig, "events", x = jtr, y = 'bases',
                       source = self._src["events"])
         rend = self.addtofig(self._fig, "peaks",  x = "bead", y = 'bases',
                              source = self._src["peaks"])
@@ -58,18 +59,22 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
         self._errors = PlotError(self._fig, self._theme)
         return self._fig
 
+    def _addtodoc(self, *_):
+        raise NotImplementedError()
+
+    @property
+    def peaks(self):
+        "return the source for peaks"
+        return self._src['peaks']
+
     def _reset(self, cache: CACHE_TYPE):
         def _data():
             return self._model.runbead()
 
         def _display(items):
             data  = self._data(items)
-            print(data)
             beads = [str(i) for i in sorted(set(data['events']['bead']))]
-            cache[self._fig.x_range].update(factors = beads,
-                                            start   = -.5,
-                                            end     = len(beads)-.5,
-                                            bounds  = [-.5, len(beads)-.5])
+            cache[self._fig.x_range].update(factors = beads)
             self.setbounds(cache, self._fig, None, data['events']['bases'])
             cache[self._ref] = resetrefaxis(self._model, self._theme.reflabel)
             for i, j in data.items():
@@ -90,9 +95,9 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
                         if k != 'bead':
                             info[k].append(j[k])
                 else:
-                    print("****", j)
                     info["bases"].append(j)
                 info['bead'].append(np.full(len(info["bases"][-1]), str(i), dtype='<U3'))
+
             return {i: np.concatenate(j) if len(j) else [] for i, j in info.items()}
 
         cols = ('bead', 'bases', 'id', 'orient', 'duration', 'count')
@@ -107,9 +112,10 @@ class GBHistCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsHistMod
     _peaks:     ColumnDataSource
     _fig:       Figure
     _EMPTY = {i: np.empty(0, dtype = 'f4') for i in ('left', 'top', 'right')}
-    def _addtodoc(self, *_):
+    def create(self):
+        "add to doc"
         self._src = ColumnDataSource(data = self._EMPTY)
-        self._fig = self.figure(y_range = Range1d, x_range = FactorRange())
+        self._fig = self.figure(y_range = Range1d, x_range = Range1d)
         self.addtofig(
             self._fig, "hist",
             source = self._src,
@@ -119,20 +125,36 @@ class GBHistCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsHistMod
         self.linkmodeltoaxes(self._fig)
         return self._fig
 
-    def _reset(self, cache: CACHE_TYPE):
-        cache[self._src]['data'] = data = self._data()
-        self.setbounds(cache, self._fig, data['left'], data['top'])
+    def _addtodoc(self, *_):
+        raise NotImplementedError()
 
-    def _data(self) -> Dict[str, np.ndarray]:
-        items = getattr(self, '_peaks', None)
-        if items is None or len(items.data['count']) == 0:
+    def _reset(self, cache: CACHE_TYPE):
+        cache[self._src]['data'] = data = self._data(cache)
+        if len(data['left']):
+            xbnds = [data['left'][0], data['right'][-1]]
+            ybnds = [0, np.max(data['top'])]
+        else:
+            xbnds = []
+            ybnds = []
+        self.setbounds(cache, self._fig, xbnds, ybnds)
+
+    def _data(self, cache) -> Dict[str, np.ndarray]:
+        if self._peaks in cache:
+            data = cache[self._peaks].get("data", self._peaks.data)
+        if len(data['count']) == 0:
             return self._EMPTY
 
-        vals  = items.data[self._theme.xdata]
+        vals  = data[self._theme.xdata]
         if len(vals):
-            sel   = getattr(items.selected, "indices", None)
-            if sel is not None:
-                vals = vals[sel]
+            sel = self._peaks.selected
+            if self._peaks in cache and 'selected' in cache[self._peaks]:
+                sel = cache[self._peaks]["selected"]
+            if sel in cache and "indices" in cache[sel]:
+                inds = cache[sel]["indices"]
+            else:
+                inds = getattr(sel, "indices", None)
+            if inds:
+                vals = vals[inds]
 
         if len(vals) == 0:
             return self._EMPTY
@@ -143,7 +165,7 @@ class GBHistCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsHistMod
         return {
             'left':  edges[:-1],
             'right': edges[1:],
-            'y':     np.histogram(vals, bins = edges)[0]
+            'top':   np.histogram(vals, bins = edges)[0]
         }
 
     def setpeaks(self, peaks):
@@ -213,7 +235,10 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
 
     def _addtodoc(self, ctrl, doc):
         "returns the figure"
-        plots = [getattr(i, '_addtodoc')(ctrl, doc) for i in self._plots]
+        plots = [i.create() for i in self._plots]
+        self._duration.setpeaks(self._scatter.peaks)
+        self._rate    .setpeaks(self._scatter.peaks)
+
         loc   = self._ctrl.theme.get(GroupedBeadsScatterTheme, 'toolbar')['location']
         mode  = self.defaultsizingmode()
 
