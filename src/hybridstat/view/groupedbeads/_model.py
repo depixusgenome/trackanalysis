@@ -8,7 +8,7 @@ from control.decentralized  import Indirection
 from model.plots            import PlotTheme, PlotModel, PlotDisplay, PlotAttrs
 from utils                  import initdefaults
 from .._model               import PeaksPlotModelAccess, PeakSelectorTask, PeaksPlotTheme
-from .._peakinfo            import createpeaks as _createpeaks
+from .._peakinfo            import createpeaks as _createpeaks, PeakInfoModelAccess
 
 class GroupedBeadsScatterTheme(PlotTheme):
     "grouped beads plot theme"
@@ -21,8 +21,12 @@ class GroupedBeadsScatterTheme(PlotTheme):
     format   = '0.0'
     events   = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'},   'circle',
                          3, alpha = .5)
-    peaks    = PlotAttrs({"dark": 'lightgreen', 'basic': 'darkgreen'}, 'diamond',
-                         8, alpha = .5)
+    peaks    = PlotAttrs(dict(events.color), 'diamond', 10, alpha = .5)
+    hpin     = PlotAttrs('color', 'cross', 15, alpha = 1., line_width=2)
+    pkcolors = {
+        'dark':  {'missing': 'red', 'found': 'lightgreen'},
+        'basic': {'missing': 'red', 'found': 'darkgreen'}
+    }
     toolbar  = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,reset,save,hover'
     tooltipmode      = 'mouse'
@@ -119,23 +123,24 @@ class GroupedBeadsModelAccess(PeaksPlotModelAccess):
             return None
 
         seq   = self.sequencekey
-        beads = {i: self._defaultfitparameters(i, j)
-                 for i, j in cache.items() if j[1] is not None}
         if seq is not None and self.oligos:
             best  = lambda y: min(y, default = None, key = lambda x: y[x][0])
-            beads = {i: beads[i]
+            beads = {i: self.getfitparameters(seq, i)
                      for i, (j, _) in cache.items()
-                     if best(getattr(j, 'distances', [])) == seq}
+                     if best(getattr(j, 'distances', [])) == seq or i == self.bead}
+        else:
+            beads = {i: self._defaultfitparameters(i, j)
+                     for i, j in cache.items() if j[1] is not None}
 
         if len(beads) == 0:
             return None
 
         tsk         = cast(PeakSelectorTask, self.peakselection.task)
         out: Output = {}
-        print(beads)
         for bead, params in beads.items():
             itms      = tuple(tsk.details2output(cache[bead][1]))
-            out[bead] = [], _createpeaks(self, itms)
+            mdl       = PeakInfoModelAccess(self, bead)
+            out[bead] = [], _createpeaks(mdl, itms)
             for _, evts in itms:
                 evts = [np.nanmean(np.concatenate(i['data']))
                         for i in evts if len(i['data'])]

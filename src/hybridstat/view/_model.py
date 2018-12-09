@@ -212,9 +212,11 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
             vals[[0,-1]] = 0.
         return vals
 
-    def identifiedpeaks(self, peaks):
+    def identifiedpeaks(self, peaks, bead = NoArgs):
         "returns an array of identified peaks"
-        ref = self.referencepeaks
+        if bead is NoArgs:
+            bead = self.bead
+        ref = self.__store.peaks.get(bead, None)
         arr = np.full(len(peaks), np.NaN, dtype = 'f4')
         if len(peaks) and ref is not None and len(ref):
             ids = match.compute(ref, peaks, self.__theme.peakprecision)
@@ -468,10 +470,18 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         if addto:
             self.addto(ctrl, noerase = False)
 
-    def getfitparameters(self, key = NoArgs) -> Tuple[float, float]:
+    def getfitparameters(self, key = NoArgs, bead = NoArgs) -> Tuple[float, float]:
         "return the stretch  & bias for the current bead"
+        if bead is not NoArgs:
+            tmp   = None if self.roottask is None else self._ctrl.tasks.cache(self.roottask, -1)()
+            cache = (None, None) if tmp is None or bead not in tmp else tmp[bead]
+
         if key is not None:
-            dist = self.peaksmodel.display.distances
+            if bead is NoArgs:
+                dist = self.peaksmodel.display.distances
+            else:
+                dist = getattr(cache[0], "distances", {})
+
             key  = self.sequencekey if key is NoArgs else key
             if key in dist:
                 return dist[key][1:]
@@ -480,7 +490,10 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         if out[0] is None:
             out = self.peaksmodel.config.estimatedstretch, out[1]
         if out[1] is None:
-            out = out[0], self.peaksmodel.display.estimatedbias
+            if bead is NoArgs:
+                out = out[0], self.peaksmodel.display.estimatedbias
+            else:
+                out = out[0], getattr(cache[1], "peaks", [0])[0]
         return cast(Tuple[float, float], out)
 
     @property
@@ -682,11 +695,11 @@ def resetrefaxis(mdl, reflabel):
     "sets up the ref axis"
     task = mdl.identification.task
     fit  = getattr(task, 'fit', {}).get(mdl.sequencekey, None)
-    if fit is None or len(fit.peaks) <= 2:
+    if fit is None or len(fit.peaks) == 0:
         return dict(visible = False)
     label = mdl.sequencekey
     if not label:
         label = reflabel
-    return dict(ticker     = list(fit.peaks[1:-1]),
+    return dict(ticker     = list(fit.peaks),
                 visible    = True,
                 axis_label = label)

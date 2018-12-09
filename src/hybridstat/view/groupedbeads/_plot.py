@@ -12,8 +12,9 @@ from bokeh.models           import (ColumnDataSource, Range1d, FactorRange,
 from bokeh.transform        import jitter
 
 from sequences.modelaccess  import SequenceAnaIO
+from view.colors            import tohex
 from view.plots             import PlotView
-from view.plots.base        import GroupStateDescriptor
+from view.plots.base        import GroupStateDescriptor, themed
 from view.plots.ploterror   import PlotError
 from view.plots.tasks       import TaskPlotCreator, CACHE_TYPE
 from .._model               import resetrefaxis, PeaksPlotTheme
@@ -44,6 +45,7 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
         jtr       = jitter("bead", range = self._fig.x_range, width = .75)
         self.addtofig(self._fig, "events", x = jtr, y = 'bases',
                       source = self._src["events"])
+        self.addtofig(self._fig, "hpin",  x = "bead", y = 'bases', source = self._src["hpin"])
         rend = self.addtofig(self._fig, "peaks",  x = "bead", y = 'bases',
                              source = self._src["peaks"])
         hover = self._fig.select(HoverTool)
@@ -74,6 +76,8 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
         def _display(items):
             data  = self._data(items)
             beads = [str(i) for i in sorted(set(data['events']['bead']))]
+            beads.remove(str(self._model.bead))
+            beads.insert(0, str(self._model.bead))
             cache[self._fig.x_range].update(factors = beads)
             self.setbounds(cache, self._fig, None, data['events']['bases'])
             cache[self._ref] = resetrefaxis(self._model, self._theme.reflabel)
@@ -82,27 +86,48 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
 
         self._errors(cache, _data, _display)
 
-    @staticmethod
-    def _data(items) -> FigData:
+    def _data(self, items) -> FigData:
         if items is None:
             items = {}
 
-        def _create(cols, itr):
-            info: Dict[str, List[np.ndarray]] = {i: [] for i in cols}
-            for i, j in ((i, _[itr]) for i, _ in items.items()):
-                if isinstance(j, dict):
-                    for k in cols:
-                        if k != 'bead':
-                            info[k].append(j[k])
-                else:
-                    info["bases"].append(j)
-                info['bead'].append(np.full(len(info["bases"][-1]), str(i), dtype='<U3'))
-
-            return {i: np.concatenate(j) if len(j) else [] for i, j in info.items()}
-
         cols = ('bead', 'bases', 'id', 'orient', 'duration', 'count')
-        return {"events": _create(('bead', 'bases'), False),
-                "peaks":  _create(cols, True)}
+        out  = {"events": self.__exp(items, ('bead', 'bases'), False),
+                "peaks":  self.__exp(items, cols, True),
+                'hpin':   self.__hpin(items)}
+        return out
+
+    @staticmethod
+    def __exp(items, cols, itr):
+        info: Dict[str, List[np.ndarray]] = {i: [] for i in cols}
+        for i, _ in items.items():
+            j = _[itr]
+            if isinstance(j, dict):
+                for k in cols:
+                    if k != 'bead':
+                        info[k].append(j[k])
+            else:
+                info["bases"].append(j)
+            info['bead'].append(np.full(len(info["bases"][-1]), str(i), dtype='<U3'))
+        return {i: np.concatenate(j) if len(j) else [] for i, j in info.items()}
+
+    def __hpin(self, items):
+        task = self._model.identification.task
+        fit  = getattr(task, 'fit', {}).get(self._model.sequencekey, None)
+        if fit is not None and len(fit.peaks) > 0:
+            beads  = np.sort(list(items))
+            return {'bead':  np.repeat(beads, len(fit.peaks)).astype('<U3'),
+                    'bases': np.concatenate([fit.peaks]*len(beads)),
+                    'color': self.__hpincolors(beads, items, fit.peaks)}
+        return {'bead': [], 'bases': [], "color": []}
+
+    def __hpincolors(self, beads, items, fitpeaks):
+        colors = tohex(themed(self, self._theme.pkcolors))
+        arr    = np.array([colors['missing']]*len(beads)*len(fitpeaks))
+        for ibead, cache in items.items():
+            izero = np.searchsorted(beads, ibead)*len(fitpeaks)
+            found = cache[1]['id'][np.isfinite(cache[1]['id'])].astype('i4')
+            arr[np.searchsorted(fitpeaks,found)+izero] = colors['found']
+        return arr
 
 class GBHistCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsHistModel]):
     "Building a histogram for a given peak characteristic"

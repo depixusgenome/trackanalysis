@@ -9,18 +9,65 @@ import numpy                    as     np
 
 from eventdetection.processor   import EventDetectionTask
 from peakfinding.probabilities  import Probability
+from utils                      import NoArgs
 
 if TYPE_CHECKING:
     from ._model                import PeaksPlotModelAccess # pylint: disable=unused-import
 
+class PeakInfoModelAccess:
+    "wrapper to acces model info"
+    def __init__(self, mdl, bead = NoArgs):
+        self._model = mdl
+        self._bead  = bead
+
+    def hasidentification(self) -> bool:
+        "whether the model has an FitToHairpinTask"
+        return self._model.identification.task is not None
+
+    def identifiedpeaks(self, zvals):
+        "the identified peaks"
+        return self._model.fittoreference.identifiedpeaks(zvals, self._bead)
+
+    def sequences(self):
+        "return the sequences available"
+        return self._model.sequences(...)
+
+    def getfitparameters(self, key):
+        "return fit parameters"
+        return self._model.getfitparameters(key, self._bead)
+
+    def hybridisations(self):
+        "return hybridizations"
+        return self._model.hybridisations(...)
+
+    def matchpairs(self, key, zvals):
+        "return matched pairs"
+        dist = self.getfitparameters(key)
+        return self._model.identification.attribute('match', key).pair(zvals, *dist)['key']
+
+    @property
+    def sequencekey(self):
+        "return the current sequence"
+        return self._model.sequencekey
+
+    @property
+    def track(self):
+        "return the current track"
+        return self._model.track
+
+    @property
+    def eventdetectiontask(self):
+        "return the current track"
+        return self._model.eventdetection.task
+
 class PeakInfo(ABC):
     "Creates a peaks info dictionnary"
     @abstractmethod
-    def keys(self, mdl: 'PeaksPlotModelAccess') -> List[str]:
+    def keys(self, mdl: PeakInfoModelAccess) -> List[str]:
         "returns the list of keys"
 
     @abstractmethod
-    def values(self, mdl: 'PeaksPlotModelAccess', peaks, dico: Dict[str, np.ndarray]):
+    def values(self, mdl: PeakInfoModelAccess, peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
 
     def defaults(self, mdl, peaks) -> Dict[str, np.ndarray]:
@@ -31,25 +78,25 @@ class PeakInfo(ABC):
 class ZPeakInfo(PeakInfo):
     "All base peak-related info"
     @staticmethod
-    def keys(mdl: 'PeaksPlotModelAccess') -> List[str]:
+    def keys(mdl: PeakInfoModelAccess) -> List[str]:
         "returns the list of keys"
         return ['z']
 
     @staticmethod
-    def values(mdl: 'PeaksPlotModelAccess', peaks, dico: Dict[str, np.ndarray]):
+    def values(mdl: PeakInfoModelAccess, peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
         dico['z'] = np.array([i for i, _ in peaks], dtype = 'f4')
 
 class ReferencePeakInfo(PeakInfo):
     "All FitToReferenceTask related info"
-    def keys(self, mdl: 'PeaksPlotModelAccess') -> List[str]:
+    def keys(self, mdl: PeakInfoModelAccess) -> List[str]:
         "returns the list of keys"
-        return [] if mdl.identification.task else ['id', 'distance']
+        return [] if mdl.hasidentification else ['id', 'distance']
 
-    def values(self, mdl: 'PeaksPlotModelAccess', peaks, dico: Dict[str, np.ndarray]):
+    def values(self, mdl: PeakInfoModelAccess, peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
         zvals  = np.array([i for i, _ in peaks], dtype = 'f4')
-        ided   = mdl.fittoreference.identifiedpeaks(zvals)
+        ided   = mdl.identifiedpeaks(zvals)
         dico.update(id = ided, distance = zvals - ided)
 
 class IdentificationPeakInfo(PeakInfo):
@@ -59,26 +106,26 @@ class IdentificationPeakInfo(PeakInfo):
         "base keys"
         return ['id', 'distance', 'bases', 'orient']
 
-    def keys(self, mdl: 'PeaksPlotModelAccess') -> List[str]:
+    def keys(self, mdl: PeakInfoModelAccess) -> List[str]:
         "returns the list of keys"
         names = self.basekeys()
-        return names + [''.join(i) for i in product(mdl.sequences(...), names)]
+        return names + [''.join(i) for i in product(mdl.sequences(), names)]
 
-    def defaults(self, mdl: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
+    def defaults(self, mdl: PeakInfoModelAccess, peaks) -> Dict[str, np.ndarray]:
         dflt = super().defaults(mdl, peaks)
         for i in dflt:
             if i.endswith('orient'):
                 dflt[i]  = np.full(len(dflt[i]), ' ', dtype = '<U1')
         return dflt
 
-    def values(self, mdl: 'PeaksPlotModelAccess', peaks, dico: Dict[str, np.ndarray]):
+    def values(self, mdl: PeakInfoModelAccess, peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
         zvals         = np.array([i[0] for i in peaks], dtype = 'f4')
         dist          = mdl.getfitparameters(None)
         dico['bases'] = (zvals - dist[1])*dist[0]
-        for key, hyb in mdl.hybridisations(...).items():
+        for key, hyb in mdl.hybridisations().items():
             dist = mdl.getfitparameters(key)
-            tmp  = mdl.identification.attribute('match', key).pair(zvals, *dist)['key']
+            tmp  = mdl.matchpairs(key, zvals)
             good = tmp >= 0
             ori  = dict(hyb)
 
@@ -94,19 +141,20 @@ class IdentificationPeakInfo(PeakInfo):
 
 class StatsPeakInfo(PeakInfo):
     "All stats related info"
-    def keys(self, mdl: 'PeaksPlotModelAccess') -> List[str]:
+    def keys(self, mdl: PeakInfoModelAccess) -> List[str]:
         "returns the list of keys"
         return ['duration', 'sigma', 'count', 'skew']
 
-    def values(self, mdl: 'PeaksPlotModelAccess', peaks, dico: Dict[str, np.ndarray]):
+    def values(self, mdl: PeakInfoModelAccess, peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
         if len(peaks) == 0:
             return
 
-        task = cast(EventDetectionTask, mdl.eventdetection.task)
-        prob = Probability(framerate   = getattr(mdl.track, 'framerate', 30.),
-                           minduration = task.events.select.minduration)
-        dur  = mdl.track.phase.duration(..., task.phase) # type: ignore
+        track = mdl.track
+        task  = cast(EventDetectionTask, mdl.eventdetectiontask)
+        prob  = Probability(framerate   = getattr(track, 'framerate', 30.),
+                            minduration = task.events.select.minduration)
+        dur   = track.phase.duration(..., task.phase) # type: ignore
         for i, (_, evts) in enumerate(peaks):
             val                 = prob(evts, dur)
             dico['duration'][i] = val.averageduration
@@ -114,10 +162,13 @@ class StatsPeakInfo(PeakInfo):
             dico['count'][i]    = min(100., val.hybridisationrate*100.)
             dico['skew'][i]     = np.nanmedian(prob.skew(evts))
 
-def createpeaks(self: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
+def createpeaks(self, peaks) -> Dict[str, np.ndarray]:
     "Creates the peaks data"
     classes = [ZPeakInfo(), ReferencePeakInfo(), IdentificationPeakInfo(), StatsPeakInfo()]
     dico    = {}
+    if not isinstance(self, PeakInfoModelAccess):
+        self = PeakInfoModelAccess(self)
+
     for i in classes:
         dico.update(i.defaults(self, peaks))
     for i in classes:

@@ -228,7 +228,9 @@ class PlotAttrsView(PlotAttrs):
         cls._default(args)
         cls._coloralpha(args)
 
+    _cross    = _triangle
     _diamond  = _triangle
+    _square   = _triangle
     _vbar     = _patch
     _quad     = _line
 
