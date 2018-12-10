@@ -79,7 +79,7 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
             data  = self._data(items)
             beads = [i for i in sorted(int(i) for i in set(data['events']['bead']))]
             bead  = self._model.bead
-            if bead is not None and beads[0] != bead:
+            if bead in beads:
                 beads.remove(bead)
                 beads.insert(0, bead)
 

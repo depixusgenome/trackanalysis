@@ -121,6 +121,7 @@ class GroupedBeadsModelAccess(PeaksPlotModelAccess):
             cache = self._ctrl.tasks.cache(self.roottask, -1)()
             if not cache:
                 return {}
+            cache = dict(cache)
 
         cache = {i: j for i, j in cache.items() if not isinstance(j, Exception)}
         bead  = self.bead
@@ -153,6 +154,7 @@ class GroupedBeadsModelAccess(PeaksPlotModelAccess):
         if cache is None:
             return None
 
+        cache = dict(cache)
         beads = self.displayedbeads(cache)
         if not beads:
             return None

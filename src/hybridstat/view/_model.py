@@ -12,7 +12,7 @@ import numpy                    as     np
 from control.decentralized      import Indirection
 from control.modelaccess        import TaskAccess
 from cleaning.view              import DataCleaningModelAccess
-from model.task                 import RootTask
+from model.task                 import RootTask, DataSelectionTask
 from model.plots                import PlotModel, PlotTheme, PlotAttrs, PlotDisplay
 from peakfinding.histogram      import interpolator
 from peakfinding.selector       import PeakSelectorDetails
@@ -402,6 +402,15 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
                 task = self.default(mdl)
                 self.update(**(task.config() if task else {'disabled': True}))
 
+        @ctrl.tasks.observe("addtask", "updatetask", "removetask")
+        def _ondataselection(task = None, cache = None, **_):
+            if isinstance(task, DataSelectionTask):
+                for proc, elem in cache:
+                    if isinstance(proc.task, self.tasktype) and elem:
+                        for i in task.discarded:
+                            elem.pop(i, None)
+                        self.cache = elem
+
         ctrl.theme  .observe(mdl.sequencemodel.config, _observe)
         type(self).__defaults.observe(ctrl, self, _observe)
         ctrl.display.observe(mdl.peaksmodel.display,   _observe)
@@ -652,13 +661,13 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         self.singlestrand.setobservers(self, ctrl)
 
         @ctrl.display.observe(self._tasksdisplay)
-        def _onchangetrack(old = None,  **_):
+        def _onchangetrack(old = None, calllater = None, **_):
             if "roottask" in old:
-                self._poolcompute()
+                calllater.append(self._poolcompute)
 
         @ctrl.tasks.observe("addtask", "updatetask", "removetask")
-        def _onchangetasks(**_):
-            self._poolcompute()
+        def _onchangetasks(calllater = None, **_):
+            calllater.append(self._poolcompute)
 
     def fiterror(self) -> bool:
         "True if not fit was possible"
@@ -691,37 +700,36 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         procs = procs.cleancopy()
         refc  = self.fittoreference.refcache
 
-        async def _iter():
-            keys    = np.array(list(set(self.track.beads.keys()) - set(store)))
-            nkeys   = len(keys)
-            if not nkeys:
-                return
+        keys  = np.array(list(set(self.track.beads.keys()) - set(store)))
+        nkeys = len(keys)
+        if not nkeys:
+            return
 
-            ncpu    = min(nkeys, self.peaksmodel.config.ncpu)
-            jobs    = ([keys] if ncpu == 1 else
-                       np.split(keys, list(range(nkeys//ncpu+1, nkeys, nkeys//ncpu+1))))
-            pipes   = [Pipe() for i in range(len(jobs))]
-            process = [Process(target = self._poolrun,
-                               args   = (pipe[1], procs, refc, job))
-                       for pipe, job in zip(pipes, jobs)]
-            for _ in process:
-                _.start()
-            out    = [True]
-            while out[0] is not None:
+        keepgoing = lambda: root is self.roottask and cache() is not None
+
+        async def _iter():
+            pipes = []
+            ncpu  = min(nkeys, self.peaksmodel.config.ncpu)
+            for job in range(0, nkeys, nkeys//ncpu+1):
+                inp, oup = Pipe()
+                args     = (oup, procs, refc, keys[job:job+nkeys//ncpu+1])
+                Process(target = self._poolrun, args = args).start()
+                pipes.append(inp)
+
+            while len(pipes) and keepgoing():
                 await _sleep(self.peaksmodel.config.waittime)
-                for pipe, _ in pipes:
-                    while pipe.poll() and cache() is not None and root is self.roottask:
-                        out = pipe.recv()
+                for i, inp in enumerate(list(pipes)):
+                    while inp.poll() and keepgoing():
+                        out = inp.recv()
                         if out[0] is None:
+                            del pipes[i]
                             break
 
-                        if out[0] not in store:
+                        elif out[0] not in store:
                             yield out
 
-                if out[0] is not None and cache() is None or root is not self.roottask:
-                    for pipe, _ in pipes:
-                        pipe.send(True)
-                    break
+            for inp in pipes:
+                inp.send(True)
 
         async def _thread():
             with self._ctrl.display("hybridstat.peaks.store", args = {}) as evt:
