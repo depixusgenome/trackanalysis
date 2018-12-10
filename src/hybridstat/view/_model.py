@@ -318,7 +318,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
 
         self._ctrl.display.update(self.__display, constraints = cstrs)
         if  self.task is not None:
-            self.update(constraints = {i: dict(j) for i, j in cstrs.items()})
+            self.update(constraints = deepcopy(cstrs[root]))
 
     def constraints(self,
                     root: Optional[RootTask] = None,
