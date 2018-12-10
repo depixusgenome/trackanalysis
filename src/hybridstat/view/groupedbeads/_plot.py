@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View for seeing all beads together peaks"
+from functools              import partial
 from typing                 import Dict, List
 import numpy as np
 
@@ -37,7 +38,8 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
     def create(self):
         "add to doc"
         self._src = {i: ColumnDataSource(data = j) for i, j in self._data(None).items()}
-        self._fig = self.figure(y_range = Range1d, x_range = FactorRange())
+        self._fig = self.figure(y_range   = Range1d, x_range = FactorRange())
+        self._fig.grid[0].grid_line_alpha = 0.
         self._ref = LinearAxis(axis_label = self._theme.reflabel,
                                formatter  = NumeralTickFormatter(format = "0"))
         self._fig.add_layout(self._ref, 'right')
@@ -75,10 +77,13 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
 
         def _display(items):
             data  = self._data(items)
-            beads = [str(i) for i in sorted(set(data['events']['bead']))]
-            beads.remove(str(self._model.bead))
-            beads.insert(0, str(self._model.bead))
-            cache[self._fig.x_range].update(factors = beads)
+            beads = [i for i in sorted(int(i) for i in set(data['events']['bead']))]
+            bead  = self._model.bead
+            if bead is not None and beads[0] != bead:
+                beads.remove(bead)
+                beads.insert(0, bead)
+
+            cache[self._fig.x_range].update(factors = [str(i) for i in beads])
             self.setbounds(cache, self._fig, None, data['events']['bases'])
             cache[self._ref] = resetrefaxis(self._model, self._theme.reflabel)
             for i, j in data.items():
@@ -259,6 +264,20 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
         def _ongroupedbeads(**_):
             if self.isactive():
                 self.reset(False)
+
+        curr = [False]
+        name = GroupedBeadsScatterTheme().name
+
+        def _reset():
+            curr[0] = False
+            self._doc.add_next_tick_callback(partial(self.reset, False))
+
+        @ctrl.display.observe("hybridstat.peaks.store")
+        def _on_store(**_):
+            if not curr[0]:
+                curr[0] = True
+                time    = self._ctrl.theme.get(name, "displaytimeout")
+                self._doc.add_timeout_callback(_reset, time)
 
     def addto(self, ctrl, noerase = True):
         "adds the models to the controller"

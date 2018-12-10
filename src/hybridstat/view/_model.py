@@ -694,6 +694,9 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         async def _iter():
             keys    = np.array(list(set(self.track.beads.keys()) - set(store)))
             nkeys   = len(keys)
+            if not nkeys:
+                return
+
             ncpu    = min(nkeys, self.peaksmodel.config.ncpu)
             jobs    = ([keys] if ncpu == 1 else
                        np.split(keys, list(range(nkeys//ncpu+1, nkeys, nkeys//ncpu+1))))
@@ -721,10 +724,12 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
                     break
 
         async def _thread():
-            async for bead, itms, ref in _iter(): # pylint: disable=not-an-iterable
-                store[bead] = itms
-                if ref is not None:
-                    refc[bead]  = ref
+            with self._ctrl.display("hybridstat.peaks.store", args = {}) as evt:
+                async for bead, itms, ref in _iter(): # pylint: disable=not-an-iterable
+                    store[bead] = itms
+                    if ref is not None:
+                        refc[bead] = ref
+                    evt({"bead": bead})
 
         spawn(_thread)
 

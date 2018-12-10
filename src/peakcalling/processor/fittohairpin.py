@@ -17,7 +17,7 @@ from   peakfinding.processor       import (PeaksDict, SingleStrandTask,
                                            BaselinePeakTask, SingleStrandProcessor,
                                            BaselinePeakProcessor)
 from   utils                       import (StreamUnion, initdefaults, updatecopy,
-                                           asobjarray, DefaultValue)
+                                           asobjarray, DefaultValue, isint)
 from   ..tohairpin                 import (HairpinFitter, PeakGridFit, Distance,
                                            PeakMatching, Pivot, PEAKS_TYPE)
 from   .._base                     import Range
@@ -229,7 +229,7 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
     # pylint: disable=arguments-differ
     def compute(self, aitem: Union[BEADKEY, PeakEventsTuple]) -> FitBead:
         "Action applied to the frame"
-        if isinstance(aitem, BEADKEY):
+        if isint(aitem):
             bead = cast(BEADKEY, aitem)
             inp  = cast(PeakEvents, cast(dict, self.data)[bead])
         else:

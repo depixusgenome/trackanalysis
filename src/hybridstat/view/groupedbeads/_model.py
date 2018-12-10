@@ -36,6 +36,7 @@ class GroupedBeadsScatterTheme(PlotTheme):
                         ('Ref (base)', '@id'),
                         (PeaksPlotTheme.xlabel,    '@count{0.0}'),
                         (PeaksPlotTheme.xtoplabel, '@duration{0.000}')]
+    displaytimeout = 1.
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -85,8 +86,8 @@ class GroupedBeadsModelAccess(PeaksPlotModelAccess):
     __store = Indirection()
     def __init__(self, ctrl, addto = False):
         super().__init__(ctrl, addto = addto)
-        self.__store = GroupedBeadsStore()
-        #ctrl.theme.updatedefaults("hybridstat.peaks", ncpu = 2)
+        self.__store  = GroupedBeadsStore()
+        ctrl.theme.updatedefaults("hybridstat.peaks", ncpu = 2)
 
     @property
     def discardedbeads(self) -> Set[int]:
@@ -112,6 +113,37 @@ class GroupedBeadsModelAccess(PeaksPlotModelAccess):
             out = out[0], itm[1].peaks[0]
         return cast(Tuple[float, float], out)
 
+    def displayedbeads(self, cache = None) -> Dict[int, Tuple[float, float]]:
+        "return the displayed beads"
+        if not cache:
+            cache = self._ctrl.tasks.cache(self.roottask, -1)()
+            if not cache:
+                return {}
+
+        cache = {i: j for i, j in cache.items() if not isinstance(j, Exception)}
+        bead  = self.bead
+        for i in self.discardedbeads:
+            if i != bead:
+                cache.pop(i, None)
+
+        if not cache:
+            return {}
+
+        seq = self.sequencekey
+        if seq is not None and self.oligos:
+            best  = lambda y: min(y, default = None, key = lambda x: y[x][0])
+            return {
+                i: self.getfitparameters(seq, i)
+                for i, j in cache.items()
+                if best(getattr(j[0], 'distances', [])) == seq or i == self.bead
+            }
+
+        return {
+            i: self._defaultfitparameters(i, j)
+            for i, j in cache.items()
+            if j[1] is not None
+        }
+
     def runbead(self) -> Optional[Output]: # type: ignore
         "collects the information already found in different peaks"
         super().runbead()
@@ -119,24 +151,8 @@ class GroupedBeadsModelAccess(PeaksPlotModelAccess):
         if cache is None:
             return None
 
-        cache = {i: j for i, j in cache.items() if not isinstance(j, Exception)}
-        if len(cache) == 0:
-            return None
-
-        seq   = self.sequencekey
-        if seq is not None and self.oligos:
-            best  = lambda y: min(y, default = None, key = lambda x: y[x][0])
-            beads = {i: self.getfitparameters(seq, i)
-                     for i, (j, _) in cache.items()
-                     if best(getattr(j, 'distances', [])) == seq or i == self.bead}
-        else:
-            beads = {i: self._defaultfitparameters(i, j)
-                     for i, j in cache.items() if j[1] is not None}
-        for i in self.discardedbeads:
-            if i != self.bead:
-                beads.pop(i, None)
-
-        if len(beads) == 0:
+        beads = self.displayedbeads(cache)
+        if not beads:
             return None
 
         tsk         = cast(PeakSelectorTask, self.peakselection.task)
