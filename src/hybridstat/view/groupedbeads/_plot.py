@@ -274,7 +274,7 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
 
         @ctrl.display.observe("hybridstat.peaks.store")
         def _on_store(**_):
-            if not curr[0]:
+            if self.isactive() and not curr[0]:
                 curr[0] = True
                 time    = self._ctrl.theme.get(name, "displaytimeout")
                 self._doc.add_timeout_callback(_reset, time)
@@ -324,4 +324,4 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
 @setupio
 class GroupedBeadsPlotView(PlotView[GroupedBeadsPlotCreator]):
     "Peaks plot view"
-    PANEL_NAME = 'FoV Peaks'
+    PANEL_NAME = 'Hairpin Groups'

@@ -22,7 +22,7 @@ class TabsTheme:
         self.name:    str            = "app.tabs"
         self.startup: str            = startup
         self.initial: str            = initial
-        self.width:   int            = 600
+        self.width:   int            = 1000
         self.height:  int            = 30
         self.titles:  Dict[str, str] = OrderedDict()
         for i, j in panels.items():

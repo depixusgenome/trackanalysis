@@ -19,13 +19,16 @@ from view.tabs           import TabsView, TabsTheme, initsubclass
 from ._io                import setupio
 from .peaksplot          import PeaksPlotView
 from .cyclehistplot      import CycleHistPlotView
+from .groupedbeads       import GroupedBeadsPlotView
 
-PANELS = {FoVPlotView        : 'fov',
-          QualityControlView : 'qc',
-          CleaningView       : 'cleaning',
-          CyclesPlotView     : 'cycles',
-          PeaksPlotView      : 'peaks',
-          CycleHistPlotView  : 'cyclehist'}
+PANELS = {FoVPlotView          : 'fov',
+          QualityControlView   : 'qc',
+          CleaningView         : 'cleaning',
+          CyclesPlotView       : 'cycles',
+          PeaksPlotView        : 'peaks',
+          CycleHistPlotView    : 'cyclehist',
+          GroupedBeadsPlotView : 'grouped'}
+
 NAME   = "CyclesApp"
 class HybridStatTheme(TabsTheme):
     "HybridStatTheme"
