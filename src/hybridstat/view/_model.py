@@ -686,8 +686,8 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         if procs is None:
             return
 
-        store = procs.data.setCacheDefault(-1, {})
-        cache = procs.data.getCache(-1)
+        store = procs.data.setcachedefault(-1, {})
+        cache = procs.data.getcache(-1)
         procs = procs.cleancopy()
         refc  = self.fittoreference.refcache
 

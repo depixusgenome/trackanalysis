@@ -68,7 +68,7 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
 
     def run(self, args):
         "updates frames"
-        cache = args.data.setCacheDefault(self, {})
+        cache = args.data.setcachedefault(self, {})
         args.apply(self.apply(cache =  cache, **self.config()))
 
     def beads(self, _, selected: Iterable[int]) -> Iterable[int]: # type: ignore

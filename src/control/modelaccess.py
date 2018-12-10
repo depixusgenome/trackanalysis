@@ -212,7 +212,7 @@ class TaskAccess(TaskPlotModelAccess):
         "sets the processor's cache if the task exists"
         ctrl = self.processors()
         if ctrl is not None:
-            ctrl.data.setCache(self.task, value)
+            ctrl.data.setcache(self.task, value)
 
     @property
     def processor(self) -> Optional[Processor]:

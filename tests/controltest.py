@@ -150,9 +150,9 @@ def test_task_mutations():
         return dum, proc
 
     cnt = [0]
-    _DummyTask0, _DummyProcess0 = _make(0, lambda i, j: j.setCacheDefault(i, list(cnt)))
+    _DummyTask0, _DummyProcess0 = _make(0, lambda i, j: j.setcacheDefault(i, list(cnt)))
     _DummyTask1, _DummyProcess1 = _make(1, lambda i, j: None)
-    _DummyTask2, _DummyProcess2 = _make(2, lambda i, j: j.setCache(i, list(cnt)))
+    _DummyTask2, _DummyProcess2 = _make(2, lambda i, j: j.setcache(i, list(cnt)))
 
     ctrl = TaskController()
 

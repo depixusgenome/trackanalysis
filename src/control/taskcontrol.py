@@ -80,7 +80,7 @@ class ProcessorController:
 
     def update(self, tsk):
         "clears data starting at *tsk*"
-        self.data.delCache(tsk)
+        self.data.delcache(tsk)
 
     def cleancopy(self) -> 'ProcessorController':
         "returns a cache with only the processors"
@@ -91,7 +91,7 @@ class ProcessorController:
 
     def clear(self):
         "clears data starting at *tsk*"
-        self.data.delCache()
+        self.data.delcache()
 
     def run(self, tsk:Task = None, copy = None, pool = None):
         """
@@ -221,7 +221,7 @@ class BaseTaskController(Controller):
 
     def cache(self, parent:RootTask, tsk:Optional[Task]):
         "Returns the cache for a given task"
-        return self._items[parent].data.getCache(tsk)
+        return self._items[parent].data.getcache(tsk)
 
     def run(self, parent:RootTask, tsk:Task, copy = False, pool = None):
         """

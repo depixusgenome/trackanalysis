@@ -120,7 +120,7 @@ def runbead(ctrl, bead, refcache):
     if ctrl is None:
         return None
 
-    cache = ctrl.data.setCacheDefault(-1, {})
+    cache = ctrl.data.setcachedefault(-1, {})
     out   = cache.get(bead, None)
     if out is None:
         store: List[PeakSelectorDetails] = []

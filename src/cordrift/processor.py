@@ -181,7 +181,7 @@ class DriftProcessor(Processor[DriftTask]):
     def run(self, args):
         "updates frames"
         kwa          = self.config()
-        kwa['cache'] = args.data.setCacheDefault(self, {})
+        kwa['cache'] = args.data.setcachedefault(self, {})
         if not (self.task.onbeads or args.pool is None):
             kwa.update(args.poolkwargs(self.task))
 

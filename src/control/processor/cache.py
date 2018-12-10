@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "List of processes and cache"
-from typing         import (Union, Iterable, List, Tuple, Any, Iterator,
-                            Type, cast)
-from utils          import isfunction
-from model.task     import Task
-from .base          import Processor, register
+from typing     import Union, Iterable, List, Tuple, Any, Iterator, Type, cast
+from utils      import isfunction
+from model.task import Task
+from .base      import Processor, register
 
 def _version():
     i = 0
@@ -33,7 +32,7 @@ class CacheItem:
         "returns the index of the provided task"
         return tsk is self.proc or tsk is self.proc.task
 
-    def _getCache(self, old):
+    def _getcache(self, old):
         "Delayed access to the cache"
         def _call():
             version, cache = self._cache
@@ -42,17 +41,17 @@ class CacheItem:
             return cache
         return _call
 
-    def setCacheDefault(self, item):
+    def setcachedefault(self, item):
         "Sets the cache if it does not exist yet"
         version, cache = self._cache
         if cache is None:
             cache = item() if isfunction(item) else item
             nvers = next(self._VERSION)
             if version == self._cache[0]:
-                self.setCache(cache, nvers)
+                self.setcache(cache, nvers)
         return cache
 
-    def setCache(self, cache, version = None):
+    def setcache(self, cache, version = None):
         "Sets the cache and its version"
         if version is None:
             version = next(self._VERSION)
@@ -61,13 +60,13 @@ class CacheItem:
         while version > self._cache[0]:
             self._cache = item
 
-        return self._getCache(version)
+        return self._getcache(version)
 
-    def getCache(self):
+    def getcache(self):
         "Delayed access to the cache"
-        return self._getCache(self._cache[0])
+        return self._getcache(self._cache[0])
 
-    cache   = property(lambda self: self.getCache(), setCache)
+    cache   = property(lambda self: self.getcache(), setcache)
     proc    = property(lambda self: self._proc)
 
 RepType = Tuple[int, Processor, Processor]
@@ -82,7 +81,7 @@ class CacheReplacement:
 
     def taskcache(self, task:Task):
         "returns the task cache"
-        return self.cache.getCache(task)()
+        return self.cache.getcache(task)()
 
     def __enter__(self):
         if self.cache is None:
@@ -146,11 +145,11 @@ class Cache(Iterable[Processor]):
     @property
     def first(self):
         "returns the data from the first task"
-        return self._items[0].getCache()
+        return self._items[0].getcache()
 
     def last(self, tsk):
         "returns the data from the last task"
-        return self._items[self.index(tsk)].getCache()
+        return self._items[self.index(tsk)].getcache()
 
     def append(self, proc) -> 'Cache':
         "appends a processor"
@@ -165,12 +164,12 @@ class Cache(Iterable[Processor]):
     def insert(self, index, proc):
         "inserts a processor"
         self._items.insert(index, CacheItem(proc))
-        self.delCache(index)
+        self.delcache(index)
 
     def pop(self, ide):
         "removes a processor"
         ind = self.index(ide)
-        self.delCache(ind)
+        self.delcache(ind)
         self._items.pop(ind)
     remove = pop
 
@@ -184,22 +183,22 @@ class Cache(Iterable[Processor]):
         "returns a cache with only the processors"
         return Cache([i.proc for i in self._items])
 
-    def getCache(self, ide):
+    def getcache(self, ide):
         "access to processor's cache"
-        return self._items[self.index(ide)].getCache()
+        return self._items[self.index(ide)].getcache()
 
-    def setCacheDefault(self, ide, item):
+    def setcachedefault(self, ide, item):
         """
         Sets the cache unless, it exists already.
         If the item is a lambda, the latter is executed before storing
         """
-        return self._items[self.index(ide)].setCacheDefault(item)
+        return self._items[self.index(ide)].setcachedefault(item)
 
-    def setCache(self, ide, value):
+    def setcache(self, ide, value):
         "sets a processor's cache"
-        return self._items[self.index(ide)].setCache(value)
+        return self._items[self.index(ide)].setcache(value)
 
-    def delCache(self, tsk = None):
+    def delcache(self, tsk = None):
         """
         Clears cache starting at *tsk*.
         Clears all if tsk is None
@@ -208,7 +207,7 @@ class Cache(Iterable[Processor]):
         orig = self._items[ind]
 
         def _clear(proc, *_1):
-            proc.setCache(None)
+            proc.setcache(None)
 
         for proc in self._items[ind:]:
             getattr(type(proc), 'clear', _clear)(proc, self, orig)

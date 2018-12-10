@@ -312,7 +312,7 @@ def test_cycleprocess_withalignment():
         ret  = dict(next(i for i in pair.run(pool = pool))[0,...].withphases(5))
         ret  = {i: j - j.mean() for i, j in ret.items()}
 
-        cache = pair.data.getCache(-1)()
+        cache = pair.data.getcache(-1)()
         if cache is not None:
             cache = {i[1] if isinstance(i, tuple) else i: j.value - j.value.mean()
                      for i, j in cache.items()}

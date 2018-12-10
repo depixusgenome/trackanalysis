@@ -170,7 +170,7 @@ class Processor(Generic[TaskType]):
         """
         @wraps(fcn)
         def _run(self: 'Processor', args:'Runner'):
-            cache  = args.data.setCacheDefault(self, dict())
+            cache  = args.data.setcachedefault(self, dict())
             # pylint: disable=protected-access
             args.apply(partial(self._setup_cache, cache, fcn(self, args)))
         return _run
