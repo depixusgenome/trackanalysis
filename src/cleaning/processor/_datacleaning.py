@@ -196,5 +196,5 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
 
     def run(self, args):
         "updates the frames"
-        cache = args.data.setCacheDefault(self, dict())
+        cache = args.data.setcachedefault(self, dict())
         return args.apply(partial(self.apply, cache = cache, **self.config()))

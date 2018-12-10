@@ -66,21 +66,21 @@ class ProcessorController:
 
         if index is _none:
             self.model.append(task)
-            self.data .append(proc)
-        else:
-            self.model.insert(index, task)
-            self.data .insert(index, proc)
+            self.data.append(proc)
+            return []
+        self.model.insert(index, task)
+        return self.data .insert(index, proc)
 
     def remove(self, task):
         "removes a task from the list"
         task = self.task(task)
 
         self.model.remove(task)
-        self.data .remove(task)
+        return self.data .remove(task)
 
     def update(self, tsk):
         "clears data starting at *tsk*"
-        self.data.delcache(tsk)
+        return self.data.delcache(tsk)
 
     def cleancopy(self) -> 'ProcessorController':
         "returns a cache with only the processors"
@@ -291,25 +291,25 @@ class BaseTaskController(Controller):
     @Controller.emit
     def addtask(self, parent:RootTask, task:Task, index = _none) -> dict:
         "opens a new file"
-        old = tuple(self._items[parent].model)
-        self._items[parent].add(task, self.__processors[type(task)], index = index)
-        return dict(controller = self, parent = parent, task = task, old = old)
+        old   = tuple(self._items[parent].model)
+        cache = self._items[parent].add(task, self.__processors[type(task)], index = index)
+        return dict(controller = self, parent = parent, task = task, old = old, cache = cache)
 
     @Controller.emit
     def updatetask(self, parent:RootTask, task:Union[Type[Task],int], **kwargs) -> dict:
         "updates a task"
-        tsk = self.task(parent, task, noemission = True)
-        old = Controller.updateModel(tsk, **kwargs)
-        self._items[parent].update(tsk)
-        return dict(controller = self, parent = parent, task = tsk, old = old)
+        tsk   = self.task(parent, task, noemission = True)
+        old   = Controller.updatemodel(tsk, **kwargs)
+        cache = self._items[parent].update(tsk)
+        return dict(controller = self, parent = parent, task = tsk, old = old, cache = cache)
 
     @Controller.emit
     def removetask(self, parent:RootTask, task:Union[Type[Task],int]) -> dict:
         "removes a task"
-        tsk = self.task(parent, task, noemission = True)
-        old = tuple(self._items[parent].model)
-        self._items[parent].remove(tsk)
-        return dict(controller = self, parent = parent, task = tsk, old = old)
+        tsk   = self.task(parent, task, noemission = True)
+        old   = tuple(self._items[parent].model)
+        cache = self._items[parent].remove(tsk)
+        return dict(controller = self, parent = parent, task = tsk, old = old, cache = cache)
 
     @overload
     def cleardata(self, parent: '_Ellipsis', task: Task = None) -> dict:

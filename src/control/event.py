@@ -385,7 +385,7 @@ class Controller(Event):
         return Event.internalemit(*names, returns = returns)
 
     @staticmethod
-    def updateModel(model, **kwargs) -> dict:
+    def updatemodel(model, **kwargs) -> dict:
         "updates a model element"
         old = dict()
         for name, val in kwargs.items():

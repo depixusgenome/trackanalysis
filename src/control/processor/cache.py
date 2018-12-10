@@ -161,16 +161,17 @@ class Cache(Iterable[Processor]):
         self._items.extend(CacheItem(i) for i in procs)
         return self
 
-    def insert(self, index, proc):
+    def insert(self, index, proc) -> List[Tuple[Processor, Any]]:
         "inserts a processor"
         self._items.insert(index, CacheItem(proc))
-        self.delcache(index)
+        return self.delcache(index)[1:]
 
-    def pop(self, ide):
+    def pop(self, ide) -> List[Tuple[Processor, Any]]:
         "removes a processor"
         ind = self.index(ide)
-        self.delcache(ind)
+        old = self.delcache(ind)
         self._items.pop(ind)
+        return old
     remove = pop
 
     def keepupto(self, task, included = True) -> 'Cache':
@@ -198,19 +199,21 @@ class Cache(Iterable[Processor]):
         "sets a processor's cache"
         return self._items[self.index(ide)].setcache(value)
 
-    def delcache(self, tsk = None):
+    def delcache(self, tsk = None) -> List[Tuple[Processor, Any]]:
         """
         Clears cache starting at *tsk*.
         Clears all if tsk is None
         """
         ind  = self.index(tsk)
         orig = self._items[ind]
+        old  = [(i.proc, i.cache()) for i in self._items[ind:]]
 
         def _clear(proc, *_1):
             proc.setcache(None)
 
         for proc in self._items[ind:]:
             getattr(type(proc), 'clear', _clear)(proc, self, orig)
+        return old
 
     def __len__(self):
         return len(self._items)

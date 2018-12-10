@@ -20,7 +20,7 @@ class InMemoryTrackProcessor(Processor[_tasks.InMemoryTrackTask]):
     def run(self, args:'Runner'):
         "updates frames"
         task = cast(_tasks.InMemoryTrackTask, self.task)
-        trk  = args.data.setCacheDefault(self, deepcopy(task.track))
+        trk  = args.data.setcachedefault(self, deepcopy(task.track))
         args.apply((trk.beads,), levels = self.levels)
 
     @staticmethod
@@ -40,10 +40,10 @@ class TrackReaderProcessor(Processor[_tasks.TrackReaderTask]):
         task  = cast(_tasks.TrackReaderTask, self.task)
         attr  = 'cycles' if task.levelou is Level.cycle else 'beads'
         if isinstance(task.path, dict):
-            trk = args.data.setCacheDefault(self, TracksDict())
+            trk = args.data.setcachedefault(self, TracksDict())
             trk.update(task.path)
         else:
-            trk = args.data.setCacheDefault(self,
+            trk = args.data.setcachedefault(self,
                                             Track(path = task.path,
                                                   key  = task.key,
                                                   axis = task.axis))
