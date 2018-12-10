@@ -69,6 +69,32 @@ class EmitPolicy(Enum):
             LOGS.debug("callater %s", i)
             i()
 
+class EventHandlerContext:
+    "handle a list of events repeatedly"
+    _fcns:      Callable
+    _policy:    EmitPolicy
+    def __init__(self, ctrl, lst, policy, args):
+        self._ctrl   = ctrl
+        self._lst    = lst
+        self._args   = policy, args
+
+    def __enter__(self):
+        self._fcns   = self._ctrl.getobservers(self._lst)
+        self._policy = EmitPolicy.get(cast(EmitPolicy, self._args[0]), self._args[1])
+        return self
+
+    def __exit__(self, *_):
+        pass
+
+    def handle(self, args):
+        "handle events"
+        _CNT[0] += 1
+        LOGS.debug("[%d] Handling %s (%s)", _CNT[0], self._lst, self._ctrl)
+        self._policy.run(self._fcns, args)
+        LOGS.debug("[%d] Handled %s (%s)", _CNT[0], self._lst, self._ctrl)
+
+    __call__ = handle
+
 _CNT         = [0]
 _COMPLETIONS = Dict[Callable, Set[Callable]]
 _HANDLERS    = Dict[str, Union[Set[Callable], _COMPLETIONS]]
@@ -130,6 +156,14 @@ class Event:
             policy.run(allfcns, args)
             LOGS.debug("[%d] Handled %s (%s)", _CNT[0], lst, self)
         return args
+
+    def __call__(
+            self,
+            lst:Union[str,Set[str]],
+            policy:Optional[EmitPolicy]                 = None,
+            args  :Optional[Union[Tuple,Sequence,Dict]] = None
+    ):
+        return EventHandlerContext(self, lst, policy, args)
 
     def emit(self, *names, returns = EmitPolicy.annotations):
         "wrapped methow will fire events named in arguments"
