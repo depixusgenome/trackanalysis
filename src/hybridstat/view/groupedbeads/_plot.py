@@ -116,10 +116,10 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
         return {i: np.concatenate(j) if len(j) else [] for i, j in info.items()}
 
     def __hpin(self, items):
-        task = self._model.identification.task
-        fit  = getattr(task, 'fit', {}).get(self._model.sequencekey, None)
-        if fit is not None and len(fit.peaks) > 0:
-            beads  = np.sort(list(items))
+        task  = self._model.identification.task
+        fit   = getattr(task, 'fit', {}).get(self._model.sequencekey, None)
+        beads = np.sort(list(items))
+        if fit is not None and len(fit.peaks) > 0 and len(beads) > 0:
             return {'bead':  np.repeat(beads, len(fit.peaks)).astype('<U3'),
                     'bases': np.concatenate([fit.peaks]*len(beads)),
                     'color': self.__hpincolors(beads, items, fit.peaks)}
