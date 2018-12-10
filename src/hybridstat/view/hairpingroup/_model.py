@@ -10,7 +10,7 @@ from utils                  import initdefaults
 from .._model               import PeaksPlotModelAccess, PeakSelectorTask, PeaksPlotTheme
 from .._peakinfo            import createpeaks as _createpeaks, PeakInfoModelAccess
 
-class GroupedBeadsScatterTheme(PlotTheme):
+class HairpinGroupScatterTheme(PlotTheme):
     "grouped beads plot theme"
     name     = "groupedbeads.plot"
     figsize  = PlotTheme.defaultfigsize(950, 550)
@@ -44,15 +44,15 @@ class GroupedBeadsScatterTheme(PlotTheme):
     def __init__(self, **_):
         super().__init__(**_)
 
-class GroupedBeadsScatterModel(PlotModel):
+class HairpinGroupScatterModel(PlotModel):
     "grouped beads plot model"
-    theme   = GroupedBeadsScatterTheme()
+    theme   = HairpinGroupScatterTheme()
     display = PlotDisplay(name = "groupedbeads.plot")
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
 
-class GroupedBeadsHistTheme(PlotTheme):
+class HairpinGroupHistTheme(PlotTheme):
     "grouped beads plot theme"
     name     = "groupedbeads.plot.hist"
     figsize  = PlotTheme.defaultfigsize(300, 300)
@@ -68,27 +68,27 @@ class GroupedBeadsHistTheme(PlotTheme):
     def __init__(self, **_):
         super().__init__(**_)
 
-class GroupedBeadsHistModel(PlotModel):
+class HairpinGroupHistModel(PlotModel):
     "grouped beads plot model"
-    theme   = GroupedBeadsHistTheme()
+    theme   = HairpinGroupHistTheme()
     display = PlotDisplay(name = "groupedbeads.plot.hist")
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
 
-class GroupedBeadsStore:
+class HairpinGroupStore:
     "info used for grouping beads"
     def __init__(self):
         self.name:      str                 = "groupedbeads"
         self.discarded: Dict[str, Set[int]] = {}
 
 Output = Dict[int, Tuple[List[np.ndarray], Dict[str, np.ndarray]]]
-class GroupedBeadsModelAccess(PeaksPlotModelAccess):
+class HairpinGroupModelAccess(PeaksPlotModelAccess):
     "task acces to grouped beads"
     __store = Indirection()
     def __init__(self, ctrl, addto = False):
         super().__init__(ctrl, addto = addto)
-        self.__store  = GroupedBeadsStore()
+        self.__store  = HairpinGroupStore()
         ctrl.theme.updatedefaults("hybridstat.peaks", ncpu = 2)
 
     @property

@@ -77,7 +77,7 @@ class DiscardedBeadsInput:
             'forced':    ', '.join(str(i) for i in sorted(forced))
         }
 
-class GroupedBeadsPlotWidgets:
+class HairpinGroupPlotWidgets:
     "peaks plot widgets"
     enabler: TaskWidgetEnabler
     def __init__(self, ctrl, mdl):

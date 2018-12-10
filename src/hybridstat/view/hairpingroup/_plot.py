@@ -20,17 +20,17 @@ from view.plots.ploterror   import PlotError
 from view.plots.tasks       import TaskPlotCreator, CACHE_TYPE
 from .._model               import resetrefaxis, PeaksPlotTheme
 from .._io                  import setupio
-from ._model                import (GroupedBeadsScatterModel, GroupedBeadsModelAccess,
-                                    GroupedBeadsScatterTheme, GroupedBeadsHistModel,
-                                    GroupedBeadsHistTheme, PlotDisplay)
-from ._widget               import GroupedBeadsPlotWidgets
+from ._model                import (HairpinGroupScatterModel, HairpinGroupModelAccess,
+                                    HairpinGroupScatterTheme, HairpinGroupHistModel,
+                                    HairpinGroupHistTheme, PlotDisplay)
+from ._widget               import HairpinGroupPlotWidgets
 
 ColumnData = Dict[str, np.ndarray]
 FigData    = Dict[str, ColumnData]
-class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScatterModel]):
+class GBScatterCreator(TaskPlotCreator[HairpinGroupModelAccess, HairpinGroupScatterModel]):
     "Building a scatter plot of beads vs hybridization positions"
-    _model:  GroupedBeadsModelAccess
-    _theme:  GroupedBeadsScatterTheme
+    _model:  HairpinGroupModelAccess
+    _theme:  HairpinGroupScatterTheme
     _src:    Dict[str, ColumnDataSource]
     _fig:    Figure
     _ref:    LinearAxis
@@ -134,10 +134,10 @@ class GBScatterCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsScat
             arr[np.searchsorted(fitpeaks,found)+izero] = colors['found']
         return arr
 
-class GBHistCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsHistModel]):
+class GBHistCreator(TaskPlotCreator[HairpinGroupModelAccess, HairpinGroupHistModel]):
     "Building a histogram for a given peak characteristic"
-    _model:     GroupedBeadsModelAccess
-    _theme:     GroupedBeadsHistTheme
+    _model:     HairpinGroupModelAccess
+    _theme:     HairpinGroupHistTheme
     _src:       ColumnDataSource
     _peaks:     ColumnDataSource
     _fig:       Figure
@@ -211,7 +211,7 @@ class GBHistCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsHistMod
         peaks.selected.on_change("indices", onselected_cb)
 
 @GroupStateDescriptor(*(f"groupedbeads.plot{i}" for i in ("", ".duration", ".rate")))
-class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
+class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
     "Building scatter & hist plots"
     def __init__(self, ctrl):
         super().__init__(ctrl, addto = False)
@@ -219,7 +219,7 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
         self._scatter  = GBScatterCreator(ctrl, **args)
 
         args.update(
-            theme = GroupedBeadsHistTheme(
+            theme = HairpinGroupHistTheme(
                 xdata   = "duration",
                 binsize = .1,
                 xlabel  = PeaksPlotTheme.xtoplabel,
@@ -230,7 +230,7 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
         self._duration = GBHistCreator(ctrl, **args)
 
         args.update(
-            theme = GroupedBeadsHistTheme(
+            theme = HairpinGroupHistTheme(
                 xdata   = "count",
                 binsize = .5,
                 xlabel  = PeaksPlotTheme.xlabel,
@@ -239,7 +239,7 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
             display = PlotDisplay(name = "groupedbeads.plot.rate")
         )
         self._rate     = GBHistCreator(ctrl, **args)
-        self._widgets  = GroupedBeadsPlotWidgets(ctrl, self._model)
+        self._widgets  = HairpinGroupPlotWidgets(ctrl, self._model)
         self.addto(ctrl)
 
     @property
@@ -266,7 +266,7 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
                 self.reset(False)
 
         curr = [False]
-        name = GroupedBeadsScatterTheme().name
+        name = HairpinGroupScatterTheme().name
 
         def _reset():
             curr[0] = False
@@ -295,7 +295,7 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
                 self._rate.reset(False)
         self._scatter.peaks.selected.on_change('indices', _update_cb)
 
-        loc   = self._ctrl.theme.get(GroupedBeadsScatterTheme, 'toolbar')['location']
+        loc   = self._ctrl.theme.get(HairpinGroupScatterTheme, 'toolbar')['location']
         mode  = self.defaultsizingmode()
 
         widg  = self._widgets.addtodoc(self, ctrl, doc)
@@ -322,6 +322,6 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
             pass
 
 @setupio
-class GroupedBeadsPlotView(PlotView[GroupedBeadsPlotCreator]):
+class HairpinGroupPlotView(PlotView[HairpinGroupPlotCreator]):
     "Peaks plot view"
     PANEL_NAME = 'Hairpin Groups'
