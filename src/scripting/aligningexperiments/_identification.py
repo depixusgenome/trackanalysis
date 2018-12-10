@@ -21,7 +21,6 @@ class PeakIdentifier:
         Return pairs of peaks per bead and track.
         The peak & event positions should already be aligned
         """
-        inf                   = np.iinfo('i4').max
         cols: Dict[str, list] = {i: [] for i in ('track', 'bead', attr, 'reference')}
         for bead, track in {k[1:] for k in data[['bead', 'track']].itertuples()}:
             thisref  = np.asarray(ref        if isinstance(ref, np.ndarray) else
@@ -34,8 +33,8 @@ class PeakIdentifier:
                 flags = matchpeaks(thisref, peaks.astype("f4"), 10.)
             else:
                 flags = self.peakflagger(thisref, [peaks])[0]
-            cols['reference'].append(thisref[flags[flags < inf]].astype('i4'))
-            cols[attr].append(peaks[flags < inf])
+            cols['reference'].append(thisref[flags[flags >= 0]].astype('i4'))
+            cols[attr].append(peaks[flags >= 0])
             cols['track'].append([track]*len(cols[attr][-1]))
             cols['bead'].append(np.full(len(cols[attr][-1]), bead, dtype = 'i4'))
 

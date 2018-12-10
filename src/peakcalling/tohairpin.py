@@ -446,7 +446,7 @@ def matchpeaks(ref, peaks, window):
     ```
     """
     ids = _match.compute(ref, peaks, window)
-    arr = np.full(len(peaks), np.iinfo('i4').max, dtype = 'i4')
+    arr = np.full(len(peaks), np.iinfo('i4').min, dtype = 'i4')
     arr[ids[:,1]] = ids[:,0]
     return arr
 
