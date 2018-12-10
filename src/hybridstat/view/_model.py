@@ -4,7 +4,7 @@
 from   asyncio                  import sleep as _sleep
 from   copy                     import copy, deepcopy
 from   multiprocessing          import Process, Pipe
-from   typing                   import Optional, Dict, Tuple, Any, Sequence, cast
+from   typing                   import Set, Optional, Dict, Tuple, Any, Sequence, cast
 import pickle
 
 import numpy                    as     np
@@ -296,6 +296,41 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         self.__defaults = FitToHairpinConfig()
         self.__display  = FitToHairpinDisplay()
 
+    def getforcedbeads(self, seq: Optional[str]) -> Set[int]:
+        "return the bead forced to the current sequence key"
+        if seq is not None:
+            task = cast(FitToHairpinTask, self.task)
+            if task is not None:
+                return {i for i, j in task.constraints.items() if j.hairpin == seq}
+        return set()
+
+    def setforcedbeads(self, seq: Optional[str], values: Set[int]):
+        "return the bead forced to the current sequence key"
+        forced = self.getforcedbeads(seq)
+        if forced == values:
+            return
+
+        if seq is None:
+            return
+
+        task = self.task
+        if task is None:
+            return
+        root        = cast(RootTask, self.roottask)
+        cstrs       = dict(self.__display.constraints)
+        cstrs[root] = cur = dict(cstrs.get(root, {}))
+        for i in forced-values:
+            if cur[i].constraints:
+                cur[i] = DistanceConstraint(None, cur[i].constraints)
+            else:
+                del cur[i]
+
+        for i in values-forced:
+            cur[i] = DistanceConstraint(seq, {})
+
+        self._ctrl.display.update(self.__display, constraints = cstrs)
+        self.update(constraints = deepcopy(cur))
+
     def newconstraint(self,
                       hairpin : Optional[str],
                       stretch : Optional[float],
@@ -340,6 +375,24 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         return (cur[0],
                 cur[1].get("stretch", (None,))[0],
                 cur[1].get("bias",    (None,))[0])
+
+    def update(self, **kwa):
+        "removes the task"
+        cache = self.cache() # pylint: disable=not-callable
+        if len(kwa) != 1 or 'constraints' not in kwa or not cache:
+            super().update(**kwa)
+        else:
+            cur = self.task.constraints
+            new = kwa['constraints']
+            for i in set(cur) ^ set(new):
+                cache.pop(i, None)
+            for i in set(cur) & set(new):
+                if cur[i] != new[i]:
+                    cache.pop(i, None)
+
+            super().update(**kwa)
+            if cache:
+                self.cache = cache
 
     def setobservers(self, mdl, ctrl):
         "observes the global model"

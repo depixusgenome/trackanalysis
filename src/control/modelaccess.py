@@ -157,6 +157,11 @@ class TaskAccess(TaskPlotModelAccess):
         out = type(task)(**cnf)
         return out
 
+    def processors(self) -> Optional[ProcessorController]:
+        "returns a tuple (dataitem, bead) to be displayed"
+        task = self.task
+        return None if task is None else self._tasksdisplay.processors(self._ctrl, task)
+
     @property
     def instrument(self) -> str:
         "the current instrument type"
@@ -201,6 +206,13 @@ class TaskAccess(TaskPlotModelAccess):
     def cache(self) -> Callable[[],Any]:
         "returns the processor's cache if it exists"
         return self._tasksdisplay.cache(self._ctrl, self.task)
+
+    @cache.setter
+    def cache(self, value):
+        "sets the processor's cache if the task exists"
+        ctrl = self.processors()
+        if ctrl is not None:
+            ctrl.data.setCache(self.task, value)
 
     @property
     def processor(self) -> Optional[Processor]:

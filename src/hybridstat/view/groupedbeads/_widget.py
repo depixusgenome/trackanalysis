@@ -4,7 +4,6 @@
 import bokeh.core.properties   as props
 from bokeh.models           import Widget
 
-from control.beadscontrol   import DataSelectionBeadController
 from view.static            import route
 from utils.gui              import parseints
 from .._widget              import (PeakIDPathWidget, PeaksSequencePathWidget,
@@ -15,46 +14,56 @@ class DpxDiscardedBeads(Widget):
     __css__            = route("groupedbeads.css", "icons.css")
     __implementation__ = '_widget.coffee'
     __javascript__     = route()
-    frozen      = props.Bool(True)
-    discarded   = props.String('')
-    accepted    = props.String('')
-    seltype     = props.Bool(True)
-    helpmessage = props.String('')
+    frozen        = props.Bool(True)
+    discarded     = props.String('')
+    discardedhelp = props.String('')
+    forced        = props.String('')
+    forcedhelp    = props.String('')
+
+class DiscardedBeadsInputTheme:
+    "Help messages for the widget"
+    def __init__(self):
+        self.name          = "groupedbeads.input"
+        self.discardedhelp = "Remove from displays"
+        self.forcedhelp    = "Force hairpin choice"
 
 class DiscardedBeadsInput:
     "discarded beads"
     __widget: DpxDiscardedBeads
-    def __init__(self, _, model):
+    def __init__(self, ctrl, model):
         self.__model = model
+        self.__theme = ctrl.theme.add(DiscardedBeadsInputTheme(), False)
 
     def addtodoc(self, mainview, ctrl):
         "sets-up the gui"
-        bdctrl        = DataSelectionBeadController(ctrl)
-        self.__widget = DpxDiscardedBeads(**self.__data(), name = 'GroupedBeads:discard')
-
-        def _onaccepted_cb(attr, old, new):
-            if not mainview.isactive():
-                return
-
-            beads = parseints(new)
-            beads = set(bdctrl.allbeads) - beads
-            if beads != self.__model.discardedbeads:
-                with ctrl.action:
-                    self.__model.discardedbeads = beads
-            self.__widget.update(**self.__data())
+        self.__widget = DpxDiscardedBeads(
+            discardedhelp = self.__theme.discardedhelp,
+            forcedhelp    = self.__theme.forcedhelp,
+            **self.__data()
+        )
 
         def _ondiscarded_cb(attr, old, new):
-            if not mainview.isactive():
-                return
+            if mainview.isactive():
+                beads = parseints(new)
+                if beads != self.__model.discardedbeads:
+                    with ctrl.action:
+                        self.__model.discardedbeads = beads
+                else:
+                    self.__widget.update(**self.__data())
 
-            beads = parseints(new)
-            if beads != self.__model.discardedbeads:
-                with ctrl.action:
-                    self.__model.discardedbeads = beads
-            self.__widget.update(**self.__data())
+        def _onforced_cb(attr, old, new):
+            if mainview.isactive():
+                beads = parseints(new)
+                key   = self.__model.sequencekey
+                cnf   = self.__model.identification
+                if beads != cnf.getforcedbeads(key):
+                    with ctrl.action:
+                        cnf.setforcedbeads(key, beads)
+                else:
+                    self.__widget.update(**self.__data())
 
         self.__widget.on_change('discarded',   _ondiscarded_cb)
-        self.__widget.on_change('accepted',    _onaccepted_cb)
+        self.__widget.on_change('forced',      _onforced_cb)
         return [self.__widget]
 
     def reset(self, cache):
@@ -62,11 +71,11 @@ class DiscardedBeadsInput:
         cache[self.__widget] = self.__data()
 
     def __data(self):
-        disc   = self.__model.discardedbeads
-        bdctrl = DataSelectionBeadController(getattr(self.__model, '_ctrl'))
-        acc    = set(bdctrl.allbeads) - disc
-        return  dict(accepted  = ', '.join(str(i) for i in sorted(acc)),
-                     discarded = ', '.join(str(i) for i in sorted(disc)))
+        forced = self.__model.identification.getforcedbeads(self.__model.sequencekey)
+        return {
+            'discarded': ', '.join(str(i) for i in sorted(self.__model.discardedbeads)),
+            'forced':    ', '.join(str(i) for i in sorted(forced))
+        }
 
 class GroupedBeadsPlotWidgets:
     "peaks plot widgets"

@@ -28,7 +28,7 @@ class GroupedBeadsScatterTheme(PlotTheme):
         'basic': {'missing': 'red', 'found': 'darkgreen'}
     }
     toolbar  = dict(PlotTheme.toolbar)
-    toolbar['items'] = 'pan,box_zoom,reset,save,hover'
+    toolbar['items'] = 'pan,box_zoom,reset,save,hover,box_select'
     tooltipmode      = 'mouse'
     tooltippolicy    = 'follow_mouse'
     tooltips         = [('Bead', '@bead'),
@@ -86,6 +86,7 @@ class GroupedBeadsModelAccess(PeaksPlotModelAccess):
     def __init__(self, ctrl, addto = False):
         super().__init__(ctrl, addto = addto)
         self.__store = GroupedBeadsStore()
+        #ctrl.theme.updatedefaults("hybridstat.peaks", ncpu = 2)
 
     @property
     def discardedbeads(self) -> Set[int]:
@@ -131,6 +132,9 @@ class GroupedBeadsModelAccess(PeaksPlotModelAccess):
         else:
             beads = {i: self._defaultfitparameters(i, j)
                      for i, j in cache.items() if j[1] is not None}
+        for i in self.discardedbeads:
+            if i != self.bead:
+                beads.pop(i, None)
 
         if len(beads) == 0:
             return None

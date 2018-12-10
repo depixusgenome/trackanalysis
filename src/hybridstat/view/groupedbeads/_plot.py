@@ -164,8 +164,10 @@ class GBHistCreator(TaskPlotCreator[GroupedBeadsModelAccess, GroupedBeadsHistMod
         self.setbounds(cache, self._fig, xbnds, ybnds)
 
     def _data(self, cache) -> Dict[str, np.ndarray]:
+        data = self._peaks.data
         if self._peaks in cache:
             data = cache[self._peaks].get("data", self._peaks.data)
+
         if len(data['count']) == 0:
             return self._EMPTY
 
@@ -253,6 +255,11 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
                 if root is not None and {'hpins'} == set(old):
                     self.calllater(lambda: self.reset(False))
 
+        @ctrl.display.observe
+        def _ongroupedbeads(**_):
+            if self.isactive():
+                self.reset(False)
+
     def addto(self, ctrl, noerase = True):
         "adds the models to the controller"
         for i in self._plots:
@@ -263,6 +270,11 @@ class GroupedBeadsPlotCreator(TaskPlotCreator[GroupedBeadsModelAccess, None]):
         plots = [i.create() for i in self._plots]
         self._duration.setpeaks(self._scatter.peaks)
         self._rate    .setpeaks(self._scatter.peaks)
+        def _update_cb(attr, old, new):
+            if self.isactive():
+                self._duration.reset(False)
+                self._rate.reset(False)
+        self._scatter.peaks.selected.on_change('indices', _update_cb)
 
         loc   = self._ctrl.theme.get(GroupedBeadsScatterTheme, 'toolbar')['location']
         mode  = self.defaultsizingmode()
