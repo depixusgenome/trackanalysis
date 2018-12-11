@@ -29,3 +29,4 @@ further studies.
    CycleApp/cleaning
    CycleApp/cycles
    CycleApp/peaks
+   CycleApp/hairpingroup
