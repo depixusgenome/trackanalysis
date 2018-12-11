@@ -16,9 +16,10 @@ if TYPE_CHECKING:
 
 class PeakInfoModelAccess:
     "wrapper to acces model info"
-    def __init__(self, mdl, bead = NoArgs):
-        self._model = mdl
-        self._bead  = bead
+    def __init__(self, mdl, bead = NoArgs, classes = NoArgs):
+        self._model   = mdl
+        self._bead    = bead
+        self._classes = classes
 
     def hasidentification(self) -> bool:
         "whether the model has an FitToHairpinTask"
@@ -59,6 +60,22 @@ class PeakInfoModelAccess:
     def eventdetectiontask(self):
         "return the current track"
         return self._model.eventdetection.task
+
+    def createpeaks(self, peaks) -> Dict[str, np.ndarray]:
+        "Creates the peaks data"
+        dico: Dict[str, np.ndarray] = {}
+        classes                     = self._classes
+        if classes is NoArgs:
+            classes = [
+                ZPeakInfo(),                ReferencePeakInfo(),
+                IdentificationPeakInfo(),   StatsPeakInfo()
+            ]
+
+        for i in classes:
+            dico.update(i.defaults(self, peaks))
+        for i in classes:
+            i.values(self, peaks, dico)
+        return dico
 
 class PeakInfo(ABC):
     "Creates a peaks info dictionnary"
@@ -121,7 +138,7 @@ class IdentificationPeakInfo(PeakInfo):
     def values(self, mdl: PeakInfoModelAccess, peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
         zvals         = np.array([i[0] for i in peaks], dtype = 'f4')
-        dist          = mdl.getfitparameters(None)
+        dist          = mdl.getfitparameters(mdl.sequencekey)
         dico['bases'] = (zvals - dist[1])*dist[0]
         for key, hyb in mdl.hybridisations().items():
             dist = mdl.getfitparameters(key)
@@ -164,13 +181,6 @@ class StatsPeakInfo(PeakInfo):
 
 def createpeaks(self, peaks) -> Dict[str, np.ndarray]:
     "Creates the peaks data"
-    classes = [ZPeakInfo(), ReferencePeakInfo(), IdentificationPeakInfo(), StatsPeakInfo()]
-    dico    = {}
     if not isinstance(self, PeakInfoModelAccess):
-        self = PeakInfoModelAccess(self)
-
-    for i in classes:
-        dico.update(i.defaults(self, peaks))
-    for i in classes:
-        i.values(self, peaks, dico)
-    return dico
+        return PeakInfoModelAccess(self).createpeaks(peaks)
+    return self.createpeaks(peaks)

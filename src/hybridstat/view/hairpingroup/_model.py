@@ -8,7 +8,20 @@ from control.decentralized  import Indirection
 from model.plots            import PlotTheme, PlotModel, PlotDisplay, PlotAttrs
 from utils                  import initdefaults
 from .._model               import PeaksPlotModelAccess, PeakSelectorTask, PeaksPlotTheme
-from .._peakinfo            import createpeaks as _createpeaks, PeakInfoModelAccess
+from .._peakinfo            import (PeakInfoModelAccess as _PeakInfoModelAccess,
+                                    IdentificationPeakInfo, StatsPeakInfo)
+
+class PeakInfoModelAccess(_PeakInfoModelAccess):
+    "Limiting the info to extract from all peaks"
+    _CLASSES = [IdentificationPeakInfo(), StatsPeakInfo()]
+    def __init__(self, mdl, bead):
+        super().__init__(mdl, bead, self._CLASSES)
+
+    def hybridisations(self):
+        "returns the peaks for a single sequence"
+        key = self.sequencekey
+        seq = self._model.hybridisations(key)
+        return None if seq is None else {key: seq}
 
 class HairpinGroupScatterTheme(PlotTheme):
     "grouped beads plot theme"
@@ -158,14 +171,12 @@ class HairpinGroupModelAccess(PeaksPlotModelAccess):
 
         tsk         = cast(PeakSelectorTask, self.peakselection.task)
         out: Output = {}
-        for bead, params in beads.items():
+        bead        = self.bead
+        keyfcn      = lambda x: -1000 if x[0] == bead else x[0]
+        for bead, params in sorted(beads.items(), key = keyfcn):
             itms      = tuple(tsk.details2output(cache[bead][1]))
-            mdl       = PeakInfoModelAccess(self, bead)
-            out[bead] = [], _createpeaks(mdl, itms)
-            for _, evts in itms:
-                evts = [np.nanmean(np.concatenate(i['data']))
-                        for i in evts if len(i['data'])]
-                out[bead][0].append(np.array(evts, dtype = 'f4'))
+            out[bead] = [], PeakInfoModelAccess(self, bead).createpeaks(itms)
+            out[bead][0].extend(cache[bead][1].positions)
 
             if len(out[bead][0]):
                 evts = (np.concatenate(out[bead][0])-params[1])*params[0]
