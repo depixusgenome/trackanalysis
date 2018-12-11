@@ -25,7 +25,7 @@ from    control.modelaccess     import PlotModelAccess
 from    model.task.application  import TaskIOTheme
 from    model.plots             import (PlotAttrs, PlotState, PlotModel,
                                         PlotDisplay, PlotTheme)
-from    ..base                  import (BokehView, spawn, SINGLE_THREAD,
+from    ..base                  import (BokehView, spawn, SINGLE_THREAD, threadmethod,
                                         defaultsizingmode as _defaultsizingmode)
 from    ..colors                import tohex
 from    .bokehext               import DpxKeyedRow, DpxHoverTool
@@ -788,7 +788,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                 self._updater.reset(self._theme, self._model.themename, cache)
             ctrl.display.handle('rendered', args = {'plot': self})
     else:
-        async def __cache_compute(self, old, ctrl, cache, identity):
+        def __cache_compute(self, old, ctrl, cache, identity):
             self._LOCK.acquire()
             start      = clock()
             self.state = PlotState.resetting
@@ -823,7 +823,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
 
         async def __cached_reset(self,  ctrl, old):
             args : tuple = (ctrl, self._OrderedDict(), self._statehash())
-            delay        = await self.__cache_compute(old, *args)
+            delay        = await threadmethod(self.__cache_compute, old, *args)
             self.calllater(partial(self.__cache_render, delay, *args))
 
         def __doreset(self, ctrl):

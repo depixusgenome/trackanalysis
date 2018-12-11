@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "List of processes and cache"
+from functools  import partial
 from typing     import Union, Iterable, List, Tuple, Any, Iterator, Type, cast
 from utils      import isfunction
 from model.task import Task
@@ -34,12 +35,8 @@ class CacheItem:
 
     def _getcache(self, old):
         "Delayed access to the cache"
-        def _call():
-            version, cache = self._cache
-            if old != version:
-                return None
-            return cache
-        return _call
+        version, cache = self._cache
+        return None if old != version else cache
 
     def setcachedefault(self, item):
         "Sets the cache if it does not exist yet"
@@ -60,11 +57,11 @@ class CacheItem:
         while version > self._cache[0]:
             self._cache = item
 
-        return self._getcache(version)
+        return partial(self._getcache, version)
 
     def getcache(self):
         "Delayed access to the cache"
-        return self._getcache(self._cache[0])
+        return partial(self._getcache, self._cache[0])
 
     cache   = property(lambda self: self.getcache(), setcache)
     proc    = property(lambda self: self._proc)
