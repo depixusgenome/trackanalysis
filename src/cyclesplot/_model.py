@@ -32,16 +32,14 @@ class CyclesModelConfig:
 class CyclesPlotTheme(PlotTheme):
     "theme for cycles"
     name       = "cycles.plot"
-    raw        = PlotAttrs('color', 'circle', .1, alpha = .5,
+    raw        = PlotAttrs('color', 'o', .1, alpha = .5,
                            palette = {'dark': 'YlOrBr', 'basic': 'inferno'})
     selection  = {'dark'  : PlotAttrs('lightblue', 'line',   3),
                   'basic' : PlotAttrs('blue', 'line',   3)}
     tooltips   = [('(cycle, t, z)', '(@cycle, $~x{1}, $data_y{1.1111})')]
     radius     = 1.
-    histframes     = PlotAttrs({'dark': 'darkgray', 'basic': 'gray'},
-                               'quad', 1, fill_color = 'gray')
-    histcycles     = PlotAttrs({"dark": 'darkcyan', "basic": "blue"},
-                               'quad', 1, fill_color = None, line_alpha = .5)
+    histframes     = PlotAttrs('~gray', '┸', 1, fill_color = 'gray')
+    histcycles     = PlotAttrs('~blue', '┸', 1, fill_color = None, line_alpha = .5)
     histxtoplabel  = 'Cycles'
     histxlabel     = 'Frames'
     figsize        = PlotTheme.defaultfigsize(450, 450)

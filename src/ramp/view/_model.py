@@ -66,11 +66,9 @@ class RampPlotTheme(PlotTheme):
     ramp plot theme
     """
     name             = "ramp.theme"
-    consensusarea    = PlotAttrs({"dark": 'darkgray', "basic": "gray"},
-                                 'patch', 1, alpha = .5)
+    consensusarea    = PlotAttrs('~gray', 'patch', 1, alpha = .5)
     consensusline    = PlotAttrs(consensusarea.color, 'line',  1, alpha = .5)
-    beadarea         = PlotAttrs({"dark": 'darkcyan', "basic": "blue"},
-                                 'patch', 1, alpha = .5)
+    beadarea         = PlotAttrs('~blue', 'patch', 1, alpha = .5)
     beadline         = PlotAttrs(beadarea.color, 'line',  1, alpha = .5)
     beadcycles       = PlotAttrs(beadarea.color, 'line',  1, alpha = .2)
     ylabelnormalized = "Z (% strand size)"

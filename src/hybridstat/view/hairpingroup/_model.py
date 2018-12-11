@@ -12,20 +12,18 @@ from .._peakinfo            import createpeaks as _createpeaks, PeakInfoModelAcc
 
 class HairpinGroupScatterTheme(PlotTheme):
     "grouped beads plot theme"
-    name     = "groupedbeads.plot"
-    figsize  = PlotTheme.defaultfigsize(950, 550)
-    xlabel   = 'Bead'
-    ylabel   = 'Bases'
-    reflabel = 'Hairpin'
-    ntitles  = 5
-    format   = '0.0'
-    events   = PlotAttrs({"dark": 'lightgray', 'basic': 'darkgray'}, 'circle', 3,
-                         alpha = .5)
-    peaks    = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'}, 'circle', 10,
-                         line_alpha = 1.,
-                         fill_alpha = .0)
-    hpin     = PlotAttrs('color', 'cross', 15, alpha = 1., line_width=2)
-    pkcolors = {
+    name       = "groupedbeads.plot"
+    figsize    = PlotTheme.defaultfigsize(950, 550)
+    xlabel     = 'Bead'
+    ylabel     = 'Bases'
+    reflabel   = 'Hairpin'
+    xgridalpha = 0.
+    ntitles    = 5
+    format     = '0.0'
+    events     = PlotAttrs('~gray', 'o', 3,  alpha      = .5)
+    peaks      = PlotAttrs('~blue', 'o', 10, line_alpha = 1., fill_alpha = .0)
+    hpin       = PlotAttrs('color', '+', 15, alpha      = 1., line_width = 2)
+    pkcolors   = {
         'dark':  {'missing': 'red', 'found': 'lightgreen'},
         'basic': {'missing': 'red', 'found': 'darkgreen'}
     }
@@ -60,8 +58,7 @@ class HairpinGroupHistTheme(PlotTheme):
     binsize  = .1
     xlabel   = PeaksPlotTheme.xtoplabel
     ylabel   = 'Density'
-    hist     = PlotAttrs({'dark': 'darkgray', 'basic': 'gray'},
-                         'quad', 1, fill_color = 'gray')
+    hist     = PlotAttrs('~gray', '┸', 1, fill_color = 'gray')
     toolbar  = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,reset,save'
     @initdefaults(frozenset(locals()))

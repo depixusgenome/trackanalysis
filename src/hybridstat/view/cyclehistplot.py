@@ -36,8 +36,8 @@ class CyclePlotTheme(PlotTheme):
     ylabel    = PlotTheme.yrightlabel
     ntitles   = 5
     format    = '0.0a'
-    frames    = PlotAttrs({'basic': 'lightgray', 'dark': 'darkgray'}, 'line', 1., alpha=.25)
-    points    = PlotAttrs(deepcopy(PeaksPlotTheme.count.color), 'circle', 1, alpha=.5)
+    frames    = PlotAttrs('~gray', '-', 1., alpha=.25)
+    points    = PlotAttrs(deepcopy(PeaksPlotTheme.count.color), 'o', 1, alpha=.5)
     toolbar   = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,wheel_zoom,reset,save'
     @initdefaults(frozenset(locals()))
@@ -62,8 +62,8 @@ class HistPlotTheme(PlotTheme):
     reflabel         = 'Hairpin'
     formats          = {'bases': '0.0a', 'ref': '0', 'exp': '0.0'}
     hist             = deepcopy(PeaksPlotTheme.count)
-    events           = PlotAttrs(hist.color, 'circle',   3, alpha = .25)
-    peaks            = PlotAttrs(hist.color, 'triangle', 5, alpha = 0., angle = np.pi/2.)
+    events           = PlotAttrs(hist.color, 'o', 3, alpha = .25)
+    peaks            = PlotAttrs(hist.color, '△', 5, alpha = 0., angle = np.pi/2.)
     pkcolors         = deepcopy(PeaksPlotTheme.pkcolors)
     minzoomz         = .008
     toolbar          = dict(CyclePlotTheme.toolbar)

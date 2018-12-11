@@ -25,7 +25,7 @@ from view.plots.base        import PlotView, CACHE_TYPE
 class FoVPlotTheme(PlotTheme):
     "FoV plot theme"
     name        = "fov"
-    beads       = PlotAttrs('color', 'circle',
+    beads       = PlotAttrs('color', 'o',
                             alpha                   = .7,
                             nonselection_alpha      = .7,
                             selection_alpha         = .7,

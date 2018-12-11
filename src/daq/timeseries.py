@@ -38,8 +38,8 @@ class TimeSeriesTheme:
                  "led1":    "Led 1 intensity",
                  "led2":    "Led 2 intensity"
                 }
-    leftattr  = PlotAttrs("lightblue", "circle", size=5)
-    rightattr = PlotAttrs("red",       "line",   1)
+    leftattr  = PlotAttrs("lightblue", "o", size=5)
+    rightattr = PlotAttrs("red",       "-",   1)
     figsize   = 800, 400, 'fixed'
     maxlength = 5000
     period    = 1. # seconds

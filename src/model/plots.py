@@ -19,14 +19,22 @@ class PlotState(Enum):
 
 class PlotAttrs:
     "Plot Attributes for one variable"
+    _GLYPHS = {
+        '-' : 'line',    'o': 'circle', '△': 'triangle',
+        '◇' : 'diamond', '□': 'square', '┸': 'quad',
+        '+' : 'cross'
+    }
     def __init__(self,
-                 color   = 'blue',
+                 color   = '~blue',
                  glyph   = 'line',
                  size    = 1,
                  palette = None,
                  **kwa) -> None:
-        self.color   = color
-        self.glyph   = glyph
+        if isinstance(color, str) and len(color) and color[0] == '~':
+            self.color = {'dark': f'light{color[1:]}', 'basic': f'dark{color[1:]}'}
+        else:
+            self.color = color
+        self.glyph   = self._GLYPHS.get(glyph, glyph)
         self.size    = size
         self.palette = palette
         self.__dict__.update(kwa)

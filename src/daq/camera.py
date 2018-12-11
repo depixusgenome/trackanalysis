@@ -44,7 +44,7 @@ class CameraTheme:
     xlabel    = "x (µm)"
     ylabel    = "y (µm)"
     names     = PlotAttrs("lightblue", "text", x_offset = 5)
-    position  = PlotAttrs("lightblue", "circle",
+    position  = PlotAttrs("lightblue", "o",
                           size                    = 10,
                           line_color              = 'lightblue',
                           fill_alpha              = 0.,

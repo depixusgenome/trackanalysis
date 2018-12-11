@@ -49,13 +49,12 @@ class PeaksPlotTheme(PlotTheme):
     xlabel          = 'Rate (%)'
     fiterror        = "Fit unsuccessful!"
     ntitles         = 4
-    count           = PlotAttrs({"dark": 'lightblue', 'basic': 'darkblue'}, 'line', 1)
-    eventscount     = PlotAttrs(count.color, 'circle', 3)
-    peakscount      = PlotAttrs(count.color, 'triangle', 15, fill_alpha = 0.5,
+    count           = PlotAttrs('~blue', '-', 1)
+    eventscount     = PlotAttrs(count.color, 'o', 3)
+    peakscount      = PlotAttrs(count.color, '△', 15, fill_alpha = 0.5,
                                 angle = np.pi/2.)
     referencecount  = PlotAttrs('bisque', 'patch', alpha = 0.5)
-    peaksduration   = PlotAttrs({"dark": 'lightgreen', 'basic': 'darkgreen'},
-                                'diamond', 15, fill_alpha = 0.5, angle = np.pi/2.)
+    peaksduration   = PlotAttrs('~green', '◇', 15, fill_alpha = 0.5, angle = np.pi/2.)
     pkcolors        = dict(dark  = dict(reference       = 'bisque',
                                         missing         = 'red',
                                         found           = 'black'),

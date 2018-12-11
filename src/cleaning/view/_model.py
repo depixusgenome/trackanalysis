@@ -27,6 +27,11 @@ class DataCleaningAccess(TaskAccess, tasktype = DataCleaningTask):
         cur = mem.get(self.bead, None)
         return None if cur is None else {i.name: i for i in cur[0]}
 
+    @cache.setter
+    def cache(self, value):
+        "set the cache object"
+        raise NotImplementedError()
+
     def saturatedcycles(self, cache):
         "returns saturated cycles"
         sat                = cache['saturation'].values
@@ -170,9 +175,8 @@ class CleaningPlotTheme(PlotTheme):
     cleaning plot theme
     """
     name             = "cleaning.theme"
-    lines            = PlotAttrs({'basic': 'lightgray', 'dark': 'darkgray'},
-                                 'line', 1, alpha   = .3)
-    points           = PlotAttrs('color',  'circle', 1, alpha   = .5)
+    lines            = PlotAttrs('~gray', '-', 1, alpha = .3)
+    points           = PlotAttrs('color', 'o', 1, alpha = .5)
     figsize          = PlotTheme.defaultfigsize(500, 700)
     maxfixedbeads    = 15
     widgetwidth      = 470

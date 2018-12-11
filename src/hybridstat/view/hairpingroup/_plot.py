@@ -39,7 +39,7 @@ class GBScatterCreator(TaskPlotCreator[HairpinGroupModelAccess, HairpinGroupScat
         "add to doc"
         self._src = {i: ColumnDataSource(data = j) for i, j in self._data(None).items()}
         self._fig = self.figure(y_range   = Range1d, x_range = FactorRange())
-        self._fig.grid[0].grid_line_alpha = 0.
+        self._fig.grid[0].grid_line_alpha = self._theme.xgridalpha
         self._ref = LinearAxis(axis_label = self._theme.reflabel,
                                formatter  = NumeralTickFormatter(format = "0"))
         self._fig.add_layout(self._ref, 'right')
@@ -161,8 +161,9 @@ class GBHistCreator(TaskPlotCreator[HairpinGroupModelAccess, HairpinGroupHistMod
     def _reset(self, cache: CACHE_TYPE):
         cache[self._src]['data'] = data = self._data(cache)
         if len(data['left']):
-            xbnds = [data['left'][0], data['right'][-1]]
-            ybnds = [0, np.max(data['top'])]
+            bsize = self._theme.binsize
+            xbnds = [data['left'][0]-bsize, data['right'][-1]+bsize]
+            ybnds = [0, np.max(data['top'])+1]
         else:
             xbnds = []
             ybnds = []
@@ -221,7 +222,7 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
         args.update(
             theme = HairpinGroupHistTheme(
                 xdata   = "duration",
-                binsize = .1,
+                binsize = .2,
                 xlabel  = PeaksPlotTheme.xtoplabel,
                 name    = "groupedbeads.plot.duration"
             ),
@@ -232,7 +233,7 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
         args.update(
             theme = HairpinGroupHistTheme(
                 xdata   = "count",
-                binsize = .5,
+                binsize = 2.,
                 xlabel  = PeaksPlotTheme.xlabel,
                 name    = "groupedbeads.plot.rate"
             ),

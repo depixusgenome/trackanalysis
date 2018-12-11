@@ -125,10 +125,10 @@ class QualityControlModelAccess(DataCleaningModelAccess):
 class DriftControlPlotTheme(PlotTheme):
     "drift control plot theme"
     name             = "qc.driftcontrol.plot"
-    measures         = PlotAttrs('', 'line', 2, alpha     = .75)
-    median           = PlotAttrs('', 'line', 2, line_dash = 'dashed')
-    pop10            = PlotAttrs('', 'line', 2, line_dash = [4])
-    pop90            = PlotAttrs('', 'line', 2, line_dash = [4])
+    measures         = PlotAttrs('', '-', 2, alpha     = .75)
+    median           = PlotAttrs('', '-', 2, line_dash = 'dashed')
+    pop10            = PlotAttrs('', '-', 2, line_dash = [4])
+    pop90            = PlotAttrs('', '-', 2, line_dash = [4])
     colors           = dict(dark  = dict(measures = 'lightblue',
                                          median   = 'lightgreen',
                                          pop10    = 'lightgreen',
@@ -181,7 +181,7 @@ class ExtensionPlotTheme(DriftControlPlotTheme):
     "drift control plot theme"
     name       = "qc.extension.plot"
     ylabel     = 'δ(Φ3-Φ1) (µm)'
-    measures   = PlotAttrs('', 'circle', 2, alpha = .75)
+    measures   = PlotAttrs('', 'o', 2, alpha = .75)
     ybars      = PlotAttrs('', 'vbar', 1,   alpha = .75)
     ymed       = PlotAttrs('', 'vbar', 1,   fill_alpha = 0.)
     colors     = dict(DriftControlPlotTheme.colors)
