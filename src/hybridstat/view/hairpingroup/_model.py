@@ -21,7 +21,7 @@ class PeakInfoModelAccess(_PeakInfoModelAccess):
         "returns the peaks for a single sequence"
         key = self.sequencekey
         seq = self._model.hybridisations(key)
-        return None if seq is None else {key: seq}
+        return {} if seq is None else {key: seq}
 
 class HairpinGroupScatterTheme(PlotTheme):
     "grouped beads plot theme"
@@ -49,7 +49,7 @@ class HairpinGroupScatterTheme(PlotTheme):
                         ('Ref (base)', '@id'),
                         (PeaksPlotTheme.xlabel,    '@count{0.0}'),
                         (PeaksPlotTheme.xtoplabel, '@duration{0.000}')]
-    displaytimeout = 1.
+    displaytimeout = .5
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
