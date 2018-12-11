@@ -6,8 +6,8 @@ from    typing                  import (Tuple, Optional, Type, Union, Any, Gener
 from    collections             import OrderedDict
 from    abc                     import abstractmethod
 from    contextlib              import contextmanager
-from    functools               import wraps
-from    time                    import time
+from    functools               import wraps, partial
+from    time                    import clock
 from    threading               import RLock
 import  warnings
 
@@ -25,9 +25,8 @@ from    control.modelaccess     import PlotModelAccess
 from    model.task.application  import TaskIOTheme
 from    model.plots             import (PlotAttrs, PlotState, PlotModel,
                                         PlotDisplay, PlotTheme)
-from    ..base                  import (BokehView, threadmethod, spawn,
-                                        defaultsizingmode as _defaultsizingmode,
-                                        SINGLE_THREAD)
+from    ..base                  import (BokehView, spawn, SINGLE_THREAD,
+                                        defaultsizingmode as _defaultsizingmode)
 from    ..colors                import tohex
 from    .bokehext               import DpxKeyedRow, DpxHoverTool
 
@@ -171,7 +170,7 @@ class PlotAttrsView(PlotAttrs):
         else:
             palette = getattr(bokeh.palettes, self.palette, None)
         if palette is None:
-            return [self.color]*count
+            return [self.color]*count # type: ignore
         if isinstance(palette, dict):
             colors: List[str] = max(palette.values(), key = len)
             npal   = len(colors)
@@ -775,6 +774,10 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
             with self.resetting():
                 self._model.reset()
 
+    def _statehash(self):
+        "return an id specific to the current state"
+        return id(self)
+
     if SINGLE_THREAD:
         # use this for single-thread debugging
         LOGS.info("Running in single-thread mode")
@@ -785,47 +788,51 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
                 self._updater.reset(self._theme, self._model.themename, cache)
             ctrl.display.handle('rendered', args = {'plot': self})
     else:
+        async def __cache_compute(self, old, ctrl, cache, identity):
+            self._LOCK.acquire()
+            start      = clock()
+            self.state = PlotState.resetting
+            with BokehView.computation.type(ctrl, calls = self.__cache_compute):
+                try:
+                    if self._statehash() == identity:
+                        self._reset(cache)
+                        self._updater.reset(self._theme, self._model.themename, cache)
+                        if self._statehash() != identity:
+                            cache.clear()
+                except Exception as exc: # pylint: disable=broad-except
+                    args = getattr(exc, 'args', tuple())
+                    if len(args) == 2 and args[1] == "warning":
+                        ctrl.display.update("message", message = exc)
+                    else:
+                        raise
+                finally:
+                    self._LOCK.release()
+                    self.state = old
+            return clock() - start
+
+        def __cache_render(self, delay, ctrl, cache, identity):
+            start = clock()
+            if cache:
+                with BokehView.computation.type(ctrl, calls = self.__cache_render):
+                    with self.resetting(cache):
+                        if self._statehash() != identity:
+                            cache.clear()
+            ctrl.display.handle('rendered', args = {'plot': self})
+            LOGS.debug("%s.reset done in %.3f+%.3f",
+                       type(self).__qualname__, delay, clock() - start)
+
+        async def __cached_reset(self,  ctrl, old):
+            args : tuple = (ctrl, self._OrderedDict(), self._statehash())
+            delay        = await self.__cache_compute(old, *args)
+            self.calllater(partial(self.__cache_render, delay, *args))
+
         def __doreset(self, ctrl):
             with self.resetting():
                 self._model.reset()
-            if getattr(self, '_doc', None) is None:
-                return
 
-            old, self.state = self.state, PlotState.abouttoreset
-            durations       = [0.]
-            async def _reset_and_render():
-                cache = self._OrderedDict()
-                def _reset():
-                    start = time()
-                    self.state = PlotState.resetting
-                    with BokehView.computation.type(ctrl, calls = self.__doreset):
-                        try:
-                            self._reset(cache)
-                            self._updater.reset(self._theme, self._model.themename, cache)
-                        except Exception as exc: # pylint: disable=broad-except
-                            args = getattr(exc, 'args', tuple())
-                            if len(args) == 2 and args[1] == "warning":
-                                ctrl.display.update("message", message = exc)
-                            else:
-                                raise
-                        finally:
-                            self.state = old
-                            durations.append(time() - start)
-
-                await threadmethod(_reset)
-
-                def _render():
-                    start = time()
-                    if cache:
-                        with BokehView.computation.type(ctrl, calls = self.__doreset):
-                            with self.resetting(cache):
-                                pass
-                    ctrl.display.handle('rendered', args = {'plot': self})
-                    LOGS.debug("%s.reset done in %.3f+%.3f",
-                               type(self).__qualname__, durations[-1], time() - start)
-                self.calllater(_render)
-
-            spawn(_reset_and_render)
+            if getattr(self, '_doc', None) is not None:
+                old, self.state = self.state, PlotState.abouttoreset
+                spawn(self.__cached_reset, ctrl, old)
 
     def _keyedlayout(self, ctrl, main, *figs, left = None, bottom = None, right = None):
         return DpxKeyedRow.keyedlayout(ctrl, self, main, *figs,
