@@ -252,9 +252,9 @@ class RampWidgets:
             if hasattr(widget, 'observe'):
                 widget.observe(self, ctrl)
 
-    def create(self, ctrl):
+    def create(self, view, ctrl):
         "add to the gui"
-        widgets = {i: j.addtodoc(self, ctrl) for i, j in self.__widgets.items()}
+        widgets = {i: j.addtodoc(view, ctrl) for i, j in self.__widgets.items()}
         self.__objects = TaskWidgetEnabler(widgets)
         names   = "filtering", "status", "extension", "zmag", "bead"
         return sum((widgets[i] for i in names), [])

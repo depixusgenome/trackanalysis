@@ -63,7 +63,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
         self.linkmodeltoaxes(fig)
 
         mode = self.defaultsizingmode(width = self._theme.widgetwidth)
-        left = layouts.widgetbox(self.__widgets.create(ctrl), **mode)
+        left = layouts.widgetbox(self.__widgets.create(self, ctrl), **mode)
         return self._keyedlayout(ctrl, fig, left = left)
 
     def _reset(self, cache: CACHE_TYPE):
