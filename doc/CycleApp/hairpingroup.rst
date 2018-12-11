@@ -47,3 +47,14 @@ It's possible to select which hybridisation positions to use in both *rate* and
 *duration* histograms. This can be done by using the toolbar on top of the
 scatter plot by clicking on the icon with a rectangle, then by drawing a
 rectangle around the positions to be selected.
+
+Automated Computations
+======================
+
+The software automatically computes hybridisation positions for all *ok* beads.
+It restarts those computations every time a change is made to settings which
+could affect these positions. This includes settings in the *Cleaning* tab and
+others.
+
+Computations are performed using two cores only. The display refreshes
+automatically as more and more beads are completed.
