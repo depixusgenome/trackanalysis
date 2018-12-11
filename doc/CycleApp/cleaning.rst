@@ -227,7 +227,7 @@ Fixed Beads
 -----------
 
 * |DZ|: set the maximum extent a bead may have and be considered fixed.
-* |NOISE|: set the maximum noise a bead may suffer from an be
+* |NOISE|: set the maximum noise a bead may suffer from.
 * :math:`\phi 5` repeatability: sets how close together to the median cycle
   profile 90% of values must sit for a bead to be considered fixed.
 * |SUBTRACTION|
