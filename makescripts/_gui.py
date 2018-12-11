@@ -57,9 +57,9 @@ def guimake_doc(bld, scriptname):
     bld(
         rule   = rule,
         source = (
-            bld.path.ant_glob(f'doc/{scriptname}/*.rst')
-            + bld.path.ant_glob('doc/conf.py')
-            + bld.path.ant_glob(f'doc/{scriptname}.rst')),
+            bld.srcnode.ant_glob(f'doc/{scriptname}/*.rst')
+            + bld.srcnode.ant_glob('doc/conf.py')
+            + bld.srcnode.ant_glob(f'doc/{scriptname}.rst')),
         target = bld.path.find_or_declare(target+f'/{scriptname}.html')
     )
 
