@@ -27,7 +27,7 @@ PANELS = {FoVPlotView          : 'fov',
           CyclesPlotView       : 'cycles',
           PeaksPlotView        : 'peaks',
           CycleHistPlotView    : 'cyclehist',
-          HairpinGroupPlotView : 'grouped'}
+          HairpinGroupPlotView : 'hairpin'}
 
 NAME   = "CyclesApp"
 class HybridStatTheme(TabsTheme):
