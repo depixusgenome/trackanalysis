@@ -24,8 +24,8 @@ class DiscardedBeadsInputTheme:
     "Help messages for the widget"
     def __init__(self):
         self.name          = "groupedbeads.input"
-        self.discardedhelp = "Remove from displays"
-        self.forcedhelp    = "Force hairpin choice"
+        self.discardedhelp = "Discard some beads from displays"
+        self.forcedhelp    = "Force beads' hairpin choice"
 
 class DiscardedBeadsInput:
     "discarded beads"
