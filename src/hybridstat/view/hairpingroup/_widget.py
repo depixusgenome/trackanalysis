@@ -15,6 +15,7 @@ class DpxDiscardedBeads(Widget):
     __implementation__ = '_widget.coffee'
     __javascript__     = route()
     frozen        = props.Bool(True)
+    hassequence   = props.Bool(False)
     discarded     = props.String('')
     discardedhelp = props.String('')
     forced        = props.String('')
@@ -24,8 +25,8 @@ class DiscardedBeadsInputTheme:
     "Help messages for the widget"
     def __init__(self):
         self.name          = "groupedbeads.input"
-        self.discardedhelp = "Discard some beads from displays"
-        self.forcedhelp    = "Force beads' hairpin choice"
+        self.discardedhelp = "Discard beads from displays"
+        self.forcedhelp    = "Force beads to a hairpin"
 
 class DiscardedBeadsInput:
     "discarded beads"
@@ -74,7 +75,8 @@ class DiscardedBeadsInput:
         forced = self.__model.identification.getforcedbeads(self.__model.sequencekey)
         return {
             'discarded': ', '.join(str(i) for i in sorted(self.__model.discardedbeads)),
-            'forced':    ', '.join(str(i) for i in sorted(forced))
+            'forced':    ', '.join(str(i) for i in sorted(forced)),
+            'hassequence': self.__model.identification.task is not None
         }
 
 class HairpinGroupPlotWidgets:
