@@ -102,8 +102,7 @@ class PeaksSequencePathWidget(SequencePathWidget):
         if len(dist) == 0 or len(out['menu']) <= 3:
             return out
 
-        tmp  = self.__peaks.identification.constraints()[0]
-        menu = [i[0] for i in out['menu'][:-2] if tmp is None or i[0] == tmp]
+        menu = [i[0] for i in out['menu'][:-2]]
         menu = (sorted((i for i in menu if i in dist), key = dist.__getitem__)
                 +sorted(i for i in menu if i not in dist))
 
