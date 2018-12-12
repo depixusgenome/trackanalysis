@@ -17,7 +17,7 @@ from view.plots             import PlotView
 from view.plots.base        import GroupStateDescriptor, themed
 from view.plots.ploterror   import PlotError
 from view.plots.tasks       import TaskPlotCreator, CACHE_TYPE
-from .._model               import resetrefaxis, PeaksPlotTheme
+from .._model               import resetrefaxis, PeaksPlotTheme, PoolComputationsDisplay
 from .._io                  import setupio
 from ._model                import (HairpinGroupScatterModel, HairpinGroupModelAccess,
                                     HairpinGroupScatterTheme, HairpinGroupHistModel,
@@ -210,7 +210,7 @@ class GBHistCreator(TaskPlotCreator[HairpinGroupModelAccess, HairpinGroupHistMod
                 self._reset(cache)
         peaks.selected.on_change("indices", onselected_cb)
 
-@GroupStateDescriptor(*(f"groupedbeads.plot{i}" for i in ("", ".duration", ".rate")))
+@GroupStateDescriptor(*(f"hairpingroup.plot{i}" for i in ("", ".duration", ".rate")))
 class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
     "Building scatter & hist plots"
     def __init__(self, ctrl):
@@ -223,9 +223,9 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
                 xdata   = "duration",
                 binsize = .2,
                 xlabel  = PeaksPlotTheme.xtoplabel,
-                name    = "groupedbeads.plot.duration"
+                name    = "hairpingroup.plot.duration"
             ),
-            display =  PlotDisplay(name = "groupedbeads.plot.duration")
+            display =  PlotDisplay(name = "hairpingroup.plot.duration")
         )
         self._duration = GBHistCreator(ctrl, **args)
 
@@ -234,9 +234,9 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
                 xdata   = "count",
                 binsize = 2.,
                 xlabel  = PeaksPlotTheme.xlabel,
-                name    = "groupedbeads.plot.rate"
+                name    = "hairpingroup.plot.rate"
             ),
-            display = PlotDisplay(name = "groupedbeads.plot.rate")
+            display = PlotDisplay(name = "hairpingroup.plot.rate")
         )
         self._rate     = GBHistCreator(ctrl, **args)
         self._widgets  = HairpinGroupPlotWidgets(ctrl, self._model)
@@ -261,9 +261,14 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
                     self.calllater(lambda: self.reset(False))
 
         @ctrl.display.observe
-        def _ongroupedbeads(**_):
+        def _onhairpingroup(**_):
             if self.isactive():
                 self.reset(False)
+
+        @ctrl.display.observe("hairpingroup.plot")
+        def _onactivate(old = None, **_):
+            if self.isactive() and 'state' in old:
+                ctrl.display.update(PoolComputationsDisplay(), canstart = True)
 
         name = HairpinGroupScatterTheme().name
         curr = [False, lambda: False]
@@ -325,16 +330,22 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
 
     def _reset(self, cache:CACHE_TYPE):
         done = 0
-        for i in self._plots:
+        try:
+            self._scatter.delegatereset(cache)
+            done += 1
+        finally:
             try:
-                i.delegatereset(cache)
+                self._duration.delegatereset(cache)
                 done += 1
             finally:
-                pass
-        try:
-            self._widgets.reset(cache, done != len(self._plots))
-        finally:
-            pass
+                try:
+                    self._rate.delegatereset(cache)
+                    done += 1
+                finally:
+                    try:
+                        self._widgets.reset(cache, done != 3)
+                    finally:
+                        pass
 
 @setupio
 class HairpinGroupPlotView(PlotView[HairpinGroupPlotCreator]):

@@ -25,7 +25,7 @@ class PeakInfoModelAccess(_PeakInfoModelAccess):
 
 class HairpinGroupScatterTheme(PlotTheme):
     "grouped beads plot theme"
-    name       = "groupedbeads.plot"
+    name       = "hairpingroup.plot"
     figsize    = PlotTheme.defaultfigsize(950, 550)
     xlabel     = 'Bead'
     ylabel     = 'Bases'
@@ -58,14 +58,14 @@ class HairpinGroupScatterTheme(PlotTheme):
 class HairpinGroupScatterModel(PlotModel):
     "grouped beads plot model"
     theme   = HairpinGroupScatterTheme()
-    display = PlotDisplay(name = "groupedbeads.plot")
+    display = PlotDisplay(name = "hairpingroup.plot")
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
 
 class HairpinGroupHistTheme(PlotTheme):
     "grouped beads plot theme"
-    name     = "groupedbeads.plot.hist"
+    name     = "hairpingroup.plot.hist"
     figsize  = PlotTheme.defaultfigsize(300, 300)
     xdata    = "duration"
     binsize  = .1
@@ -81,7 +81,7 @@ class HairpinGroupHistTheme(PlotTheme):
 class HairpinGroupHistModel(PlotModel):
     "grouped beads plot model"
     theme   = HairpinGroupHistTheme()
-    display = PlotDisplay(name = "groupedbeads.plot.hist")
+    display = PlotDisplay(name = "hairpingroup.plot.hist")
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
@@ -89,7 +89,7 @@ class HairpinGroupHistModel(PlotModel):
 class HairpinGroupStore:
     "info used for grouping beads"
     def __init__(self):
-        self.name:      str                 = "groupedbeads"
+        self.name:      str                 = "hairpingroup"
         self.discarded: Dict[str, Set[int]] = {}
 
 Output = Dict[int, Tuple[List[np.ndarray], Dict[str, np.ndarray]]]
@@ -99,7 +99,6 @@ class HairpinGroupModelAccess(PeaksPlotModelAccess):
     def __init__(self, ctrl, addto = False):
         super().__init__(ctrl, addto = addto)
         self.__store  = HairpinGroupStore()
-        ctrl.theme.updatedefaults("hybridstat.peaks", ncpu = 2)
 
     @property
     def discardedbeads(self) -> Set[int]:

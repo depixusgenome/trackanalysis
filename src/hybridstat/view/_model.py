@@ -71,8 +71,6 @@ class PeaksPlotConfig:
     def __init__(self):
         self.name:             str   = "hybridstat.peaks"
         self.estimatedstretch: float = 1./8.8e-4
-        self.ncpu:             int   = 0
-        self.waittime:         float = .1
 
 class PeaksPlotDisplay(PlotDisplay):
     "PeaksPlotDisplay"
@@ -80,6 +78,7 @@ class PeaksPlotDisplay(PlotDisplay):
     observing                         = False
     distances : Dict[str, Distance]   = dict()
     peaks:      Dict[str, np.ndarray] = dict()
+    precompute: int                   = False
     estimatedbias                     = 0.
     constraintspath: Any              = None
     useparams: bool                   = False
@@ -519,11 +518,29 @@ class ObserversDisplay:
     def __init__(self):
         self.observing = False
 
+class PoolComputationsConfig:
+    "PoolComputationsConfig"
+    def __init__(self):
+        self.name:     str   = "hybridstat.precomputations"
+        self.ncpu:     int   = 2
+        self.waittime: float = .1
+
+class PoolComputationsDisplay:
+    "PoolComputationsConfig"
+    def __init__(self):
+        self.name:     str  = "hybridstat.precomputations"
+        self.calls:    int  = 1
+        self.canstart: bool = False
+
 class PoolComputations:
     "Deals with pool computations"
+    _config  = Indirection()
+    _display = Indirection()
     def __init__(self, mdl):
-        self._mdl   = mdl
-        self._calls = 0
+        self._mdl     = mdl
+        self._ctrl    = mdl.ctrl
+        self._config  = PoolComputationsConfig()
+        self._display = PoolComputationsDisplay()
 
     @staticmethod
     def _poolrun(pipe, procs, refcache, keys):
@@ -536,22 +553,36 @@ class PoolComputations:
 
     def setobservers(self, ctrl):
         "sets observers"
+        def _start(calllater = None, **_):
+            disp = self._display
+            print(disp.calls, disp.canstart)
+            if disp.canstart:
+                self._ctrl.display.update(disp, calls = disp.calls+1)
+                print("starting ", disp.calls, disp.canstart)
+                calllater.append(lambda: self._poolcompute(disp.calls))
+
         @ctrl.display.observe("tasks")
         def _onchangetrack(old = None, calllater = None, **_):
             if "roottask" in old:
-                self._calls += 1
-                calllater.append(lambda: self._poolcompute(self._calls))
+                _start(calllater)
 
-        @ctrl.tasks.observe("addtask", "updatetask", "removetask")
-        def _onchangetasks(calllater = None, **_):
-            self._calls += 1
-            calllater.append(lambda: self._poolcompute(self._calls))
+        @ctrl.display.observe(self._display.name)
+        def _onprecompute(calllater = None, old = None, **_):
+            if {"canstart"} == set(old):
+                _start(calllater)
+
+        ctrl.tasks.observe("addtask", "updatetask", "removetask", _start)
 
     def _keepgoing(self, cache, root, idtag):
-        return root is self._mdl.roottask and self._calls == idtag and cache() is not None
+        calls = self._display.calls
+        return root is self._mdl.roottask and calls == idtag and cache() is not None
 
     def _poolcompute(self, identity, **_):
-        if self._mdl.peaksmodel.config.ncpu <= 0 or identity != self._calls:
+        if (
+                self._config.ncpu <= 0
+                or not self._display.canstart
+                or identity != self._display.calls
+        ):
             return
 
         mdl   = self._mdl
@@ -573,7 +604,7 @@ class PoolComputations:
 
         async def _iter():
             pipes = []
-            ncpu  = min(nkeys, mdl.peaksmodel.config.ncpu)
+            ncpu  = min(nkeys, self._config.ncpu)
             for job in range(0, nkeys, nkeys//ncpu+1):
                 inp, oup = Pipe()
                 args     = (oup, procs, refc, keys[job:job+nkeys//ncpu+1])
@@ -581,7 +612,7 @@ class PoolComputations:
                 pipes.append(inp)
 
             while len(pipes) and keepgoing():
-                await _sleep(mdl.peaksmodel.config.waittime)
+                await _sleep(self._config.waittime)
                 for i, inp in enumerate(list(pipes)):
                     while inp.poll() and keepgoing():
                         out = inp.recv()
