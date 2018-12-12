@@ -1,5 +1,35 @@
 # CycleApp
 
+## cycles_v6.4
+
+* 2018-12-17 09:35:52 +0100  (tag: cycles_v6.4)
+
+### Hairpin Groups
+
+This new tab displays multiple beads at a time. There are 3 plots:
+
+* A scatter plot displays beads on the x-axis and hybridisation positions on the y-axis.
+* The two histograms display durations and rates of selected hybridization
+  positions.  The user can select positions graphically using the scatter plot.
+  This will update the histograms.
+
+Beads displayed are:
+
+* the current bead,
+* all beads which were affected to the currently selected hairpin,
+* unless the user discarded them from the display (2nd input box on the left).
+
+Computations are run in the background using 2 cores. Beads will appear
+automatically once computed. To disable this, go to the advanced menu and set
+the number of cores to zero.
+
+### Cleaning
+
+Since version 6.3, values in phase 5 which are not between median positions in
+phase 1 and 3 are discarded. In some situations, this leads to the bead loosing
+a majority of values.  This can happen with the SDI when there are phase jumps
+in the tracking algorithm. The cleaning tab will now report such situations.
+
 ## cycles_v6.3
 
 * 2018-12-10 09:35:52 +0100  (tag: cycles_v6.3.2)
