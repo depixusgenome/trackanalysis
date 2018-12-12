@@ -150,7 +150,8 @@ def run(locs, direct, star, jupyter):
         else:
             def tutorial():
                 "clues for the beginner"
-                print(locs['TUTORIAL'])
+                # mark the print as non-debug: add file = ...
+                print(locs['TUTORIAL'], file = sys.stdout)
             locs['tutorial'] = tutorial
 
         getLogger("").info('Beginners can start by typing: tutorial()')
