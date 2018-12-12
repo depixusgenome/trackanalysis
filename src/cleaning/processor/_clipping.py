@@ -9,16 +9,18 @@ from   model.level        import Level, PHASE
 from   model.task         import Task
 from   control.processor  import Processor
 from   utils              import initdefaults
+from   ._datacleaning     import DataCleaningErrorMessage, DataCleaningException
 
 class ClippingTask(Task):
     "Task discarding phase 5 data below phase 1 or above phase 3"
-    level       = Level.bead
-    lowfactor   = 4.
-    highfactor  = 0.
-    low         = PHASE.initial
-    high        = PHASE.pull
-    correction  = PHASE.measure
-    replacement = np.NaN
+    level         = Level.bead
+    lowfactor     = 4.
+    highfactor    = 0.
+    low           = PHASE.initial
+    high          = PHASE.pull
+    correction    = PHASE.measure
+    replacement   = np.NaN
+    minpopulation = 80.
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -64,13 +66,38 @@ class ClippingTask(Task):
                 i[~np.isfinite(i)]         = maxv+1
                 i[(i < minv) | (i > maxv)] = self.replacement
 
+class ClippingErrorMessage(DataCleaningErrorMessage):
+    "a clipping exception message"
+    def getmessage(self, percentage = False):
+        "returns the message"
+        data = self.data()[0][-1][1:].strip()
+        return 'has less than %s %% points with the range of phases 1 and 3' % data
+
+class ClippingExeption(DataCleaningException):
+    "a clipping exception"
+
 class ClippingProcessor(Processor[ClippingTask]):
     "Processor for cleaning the data"
-    @staticmethod
-    def _action(task, frame, info):
+    @classmethod
+    def _action(cls, task, frame, info):
         "action of clipping"
         task(frame.track, *info)
+        if task.minpopulation > 0.:
+            exc = cls.test(task, frame, info)
+            if isinstance(exc, Exception):
+                raise exc # pylint: disable=raising-bad-type
         return info
+
+    @staticmethod
+    def test(task, frame, info)-> Optional[ClippingExeption]:
+        "test how much remaining pop"
+        if np.isfinite(info[1]).sum() <= len(info[1]) * task.minpopulation * 1e-2:
+            ncy = getattr(frame.track, 'ncycles', 0)
+            msg = ClippingErrorMessage(
+                None, task.config(), type(task), info[0], frame.parents, ncy
+            )
+            return ClippingExeption(msg, 'warning')
+        return None
 
     @classmethod
     def apply(cls, toframe = None, **cnf):

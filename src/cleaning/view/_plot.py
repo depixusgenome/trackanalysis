@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot view for cleaning data"
-from    typing         import Dict
-
-from    bokeh.plotting import Figure
-from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
-from    bokeh          import layouts
+from    functools               import partial
+from    typing                  import Dict
+from    bokeh.plotting          import Figure
+from    bokeh.models            import LinearAxis, ColumnDataSource, Range1d
+from    bokeh                   import layouts
 
 import  numpy                   as     np
 
 from    utils.array             import repeat
+from    utils.logconfig         import getLogger
 from    view.plots              import PlotView, DpxHoverTool, CACHE_TYPE
 from    view.plots.tasks        import TaskPlotCreator
 from    view.colors             import tohex
@@ -20,7 +21,33 @@ from    ._model                 import (DataCleaningModelAccess, CleaningPlotMod
                                         CleaningPlotTheme)
 from    ._widget                import WidgetMixin
 from    ..datacleaning          import DataCleaning
-from    ..processor             import DataCleaningProcessor
+from    ..processor             import (DataCleaningProcessor,
+                                        ClippingProcessor, ClippingTask)
+LOGS = getLogger(__name__)
+
+class GuiClippingProcessor(ClippingProcessor):
+    "gui data cleaning processor"
+    @classmethod
+    def _cache_action(cls, cache, task, frame, info):
+        cpy = np.copy(info[1])
+        task(frame.track, info[0], cpy)
+        if task.minpopulation > 0.:
+            cache['exc'] = cls.test(task, frame, (info[0], cpy))
+        cache['gui'] = np.isnan(cpy)
+        return info
+
+    @classmethod
+    def apply(cls, toframe = None, **cnf):
+        "applies the task to a frame or returns a method that will"
+        if toframe is None:
+            return partial(cls.apply, **cnf)
+        cache = cnf.pop('cache')
+        return toframe.withaction(partial(cls._cache_action, cache, ClippingTask(**cnf)))
+
+    def run(self, args):
+        "updates the frames"
+        cache = args.data.setcachedefault(self, dict())
+        return args.apply(partial(self.apply, cache = cache, **self.config()))
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
@@ -44,16 +71,16 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
     @classmethod
     def runbead(cls, mdl):
         "updates the cache in the gui and returns the nans"
-        ctx, items, nans, exc = mdl.runcontext(cls), None, None, None
+        ctx   = mdl.runcontext(cls, GuiClippingProcessor)
+        items = nans = exc = None
         with ctx as cycles:
             if cycles is not None:
                 items = list(cycles[mdl.bead, ...])
 
-                tsk   = mdl.cleaning.task
-                if tsk is not None:
-                    nans = ctx.taskcache(tsk).pop('gui', None)
-                    exc  = ctx.taskcache(tsk).pop('exc', None)
-
+                for tsk in (mdl.cleaning.task, mdl.clipping.task):
+                    if tsk:
+                        exc  = ctx.taskcache(tsk).pop('exc', None) if exc is None else exc
+                        nans = ctx.taskcache(tsk).pop('gui', None)
         return items, nans, exc
 
 class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotModel],
@@ -97,14 +124,17 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         return self._keyedlayout(ctrl, fig, left = left)
 
     def _reset(self, cache: CACHE_TYPE):
-        items, nans, disable, exc = None, None, True, None
+        items   = nans = exc = None
+        disable = True
         try:
             items, nans, exc = GuiDataCleaningProcessor.runbead(self._model)
             disable          = False
         except Exception as err: # pylint: disable=broad-except
+            LOGS.exception(err)
             self._errors.reset(cache, err)
-        finally:
+        else:
             self._errors.reset(cache, exc)
+        finally:
             data        = self.__data(items, nans)
             self.setbounds(cache, self.__fig, data['t'], data['z'])
             cache[self.__source]['data'] = data

@@ -286,7 +286,7 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
                     _reset(check)
                     return
 
-            if not curr[0]:
+            if not curr[0] and hasattr(self, "_doc"):
                 curr[0] = True
                 tout    = self._ctrl.theme.get(name, "displaytimeout")
                 self._doc.add_timeout_callback(lambda: _reset(check), 1e3*tout)
