@@ -55,7 +55,7 @@ class PeakSelectorDetails: # pylint: disable=too-many-instance-attributes
             if any(len(i) for i in good):
                 evts = self.__move(good, self.corrections, self.events.discarded)
                 vals.append((self.__measure(zmeas, peak, evts), evts))
-        return PeakListArray(vals, discarded = self.events.discarded)
+        return PeakListArray(vals, discarded = getattr(self.events, 'discarded', 0))
 
     @staticmethod
     def __move(evts, deltas, discarded) -> PeaksArray:
@@ -157,6 +157,10 @@ class PeakSelector(PrecisionAlg):
         projector = updatecopy(self.histogram, True, precision = precision)
 
         pos       = projector.eventpositions(events)
+        if len(pos) == 0:
+            return PeakSelectorDetails(pos, np.empty([], dtype = 'f4'), # type: ignore
+                                       0., 1., 0., [], orig, [])
+
         if callable(self.align):
             delta  = self.align(pos, projector = projector) # pylint: disable=not-callable
             pos   += delta
@@ -184,7 +188,7 @@ class PeakSelector(PrecisionAlg):
     def details2output(self, dtl: Optional[PeakSelectorDetails]) -> PeakListArray:
         "return results from precomputed details"
         if dtl is None:
-            return PeakListArray([])
+            dtl = PeakSelectorDetails([], [], 0., 1., 0., [], [], []) # type: ignore
         return dtl.output(self.histogram.zmeasure)
 
     def __call__(self, evts: Input, precision: PRECISION = None) -> PeakListArray:

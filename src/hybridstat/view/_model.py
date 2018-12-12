@@ -711,8 +711,11 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
             self.peaksmodel.display,
             distances     = getattr(tmp, 'distances', {}),
             peaks         = pkinfo.createpeaks(tuple(pksel.details2output(dtl))),
-            estimatedbias = dtl.peaks[0]
+            estimatedbias = getattr(dtl, 'peaks', [0.])[0]
         )
+
+        if dtl is not None:
+            self.sequencemodel.setnewkey(self._ctrl, self.sequencekey)
 
         if isinstance(out, Exception):
             raise out # pylint: disable=raising-bad-type

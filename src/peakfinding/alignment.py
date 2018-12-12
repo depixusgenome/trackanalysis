@@ -196,7 +196,7 @@ class PeakCorrelationAlignment:
         bias       = None
         for action in self.actions:
             bias = action(wtab, bias)
-        return bias
+        return np.zeros(len(data), dtype = 'f4') if bias is None else bias
 
     @classmethod
     def run(cls, data: Iterable[np.ndarray], **kwa):

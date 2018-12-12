@@ -130,20 +130,18 @@ class Histogram(PrecisionAlg):
                 fcn = getattr(np, fcn)
         return self.__eventpositions(events, bias, fcn)
 
-    def positionsandprecision(self, data, precision) -> Optional[Tuple[np.ndarray, float]]:
+    def positionsandprecision(self, data, precision) -> Tuple[np.ndarray, float]:
         "computes positions and the precision"
-        data  = asobjarray(data)
-        first = next((i for i in data if len(i)), None)
-        if first is None:
-            return None
-
-        if getattr(first, 'dtype', 'f') == EVENTS_DTYPE or not np.isscalar(first[0]):
-            return self.getprecision(precision, data), self.eventpositions(data)
+        arr: np.ndarray = asobjarray(data)
+        first           = next((i for i in arr if len(i)), None)
+        if first is not None:
+            if getattr(first, 'dtype', 'f') == EVENTS_DTYPE or not np.isscalar(first[0]):
+                return self.getprecision(precision, arr), self.eventpositions(arr)
 
         if precision is None:
-            return data, self.precision
+            return arr, self.precision
 
-        return data, precision
+        return arr, precision
 
     def kernelarray(self) -> np.ndarray:
         "the kernel used in the histogram creation"

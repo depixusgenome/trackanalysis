@@ -137,6 +137,10 @@ def runbead(ctrl, bead, refcache):
                     tmp = view[bead]
                 except DataCleaningException as exc:
                     out = cache[bead] = exc
+                except TypeError:
+                    import pickle
+                    pickle.dump(ctrl, open(f"/tmp/x{bead}.pk", "wb"))
+                    raise
                 else:
                     out = (tmp      if ident                         else None,
                            store[0] if store and len(store[0].peaks) else None)

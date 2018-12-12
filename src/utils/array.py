@@ -85,12 +85,10 @@ def asdataarrays(aevents:Iterable[Iterable], view: type = None, **kwa)-> Optiona
     "converts  an Iterable[Iterable] to a np.array"
     events = _m_asarray(aevents)
     first  = next((evt for evt in events if len(evt)), None)
-    if first is None:
-        return None
-
-    if getattr(first, 'dtype', 'f') == EVENTS_DTYPE or not np.isscalar(first[0]):
-        for j, evt in enumerate(events):
-            events[j] = _m_asarray(evt)
+    if first is not None:
+        if getattr(first, 'dtype', 'f') == EVENTS_DTYPE or not np.isscalar(first[0]):
+            for j, evt in enumerate(events):
+                events[j] = _m_asarray(evt)
 
     return asview(events, view, **kwa) # type: ignore
 

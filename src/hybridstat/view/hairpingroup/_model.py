@@ -133,7 +133,8 @@ class HairpinGroupModelAccess(PeaksPlotModelAccess):
                 return {}
             cache = dict(cache)
 
-        cache = {i: j for i, j in cache.items() if not isinstance(j, Exception)}
+        cache = {i: j for i, j in cache.items()
+                 if not isinstance(j, Exception) and j[1] is not None}
         bead  = self.bead
         for i in self.discardedbeads:
             if i != bead:
