@@ -8,7 +8,7 @@ from pathlib                    import Path
 from pytest                     import approx       # pylint: disable=no-name-in-module
 import numpy as np
 
-from bokeh.models               import Tabs
+from bokeh.models               import Tabs, FactorRange
 from tornado.gen                import sleep
 from tornado.ioloop             import IOLoop
 
@@ -188,6 +188,49 @@ def test_cyclehistplot(bokehaction): # pylint: disable=too-many-statements,too-m
         server.load('big_legacy')
         _t_e_s_t_peaks(server, bokehaction)
 
+def test_hairpingroup(bokehaction): # pylint: disable=too-many-statements,too-many-locals
+    "test peaksplot"
+    with bokehaction.launch('hybridstat.view.hairpingroup.HairpinGroupPlotView',
+                            'app.toolbar') as server:
+        server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
+        server.load('big_legacy')
+        rng  = server.widget.get(FactorRange)
+        tbar = server.widget.get('Main:toolbar')
+        filt = server.widget.get('HairpinGroup:filter')
+        assert rng.factors == ['0']
+
+        server.change(tbar, 'bead', tbar.bead+1, rendered = True)
+        assert rng.factors == ['1', '0']
+
+        server.load('hairpins.fasta', andpress = False, rendered = False)
+        server.change('Cycles:Sequence', 'value', '←')
+        server.change('Cycles:Oligos', 'value', 'ctgt', rendered = True)
+        server.wait()
+        assert rng.factors == ['1']
+
+        server.change(tbar, 'bead', tbar.bead+1, rendered = True)
+        assert rng.factors == ['2']
+
+        server.change(tbar, 'bead', 0, rendered = True)
+        assert rng.factors == ['0']
+
+        server.change(tbar, 'bead', 4, rendered = True)
+        assert rng.factors == ['4', '0']
+
+        server.change(filt, 'forced', '2', rendered = True)
+        server.change(tbar, 'bead', 2, rendered = True)
+        server.change('Cycles:Sequence', 'value', 'GF1', rendered = True)
+        assert rng.factors == ['2', '1']
+
+        server.change('Cycles:Sequence', 'value', 'GF4', rendered = True)
+        assert rng.factors == ['2', '0', '4']
+
+        server.change(filt, 'discarded', '0', rendered = True)
+        assert rng.factors == ['2', '4']
+
+        server.change(tbar, 'bead', 4, rendered = True)
+        assert rng.factors == ['4', '2']
+
 def test_reference(bokehaction):
     "test peaksplot"
     with bokehaction.launch('hybridstat.view.peaksplot.PeaksPlotView',
@@ -238,4 +281,4 @@ def test_hybridstat(bokehaction):
         server.wait()
 
 if __name__ == '__main__':
-    test_cyclehistplot(bokehaction(None))
+    test_hairpingroup(bokehaction(None))

@@ -42,6 +42,7 @@ class DiscardedBeadsInput:
         self.__widget = DpxDiscardedBeads(
             discardedhelp = self.__theme.discardedhelp,
             forcedhelp    = self.__theme.forcedhelp,
+            name          = 'HairpinGroup:filter',
             **self.__data()
         )
 
