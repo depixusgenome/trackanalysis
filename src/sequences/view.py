@@ -266,11 +266,7 @@ class SequencePathWidget:
                                   ctrl.theme,   self._model.config,
                                   ctrl.display, self._model.display)
 
-        @mainview.actionifactive(ctrl)
-        def _onclick(new):
-            self._onclick(ctrl, new)
-
-        self._widget.on_click(_onclick)
+        self._widget.on_click(ctrl.action(lambda new: self._onclick(ctrl, new)))
         return [self._widget]
 
     def observe(self, ctrl):
@@ -350,10 +346,8 @@ class OligoListWidget:
                                           name        = 'Cycles:Oligos',
                                           css_classes = css)
 
-        @mainview.actionifactive(ctrl)
-        def _onclick_cb(attr, old, new):
-            self.__model.setnewprobes(ctrl, new)
-        self.__widget.on_change('value', _onclick_cb)
+        fcn = ctrl.action(lambda attr, old, new: self.__model.setnewprobes(ctrl, new))
+        self.__widget.on_change('value', fcn)
 
         mainview.differedobserver(self.__data, self.__widget,
                                   ctrl.theme,   self.__model.config,
