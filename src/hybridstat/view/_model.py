@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
 from   asyncio                  import sleep as _sleep
-from   copy                     import copy, deepcopy
+from   copy                     import deepcopy
+from   functools                import partial
 from   multiprocessing          import Process, Pipe
 from   typing                   import Set, Optional, Dict, Tuple, Any, Sequence, cast
-import pickle
 
 import numpy                    as     np
 
@@ -15,7 +15,6 @@ from cleaning.view              import DataCleaningModelAccess
 from model.task                 import RootTask, DataSelectionTask
 from model.plots                import PlotModel, PlotTheme, PlotAttrs, PlotDisplay
 from peakfinding.histogram      import interpolator
-from peakfinding.selector       import PeakSelectorDetails
 from peakcalling                import match
 from peakcalling.toreference    import ChiSquareHistogramFit
 from peakcalling.tohairpin      import Distance
@@ -31,7 +30,7 @@ from view.plots.base            import themed
 
 from ..reporting.batch          import fittohairpintask
 from ._processors               import runbead, runrefbead
-from ._peakinfo                 import createpeaks as _createpeaks
+from ._peakinfo                 import PeakInfoModelAccess
 
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from eventdetection.processor.__config__ import EventDetectionTask
@@ -78,6 +77,7 @@ class PeaksPlotConfig:
 class PeaksPlotDisplay(PlotDisplay):
     "PeaksPlotDisplay"
     name                              = "hybridstat.peaks"
+    observing                         = False
     distances : Dict[str, Distance]   = dict()
     peaks:      Dict[str, np.ndarray] = dict()
     estimatedbias                     = 0.
@@ -228,7 +228,7 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
 
     def __computefitdata(self) -> bool:
         args  = {} # type: Dict[str, Any]
-        ident = pickle.dumps(tuple(self._ctrl.tasks.tasklist(self.reference)))
+        ident = self.statehash(self.reference, ...)
         if self.__store.ident == ident:
             if self.referencepeaks is not None:
                 return False
@@ -513,9 +513,103 @@ class SingleStrandTaskAccess(TaskAccess, tasktype = SingleStrandTask):
 class BaselinePeakFilterTaskAccess(TaskAccess, tasktype = BaselinePeakFilterTask):
     "access to the BaselinePeakFilterTask"
 
+class ObserversDisplay:
+    "PeaksPlotDisplay"
+    name = "hybridstat.observers"
+    def __init__(self):
+        self.observing = False
+
+class PoolComputations:
+    "Deals with pool computations"
+    def __init__(self, mdl):
+        self._mdl   = mdl
+        self._calls = 0
+
+    @staticmethod
+    def _poolrun(pipe, procs, refcache, keys):
+        for bead in keys:
+            out = runbead(procs, bead, refcache)
+            pipe.send((bead, out, refcache.get(bead, None)))
+            if pipe.poll():
+                return
+        pipe.send((None, None, None))
+
+    def setobservers(self, ctrl):
+        "sets observers"
+        @ctrl.display.observe("tasks")
+        def _onchangetrack(old = None, calllater = None, **_):
+            if "roottask" in old:
+                self._calls += 1
+                calllater.append(lambda: self._poolcompute(self._calls))
+
+        @ctrl.tasks.observe("addtask", "updatetask", "removetask")
+        def _onchangetasks(calllater = None, **_):
+            self._calls += 1
+            calllater.append(lambda: self._poolcompute(self._calls))
+
+    def _keepgoing(self, cache, root, idtag):
+        return root is self._mdl.roottask and self._calls == idtag and cache() is not None
+
+    def _poolcompute(self, identity, **_):
+        if self._mdl.peaksmodel.config.ncpu <= 0 or identity != self._calls:
+            return
+
+        mdl   = self._mdl
+        root  = mdl.roottask
+        procs = mdl.processors()
+        if procs is None:
+            return
+
+        store     = procs.data.setcachedefault(-1, {})
+        cache     = procs.data.getcache(-1)
+        procs     = procs.cleancopy()
+        refc      = mdl.fittoreference.refcache
+        keepgoing = partial(self._keepgoing, cache, root, identity)
+
+        keys  = np.array(list(set(mdl.track.beads.keys()) - set(store)))
+        nkeys = len(keys)
+        if not nkeys:
+            return
+
+        async def _iter():
+            pipes = []
+            ncpu  = min(nkeys, mdl.peaksmodel.config.ncpu)
+            for job in range(0, nkeys, nkeys//ncpu+1):
+                inp, oup = Pipe()
+                args     = (oup, procs, refc, keys[job:job+nkeys//ncpu+1])
+                Process(target = self._poolrun, args = args).start()
+                pipes.append(inp)
+
+            while len(pipes) and keepgoing():
+                await _sleep(mdl.peaksmodel.config.waittime)
+                for i, inp in enumerate(list(pipes)):
+                    while inp.poll() and keepgoing():
+                        out = inp.recv()
+                        if out[0] is None:
+                            del pipes[i]
+                            break
+
+                        elif out[0] not in store:
+                            yield out
+
+            for inp in pipes:
+                inp.send(True)
+
+        async def _thread():
+            with mdl.ctrl.display("hybridstat.peaks.store", args = {}) as evt:
+                evt({"bead": None, "check": keepgoing})
+                async for bead, itms, ref in _iter(): # pylint: disable=not-an-iterable
+                    store[bead] = itms
+                    if ref is not None:
+                        refc[bead] = ref
+                    evt({"bead": bead, "check": keepgoing})
+
+        spawn(_thread)
+
 # pylint: disable=too-many-instance-attributes
 class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
     "Access to peaks"
+    _observers = Indirection()
     def __init__(self, ctrl, addto = False):
         DataCleaningModelAccess.__init__(self, ctrl)
         SequencePlotModelAccess.__init__(self, ctrl)
@@ -527,7 +621,8 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         self.fittoreference = FitToReferenceAccess(self)
         self.identification = FitToHairpinAccess(self)
 
-        self.peaksmodel.display.peaks = _createpeaks(self, [])
+        self.peaksmodel.display.peaks = PeakInfoModelAccess(self).createpeaks([])
+        self._observers     = ObserversDisplay()
         if addto:
             self.addto(ctrl, noerase = False)
 
@@ -607,31 +702,17 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
 
     def runbead(self):
         "runs the bead"
-        out      = runbead(self.processors(),
-                           self.bead,
-                           self.fittoreference.refcache)
+        pksel    = cast(PeakSelectorTask, self.peakselection.task)
+        pkinfo   = PeakInfoModelAccess(self)
+        out      = runbead(self.processors(), self.bead, self.fittoreference.refcache)
         tmp, dtl = out if isinstance(out, tuple) else (None, None) # type: ignore
 
-        cpy                    = copy(self)
-        cpy.peaksmodel         = copy(self.peaksmodel)
-        cpy.peaksmodel.display = copy(self.peaksmodel.display)
-        disp = cpy.peaksmodel.display
-        if dtl is None:
-            disp.distances     = {}
-            disp.peaks         = _createpeaks(cpy, [])
-            disp.estimatedbias = 0.
-        else:
-            tsk   = cast(PeakSelectorTask, self.peakselection.task)
-            peaks = tuple(tsk.details2output(cast(PeakSelectorDetails, dtl)))
-
-            disp.distances     = (getattr(tmp, 'distances')
-                                  if self.identification.task else {})
-            disp.peaks         = _createpeaks(cpy, peaks)
-            disp.estimatedbias = disp.peaks['z'][0]
-        info = {i: getattr(disp, i) for i in ('distances', 'peaks', 'estimatedbias')}
-        self._ctrl.display.update(self.peaksmodel.display, **info)
-        if dtl is not None:
-            self.sequencemodel.setnewkey(self._ctrl, cpy.sequencekey)
+        self._ctrl.display.update(
+            self.peaksmodel.display,
+            distances     = getattr(tmp, 'distances', {}),
+            peaks         = pkinfo.createpeaks(tuple(pksel.details2output(dtl))),
+            estimatedbias = dtl.peaks[0]
+        )
 
         if isinstance(out, Exception):
             raise out # pylint: disable=raising-bad-type
@@ -655,18 +736,12 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
 
     def setobservers(self, ctrl):
         "observes the global model"
+        if ctrl.display.update(ObserversDisplay.name, observing = True) is None:
+            return
         self.identification.setobservers(self, ctrl)
         self.fittoreference.setobservers(ctrl)
         self.singlestrand.setobservers(self, ctrl)
-
-        @ctrl.display.observe(self._tasksdisplay)
-        def _onchangetrack(old = None, calllater = None, **_):
-            if "roottask" in old:
-                calllater.append(self._poolcompute)
-
-        @ctrl.tasks.observe("addtask", "updatetask", "removetask")
-        def _onchangetasks(calllater = None, **_):
-            calllater.append(self._poolcompute)
+        PoolComputations(self).setobservers(ctrl)
 
     def fiterror(self) -> bool:
         "True if not fit was possible"
@@ -675,70 +750,6 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         maxv = np.finfo('f4').max
         dist = self.peaksmodel.display.distances
         return all(i[0] == maxv or not np.isfinite(i[0]) for i in dist.values())
-
-    @staticmethod
-    def _poolrun(pipe, procs, refcache, keys):
-        for bead in keys:
-            out = runbead(procs, bead, refcache)
-            pipe.send((bead, out, refcache.get(bead, None)))
-            if pipe.poll():
-                return
-        pipe.send((None, None, None))
-
-    def _poolcompute(self, **_):
-        if self.peaksmodel.config.ncpu <= 0:
-            return
-
-        root  = self.roottask
-        procs = self.processors()
-        if procs is None:
-            return
-
-        store = procs.data.setcachedefault(-1, {})
-        cache = procs.data.getcache(-1)
-        procs = procs.cleancopy()
-        refc  = self.fittoreference.refcache
-
-        keys  = np.array(list(set(self.track.beads.keys()) - set(store)))
-        nkeys = len(keys)
-        if not nkeys:
-            return
-
-        keepgoing = lambda: root is self.roottask and cache() is not None
-
-        async def _iter():
-            pipes = []
-            ncpu  = min(nkeys, self.peaksmodel.config.ncpu)
-            for job in range(0, nkeys, nkeys//ncpu+1):
-                inp, oup = Pipe()
-                args     = (oup, procs, refc, keys[job:job+nkeys//ncpu+1])
-                Process(target = self._poolrun, args = args).start()
-                pipes.append(inp)
-
-            while len(pipes) and keepgoing():
-                await _sleep(self.peaksmodel.config.waittime)
-                for i, inp in enumerate(list(pipes)):
-                    while inp.poll() and keepgoing():
-                        out = inp.recv()
-                        if out[0] is None:
-                            del pipes[i]
-                            break
-
-                        elif out[0] not in store:
-                            yield out
-
-            for inp in pipes:
-                inp.send(True)
-
-        async def _thread():
-            with self._ctrl.display("hybridstat.peaks.store", args = {}) as evt:
-                async for bead, itms, ref in _iter(): # pylint: disable=not-an-iterable
-                    store[bead] = itms
-                    if ref is not None:
-                        refc[bead] = ref
-                    evt({"bead": bead})
-
-        spawn(_thread)
 
 def createpeaks(mdl, themecolors, vals) -> Dict[str, np.ndarray]:
     "create the peaks ColumnDataSource"

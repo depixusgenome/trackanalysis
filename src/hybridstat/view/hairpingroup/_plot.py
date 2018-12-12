@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View for seeing all beads together peaks"
-from functools              import partial
 from typing                 import Dict, List
 import numpy as np
 
@@ -266,19 +265,31 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
             if self.isactive():
                 self.reset(False)
 
-        curr = [False]
         name = HairpinGroupScatterTheme().name
+        curr = [False, lambda: False]
 
-        def _reset():
+        def _cached_plot_reset(cache):
+            for i in self._plots:
+                i.delegatereset(cache)
+
+        def _reset(check):
             curr[0] = False
-            self._doc.add_next_tick_callback(partial(self.reset, False))
+            if check() and self.isactive():
+                self._spawnreset(self._ctrl, _cached_plot_reset)
 
         @ctrl.display.observe("hybridstat.peaks.store")
-        def _on_store(**_):
-            if self.isactive() and not curr[0]:
+        def _on_store(check = None, **_):
+            if check is not curr[1]:
+                curr[0] = False
+                curr[1] = check
+                if self.isactive():
+                    _reset(check)
+                    return
+
+            if not curr[0]:
                 curr[0] = True
-                time    = self._ctrl.theme.get(name, "displaytimeout")
-                self._doc.add_timeout_callback(_reset, time)
+                tout    = self._ctrl.theme.get(name, "displaytimeout")
+                self._doc.add_timeout_callback(lambda: _reset(check), 1e3*tout)
 
     def addto(self, ctrl, noerase = True):
         "adds the models to the controller"
@@ -308,6 +319,9 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
         tbar  = next(i for i in hists.children if isinstance(i, ToolbarBox))
         tbar.toolbar.logo = None
         return layouts.layout([[plots[0]], [wbox, hists]], **mode)
+
+    def _statehash(self):
+        return self._model.statehash(task = ...)
 
     def _reset(self, cache:CACHE_TYPE):
         done = 0
