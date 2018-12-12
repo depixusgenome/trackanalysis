@@ -181,8 +181,10 @@ class PeakSelector(PrecisionAlg):
             out   = _findpeaks()
         return out
 
-    def details2output(self, dtl:PeakSelectorDetails) -> PeakListArray:
+    def details2output(self, dtl: Optional[PeakSelectorDetails]) -> PeakListArray:
         "return results from precomputed details"
+        if dtl is None:
+            return PeakListArray([])
         return dtl.output(self.histogram.zmeasure)
 
     def __call__(self, evts: Input, precision: PRECISION = None) -> PeakListArray:
