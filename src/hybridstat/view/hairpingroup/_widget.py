@@ -6,8 +6,10 @@ from bokeh.models           import Widget
 
 from view.static            import route
 from utils.gui              import parseints
+from .._model               import PoolComputationsConfig
 from .._widget              import (PeakIDPathWidget, PeaksSequencePathWidget,
-                                    OligoListWidget, TaskWidgetEnabler)
+                                    OligoListWidget, TaskWidgetEnabler, advanced)
+from ._model                import HairpinGroupScatterModel
 
 class DpxDiscardedBeads(Widget):
     "Toolbar model"
@@ -89,11 +91,18 @@ class HairpinGroupPlotWidgets:
         self.oligos    = OligoListWidget(ctrl)
         self.cstrpath  = PeakIDPathWidget(ctrl, mdl)
 
+        self.advanced  = advanced(
+            cnf       = HairpinGroupScatterModel(),
+            accessors = (PoolComputationsConfig,),
+            text      = "Cores used for precomputations %(PoolComputationsConfig:ncpu)D"
+        )(ctrl, mdl)
+
     def addtodoc(self, mainview, ctrl, doc):
         "creates the widget"
         wdg = {i: j.addtodoc(mainview, ctrl) for i, j in self.__dict__.items()}
         self.enabler = TaskWidgetEnabler(wdg)
         self.cstrpath.callbacks(ctrl, doc)
+        self.advanced.callbacks(doc)
         return wdg
 
     def observe(self, ctrl):

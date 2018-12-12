@@ -11,9 +11,9 @@ from bokeh.models               import (DataTable, TableColumn, CustomJS,
                                         Widget, Div, StringFormatter, Dropdown)
 
 
-from cleaning.view              import BeadSubtractionModalDescriptor # pylint: disable=unused-import
+from cleaning.view              import BeadSubtractionModalDescriptor
 from control.beadscontrol       import TaskWidgetEnabler
-from eventdetection.view        import AlignmentModalDescriptor # pylint: disable=unused-import
+from eventdetection.view        import AlignmentModalDescriptor
 from excelreports.creation      import writecolumns
 from modaldialog.view           import tab
 from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
@@ -30,7 +30,7 @@ from view.static                import ROUTE, route
 from view.toolbar               import FileList
 from ._model                    import (PeaksPlotModelAccess, FitToReferenceStore,
                                         PeaksPlotTheme, PeaksPlotDisplay)
-from ._model                    import SingleStrandConfig # pylint: disable=unused-import
+from ._model                    import SingleStrandConfig
 
 @dataclass
 class ReferenceWidgetTheme:
@@ -571,8 +571,15 @@ class _PeakDescriptor:
 
 def advanced(**kwa):
     "create the advanced button"
-    msg = ("<b>To fit to the baseline (singlestrand) peak, add '0'"
-           " ('singlestrand') to the oligos.<b>")
+    msg  = ("<b>To fit to the baseline (singlestrand) peak, add '0'"
+            " ('singlestrand') to the oligos.<b>")
+    acc  = (
+        BeadSubtractionModalDescriptor,
+        AlignmentModalDescriptor,
+        SingleStrandConfig,
+        _IdAccessor
+    )
+    acc += tuple(kwa.pop('accessors', ())) # type: ignore
     return tab(
         f"""
         ## Cleaning
@@ -587,6 +594,7 @@ def advanced(**kwa):
 
         {msg}
 
+        {kwa.pop("text", "")}
         Min frame count per hybridisation  %(eventdetection.events.select.minlength)D
         Min hybridisations per peak        %(peakselection.finder.grouper.mincount)D
         Re-align cycles using peaks        %(peakselection.align)b
@@ -594,7 +602,7 @@ def advanced(**kwa):
         Exhaustive fit algorithm           %(_IdAccessor:alg)b
         Max Δ to theoretical peak          %(_IdAccessor:window)d
         """,
-        accessors = globals(),
+        accessors = {i.__name__: i for i in acc},
         figure    = kwa if kwa else (PeaksPlotTheme, PeaksPlotDisplay),
         base      = tab.taskwidget
     )

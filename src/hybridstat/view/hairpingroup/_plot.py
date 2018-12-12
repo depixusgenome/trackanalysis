@@ -283,12 +283,12 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
                 self._spawnreset(self._ctrl, _cached_plot_reset)
 
         @ctrl.display.observe("hybridstat.peaks.store")
-        def _on_store(check = None, **_):
+        def _on_store(check = None, bead = None, **_):
             if check is not curr[1]:
                 curr[0] = False
                 curr[1] = check
-                if self.isactive():
-                    _reset(check)
+                if self.isactive() and bead is None:
+                    self.reset(False)
                     return
 
             if not curr[0] and hasattr(self, "_doc"):
@@ -300,6 +300,14 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
         "adds the models to the controller"
         for i in self._plots:
             i.addto(ctrl, noerase=noerase)
+
+    def advanced(self):
+        "triggers the advanced dialog"
+        self._widgets.advanced.on_click()
+
+    def ismain(self, _):
+        "specific setup for when this view is the main one"
+        self._widgets.advanced.ismain(_)
 
     def _addtodoc(self, ctrl, doc):
         "returns the figure"
@@ -316,7 +324,7 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
         mode  = self.defaultsizingmode()
 
         widg  = self._widgets.addtodoc(self, ctrl, doc)
-        order = "discarded", "seq", "oligos", "cstrpath"
+        order = "discarded", "seq", "oligos", "cstrpath", "advanced"
         wbox  = layouts.widgetbox(sum((widg[i] for i in order), []), **mode)
 
         hists = layouts.gridplot([plots[1:]], **mode, toolbar_location = loc)

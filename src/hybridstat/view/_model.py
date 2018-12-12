@@ -555,10 +555,8 @@ class PoolComputations:
         "sets observers"
         def _start(calllater = None, **_):
             disp = self._display
-            print(disp.calls, disp.canstart)
             if disp.canstart:
                 self._ctrl.display.update(disp, calls = disp.calls+1)
-                print("starting ", disp.calls, disp.canstart)
                 calllater.append(lambda: self._poolcompute(disp.calls))
 
         @ctrl.display.observe("tasks")
