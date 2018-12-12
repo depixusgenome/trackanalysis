@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Controller for most plots and views"
+import pickle
 from typing                 import (Tuple, Optional, Iterator, Union, Any,
                                     Callable, Dict, Type, ClassVar, cast)
 from copy                   import copy as shallowcopy
@@ -77,8 +78,8 @@ class TaskPlotModelAccess(PlotModelAccess):
     def __init__(self, model:Union[Controller, 'PlotModelAccess']) -> None:
         super().__init__(model)
         mdl = TasksModel()
-        self._tasksconfig  = mdl.config
-        self._tasksdisplay = mdl.display
+        self._tasksconfig               = mdl.config
+        self._tasksdisplay              = mdl.display
 
     @property
     def roottask(self) -> Optional[RootTask]:
@@ -118,6 +119,23 @@ class TaskPlotModelAccess(PlotModelAccess):
         check = tuple(i.check for i in self.__dict__.values() if isinstance(i, TaskAccess))
         good  = next((j for j in tuple(self.tasklist)[::-1] if any(i(j) for i in check)), None)
         return self._tasksdisplay.processors(self._ctrl, good) if good else None
+
+    def statehash(self, root = NoArgs, task = NoArgs):
+        "returns a tag specific to the current state"
+        lst = tuple(self._ctrl.tasks.tasklist(self.roottask if root is NoArgs else root))
+        if task is NoArgs:
+            check = tuple(
+                i.check for i in self.__dict__.values() if isinstance(i, TaskAccess)
+            )
+
+            for i in range(len(lst), -1, -1):
+                if any(fcn(lst[i]) for fcn in check):
+                    lst = lst[:i+1]
+                    break
+
+        elif task in lst:
+            lst = lst[:lst.index(task)+1]
+        return pickle.dumps(lst)
 
     def runbead(self) -> Optional[TrackView]:
         "returns a TrackView to be displayed"
@@ -248,6 +266,10 @@ class TaskAccess(TaskPlotModelAccess):
     def check(self, task, parent = NoArgs) -> bool:
         "wether this controller deals with this task"
         return self._check(task, parent) and not task.disabled
+
+    def statehash(self, root = NoArgs, task = NoArgs):
+        "returns a tag specific to the current state"
+        return super().statehash(root, self.task if task is NoArgs else task)
 
     @property
     def _task(self) -> Optional[Task]:
