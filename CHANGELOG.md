@@ -2,7 +2,7 @@
 
 ## cycles_v6.4
 
-* 2018-12-17 09:35:52 +0100  (tag: cycles_v6.4)
+* 2018-12-13 09:35:52 +0100  (tag: cycles_v6.4)
 
 ### Hairpin Groups
 
@@ -10,7 +10,7 @@ This new tab displays multiple beads at a time. There are 3 plots:
 
 * A scatter plot displays beads on the x-axis and hybridisation positions on the y-axis.
 * The two histograms display durations and rates of selected hybridization
-  positions.  The user can select positions graphically using the scatter plot.
+  positions. The user can select positions graphically using the scatter plot.
   This will update the histograms.
 
 Beads displayed are:
