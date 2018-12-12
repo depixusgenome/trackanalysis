@@ -134,19 +134,6 @@ class BaseEM(EMFlagger):
         nrates[idx:idx+2] /=2
         return nrates,nparams
 
-    # def fit(self,data,rates,params):
-    #     "call the fitting algo debugging"
-    #     nrates,nparams=self.fittingalgo(data,
-    #                                     rates,
-    #                                     params,
-    #                                     self.emiter,
-    #                                     self.tol,self.precision**2)
-
-    #     if any(np.isnan(nrates)):
-    #         pickle.dump((data,rates,params,self.kwargs),open("data.dbg","wb"))
-    #         print("to debug")
-    #     return nrates,nparams
-
     def fit(self,data,rates,params):
         "call the fitting algo debugging"
         return self.fittingalgo(data,
