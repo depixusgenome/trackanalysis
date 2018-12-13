@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing all messages concerning discarded beads"
+from   functools                import partial
 from   typing                   import List, Dict, Set, Tuple, Iterator
 
 from   data                     import BEADKEY
 from   control.decentralized    import Indirection
 from   control.beadscontrol     import DataSelectionBeadController
 from   cleaning.view            import DataCleaningModelAccess
-from   cleaning.processor       import DataCleaningProcessor
+from   cleaning.processor       import (DataCleaningProcessor, ClippingProcessor,
+                                        ClippingTask)
 from   model.level              import PHASE
 from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from   utils                    import initdefaults
@@ -15,16 +17,39 @@ from   utils                    import initdefaults
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from   cleaning.processor.__config__ import DataCleaningTask
 
+def _extend(cache, info, exc):
+    if exc:
+        lst = [(info[0],)+ i for i in exc.args[0].data()]
+        cache.setdefault('messages', []).extend(lst)
+
+class GuiClippingProcessor(ClippingProcessor):
+    "gui data cleaning processor"
+    @classmethod
+    def _cache_action(cls, cache, task, frame, info):
+        task(frame.track, *info)
+        if task.minpopulation > 0.:
+            _extend(cache, info, cls.test(task, frame, info))
+        return info
+
+    @classmethod
+    def apply(cls, toframe = None, **cnf):
+        "applies the task to a frame or returns a method that will"
+        if toframe is None:
+            return partial(cls.apply, **cnf)
+        cache = cnf.pop('cache')
+        return toframe.withaction(partial(cls._cache_action, cache, ClippingTask(**cnf)))
+
+    def run(self, args):
+        "updates the frames"
+        cache = args.data.setcachedefault(self, dict())
+        return args.apply(partial(self.apply, cache = cache, **self.config()))
+
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf):
         "returns the result of the beadselection"
-        err = super().compute(frame, info, cache = cache, **cnf)
-        if err:
-            # pylint: disable=unsubscriptable-object
-            lst = [(info[0],)+ i for i in err.args[0].data()]
-            cache.setdefault('messages', []).extend(lst)
+        _extend(cache, info, super().compute(frame, info, cache = cache, **cnf))
 
 class MissinBeadDetectionConfig:
     "filters on messages to reinterpret these as missing beads"
@@ -39,7 +64,7 @@ class MissinBeadDetectionConfig:
         vals = {i: getattr(self, i) * ncycles*1e-2
                 for i in ("hfsigma", "population", "pingpong")}
         return (i for i, j, k in zip(msgs["bead"], msgs["type"], msgs["cycles"])
-                if vals.get(j, ncycles+1) <= k)
+                if k is None or (vals.get(j, ncycles+1) <= k))
 
 class QualityControlDisplay:
     "QualityControlDisplay"
@@ -63,21 +88,31 @@ class QualityControlModelAccess(DataCleaningModelAccess):
 
     def buildmessages(self):
         "creates beads and warnings where applicable"
-        default: Dict[str, List] = dict.fromkeys(('type', 'message', 'bead', 'cycles'), [])
-        tsk = self.cleaning.task
-        if tsk is not None:
-            ctx = self.runcontext(GuiDataCleaningProcessor)
+        default: Dict[str, List] = {i: [] for i in ('type', 'message', 'bead', 'cycles')}
+        tasks = self.cleaning.task, self.clipping.task
+        ncy   = self.track.ncycles
+        if any(i is not None for i in tasks):
+            ctx = self.runcontext(GuiDataCleaningProcessor, GuiClippingProcessor)
             with ctx as view:
                 if view is not None:
                     for _ in view:
                         pass
 
-                mem = ctx.taskcache(tsk).pop('messages', None)
-                if mem:
-                    default = dict(bead    = [i[0] for i in mem],
-                                   cycles  = [i[1] for i in mem],
-                                   type    = [i[2] for i in mem],
-                                   message = [i[3] for i in mem])
+                for tsk in tasks:
+                    if tsk is None:
+                        pass
+
+                    mem = ctx.taskcache(tsk).pop('messages', None)
+                    # pylint: disable=unsupported-membership-test
+                    mem = [i for i in mem if i[0] not in default['bead']]
+                    if not mem:
+                        pass
+
+                    default['bead']    += [i[0] for i in mem]
+                    default['cycles']  += [ncy if i[1] is None else i[1] for i in mem]
+                    default['type']    += [i[2] for i in mem]
+                    default['message'] += [i[3] for i in mem]
+        print(default)
         self._ctrl.display.update(self.__display, messages = default)
 
     def badbeads(self) -> Set[BEADKEY]:

@@ -189,6 +189,7 @@ class CleaningPlotTheme(PlotTheme):
                             population = 'hotpink',
                             pingpong   = 'hotpink',
                             saturation = 'chocolate',
+                            clipping   = 'red',
                             aberrant   = 'red')
     tooltips         = [(u'(cycle, t, z)', '(@cycle, $~x{1}, $data_y{1.1111})')]
     toolbar          = dict(PlotTheme.toolbar)

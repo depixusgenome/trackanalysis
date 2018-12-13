@@ -73,6 +73,13 @@ class ClippingErrorMessage(DataCleaningErrorMessage):
         data = self.data()[0][-1][1:].strip()
         return 'has less than %s %% points with the range of phases 1 and 3' % data
 
+    def data(self):
+        "returns a message if the test is invalid"
+        pop  = self.config.get('minpopulation', self.tasktype().minpopulation)
+        return [(None, 'clipping', '< %d' % pop)]
+
+DataCleaningErrorMessage.NAMES['clipping'] = "z ∉ range(φ₁ → φ₃)"
+
 class ClippingExeption(DataCleaningException):
     "a clipping exception"
 

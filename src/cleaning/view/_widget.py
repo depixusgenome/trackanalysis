@@ -271,7 +271,7 @@ class WidgetMixin(ABC):
             ## Fixed Beads
             Δz <                                 %({fix}:maxextent).3F
             σ[HF] <                              %({fix}:maxhfsigma).3F
-            φ5 repeatability: max(|z-mean(z)|) < %({fix}:maxdiff).2F
+            φ₅ repeatability: max(|z-mean(z)|) < %({fix}:maxdiff).2F
             drops: dz/dt < -                     %({fix}:drops.mindzdt).3F
             drops: number < cycles ∙             %({fix}:drops.maxdrops)D
             %(BeadSubtractionModalDescriptor:)
@@ -286,11 +286,11 @@ class WidgetMixin(ABC):
             σ[HF] <                               %(cleaning.maxhfsigma).3F
             % good frames >                       %(cleaning.minpopulation)D
             <b> Non-closing cycles</b>
-            Cycles are closed if |z(φ1)-z(φ5)| <  %(cleaning.maxdisttozero)D
+            Cycles are closed if |z(φ₁)-z(φ₅)| <  %(cleaning.maxdisttozero)D
             % non-closing cycles <                %(cleaning.maxsaturation)D
             <b></b>
             %(AlignmentModalDescriptor:)
-            Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α, α =  %(clipping.lowfactor).1oF
+            Discard z(∈ φ₅) < z(φ₁)-σ[HF]⋅α, α =  %(clipping.lowfactor).1oF
             """,
             accessors = globals(),
             figure    = (CleaningPlotModel,),

@@ -584,7 +584,7 @@ def advanced(**kwa):
         f"""
         ## Cleaning
 
-        Discard z(∈ φ5) < z(φ1)-σ[HF]⋅α %(clipping.lowfactor).1oF
+        Discard z(∈ φ₅) < z(φ₁)-σ[HF]⋅α                    %(clipping.lowfactor).1oF
         %(BeadSubtractionModalDescriptor:)
         %(AlignmentModalDescriptor:)
         Discard the single strand peak (unless in oligos)  %(SingleStrandConfig:automated)b
