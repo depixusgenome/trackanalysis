@@ -95,7 +95,7 @@ class HairpinGroupPlotWidgets:
         self.advanced  = advanced(
             cnf       = HairpinGroupScatterModel(),
             accessors = (PoolComputationsConfig,),
-            text      = "Cores used for precomputations %(PoolComputationsConfig:ncpu)D"
+            peakstext = "Cores used for precomputations %(PoolComputationsConfig:ncpu)D"
         )(ctrl, mdl)
 
     def addtodoc(self, mainview, ctrl, doc):

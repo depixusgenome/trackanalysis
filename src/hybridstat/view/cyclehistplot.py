@@ -29,7 +29,7 @@ HistData  = Dict[str, CurveData]
 class CyclePlotTheme(PlotTheme):
     "cycles & peaks plot theme: cycles"
     name      = "cyclehist.plot.cycle"
-    figsize   = PlotTheme.defaultfigsize(530, 300)
+    figsize   = PlotTheme.defaultfigsize(660, 660)
     phasezoom = PHASE.measure, 20
     fiterror  = PeaksPlotTheme.fiterror
     xlabel    = PlotTheme.xtoplabel
@@ -55,7 +55,7 @@ class CyclePlotModel(PlotModel):
 class HistPlotTheme(PlotTheme):
     "cycles & peaks plot theme: histogram"
     name     = "cyclehist.plot.hist"
-    figsize          = (1000-CyclePlotTheme.figsize[0],)+CyclePlotTheme.figsize[1:]
+    figsize          = (1100-CyclePlotTheme.figsize[0],)+CyclePlotTheme.figsize[1:]
     xlabel           = PeaksPlotTheme.xlabel
     ylabel           = CyclePlotTheme.ylabel
     explabel         = 'Hybridisations'

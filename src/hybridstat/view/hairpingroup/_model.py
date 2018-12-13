@@ -26,7 +26,7 @@ class PeakInfoModelAccess(_PeakInfoModelAccess):
 class HairpinGroupScatterTheme(PlotTheme):
     "grouped beads plot theme"
     name       = "hairpingroup.plot"
-    figsize    = PlotTheme.defaultfigsize(950, 550)
+    figsize    = PlotTheme.defaultfigsize(1000, 550)
     xlabel     = 'Bead'
     ylabel     = 'Bases'
     reflabel   = 'Hairpin'
@@ -66,7 +66,7 @@ class HairpinGroupScatterModel(PlotModel):
 class HairpinGroupHistTheme(PlotTheme):
     "grouped beads plot theme"
     name     = "hairpingroup.plot.hist"
-    figsize  = PlotTheme.defaultfigsize(300, 300)
+    figsize  = PlotTheme.defaultfigsize(350, 350)
     xdata    = "duration"
     binsize  = .1
     xlabel   = PeaksPlotTheme.xtoplabel

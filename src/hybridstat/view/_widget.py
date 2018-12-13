@@ -579,7 +579,7 @@ def advanced(**kwa):
         SingleStrandConfig,
         _IdAccessor
     )
-    acc += tuple(kwa.pop('accessors', ())) # type: ignore
+    acc += tuple(kwa.get('accessors', ())) # type: ignore
     return tab(
         f"""
         ## Cleaning
@@ -594,7 +594,7 @@ def advanced(**kwa):
 
         {msg}
 
-        {kwa.pop("text", "")}
+        {kwa.pop("peakstext", "")}
         Min frame count per hybridisation  %(eventdetection.events.select.minlength)D
         Min hybridisations per peak        %(peakselection.finder.grouper.mincount)D
         Re-align cycles using peaks        %(peakselection.align)b
