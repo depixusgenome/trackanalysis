@@ -41,7 +41,7 @@ def guimake_doc(bld, scriptname):
     "create the doc"
     if not (
             'SPHINX_BUILD' in bld.env
-            and (Path(str(bld.srcnode))/"doc"/scriptname).with_suffix(".rst").exists()
+            and (Path(str(bld.srcnode))/"doc"/scriptname).exists()
     ):
         return
     if getattr(bld.options, 'APP_PATH', None) is None:
@@ -50,8 +50,10 @@ def guimake_doc(bld, scriptname):
         target = str(bld.options.APP_PATH)+"/doc/"+scriptname
 
     rule = (
-        "${SPHINX_BUILD} "+str(bld.srcnode)+"/doc "+target
-        + f" -D master_doc={scriptname} -D project={scriptname}"
+        "${SPHINX_BUILD} "+str(bld.srcnode)+f"/doc/{scriptname} "
+        +"-c "+str(bld.srcnode)+"/doc "
+        +target
+        + f" -D master_doc={scriptname} -D project={scriptname} -q"
     )
 
     bld(
@@ -59,7 +61,7 @@ def guimake_doc(bld, scriptname):
         source = (
             bld.srcnode.ant_glob(f'doc/{scriptname}/*.rst')
             + bld.srcnode.ant_glob('doc/conf.py')
-            + bld.srcnode.ant_glob(f'doc/{scriptname}.rst')),
+        ),
         target = bld.path.find_or_declare(target+f'/{scriptname}.html')
     )
 

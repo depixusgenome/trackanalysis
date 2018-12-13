@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. include:: utils.rst
+.. include:: ../utils.rst
 
 Welcome to RampApp's documentation!
 ====================================
@@ -23,4 +23,4 @@ to testing oligos or antibodies.
    :maxdepth: 2
    :caption: Contents:
 
-   RampApp/ramps
+   ramps

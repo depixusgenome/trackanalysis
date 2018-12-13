@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. include:: utils.rst
+.. include:: ../utils.rst
 
 Welcome to CycleApp's documentation!
 ====================================
@@ -23,10 +23,10 @@ further studies.
    :maxdepth: 2
    :caption: Contents:
 
-   CycleApp/gettingstarted
-   CycleApp/fov
-   CycleApp/qc
-   CycleApp/cleaning
-   CycleApp/cycles
-   CycleApp/peaks
-   CycleApp/hairpingroup
+   gettingstarted
+   fov
+   qc
+   cleaning
+   cycles
+   peaks
+   hairpingroup
