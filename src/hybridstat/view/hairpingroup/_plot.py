@@ -210,6 +210,49 @@ class GBHistCreator(TaskPlotCreator[HairpinGroupModelAccess, HairpinGroupHistMod
                 self._reset(cache)
         peaks.selected.on_change("indices", onselected_cb)
 
+def setpoolobservers(self, ctrl, mdl, statename):
+    "sets pool observers"
+    mdl.setobservers(ctrl)
+
+    @ctrl.display.observe(mdl.sequencemodel.display)
+    def _onchangekey(old = None, **_):
+        if self.isactive():
+            root = mdl.roottask
+            if root is not None and {'hpins'} == set(old):
+                self.calllater(lambda: self.reset(False))
+
+    @ctrl.display.observe(statename)
+    def _onactivate(old = None, **_):
+        if self.isactive() and 'state' in old:
+            ctrl.display.update(PoolComputationsDisplay(), canstart = True)
+
+    name = HairpinGroupScatterTheme().name
+    curr = [False, lambda: False]
+
+    def _cached_plot_reset(cache):
+        for i in self.plots:
+            i.delegatereset(cache)
+
+    def _reset(check):
+        curr[0] = False
+        if check() and self.isactive():
+            self.spawnreset(ctrl, _cached_plot_reset)
+
+    @ctrl.display.observe("hybridstat.peaks.store")
+    def _on_store(check = None, bead = None, **_):
+        if check is not curr[1]:
+            curr[0] = False
+            curr[1] = check
+            if self.isactive() and bead is None:
+                self.reset(False)
+                return
+
+        if not curr[0] and hasattr(self, "_doc"):
+            curr[0] = True
+            tout    = ctrl.theme.get(name, "displaytimeout")
+            doc     = getattr(self, "_doc")
+            doc.add_timeout_callback(lambda: _reset(check), 1e3*tout)
+
 @GroupStateDescriptor(*(f"hairpingroup.plot{i}" for i in ("", ".duration", ".rate")))
 class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
     "Building scatter & hist plots"
@@ -243,62 +286,27 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
         self.addto(ctrl)
 
     @property
-    def _plots(self):
+    def plots(self):
+        "return figure list"
         return [self._scatter, self._duration, self._rate]
 
     def observe(self, ctrl):
         "observes the model"
         super().observe(ctrl)
-        self._model.setobservers(ctrl)
+        setpoolobservers(self, ctrl, self._model, "hairpingroup.plot")
+
         self._widgets.observe(ctrl)
         SequenceAnaIO.observe(ctrl)
-
-        @ctrl.display.observe(self._model.sequencemodel.display)
-        def _onchangekey(old = None, **_):
-            if self.isactive():
-                root = self._model.roottask
-                if root is not None and {'hpins'} == set(old):
-                    self.calllater(lambda: self.reset(False))
 
         @ctrl.display.observe
         def _onhairpingroup(**_):
             if self.isactive():
                 self.reset(False)
 
-        @ctrl.display.observe("hairpingroup.plot")
-        def _onactivate(old = None, **_):
-            if self.isactive() and 'state' in old:
-                ctrl.display.update(PoolComputationsDisplay(), canstart = True)
-
-        name = HairpinGroupScatterTheme().name
-        curr = [False, lambda: False]
-
-        def _cached_plot_reset(cache):
-            for i in self._plots:
-                i.delegatereset(cache)
-
-        def _reset(check):
-            curr[0] = False
-            if check() and self.isactive():
-                self._spawnreset(self._ctrl, _cached_plot_reset)
-
-        @ctrl.display.observe("hybridstat.peaks.store")
-        def _on_store(check = None, bead = None, **_):
-            if check is not curr[1]:
-                curr[0] = False
-                curr[1] = check
-                if self.isactive() and bead is None:
-                    self.reset(False)
-                    return
-
-            if not curr[0] and hasattr(self, "_doc"):
-                curr[0] = True
-                tout    = self._ctrl.theme.get(name, "displaytimeout")
-                self._doc.add_timeout_callback(lambda: _reset(check), 1e3*tout)
 
     def addto(self, ctrl, noerase = True):
         "adds the models to the controller"
-        for i in self._plots:
+        for i in self.plots:
             i.addto(ctrl, noerase=noerase)
 
     def advanced(self):
@@ -311,7 +319,7 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
 
     def _addtodoc(self, ctrl, doc):
         "returns the figure"
-        plots = [i.create() for i in self._plots]
+        plots = [i.create() for i in self.plots]
         self._duration.setpeaks(self._scatter.peaks)
         self._rate    .setpeaks(self._scatter.peaks)
         def _update_cb(attr, old, new):
@@ -323,10 +331,7 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
         loc   = self._ctrl.theme.get(HairpinGroupScatterTheme, 'toolbar')['location']
         mode  = self.defaultsizingmode()
 
-        widg  = self._widgets.addtodoc(self, ctrl, doc)
-        order = "discarded", "seq", "oligos", "cstrpath", "advanced"
-        wbox  = layouts.widgetbox(sum((widg[i] for i in order), []), **mode)
-
+        wbox  = self._widgets.addtodoc(self, ctrl, doc)
         hists = layouts.gridplot([plots[1:]], **mode, toolbar_location = loc)
         # pylint: disable=not-an-iterable
         tbar  = next(i for i in hists.children if isinstance(i, ToolbarBox))

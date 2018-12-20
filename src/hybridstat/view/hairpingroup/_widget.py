@@ -2,14 +2,16 @@
 # -*- coding: utf-8 -*-
 "widgets for groups of beads"
 import bokeh.core.properties   as props
+from bokeh                  import layouts
 from bokeh.models           import Widget
 
 from view.static            import route
 from utils.gui              import parseints
 from .._model               import PoolComputationsConfig
 from .._widget              import (PeakIDPathWidget, PeaksSequencePathWidget,
-                                    OligoListWidget, TaskWidgetEnabler, advanced)
-from ._model                import HairpinGroupScatterModel
+                                    OligoListWidget, TaskWidgetEnabler, advanced,
+                                    PeakListTheme, PeakListWidget)
+from ._model                import HairpinGroupScatterModel, ConsensusHistPlotModel
 
 class DpxDiscardedBeads(Widget):
     "Toolbar model"
@@ -37,7 +39,7 @@ class DiscardedBeadsInput:
         self.__model = model
         self.__theme = ctrl.theme.add(DiscardedBeadsInputTheme(), False)
 
-    def addtodoc(self, mainview, ctrl):
+    def addtodoc(self, mainview, ctrl, *_):
         "sets-up the gui"
         self.__widget = DpxDiscardedBeads(
             discardedhelp = self.__theme.discardedhelp,
@@ -85,26 +87,35 @@ class DiscardedBeadsInput:
 class HairpinGroupPlotWidgets:
     "peaks plot widgets"
     enabler: TaskWidgetEnabler
+    _MDL   = HairpinGroupScatterModel
+    _ORDER = "discarded", "seq", "oligos", "cstrpath", "advanced"
     def __init__(self, ctrl, mdl):
-        "returns a dictionnary of widgets"
-        self.discarded = DiscardedBeadsInput(ctrl, mdl)
-        self.seq       = PeaksSequencePathWidget(ctrl, mdl)
-        self.oligos    = OligoListWidget(ctrl)
-        self.cstrpath  = PeakIDPathWidget(ctrl, mdl)
+        if 'discarded' in self._ORDER:
+            self.discarded = DiscardedBeadsInput(ctrl, mdl)
+        if 'seq' in self._ORDER:
+            self.seq       = PeaksSequencePathWidget(ctrl, mdl)
+        if 'oligos' in self._ORDER:
+            self.oligos    = OligoListWidget(ctrl)
+        if 'cstrpath' in self._ORDER:
+            self.cstrpath  = PeakIDPathWidget(ctrl, mdl)
 
-        self.advanced  = advanced(
-            cnf       = HairpinGroupScatterModel(),
-            accessors = (PoolComputationsConfig,),
-            peakstext = "Cores used for precomputations %(PoolComputationsConfig:ncpu)D"
-        )(ctrl, mdl)
+        if 'advanced' in self._ORDER:
+            self.advanced  = advanced(
+                cnf       = self._MDL(),
+                accessors = (PoolComputationsConfig,),
+                peakstext = "Cores used for precomputations %(PoolComputationsConfig:ncpu)D"
+            )(ctrl, mdl)
 
-    def addtodoc(self, mainview, ctrl, doc):
+    def addtodoc(self, mainview, ctrl, doc, *_):
         "creates the widget"
-        wdg = {i: j.addtodoc(mainview, ctrl) for i, j in self.__dict__.items()}
+        mode = mainview.defaultsizingmode()
+        wdg  = {i: j.addtodoc(mainview, ctrl, *_) for i, j in self.__dict__.items()}
         self.enabler = TaskWidgetEnabler(wdg)
-        self.cstrpath.callbacks(ctrl, doc)
-        self.advanced.callbacks(doc)
-        return wdg
+        if hasattr(self, 'cstrpath'):
+            self.cstrpath.callbacks(ctrl, doc)
+        if hasattr(self, 'advanced'):
+            self.advanced.callbacks(doc)
+        return layouts.widgetbox(sum((wdg[i] for i in self._ORDER), []), **mode)
 
     def observe(self, ctrl):
         "oberver"
@@ -118,3 +129,13 @@ class HairpinGroupPlotWidgets:
             if key != 'enabler':
                 widget.reset(cache)
         self.enabler.disable(cache, disable)
+
+class ConsensusPlotWidgets(HairpinGroupScatterModel):
+    "peaks plot widgets"
+    _MD    = ConsensusHistPlotModel
+    _ORDER = "seq", "oligos", "advanced", "peaks"
+    def __init__(self, ctrl, mdl):
+        super().__init__(ctrl, mdl)
+        theme         = PeakListTheme(name = "consensus.peaks", height = 200)
+        theme.columns = theme.columns[1:-2]
+        self.peaks    = PeakListWidget(ctrl, mdl, theme)

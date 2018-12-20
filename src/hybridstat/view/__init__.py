@@ -19,7 +19,7 @@ from view.tabs           import TabsView, TabsTheme, initsubclass
 from ._io                import setupio
 from .peaksplot          import PeaksPlotView
 from .cyclehistplot      import CycleHistPlotView
-from .hairpingroup       import HairpinGroupPlotView
+from .hairpingroup       import HairpinGroupPlotView, ConsensusPlotView
 
 PANELS = {FoVPlotView          : 'fov',
           QualityControlView   : 'qc',
@@ -27,7 +27,8 @@ PANELS = {FoVPlotView          : 'fov',
           CyclesPlotView       : 'cycles',
           PeaksPlotView        : 'peaks',
           CycleHistPlotView    : 'cyclehist',
-          HairpinGroupPlotView : 'hairpin'}
+          HairpinGroupPlotView : 'hairpin',
+          ConsensusPlotView    : 'consensus'}
 
 NAME   = "CyclesApp"
 class HybridStatTheme(TabsTheme):

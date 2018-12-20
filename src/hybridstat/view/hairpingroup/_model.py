@@ -1,21 +1,32 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "See all beads together"
-from typing                 import Dict, Optional, List, Tuple, Set, cast
-import numpy as np
+from typing                            import (Dict, Optional, List, Tuple, Set,
+                                               cast, TYPE_CHECKING)
+from itertools                         import product
+import numpy                           as     np
 
-from control.decentralized  import Indirection
-from model.plots            import PlotTheme, PlotModel, PlotDisplay, PlotAttrs
-from utils                  import initdefaults
-from .._model               import PeaksPlotModelAccess, PeakSelectorTask, PeaksPlotTheme
-from .._peakinfo            import (PeakInfoModelAccess as _PeakInfoModelAccess,
-                                    IdentificationPeakInfo, StatsPeakInfo)
+from control.decentralized             import Indirection
+from model                             import InstrumentType
+from model.plots                       import PlotTheme, PlotModel, PlotDisplay, PlotAttrs
+from peakfinding.processor.__config__  import PeakSelectorTask
+from utils                             import initdefaults
+from utils.array                       import EventsArray, EVENTS_DTYPE
+from .._model                          import PeaksPlotModelAccess, PeaksPlotTheme
+from .._peakinfo                       import (PeakInfoModelAccess as _PeakInfoModelAccess,
+                                               IdentificationPeakInfo, StatsPeakInfo)
+from ..cyclehistplot                   import HistPlotTheme
 
 class PeakInfoModelAccess(_PeakInfoModelAccess):
     "Limiting the info to extract from all peaks"
     _CLASSES = [IdentificationPeakInfo(), StatsPeakInfo()]
     def __init__(self, mdl, bead):
         super().__init__(mdl, bead, self._CLASSES)
+
+    def sequences(self):
+        "return the sequences available"
+        key = self.sequencekey
+        return {} if key is None else {key: self._model.sequences(key)}
 
     def hybridisations(self):
         "returns the peaks for a single sequence"
@@ -184,3 +195,181 @@ class HairpinGroupModelAccess(PeaksPlotModelAccess):
                 evts = []
             out[bead] = evts, out[bead][1]
         return out
+
+class ConsensusScatterTheme(PlotTheme):
+    "scatter plot of durations & rates thee"
+    name       = "consensus.plot.scatter"
+    figsize    = PlotTheme.defaultfigsize(450, 450)
+    xlabel     = PeaksPlotTheme.xlabel
+    ylabel     = PeaksPlotTheme.xtoplabel
+    reflabel   = 'Hairpin'
+    format     = '0.0'
+    peaks      = PlotAttrs('color', 'o', 10, line_alpha = 1., fill_alpha = .0)
+    pkcolors   = {
+        'dark':  {'missing': 'red', 'found': 'lightgreen'},
+        'basic': {'missing': 'red', 'found': 'darkgreen'}
+    }
+    toolbar  = dict(PlotTheme.toolbar)
+    toolbar['items'] = 'pan,box_zoom,reset,save,hover,box_select'
+    tooltipmode      = 'mouse'
+    tooltippolicy    = 'follow_mouse'
+    tooltips         = [('Bead', '@bead'),
+                        ('Z (base)', '@bases'),
+                        ('Ref (base)', '@id'),
+                        (PeaksPlotTheme.xlabel,    '@count{0.0}'),
+                        (PeaksPlotTheme.xtoplabel, '@duration{0.000}')]
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
+
+class ConsensusScatterModel(PlotModel):
+    "scatter plot of durations & rates model"
+    theme   = ConsensusScatterTheme()
+    display = PlotDisplay(name = "consensus.plot.scatter")
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__()
+
+class ConsensusHistPlotTheme(HistPlotTheme):
+    "consensus plot plot model: histogram"
+    name      = "consensus.plot.hist"
+    beadpeaks = PlotAttrs('~gray', 'o', 1,  alpha = 0.)
+    figsize   = PlotTheme.defaultfigsize(660, 660)
+    xlabel    = 'Bead Count'
+    minzoomz  = None
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
+
+class ConsensusHistPlotModel(PlotModel):
+    "consensus plot plot model: histogram"
+    theme   = ConsensusHistPlotTheme()
+    display = PlotDisplay  (name = "consensus.plot.hist")
+
+class ConsensusConfig:
+    "consensus bead config"
+    def __init__(self):
+        self.name      = "consensus"
+        args           = {"align": None, "peakalign": None}
+        self.picotwist = PeakSelectorTask(rawfactor = 2., **args)
+        self.sdi       = PeakSelectorTask(rawfactor = 1., **args)
+
+    def __getitem__(self, name) -> PeakSelectorTask:
+        return getattr(self, InstrumentType(name).name)
+
+    def __setitem__(self, name, value: PeakSelectorTask):
+        setattr(self, InstrumentType(name).name, value)
+
+class ConsensusModelAccess(HairpinGroupModelAccess):
+    "task acces to grouped beads"
+    __config = Indirection()
+    if TYPE_CHECKING:
+        instrument: str
+    def __init__(self, ctrl, addto = False):
+        super().__init__(ctrl, addto = addto)
+        self.__config = ConsensusConfig()
+
+    def consensuspeaks(self, dtl):
+        "peaks for the consensus bead"
+        stats = self.__consensuspeakinfo()
+        out   = self.__consensuspeakstats(dtl, stats)
+        self.__consensuspeakid(out)
+
+        allinfo = {
+            i: np.concatenate([j[i] for j in stats.values()])
+            for i in next(iter(stats.values()), {})
+        }
+        if not allinfo:
+            allinfo = PeakInfoModelAccess(self, self.bead).createpeaks([])
+
+        kern = self.__config[self.instrument].histogram.kernelarray()
+        cnv  = {'pos': 'bases', 'bases': 'peaks', 'basesstd': 'peaksstd'}
+        return {cnv.get(i, i): j for i, j in out.items()}, allinfo, kern[kern.size//2]
+
+    def runbead(self) -> Optional[Output]: # type: ignore
+        "collects the information already found in different peaks"
+        track = self.track
+        if track is None:
+            return None
+
+        PeaksPlotModelAccess.runbead(self)
+        cache = self._ctrl.tasks.cache(self.roottask, -1)()
+        if cache is None:
+            return None
+
+        cache = dict(cache)
+        beads = self.displayedbeads(cache)
+        if not beads:
+            return None
+
+        arr   = []
+        for bead, rho in beads.items():
+            evts = (cache[bead][1].positionsperpeak()['events']-rho[1])*rho[0]
+            arr.append(EventsArray(list(enumerate(evts)), dtype = EVENTS_DTYPE))
+
+        prec = np.nanmedian([track.rawprecision(i)*rho[0] for i, rho in beads.items()])
+        import pickle
+        pickle.dump((self.__config[self.instrument], arr, prec), open("/tmp/x.pk", "wb"))
+        dtl  = self.__config[self.instrument].detailed(arr, precision = prec)
+        return dtl
+
+    def __consensuspeakinfo(self) -> Dict[int, Dict[str, np.ndarray]]:
+        if self.roottask is None:
+            return {}
+        cache = self._ctrl.tasks.cache(self.roottask, -1)()
+        assert cache is not None
+        beads = set(self.displayedbeads(cache))
+        fcn   = cast(PeakSelectorTask, self.peakselection.task).details2output
+        return {
+            i: PeakInfoModelAccess(self, i).createpeaks(tuple(fcn(cache[i][1])))
+            for i in beads
+        }
+
+    @staticmethod
+    def __consensuspeakstats(dtl, stats) -> Dict[str, np.ndarray]:
+        out: Dict[str, List[float]] = {
+            **{i:   [] for i in ('pos', 'npeaks')},
+            **{i+j: [] for i, j in product(('count', 'duration', 'bases'), ('', 'std'))},
+        }
+        if dtl is None:
+            return out
+
+        for peak, beadpeaks in dtl.output('nanmean'):
+            tmp: Dict[str, List[np.ndarray]]
+            tmp    = {'count': [], 'duration': [], 'bases': []}
+            npeaks = 0
+            for data, evts in zip(stats.values(), beadpeaks):
+                evts    = [np.max(k['data']) for k in evts]
+                bases   = np.searchsorted(data['bases'], evts)-1
+
+                npeaks += len(bases)
+                for j, k in tmp.items():
+                    k.append(data[j][bases])
+
+            out['npeaks'].append(npeaks)
+            out['pos'].append(peak)
+            for j, k in tmp.items():
+                arr = np.concatenate(k)
+                out[j].append(arr.mean())
+                out[j+'std'].append(arr.std())
+        return {i: np.array(j, dtype = 'f4') for i,j in out.items()}
+
+    def __consensuspeakid(self, out: Dict[str, np.ndarray]):
+        out.update(
+            id       = np.full(len(out['pos']), np.NaN, dtype = 'f4'),
+            distance = np.full(len(out['pos']), np.NaN, dtype = 'f4'),
+            orient   = np.full(len(out['pos']), " ", dtype = '<U1')
+        )
+        if not out or len(out['pos']) == 0:
+            return
+
+        fcn   = self.identification.attribute('match', self.sequencekey).pair
+        tmp   = fcn(out['pos'], 1., 0)['key']
+        good  = tmp >= 0
+        ori   = dict(self.hybridisations(self.sequencekey))
+
+        out['id']      [good] = tmp[good]
+        out['distance'][good] = (tmp - out['pos'])[good]
+        out['orient']  [good] = ['-+ '[int(ori.get(int(i+0.01), 2))] for i in out['id'][good]]

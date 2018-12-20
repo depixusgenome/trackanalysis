@@ -2,3 +2,4 @@
 # -*- coding: utf-8 -*-
 "See all beads together"
 from ._plot import HairpinGroupPlotCreator, HairpinGroupPlotView
+from ._consensusplot import ConsensusPlotCreator, ConsensusPlotView

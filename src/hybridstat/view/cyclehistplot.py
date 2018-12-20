@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "View for seeing both cycles and peaks"
 from copy                   import deepcopy
-from typing                 import Dict, cast
+from typing                 import Dict, TypeVar, Optional, cast
 
 import numpy as np
 
@@ -18,7 +18,7 @@ from sequences.modelaccess  import SequenceAnaIO
 from utils                  import initdefaults
 from view.plots             import PlotView
 from view.plots.ploterror   import PlotError
-from view.plots.tasks       import TaskPlotCreator, CACHE_TYPE
+from view.plots.tasks       import TaskPlotCreator, PlotModelType, CACHE_TYPE
 from ._model                import (PeaksPlotModelAccess, PeaksPlotTheme,
                                     createpeaks, resetrefaxis)
 from ._widget               import PeaksPlotWidgets, PeakListTheme
@@ -65,7 +65,7 @@ class HistPlotTheme(PlotTheme):
     events           = PlotAttrs(hist.color, 'o', 3, alpha = .25)
     peaks            = PlotAttrs(hist.color, '△', 5, alpha = 0., angle = np.pi/2.)
     pkcolors         = deepcopy(PeaksPlotTheme.pkcolors)
-    minzoomz         = .008
+    minzoomz: Optional[float] = .008/.88e-3
     toolbar          = dict(CyclePlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,wheel_zoom,hover,reset,save'
     tooltipmode      = 'hline'
@@ -168,7 +168,8 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
         zval = (zval - self._model.bias)*self._model.stretch
         return dict(t = tval, z = zval)
 
-class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
+TModelAccess = TypeVar('TModelAccess', bound = PeaksPlotModelAccess)
+class BaseHistPlotCreator(TaskPlotCreator[TModelAccess, PlotModelType]):
     "Creates a histogram of peaks"
     _theme: HistPlotTheme
     _fig: Figure
@@ -192,7 +193,7 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
         self._src = {i: ColumnDataSource(j) for i, j in self._data(None).items()}
         rends = {i: self.addtofig(self._fig, i,
                                   x      = "count",
-                                  y      = 'bases' if i == 'peaks' else "z",
+                                  y      = 'bases',
                                   source = j)
                  for i, j in self._src.items()}
         self.linkmodeltoaxes(self._fig)
@@ -216,20 +217,22 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
             for i, j in data.items():
                 cache[self._src[i]]['data'] = j
 
-            xarr  = data['peaks']['count']
+            xarr  = data['hist']['count']
             xarr  = xarr[np.isfinite(xarr)]
             xarr  = [0., xarr.max() if len(xarr) else 1.]
 
-            pks   = data['peaks']['z']
+            pks   = data['peaks']['bases']
             xbnds = np.empty(0, dtype = 'f4')
-            if len(pks) > 1:
-                xbnds = data['peaks']['count'][pks > pks[0] + self._theme.minzoomz]
-                xbnds = xbnds[np.isfinite(xbnds)]
+            if len(pks) > 1 and self._theme.minzoomz is not None:
+                minv  = pks.min() + self._theme.minzoomz-data['hist']['bases'][0]
+                delta = np.diff(self._theme.minzoomz-data['hist']['bases'][:2])[0]
+                xbnds = data['hist']['count'][1-int(minv/delta):]
+            else:
+                xbnds = data['hist']['count']
             xbnds = [0., xbnds.max() if len(xbnds) else 1.]
 
-            self.setbounds(cache, self._fig, xarr, data['hist']["z"], xbnds)
+            self.setbounds(cache, self._fig, xarr, data['hist']["bases"], xbnds)
 
-            pks = self._model.peaks['bases']
             cache[self._exp]['ticker'] = list(pks[np.isfinite(pks)])
             cache[self._ref] = resetrefaxis(self._model, self._theme.reflabel)
             task = self._model.identification.task
@@ -245,21 +248,33 @@ class HistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, HistPlotModel]):
                                         axis_label = label)
 
     def _data(self, itms) -> HistData:
-        out: HistData = {i: {"z": [], "count": []} for i in ('hist', 'events')}
-        out['peaks']  = createpeaks(self._model, self._theme.pkcolors, None)
+        out: HistData = {i: {"bases": [], "count": []} for i in ('hist', 'events')}
+        self._createpeaks(itms, out)
         if itms is None:
             return out
 
         zvals  = itms.binwidth*np.arange(len(itms.histogram), dtype = 'f4')+itms.minvalue
-        zvals  = (zvals - self._model.bias) *  self._model.stretch
+        zvals  = self._tobases(zvals)
         cnt    = itms.histogram
 
-        out['hist'].update(z = zvals, count = cnt)
+        out['hist'].update(bases = zvals, count = cnt)
 
-        pos  = (np.concatenate(itms.positions) -self._model.bias)*self._model.stretch
-        hmin = np.median(cnt)/100
-        out['events'].update(z = pos, count = interpolator(zvals, cnt, hmin)(pos))
+        pos    = self._tobases(np.concatenate(itms.positions))
+        hmin   = np.median(cnt)/100
+        interp = interpolator(zvals, cnt, hmin)
+        out['events'].update(bases = pos, count = interp(pos))
         return out
+
+    def _createpeaks(self, _, out):
+        out['peaks'] = createpeaks(self._model, self._theme.pkcolors, None)
+        return False
+
+    def _tobases(self, arr):
+        return (arr-self._model.bias)*self._model.stretch
+
+class HistPlotCreator(BaseHistPlotCreator[PeaksPlotModelAccess, # type: ignore
+                                          HistPlotModel]):
+    "Creates a histogram of peaks"
 
 class _StateDescriptor:
     def __get__(self, inst, owner):

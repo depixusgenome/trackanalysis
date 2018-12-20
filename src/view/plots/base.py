@@ -800,7 +800,8 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
     def _reset(self, cache:CACHE_TYPE):
         "initializes the plot for a new file"
 
-    def _spawnreset(self, ctrl, fcn):
+    def spawnreset(self, ctrl, fcn):
+        "launches an async reset"
         if getattr(self, '_doc', None) is None:
             return
 
@@ -824,7 +825,7 @@ class PlotCreator(Generic[ControlModelType, PlotModelType]): # pylint: disable=t
     def __doreset(self, ctrl):
         with self.resetting():
             self._model.reset()
-        self._spawnreset(ctrl, None)
+        self.spawnreset(ctrl, None)
 
     def __cache_compute(self,  # pylint: disable=too-many-arguments
                         old, fcn, ctrl, cache, identity):
