@@ -57,6 +57,20 @@ class PeakSelectorDetails: # pylint: disable=too-many-instance-attributes
                 vals.append((self.__measure(zmeas, peak, evts), evts))
         return PeakListArray(vals, discarded = getattr(self.events, 'discarded', 0))
 
+    def __posperpeak(self, label, peak) -> np.ndarray:
+        "return event positions per peak"
+        arr = [i[j == label] for i, j in zip(self.positions, self.ids)]
+        return (peak, np.concatenate(arr).astype('f4'))
+
+    def positionsperpeak(self) -> np.ndarray:
+        "return event positions per peak"
+        arr = [self.__posperpeak(*i) for i in enumerate(self.peaks)]
+        return EventsArray(
+            [i for i in arr if len(i[1])],
+            dtype     = [('peaks', 'f4'), ('events', 'O')],
+            discarded = getattr(self.events, 'discarded', 0)
+        )
+
     @staticmethod
     def __move(evts, deltas, discarded) -> PeaksArray:
         first = next((i for i in evts if i is not None), None)
