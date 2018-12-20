@@ -283,8 +283,13 @@ class ConsensusModelAccess(HairpinGroupModelAccess):
             i: np.concatenate([j[i] for j in stats.values()])
             for i in next(iter(stats.values()), {})
         }
+
         if not allinfo:
             allinfo = PeakInfoModelAccess(self, self.bead).createpeaks([])
+        else:
+            allinfo['bead'] = np.concatenate(
+                [np.full(len(j['bases']), i, dtype = 'i4') for i, j in stats.items()]
+            )
 
         kern = self.__config[self.instrument].histogram.kernelarray()
         cnv  = {'pos': 'bases', 'bases': 'peaks', 'basesstd': 'peaksstd'}
