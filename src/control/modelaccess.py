@@ -101,6 +101,13 @@ class TaskPlotModelAccess(PlotModelAccess):
         "returns the current bead number"
         return self._tasksdisplay.bead
 
+    @property
+    def instrument(self) -> str:
+        "the current instrument type"
+        if self.roottask is None:
+            return self._ctrl.theme.get("tasks", "instrument")
+        return self._ctrl.tasks.instrumenttype(self.roottask)
+
     def impacts(self, root:RootTask, task:Task) -> bool:
         "returns whether changing this tasks affects the model output"
         if root is not self.roottask:
@@ -179,13 +186,6 @@ class TaskAccess(TaskPlotModelAccess):
         "returns a tuple (dataitem, bead) to be displayed"
         task = self.task
         return None if task is None else self._tasksdisplay.processors(self._ctrl, task)
-
-    @property
-    def instrument(self) -> str:
-        "the current instrument type"
-        if self.roottask is None:
-            return self._ctrl.theme.get("tasks", "instrument")
-        return self._ctrl.tasks.instrumenttype(self.roottask)
 
     @property
     def defaultconfigtask(self) -> Task:
