@@ -218,7 +218,8 @@ class BaseHistPlotCreator(TaskPlotCreator[TModelAccess, PlotModelType]):
                 cache[self._src[i]]['data'] = j
 
             xarr  = data['hist']['count']
-            xarr  = xarr[np.isfinite(xarr)]
+            if len(xarr):
+                xarr  = xarr[np.isfinite(xarr)]
             xarr  = [0., xarr.max() if len(xarr) else 1.]
 
             pks   = data['peaks']['bases']
@@ -233,7 +234,7 @@ class BaseHistPlotCreator(TaskPlotCreator[TModelAccess, PlotModelType]):
 
             self.setbounds(cache, self._fig, xarr, data['hist']["bases"], xbnds)
 
-            cache[self._exp]['ticker'] = list(pks[np.isfinite(pks)])
+            cache[self._exp]['ticker'] = list(pks[np.isfinite(pks)]) if len(pks) else []
             cache[self._ref] = resetrefaxis(self._model, self._theme.reflabel)
             task = self._model.identification.task
             fit  = getattr(task, 'fit', {}).get(self._model.sequencekey, None)

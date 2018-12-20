@@ -675,10 +675,10 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         if out[0] is None:
             out = self.peaksmodel.config.estimatedstretch, out[1]
         if out[1] is None:
-            if bead is NoArgs:
-                out = out[0], self.peaksmodel.display.estimatedbias
-            else:
-                out = out[0], getattr(cache[1], "peaks", [0])[0]
+            out = out[0], self.peaksmodel.display.estimatedbias
+            if bead is not NoArgs:
+                if not isinstance(cache, Exception):
+                    out = out[0], getattr(cache[1], "peaks", [0])[0]
         return cast(Tuple[float, float], out)
 
     @property

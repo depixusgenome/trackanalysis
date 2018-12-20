@@ -364,7 +364,7 @@ class ConsensusModelAccess(HairpinGroupModelAccess):
             distance = np.full(len(out['pos']), np.NaN, dtype = 'f4'),
             orient   = np.full(len(out['pos']), " ", dtype = '<U1')
         )
-        if not out or len(out['pos']) == 0:
+        if not out or len(out['pos']) == 0 or self.sequencekey is None:
             return
 
         fcn   = self.identification.attribute('match', self.sequencekey).pair
