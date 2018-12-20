@@ -9,9 +9,6 @@ export class DpxDiscardedBeadsView extends WidgetView
         $(@el).find('.dpx-gb-freeze').prop('disabled', @model.frozen)
         if !@model.frozen && !@model.hassequence
             $('#dpx-gb-forced').prop('disabled', true)
-            console.log("frozen", @model.frozen, false)
-        else
-            console.log("frozen", @model.frozen, true)
 
     on_change_input: (evt) ->
         $(@el).find("#dpx-gb-#{evt}").val("#{@model[evt]}")
@@ -54,7 +51,6 @@ export class DpxDiscardedBeadsView extends WidgetView
             disabled = ' disabled=true'
         else
             disabled = if @model.frozen then ' disabled=true' else ''
-        console.log("--", name, disabled)
         place    = @model[name+'help']
         return  "<input id='dpx-gb-#{name}'"+
                     " class='dpx-gb-freeze bk-widget-form-input'"+
