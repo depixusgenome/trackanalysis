@@ -316,9 +316,9 @@ class ConsensusModelAccess(HairpinGroupModelAccess):
             evts = (cache[bead][1].positionsperpeak()['events']-rho[1])*rho[0]
             arr.append(EventsArray(list(enumerate(evts)), dtype = EVENTS_DTYPE))
 
-        prec = np.nanmedian([track.rawprecision(i)*rho[0] for i, rho in beads.items()])
-        import pickle
-        pickle.dump((self.__config[self.instrument], arr, prec), open("/tmp/x.pk", "wb"))
+        prec = self.__config[self.instrument].precision
+        if prec is None:
+            prec = np.nanmedian([track.rawprecision(i)*rho[0] for i, rho in beads.items()])
         dtl  = self.__config[self.instrument].detailed(arr, precision = prec)
         return dtl
 

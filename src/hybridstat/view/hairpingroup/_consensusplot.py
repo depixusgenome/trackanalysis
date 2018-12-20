@@ -12,7 +12,8 @@ from view.plots.tasks import TaskPlotCreator
 from .._io            import setupio
 from ..cyclehistplot  import BaseHistPlotCreator
 from ._model          import (ConsensusModelAccess, ConsensusScatterModel,
-                              ConsensusScatterTheme, ConsensusHistPlotModel)
+                              ConsensusScatterTheme, ConsensusHistPlotModel,
+                              ConsensusConfig)
 from ._plot           import setpoolobservers
 from ._widget         import ConsensusPlotWidgets
 
@@ -112,6 +113,10 @@ class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
         self._widgets.observe(ctrl)
         setpoolobservers(self, ctrl, self._model, "consensus.plot.scatter")
 
+        @ctrl.theme.observe(ConsensusConfig().name)
+        def _on_cnf(**_):
+            self.reset(False)
+
     def addto(self, ctrl, noerase = True):
         "adds the models to the controller"
         self._scatter.addto(ctrl, noerase=noerase)
@@ -122,16 +127,12 @@ class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
         hist    = self._hist.create(ctrl, doc)
         scatter = self._scatter.create(self._hist.beadpeaks)
         mode    = self.defaultsizingmode()
-        widg    = self._widgets.addtodoc(self, ctrl, doc, self._hist.peaks)
-        return layouts.row(layouts.column(scatter, widg, **mode), hist, **mode)
-
-    def advanced(self):
-        "triggers the advanced dialog"
-        self._widgets.advanced.on_click()
-
-    def ismain(self, _):
-        "specific setup for when this view is the main one"
-        self._widgets.advanced.ismain(_)
+        widg, peaks = self._widgets.addtodoc(self, ctrl, doc, self._hist.peaks)
+        return layouts.row(
+            layouts.column(hist,    widg,  **mode),
+            layouts.column(scatter, peaks, **mode),
+            **mode
+        )
 
     def _statehash(self):
         return self._model.statehash(task = ...)

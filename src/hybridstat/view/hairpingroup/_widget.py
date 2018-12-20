@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "widgets for groups of beads"
-from typing                 import ClassVar, Tuple
+from copy                   import copy
+from typing                 import ClassVar, Tuple, Iterator, Any
 import bokeh.core.properties   as props
 from bokeh                  import layouts
-from bokeh.models           import Widget
+from bokeh.models           import Widget, TextInput
 
 from view.static            import route
 from utils.gui              import parseints
@@ -12,7 +13,8 @@ from .._model               import PoolComputationsConfig
 from .._widget              import (PeakIDPathWidget, PeaksSequencePathWidget,
                                     OligoListWidget, TaskWidgetEnabler, advanced,
                                     PeakListTheme, PeakListWidget)
-from ._model                import HairpinGroupScatterModel, ConsensusHistPlotModel
+from ._model                import (HairpinGroupScatterModel, ConsensusHistPlotModel,
+                                    ConsensusConfig, Indirection)
 
 class DpxDiscardedBeads(Widget):
     "Toolbar model"
@@ -85,38 +87,24 @@ class DiscardedBeadsInput:
             'hassequence': self.__model.identification.task is not None
         }
 
-class HairpinGroupPlotWidgets:
+class Widgets:
     "peaks plot widgets"
     enabler: TaskWidgetEnabler
-    _MDL   = HairpinGroupScatterModel
-    _ORDER: ClassVar[Tuple[str,...]] = ("discarded", "seq", "oligos", "cstrpath", "advanced")
-    def __init__(self, ctrl, mdl):
-        if 'discarded' in self._ORDER:
-            self.discarded = DiscardedBeadsInput(ctrl, mdl)
-        if 'seq' in self._ORDER:
-            self.seq       = PeaksSequencePathWidget(ctrl, mdl)
-        if 'oligos' in self._ORDER:
-            self.oligos    = OligoListWidget(ctrl)
-        if 'cstrpath' in self._ORDER:
-            self.cstrpath  = PeakIDPathWidget(ctrl, mdl)
+    _ORDER: ClassVar[Tuple[str,...]] = ()
+    def _addtodoc(self, mainview, ctrl, doc, *_): # pylint: disable=unused-argument
+        mode = mainview.defaultsizingmode()
+        wdg  = {i: j.addtodoc(mainview, ctrl, *_) for i, j in self._widgets}
+        self.enabler = TaskWidgetEnabler(wdg)
+        out = layouts.widgetbox(sum((wdg[i] for i in self._ORDER), []), **mode)
+        return wdg, out
 
-        if 'advanced' in self._ORDER:
-            self.advanced  = advanced(
-                cnf       = self._MDL(),
-                accessors = (PoolComputationsConfig,),
-                peakstext = "Cores used for precomputations %(PoolComputationsConfig:ncpu)D"
-            )(ctrl, mdl)
+    @property
+    def _widgets(self) -> Iterator[Tuple[str, Any]]:
+        return iter(self.__dict__.items())
 
     def addtodoc(self, mainview, ctrl, doc, *_):
         "creates the widget"
-        mode = mainview.defaultsizingmode()
-        wdg  = {i: j.addtodoc(mainview, ctrl, *_) for i, j in self.__dict__.items()}
-        self.enabler = TaskWidgetEnabler(wdg)
-        if hasattr(self, 'cstrpath'):
-            self.cstrpath.callbacks(ctrl, doc)
-        if hasattr(self, 'advanced'):
-            self.advanced.callbacks(doc)
-        return layouts.widgetbox(sum((wdg[i] for i in self._ORDER), []), **mode)
+        return self._addtodoc(mainview, ctrl, doc, *_)[1]
 
     def observe(self, ctrl):
         "oberver"
@@ -126,17 +114,108 @@ class HairpinGroupPlotWidgets:
 
     def reset(self, cache, disable):
         "resets the widget upon opening a new file, ..."
-        for key, widget in self.__dict__.items():
+        for key, widget in self._widgets:
             if key != 'enabler':
                 widget.reset(cache)
         self.enabler.disable(cache, disable)
 
-class ConsensusPlotWidgets(HairpinGroupPlotWidgets):
+class HairpinGroupPlotWidgets(Widgets):
+    "peaks plot widgets"
+    _MDL   = HairpinGroupScatterModel
+    _ORDER: ClassVar[Tuple[str,...]] = ("discarded", "seq", "oligos", "cstrpath", "advanced")
+    def __init__(self, ctrl, mdl):
+        self.discarded = DiscardedBeadsInput(ctrl, mdl)
+        self.seq       = PeaksSequencePathWidget(ctrl, mdl)
+        self.oligos    = OligoListWidget(ctrl)
+        self.cstrpath  = PeakIDPathWidget(ctrl, mdl)
+        self.advanced  = advanced(
+            cnf       = self._MDL(),
+            accessors = (PoolComputationsConfig,),
+            peakstext = "Cores used for precomputations %(PoolComputationsConfig:ncpu)D"
+        )(ctrl, mdl)
+
+    def _addtodoc(self, mainview, ctrl, doc, *_):
+        "creates the widget"
+        out = super()._addtodoc(mainview, ctrl, doc, *_)
+        if hasattr(self, 'cstrpath'):
+            self.cstrpath.callbacks(ctrl, doc)
+        if hasattr(self, 'advanced'):
+            self.advanced.callbacks(doc)
+        return out
+
+class WidthWidgetTheme:
+    "Theme for width widget"
+    def __init__(self):
+        self.name        = "consensus.peak.width"
+        self.placeholder = "Peak kernel width (base)"
+        self.format      = "{:.1f}"
+
+class WidthWidget:
+    "sets the width of the peaks"
+    _config = Indirection()
+    _theme  = Indirection()
+    _widget : TextInput
+    def __init__(self, ctrl, mdl, *_):
+        self._ctrl   = ctrl
+        self._mdl    = mdl
+        self._config = ConsensusConfig()
+        self._theme  = WidthWidgetTheme()
+
+    def addtodoc(self, mainview, ctrl, *_):
+        "sets-up the gui"
+        self._widget = TextInput(placeholder = self._theme.placeholder, **self.__data())
+        def _on_cb(attr, old, new):
+            if not mainview.isactive():
+                return
+
+            try:
+                val = float(new) if new.strip() else None
+            except ValueError:
+                self._widget.update(**self.__data())
+                return
+
+            instr = self._mdl.instrument
+            cpy   = self._config[instr]
+            if  cpy.precision == val:
+                return
+
+            cpy           = copy(cpy)
+            cpy.precision = val
+            with ctrl.action:
+                self._ctrl.theme.update(self._config, **{instr: cpy})
+
+        self._widget.on_change("value", _on_cb)
+        return [self._widget]
+
+    def reset(self, cache):
+        "reset the widget"
+        cache[self._widget].update(**self.__data())
+
+    def __data(self):
+        prec = self._config[self._mdl.instrument].precision
+        return dict(value = "" if prec is None else self._theme.format.format(prec))
+
+class ConsensusPlotWidgets(Widgets):
     "peaks plot widgets"
     _MD    = ConsensusHistPlotModel
-    _ORDER = "seq", "oligos", "advanced", "peaks"
+    _ORDER = "seq", "oligos", "width"
     def __init__(self, ctrl, mdl):
-        super().__init__(ctrl, mdl)
-        theme         = PeakListTheme(name = "consensus.peaks", height = 200)
-        theme.columns = theme.columns[1:-2]
+        theme         = PeakListTheme(name = "consensus.peaks", height = 400)
+        get           = lambda x: [x[0]+'std', x[1].replace("(", "std ("), x[2]]
+        theme.columns = [
+            *theme.columns[1:-3],
+            get(theme.columns[-4]),
+            theme.columns[-3],
+            get(theme.columns[-3])
+        ]
+
+        self.seq      = PeaksSequencePathWidget(ctrl, mdl)
+        self.oligos   = OligoListWidget(ctrl)
         self.peaks    = PeakListWidget(ctrl, mdl, theme)
+        self.width    = WidthWidget(ctrl, mdl)
+
+    def addtodoc(self, mainview, ctrl, doc, *_):
+        "creates the widget"
+        wdg, one = self._addtodoc(mainview, ctrl, doc, *_)
+        two      = layouts.widgetbox(wdg['peaks'], **mainview.defaultsizingmode())
+        return one, two
