@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "widgets for groups of beads"
+from typing                 import ClassVar, Tuple
 import bokeh.core.properties   as props
 from bokeh                  import layouts
 from bokeh.models           import Widget
@@ -88,7 +89,7 @@ class HairpinGroupPlotWidgets:
     "peaks plot widgets"
     enabler: TaskWidgetEnabler
     _MDL   = HairpinGroupScatterModel
-    _ORDER = "discarded", "seq", "oligos", "cstrpath", "advanced"
+    _ORDER: ClassVar[Tuple[str,...]] = ("discarded", "seq", "oligos", "cstrpath", "advanced")
     def __init__(self, ctrl, mdl):
         if 'discarded' in self._ORDER:
             self.discarded = DiscardedBeadsInput(ctrl, mdl)
@@ -130,7 +131,7 @@ class HairpinGroupPlotWidgets:
                 widget.reset(cache)
         self.enabler.disable(cache, disable)
 
-class ConsensusPlotWidgets(HairpinGroupScatterModel):
+class ConsensusPlotWidgets(HairpinGroupPlotWidgets):
     "peaks plot widgets"
     _MD    = ConsensusHistPlotModel
     _ORDER = "seq", "oligos", "advanced", "peaks"

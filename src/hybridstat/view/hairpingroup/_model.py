@@ -234,11 +234,13 @@ class ConsensusScatterModel(PlotModel):
 
 class ConsensusHistPlotTheme(HistPlotTheme):
     "consensus plot plot model: histogram"
-    name      = "consensus.plot.hist"
-    beadpeaks = PlotAttrs('~gray', 'o', 1,  alpha = 0.)
-    figsize   = PlotTheme.defaultfigsize(660, 660)
-    xlabel    = 'Bead Count'
-    minzoomz  = None
+    name             = "consensus.plot.hist"
+    beadpeaks        = PlotAttrs('~gray', 'o', 1,  alpha = 0.)
+    figsize          = PlotTheme.defaultfigsize(660, 660)
+    xlabel           = 'Bead Count'
+    minzoomz         = None
+    toolbar          = dict(PlotTheme.toolbar)
+    toolbar['items'] = 'ypan,ybox_zoom,reset,save,hover,ybox_select'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)

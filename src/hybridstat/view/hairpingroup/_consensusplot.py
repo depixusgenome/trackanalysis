@@ -4,7 +4,7 @@
 import numpy as np
 from bokeh            import layouts
 from bokeh.plotting   import Figure
-from bokeh.models     import Range1d, ColumnDataSource
+from bokeh.models     import Range1d, ColumnDataSource, HoverTool
 
 from view.colors      import tohex
 from view.plots.base  import themed, PlotView, CACHE_TYPE, GroupStateDescriptor
@@ -66,8 +66,21 @@ class ConsensusScatterPlotCreator(
         "create the plot"
         self._src  = source
         self._fig  = self.figure(y_range = Range1d, x_range = Range1d)
-        self.addtofig(self._fig, 'peaks', x = 'count', y = 'duration', source = self._src)
+        rend       = self.addtofig(
+            self._fig, 'peaks', x = 'count', y = 'duration', source = self._src
+        )
         self.linkmodeltoaxes(self._fig)
+
+        hover = self._fig.select(HoverTool)
+        if len(hover) > 0:
+            hover = hover[0]
+            hover.update(
+                point_policy = self._theme.tooltippolicy,
+                tooltips     = self._theme.tooltips,
+                mode         = self._theme.tooltipmode,
+                renderers    = [rend]
+            )
+
         return self._fig
 
     def _reset(self, cache: CACHE_TYPE):
