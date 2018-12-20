@@ -314,8 +314,7 @@ class PeakListWidget:
                                       noerase = False)
 
     def __cols(self):
-        fmt   = lambda i: (StringFormatter(text_align = 'center',
-                                           font_style = 'bold') if i == '' else
+        fmt   = lambda i: (StringFormatter(text_align = 'center') if i == '' else
                            DpxNumberFormatter(format = i, text_align = 'right'))
         cols  = list(TableColumn(field      = i[0],
                                  title      = i[1],

@@ -364,10 +364,11 @@ class ConsensusModelAccess(HairpinGroupModelAccess):
         return {i: np.array(j, dtype = 'f4') for i,j in out.items()}
 
     def __consensuspeakid(self, out: Dict[str, np.ndarray]):
+        win   = PeakInfoModelAccess.searchwindow()
         out.update(
             id       = np.full(len(out['pos']), np.NaN, dtype = 'f4'),
             distance = np.full(len(out['pos']), np.NaN, dtype = 'f4'),
-            orient   = np.full(len(out['pos']), " ", dtype = '<U1')
+            orient   = np.full(len(out['pos']), " ", dtype = f'<U{1+win*2}')
         )
         if not out or len(out['pos']) == 0 or self.sequencekey is None:
             return
@@ -375,8 +376,15 @@ class ConsensusModelAccess(HairpinGroupModelAccess):
         fcn   = self.identification.attribute('match', self.sequencekey).pair
         tmp   = fcn(out['pos'], 1., 0)['key']
         good  = tmp >= 0
-        ori   = dict(self.hybridisations(self.sequencekey))
 
         out['id']      [good] = tmp[good]
         out['distance'][good] = (tmp - out['pos'])[good]
-        out['orient']  [good] = ['-+ '[int(ori.get(int(i+0.01), 2))] for i in out['id'][good]]
+
+        ori   = dict(self.hybridisations(self.sequencekey))
+        cur   = self.sequences(self.sequencekey)
+        out['orient'][good]  = [
+            '-+ '[int(ori.get(int(i+0.01), 2))] for i in out['id'][good]
+        ]
+        out['orient'][~good] = [
+            cur[max(i-win, 0):i+1+win].lower()  for i in out['bases'][~good].astype("i4")
+        ]

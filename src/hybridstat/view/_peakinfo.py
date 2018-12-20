@@ -21,6 +21,11 @@ class PeakInfoModelAccess:
         self._bead    = bead
         self._classes = classes
 
+    @staticmethod
+    def searchwindow() -> int:
+        "return the search window for unknown peaks"
+        return 5
+
     def hasidentification(self) -> bool:
         "whether the model has an FitToHairpinTask"
         return self._model.identification.task is not None
@@ -132,7 +137,11 @@ class IdentificationPeakInfo(PeakInfo):
         dflt = super().defaults(mdl, peaks)
         for i in dflt:
             if i.endswith('orient'):
-                dflt[i]  = np.full(len(dflt[i]), ' ', dtype = '<U1')
+                dflt[i]  = np.full(
+                    len(dflt[i]),
+                    ' ',
+                    dtype = f'<U{mdl.searchwindow()*2+1}'
+                )
         return dflt
 
     def values(self, mdl: PeakInfoModelAccess, peaks, dico: Dict[str, np.ndarray]):
@@ -140,17 +149,26 @@ class IdentificationPeakInfo(PeakInfo):
         zvals         = np.array([i[0] for i in peaks], dtype = 'f4')
         dist          = mdl.getfitparameters(mdl.sequencekey)
         dico['bases'] = (zvals - dist[1])*dist[0]
+        seqs          = mdl.sequences()
         for key, hyb in mdl.hybridisations().items():
             dist = mdl.getfitparameters(key)
             tmp  = mdl.matchpairs(key, zvals)
             good = tmp >= 0
-            ori  = dict(hyb)
 
-            dico[key+'bases']          = (zvals - dist[1])*dist[0]
+            dico[key+'bases']          = ((zvals - dist[1])*dist[0])
             dico[key+'id']      [good] = tmp[good]
             dico[key+'distance'][good] = (tmp - dico[key+'bases'])[good]
-            dico[key+'orient']  [good] = ['-+ '[int(ori.get(int(i+0.01), 2))]
-                                          for i in dico[key+'id'][good]]
+
+            ori                       = dict(hyb)
+            win                       = mdl.searchwindow()
+            dico[key+'orient'][good]  = [
+                '-+ '[int(ori.get(int(i+0.01), 2))]
+                for i in dico[key+'id'][good]
+            ]
+            dico[key+'orient'][~good] = [
+                seqs[key][max(i-win, 0):i+1+win].lower()
+                for i in dico[key+'bases'][~good].astype("i4")
+            ]
 
             if key == mdl.sequencekey:
                 for i in self.basekeys():
