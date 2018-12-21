@@ -204,7 +204,7 @@ class ConsensusScatterTheme(PlotTheme):
     ylabel     = PeaksPlotTheme.xtoplabel
     reflabel   = 'Hairpin'
     format     = '0.0'
-    peaks      = PlotAttrs('color', 'o', 10, line_alpha = 1., fill_alpha = .0)
+    peaks      = PlotAttrs('color', '+', 10, line_alpha = 1., fill_alpha = .0)
     pkcolors   = {
         'dark':  {'missing': 'red', 'found': 'lightgreen'},
         'basic': {'missing': 'red', 'found': 'darkgreen'}

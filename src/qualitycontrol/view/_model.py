@@ -112,7 +112,6 @@ class QualityControlModelAccess(DataCleaningModelAccess):
                     default['cycles']  += [ncy if i[1] is None else i[1] for i in mem]
                     default['type']    += [i[2] for i in mem]
                     default['message'] += [i[3] for i in mem]
-        print(default)
         self._ctrl.display.update(self.__display, messages = default)
 
     def badbeads(self) -> Set[BEADKEY]:

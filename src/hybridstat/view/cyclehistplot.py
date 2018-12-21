@@ -271,7 +271,8 @@ class BaseHistPlotCreator(TaskPlotCreator[TModelAccess, PlotModelType]):
 
     def _createpeaks(self, itms, out):
         out['peaks']           = createpeaks(self._model, self._theme.pkcolors, None)
-        out['events']['bases'] = self._tobases(np.concatenate(itms.positions))
+        if itms is not None:
+            out['events']['bases'] = self._tobases(np.concatenate(itms.positions))
         return False
 
     def _tobases(self, arr):
