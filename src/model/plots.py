@@ -30,14 +30,15 @@ class PlotAttrs:
                  size    = 1,
                  palette = None,
                  **kwa) -> None:
-        if isinstance(color, str) and len(color) and color[0] == '~':
-            self.color = {'dark': f'light{color[1:]}', 'basic': f'dark{color[1:]}'}
-        else:
-            self.color = color
+        self.color   = color
         self.glyph   = self._GLYPHS.get(glyph, glyph)
         self.size    = size
         self.palette = palette
         self.__dict__.update(kwa)
+        for i in ('color', 'selection_color', 'nonselection_color'):
+            color = self.__dict__.get(i, None)
+            if isinstance(color, str) and len(color) and color[0] == '~':
+                self.__dict__[i] = {'dark': f'light{color[1:]}', 'basic': f'dark{color[1:]}'}
 
 def defaultfigsize(*args) -> Tuple[int, int, str]:
     "return the default fig size"

@@ -62,7 +62,12 @@ class HistPlotTheme(PlotTheme):
     reflabel         = 'Hairpin'
     formats          = {'bases': '0.0a', 'ref': '0', 'exp': '0.0'}
     hist             = deepcopy(PeaksPlotTheme.count)
-    events           = PlotAttrs(hist.color, 'o', 3, alpha = .25)
+    events           = PlotAttrs(
+        hist.color, 'o', 4,
+        alpha           = .25,
+        selection_alpha = 1.,
+        selection_color = '~green'
+    )
     peaks            = PlotAttrs(hist.color, '△', 5, alpha = 0., angle = np.pi/2.)
     pkcolors         = deepcopy(PeaksPlotTheme.pkcolors)
     minzoomz: Optional[float] = .008/.88e-3
@@ -260,14 +265,13 @@ class BaseHistPlotCreator(TaskPlotCreator[TModelAccess, PlotModelType]):
 
         out['hist'].update(bases = zvals, count = cnt)
 
-        pos    = self._tobases(np.concatenate(itms.positions))
-        hmin   = np.median(cnt)/100
-        interp = interpolator(zvals, cnt, hmin)
-        out['events'].update(bases = pos, count = interp(pos))
+        interp = interpolator(zvals, cnt, np.median(cnt)/100)
+        out['events'].update(count = interp(out['events']['bases']))
         return out
 
-    def _createpeaks(self, _, out):
-        out['peaks'] = createpeaks(self._model, self._theme.pkcolors, None)
+    def _createpeaks(self, itms, out):
+        out['peaks']           = createpeaks(self._model, self._theme.pkcolors, None)
+        out['events']['bases'] = self._tobases(np.concatenate(itms.positions))
         return False
 
     def _tobases(self, arr):

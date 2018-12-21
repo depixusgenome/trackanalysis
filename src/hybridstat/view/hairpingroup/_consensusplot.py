@@ -28,10 +28,11 @@ class ConsensusHistPlotCreator(
                   for i in ('found', 'missing')]
         if dtls is not None:
             dtls.histogram /= factor
-        peaks['color']    = np.where(np.isfinite(peaks['id']), *colors[:2])
-        allpks['color']   = np.where(np.isfinite(allpks['id']), *colors[:2])
-        data['peaks']     = peaks
-        data['beadpeaks'] = allpks
+        peaks['color']  = np.where(np.isfinite(peaks['id']), *colors[:2])
+        allpks['color'] = np.where(np.isfinite(allpks['id']), *colors[:2])
+        data['peaks']   = peaks
+        data['events']  = allpks
+        data['events']['rate'] = data['events']['count']
         return True
 
     def create(self, ctrl, doc, *_):
@@ -39,9 +40,9 @@ class ConsensusHistPlotCreator(
         return self._addtodoc(ctrl, doc, *_)
 
     @property
-    def beadpeaks(self):
+    def events(self):
         "return bead peaks"
-        return self._src['beadpeaks']
+        return self._src['events']
 
     @property
     def peaks(self):
@@ -68,7 +69,7 @@ class ConsensusScatterPlotCreator(
         self._src  = source
         self._fig  = self.figure(y_range = Range1d, x_range = Range1d)
         rend       = self.addtofig(
-            self._fig, 'peaks', x = 'count', y = 'duration', source = self._src
+            self._fig, 'peaks', x = 'rate', y = 'duration', source = self._src
         )
         self.linkmodeltoaxes(self._fig)
 
@@ -89,7 +90,7 @@ class ConsensusScatterPlotCreator(
             data = cache[self._src]['data']
         else:
             data = self._src.data
-        self.setbounds(cache, self._fig, data['count'], data["duration"])
+        self.setbounds(cache, self._fig, data['rate'], data["duration"])
 
 @GroupStateDescriptor(*(f"consensus.plot.{i}" for i in ("hist", "scatter")))
 class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
@@ -125,7 +126,7 @@ class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
     def _addtodoc(self, ctrl, doc):
         "returns the figure"
         hist    = self._hist.create(ctrl, doc)
-        scatter = self._scatter.create(self._hist.beadpeaks)
+        scatter = self._scatter.create(self._hist.events)
         mode    = self.defaultsizingmode()
         widg, peaks = self._widgets.addtodoc(self, ctrl, doc, self._hist.peaks)
         return layouts.row(
