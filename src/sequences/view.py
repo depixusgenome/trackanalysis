@@ -324,7 +324,7 @@ class OligoListTheme:
     "OligoListTheme"
     name   : str = "sequence.probes"
     title  : str = ""
-    tooltip: str = 'cc!wgg, aat, singlestrand, ...?'
+    tooltip: str = 'c!cwgg, aat, singlestrand, ...?'
     width  : int = 280
 
 class OligoListWidget:

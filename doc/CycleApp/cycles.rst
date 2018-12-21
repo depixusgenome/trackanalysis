@@ -96,12 +96,15 @@ will block at position 110 rather than 108::
 
 Such a behaviour doesn't work for antibodies when, for example, looking for
 'CCWGG' positions in which the 'W' is methylated. In that case one can use a
-'!' to mark the position to use instead. In the following example, 'cc!wgg'
-will find a position at 110::
+'!' to mark the position to use instead. In the following example, 'c!cwgg'
+will find a position at 109 and 111::
 
+            100         111
+            :           :
+    3'-(...)gggtataaaGGWCCgcagggta(...)-5'
     5'-(...)cccatatttCCWGGcgtcccat(...)-3'
-            :          :
-            100        110
+            :         :
+            100       109
 
 Setting Stretch & Bias Values
 =============================
