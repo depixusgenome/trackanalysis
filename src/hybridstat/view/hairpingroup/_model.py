@@ -215,7 +215,6 @@ class ConsensusScatterTheme(PlotTheme):
     tooltippolicy    = 'follow_mouse'
     tooltips         = [('Bead',                   '@bead'),
                         ('Z (base)',               '@bases'),
-                        ('Ref (base)',             '@id'),
                         ('Strand',                 '@orient'),
                         (PeaksPlotTheme.xlabel,    '@rate{0.0}'),
                         (PeaksPlotTheme.xtoplabel, '@duration{0.000}')]
@@ -241,7 +240,7 @@ class ConsensusHistPlotTheme(HistPlotTheme):
     minzoomz         = None
     toolbar          = dict(PlotTheme.toolbar)
     toolbar['items'] = 'ypan,ybox_zoom,reset,save,hover,ybox_select'
-    tooltips         = HistPlotTheme.tooltips[:-1]
+    tooltips         = HistPlotTheme.tooltips[:-1]+[('Detection (%)', '@nbeads{0}')]
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
