@@ -383,7 +383,7 @@ class ConsensusModelAccess(HairpinGroupModelAccess):
         ori   = dict(self.hybridisations(self.sequencekey))
         cur   = self.sequences(self.sequencekey)
         out['orient'][good]  = [
-            '-+ '[int(ori.get(int(i+0.01), 2))] for i in out['id'][good]
+            '\u2796\u2795 '[int(ori.get(int(i+0.01), 2))] for i in out['id'][good]
         ]
         out['orient'][~good] = [
             cur[max(i-win, 0):i+1+win].lower()  for i in out['bases'][~good].astype("i4")

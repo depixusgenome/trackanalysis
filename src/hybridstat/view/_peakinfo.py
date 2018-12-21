@@ -162,7 +162,7 @@ class IdentificationPeakInfo(PeakInfo):
             ori                       = dict(hyb)
             win                       = mdl.searchwindow()
             dico[key+'orient'][good]  = [
-                '-+ '[int(ori.get(int(i+0.01), 2))]
+                '\u2796\u2795 '[int(ori.get(int(i+0.01), 2))]
                 for i in dico[key+'id'][good]
             ]
             dico[key+'orient'][~good] = [
