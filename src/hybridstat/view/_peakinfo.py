@@ -162,7 +162,7 @@ class IdentificationPeakInfo(PeakInfo):
             return info
 
         good       = np.isfinite(ids)
-        ori        = dict(hyb if hyb else ())
+        ori        = dict(hyb if hyb is not None else ())
         arr[good]  = [
             '\u2796\u2795 '[int(ori.get(int(i+0.01), 2))]+" "+_set(i)
             for i in ids[good].astype('i4')

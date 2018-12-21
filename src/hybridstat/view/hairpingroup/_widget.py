@@ -203,7 +203,9 @@ class ConsensusPlotWidgets(Widgets):
         theme         = PeakListTheme(name = "consensus.peaks", height = 400)
         get           = lambda x: [x[0]+'std', x[1].replace("(", "std ("), x[2]]
         theme.columns = [
-            *theme.columns[1:-3],
+            *theme.columns[1:-4],
+            ['nbeads', 'Dectection (%)', '0'],
+            theme.columns[-4],
             get(theme.columns[-4]),
             theme.columns[-3],
             get(theme.columns[-3])

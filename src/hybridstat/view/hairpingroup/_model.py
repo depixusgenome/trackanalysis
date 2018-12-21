@@ -216,7 +216,7 @@ class ConsensusScatterTheme(PlotTheme):
     tooltips         = [('Bead',                   '@bead'),
                         ('Z (base)',               '@bases'),
                         ('Ref (base)',             '@id'),
-                        ('Strand',                 '@strand'),
+                        ('Strand',                 '@orient'),
                         (PeaksPlotTheme.xlabel,    '@rate{0.0}'),
                         (PeaksPlotTheme.xtoplabel, '@duration{0.000}')]
 
@@ -338,7 +338,7 @@ class ConsensusModelAccess(HairpinGroupModelAccess):
     @staticmethod
     def __consensuspeakstats(dtl, stats) -> Dict[str, np.ndarray]:
         out: Dict[str, List[float]] = {
-            **{i:   [] for i in ('pos', 'npeaks')},
+            **{i:   [] for i in ('pos', 'nbeads')},
             **{i+j: [] for i, j in product(('count', 'duration', 'bases'), ('', 'std'))},
         }
         if dtl is None:
@@ -347,16 +347,16 @@ class ConsensusModelAccess(HairpinGroupModelAccess):
         for peak, beadpeaks in dtl.output('nanmean'):
             tmp: Dict[str, List[np.ndarray]]
             tmp    = {'count': [], 'duration': [], 'bases': []}
-            npeaks = 0
+            nbeads = 0
             for data, evts in zip(stats.values(), beadpeaks):
                 evts    = [np.max(k['data']) for k in evts]
                 bases   = np.searchsorted(data['bases'], evts)-1
 
-                npeaks += len(bases)
+                nbeads += len(bases) > 0
                 for j, k in tmp.items():
                     k.append(data[j][bases])
 
-            out['npeaks'].append(npeaks)
+            out['nbeads'].append(nbeads*100/max(1, len(dtl.events)))
             out['pos'].append(peak)
             for j, k in tmp.items():
                 arr = np.concatenate(k)

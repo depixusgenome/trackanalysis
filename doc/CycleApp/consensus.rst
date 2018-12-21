@@ -50,4 +50,5 @@ The Table
 The table displays the same information type of information as in the *Peaks*
 or *Cycles & Peaks* tab but aggregated over all beads. Thus the *Rate* and
 *Duration* columns refer to the mean or the standard deviation of all values
-relevant to that position. 
+relevant to that position. The detection rate, computed as the  percentage of
+beads contributing to a consensus peak, is added as well.
