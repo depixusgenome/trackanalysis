@@ -219,6 +219,19 @@ def marksequence(seq:str, oligs: Sequence[str]) -> str:
         seq  = seq.replace(olig.lower(), olig.upper())
     return seq
 
+def markedoligos(oligos: Sequence[str]) -> Dict[str, str]:
+    "Return a dictionnary of oligos and the characters with which to replace them"
+    oligs = {
+        i.replace('!', '').lower()
+        for i in oligos if i.lower() not in ('$', '0', 'doublestrand', 'singlestrand')
+    }
+
+    lst = {i: ''.join(chr(0x1d58d+ord(j)) for j in i) for i in oligs}
+
+    oligs = {Translator.reversecomplement(i) for i in oligs}-oligs
+    lst.update({i: ''.join(chr(0x1d5f5+ord(j)) for j in i) for i in oligs})
+    return lst
+
 def overlap(ol1:str, ol2:str, minoverlap = None):
     """
     Returns wether the 2 oligos overlap

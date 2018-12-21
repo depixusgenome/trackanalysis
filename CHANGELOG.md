@@ -1,4 +1,12 @@
 # CycleApp
+## cycles_v6.5
+
+###  Peaks
+
+In the table, the *Strand* column now reports the binding orientation as as
+well the sequence around either the theoretical position or the experimental
+position when no theoretical position was found. The sequence is marked in bold
+for bindings on the positive strand and italic bold for the negative strand.
 
 ## cycles_v6.4
 

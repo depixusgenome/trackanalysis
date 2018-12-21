@@ -9,6 +9,7 @@ import numpy                    as     np
 
 from eventdetection.processor   import EventDetectionTask
 from peakfinding.probabilities  import Probability
+from sequences                  import markedoligos
 from utils                      import NoArgs
 
 if TYPE_CHECKING:
@@ -21,10 +22,9 @@ class PeakInfoModelAccess:
         self._bead    = bead
         self._classes = classes
 
-    @staticmethod
-    def searchwindow() -> int:
+    def oligos(self) -> List[str]:
         "return the search window for unknown peaks"
-        return 5
+        return self._model.oligos
 
     def hasidentification(self) -> bool:
         "whether the model has an FitToHairpinTask"
@@ -137,12 +137,39 @@ class IdentificationPeakInfo(PeakInfo):
         dflt = super().defaults(mdl, peaks)
         for i in dflt:
             if i.endswith('orient'):
-                dflt[i]  = np.full(
-                    len(dflt[i]),
-                    ' ',
-                    dtype = f'<U{mdl.searchwindow()*2+1}'
-                )
+                dflt[i] = self.defaultstrand(mdl, peaks)
         return dflt
+
+    @classmethod
+    def defaultstrand(cls, mdl, peaks):
+        "return the empty strand array"
+        return cls.strand(mdl, None, None, peaks, None)
+
+    @staticmethod
+    def strand(mdl, seq, hyb, ids, bases):
+        "return the strand array"
+        oligs = markedoligos(mdl.oligos())
+        neigh = 2
+        win   = max((len(i)+2*neigh for i in oligs), default = 0)
+        arr   = np.full(len(ids), ' ', dtype = f'<U{win+1}')
+        if seq is None:
+            return arr
+
+        def _set(ind):
+            info = seq[max(ind-win+neigh, 0):ind+2+neigh].lower()
+            for i, j in oligs.items():
+                info = info.replace(i, j)
+            return info
+
+        good       = np.isfinite(ids)
+        ori        = dict(hyb)
+        arr[good]  = [
+            '\u2796\u2795 '[int(ori.get(int(i+0.01), 2))]+" "+_set(i)
+            for i in ids[good].astype('i4')
+        ]
+        arr[~good] = ['  '+_set(i) for i in bases[~good].astype("i4")]
+
+        return arr
 
     def values(self, mdl: PeakInfoModelAccess, peaks, dico: Dict[str, np.ndarray]):
         "sets current bead peaks and computes the fits"
@@ -158,18 +185,9 @@ class IdentificationPeakInfo(PeakInfo):
             dico[key+'bases']          = ((zvals - dist[1])*dist[0])
             dico[key+'id']      [good] = tmp[good]
             dico[key+'distance'][good] = (tmp - dico[key+'bases'])[good]
-
-            ori                       = dict(hyb)
-            win                       = mdl.searchwindow()
-            dico[key+'orient'][good]  = [
-                '\u2796\u2795 '[int(ori.get(int(i+0.01), 2))]
-                for i in dico[key+'id'][good]
-            ]
-            dico[key+'orient'][~good] = [
-                seqs[key][max(i-win, 0):i+1+win].lower()
-                for i in dico[key+'bases'][~good].astype("i4")
-            ]
-
+            dico[key+'orient']         = self.strand(
+                mdl, seqs[key], hyb, dico[key+'id'], dico[key+'bases']
+            )
             if key == mdl.sequencekey:
                 for i in self.basekeys():
                     dico[i] = dico[key+i]
