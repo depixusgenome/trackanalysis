@@ -6,7 +6,7 @@ Hairpin Group
 
 .. figure:: ../_images/hairpingroup.png
 
-    Display on all beads attached to a given hairpin as well as the current bead.
+    Displays showing beads attached to a given hairpin as well as the current bead.
     The rates and durations for all *selected* peaks are shown on the bottom plots.
 
 

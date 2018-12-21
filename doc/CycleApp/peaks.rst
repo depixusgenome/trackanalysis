@@ -108,11 +108,12 @@ The following characteristics are reported in the table of the |Peaks|.
 * :math:`z (\mathrm{base)}` is the mean position of events in the peak in base number:
   :math:`z (\mathrm{base}) = \mathrm{stretch} (z (\mathrm{µm}) - \mathrm{bias})`.
 * `Hairpin` is the theoretical position assigned to the peak if any.
-* `Strand` reports the strand on which the assigned theoretical position can be
-  found as well as the sequence around either the theoretical position or the
-  experimental position when no theoretical position was found. The sequence is
-  marked in bold for bindings on the positive strand and italic bold for the
-  negative strand.
+* `Strand` reports nothing unless theoretical positions are available. If there
+  are some, it reports the strand on which the assigned theoretical position
+  can be found as well as the sequence around either the theoretical position
+  or the experimental position when no theoretical position was found. The
+  sequence is marked in bold for bindings on the positive strand and italic
+  bold for the negative strand.
 * `Distance` is the distance between experimental and theoretical positions, in
   number of bases. 
 * `Rate (%)` is the percentage of cycles for which an event was detected for

@@ -8,6 +8,11 @@ well the sequence around either the theoretical position or the experimental
 position when no theoretical position was found. The sequence is marked in bold
 for bindings on the positive strand and italic bold for the negative strand.
 
+### Consensus
+
+The goal of this **new** tab is to show a consensus on all beads attached to the
+current hairpin. If none has been indicated, the tab is of lesser interest.
+
 ## cycles_v6.4
 
 * 2018-12-13 10:58:19 +0100  (tag: cycles_v6.4.1)
