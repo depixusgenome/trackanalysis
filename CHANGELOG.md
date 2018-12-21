@@ -1,6 +1,8 @@
 # CycleApp
 ## cycles_v6.5
 
+* 2018-12-21 11:58:19 +0100  (tag: cycles_v6.5)
+
 ###  Peaks
 
 In the table, the *Strand* column now reports the binding orientation as as
