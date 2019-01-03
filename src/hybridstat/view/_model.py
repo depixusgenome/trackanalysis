@@ -538,9 +538,12 @@ class PoolComputations:
     _display = Indirection()
     def __init__(self, mdl):
         self._mdl     = mdl
-        self._ctrl    = mdl.ctrl
         self._config  = PoolComputationsConfig()
         self._display = PoolComputationsDisplay()
+
+    @property
+    def _ctrl(self):
+        return self._mdl.ctrl
 
     @staticmethod
     def _poolrun(pipe, procs, refcache, keys):

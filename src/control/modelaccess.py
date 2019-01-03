@@ -3,7 +3,8 @@
 "Controller for most plots and views"
 import pickle
 from typing                 import (Tuple, Optional, Iterator, Union, Any,
-                                    Callable, Dict, Type, ClassVar, cast)
+                                    Callable, Dict, Type, ClassVar,
+                                    TYPE_CHECKING, cast)
 from copy                   import copy as shallowcopy
 
 from control.decentralized  import Indirection
@@ -17,11 +18,14 @@ from utils.inspection       import diffobj
 from .processor             import Processor
 from .processor.cache       import CacheReplacement
 from .taskcontrol           import ProcessorController
-from .event                 import Controller
+
+if TYPE_CHECKING:
+    # pylint: disable=unused-import
+    from app.maincontrol import SuperController
 
 class PlotModelAccess:
     "Default plot model"
-    def __init__(self, model:Union[Controller, 'PlotModelAccess']) -> None:
+    def __init__(self, model:Union['SuperController', 'PlotModelAccess']) -> None:
         self._model = model
         self._ctrl  = getattr(model, 'ctrl', model)
 
@@ -75,7 +79,7 @@ class TaskPlotModelAccess(PlotModelAccess):
     "Contains all access to model items likely to be set by user actions"
     _tasksconfig  = Indirection()
     _tasksdisplay = Indirection()
-    def __init__(self, model:Union[Controller, 'PlotModelAccess']) -> None:
+    def __init__(self, model:Union['SuperController', 'PlotModelAccess']) -> None:
         super().__init__(model)
         mdl = TasksModel()
         self._tasksconfig               = mdl.config
@@ -156,12 +160,15 @@ class TaskPlotModelAccess(PlotModelAccess):
     def addtodoc(self, _):
         "adds items to the doc"
 
-class TaskAccess(TaskPlotModelAccess):
+class TaskAccess:
     "access to tasks"
     tasktype:   ClassVar[Type[Task]]
     attrs:      ClassVar[Tuple[Tuple[str, Any],...]]
     side:       ClassVar[int]
     configname: ClassVar[str]
+    def __init__(self, model: TaskPlotModelAccess):
+        self._tasksmodel = model
+
     def __init_subclass__(cls,
                           tasktype:   Type[Task]               = Task,
                           attrs:      Optional[Dict[str, Any]] = None,
@@ -174,13 +181,32 @@ class TaskAccess(TaskPlotModelAccess):
         cls.tasktype   = tasktype
         cls.configname = ConfigurationDescriptor.defaulttaskname(configname, tasktype)
 
-    @staticmethod
-    def __deepcopy(task, kwa):
-        cnf = task.__getstate__() if hasattr(task, '__getstate__') else dict(task.__dict__)
-        cnf.update(kwa)
+    @property
+    def roottask(self) -> Optional[RootTask]:
+        "returns the current track"
+        return self._tasksmodel.roottask
 
-        out = type(task)(**cnf)
-        return out
+    @property
+    def tasklist(self) -> Iterator[Task]:
+        "return the tasklist associated to the root task"
+        return self._tasksmodel.tasklist
+
+    @property
+    def track(self) -> Optional[Track]:
+        "returns the current track"
+        return self._tasksmodel.track
+
+    @property
+    def bead(self) -> Optional[BEADKEY]:
+        "returns the current bead number"
+        return self._tasksmodel.bead
+
+    @property
+    def instrument(self) -> str:
+        "the current instrument type"
+        if self.roottask is None:
+            return self._ctrl.theme.get("tasks", "instrument")
+        return self._ctrl.tasks.instrumenttype(self.roottask)
 
     def processors(self) -> Optional[ProcessorController]:
         "returns a tuple (dataitem, bead) to be displayed"
@@ -246,20 +272,20 @@ class TaskAccess(TaskPlotModelAccess):
         if root is None:
             return
         task = self._task
-
+        ctrl = self._ctrl.tasks
         if kwa.get('disabled', False):
             if task is None:
                 return
-            self._ctrl.tasks.removetask(root, task)
+            ctrl.removetask(root, task)
             kwa = {'disabled': True}
 
         elif task is None:
             kwa['disabled'] = False
             item = self.__deepcopy(self.configtask, kwa)
-            self._ctrl.tasks.addtask(root, item, index = self.index)
+            ctrl.addtask(root, item, index = self.index)
         else:
             kwa['disabled'] = False
-            self._ctrl.tasks.updatetask(root, task, **kwa)
+            ctrl.updatetask(root, task, **kwa)
 
         self.configtask = kwa
 
@@ -269,7 +295,19 @@ class TaskAccess(TaskPlotModelAccess):
 
     def statehash(self, root = NoArgs, task = NoArgs):
         "returns a tag specific to the current state"
-        return super().statehash(root, self.task if task is NoArgs else task)
+        return self._tasksmodel.statehash(root, self.task if task is NoArgs else task)
+
+    @property
+    def _ctrl(self):
+        return self._tasksmodel.ctrl
+
+    @property
+    def _tasksdisplay(self):
+        return getattr(self._tasksmodel, '_tasksdisplay')
+
+    @property
+    def _tasksconfig(self):
+        return getattr(self._tasksmodel, '_tasksconfig')
 
     @property
     def _task(self) -> Optional[Task]:
@@ -285,3 +323,11 @@ class TaskAccess(TaskPlotModelAccess):
         return (isinstance(task, self.tasktype)
                 and (parent is NoArgs or parent is self.roottask)
                 and all(getattr(task, i) == j for i, j in self.attrs))
+
+    @staticmethod
+    def __deepcopy(task, kwa):
+        cnf = task.__getstate__() if hasattr(task, '__getstate__') else dict(task.__dict__)
+        cnf.update(kwa)
+
+        out = type(task)(**cnf)
+        return out
