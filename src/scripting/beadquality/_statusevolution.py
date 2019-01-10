@@ -3,7 +3,7 @@
 """
 Means for creating and displaying the quality of a set of tracks
 """
-from   typing    import Union
+from   typing    import Union, List, cast
 
 import holoviews as hv
 import pandas    as pd
@@ -24,8 +24,8 @@ class StatusEvolution:
     xlabel    = 'date'
     ylabel    = '% beads (total {total})'
     title     = "Evolution of the bead status as function of time"
-    ptsstyle  = dict(marker = 'o', size = 5)
-    plotopts  = {'show_grid': True, 'xrotation': 45}
+    ptsstyle  = {'marker': 'o', 'size': 5}
+    styleopts = {'show_grid': True, 'xrotation': 45}
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -44,15 +44,14 @@ class StatusEvolution:
         total = len(trackqc.status.index)
         for i in self.params:
             frame[i] *= 100/total
-        hover = HoverTool(tooltips = self.tooltips)
-        crvs  = [(hv.Points(frame, kdims = ['date', i], label = i)
-                  (style = dict(color = j, **self.ptsstyle),
-                   plot  = dict(tools=[hover], **self.plotopts)))
-                 for i, j in zip(self.params, self.colors)]
-        crvs += [(hv.Curve (frame, kdims = ['date', i], label = i)
-                  (style = dict(color = j),
-                   plot  = dict(tools=[hover], **self.plotopts)))
-                 for i, j in zip(self.params, self.colors)]
+        hover                  = HoverTool(tooltips = self.tooltips)
+        crvs: List[hv.Element] = []
+        for tpe, opts in zip((hv.Points, hv.Curve), (self.ptsstyle, {})):
+            opts = {'tools': [hover], **cast(dict, opts), **cast(dict, self.styleopts)}
+            crvs.extend(
+                tpe(frame, kdims = ['date', i], label = i).options(color = j, **opts)
+                for i, j in zip(self.params, self.colors)
+            )
 
         def _newaxis(plot, _):
             plot.state.extra_x_ranges = {"track": FactorRange(*frame.track.values)}

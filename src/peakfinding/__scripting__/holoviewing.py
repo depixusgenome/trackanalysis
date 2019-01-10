@@ -41,38 +41,42 @@ class PeaksDisplay(_CycleDisplay, display = PeaksDict): # type: ignore
 
     # pylint: disable=too-many-arguments,arguments-differ
     @staticmethod
-    def __histogram(det, params, norm, opts, estyle):
-        return hv.Curve((det.xaxis(*params), det.yaxis(norm)), **opts)(style = estyle)
+    def __histogram(det, params, norm, opts):
+        return hv.Curve((det.xaxis(*params), det.yaxis(norm)), **opts)
 
     @staticmethod
     def __events(det, params, opts, estyle, hist):
         if len(det.positions) == 0:
-            return hv.Scatter(([], []), **opts)(style = estyle)
+            return hv.Scatter(([], []), **opts).options(**estyle)
 
         pks   = (np.concatenate(det.positions)-params[1])*params[0]
         pks   = pks[np.concatenate(det.ids) != np.iinfo('i4').max]
         yvals = [hist[i] for i in pks]
-        return hv.Scatter((pks, yvals), **opts)(style = estyle)
+        return hv.Scatter((pks, yvals), **opts).options(**estyle)
 
     @classmethod
     def __errorbars(cls, det, params, opts, pstyle, hist):
+        if 'size' in pstyle:
+            pstyle = dict(pstyle)
+            pstyle.pop('size')
+
         if len(det.positions) == 0:
-            return hv.Curve(([], []), **opts)(style = pstyle)
+            return hv.Curve(([], []), **opts).options(**pstyle)
 
         means = [((i-params[1])*params[0], Probability.resolution(j))
                  for i, j in det.output]
         xvals = np.hstack([[i-j, i+j, np.NaN]         for i, j in means])
         yvals = np.hstack([[hist[i], hist[i], np.NaN] for i, j in means])
-        return hv.Curve((xvals, yvals), **opts)(style = pstyle)
+        return hv.Curve((xvals, yvals), **opts).options(**pstyle)
 
     @staticmethod
     def __peaks(det, params, opts, pstyle, hist):
         if len(det.positions) == 0:
-            return hv.Scatter(([], []), **opts)(style = pstyle)
+            return hv.Scatter(([], []), **opts).options(**pstyle)
 
         means = [(i-params[1])*params[0] for i, _ in det.output]
         yvals = [hist[i] for i in means]
-        return hv.Scatter((means, yvals), **opts)(style = pstyle)
+        return hv.Scatter((means, yvals), **opts).options(**pstyle)
 
     @staticmethod
     def graphdims():
@@ -111,7 +115,7 @@ class PeaksDisplay(_CycleDisplay, display = PeaksDict): # type: ignore
             elif self._labels is True:
                 opts['label'] = 'histogram'
 
-            itms.append(self.__histogram(det, cparams, norm, opts, estyle))
+            itms.append(self.__histogram(det, cparams, norm, opts))
             itms.append(self.__events   (det, cparams, opts, estyle, itms[-1]))
 
             if isinstance(self._labels, str):
@@ -223,7 +227,7 @@ class PeaksTracksDictDisplay(TracksDictDisplay, peaks = TracksDict): # type: ign
             return ovrs
 
         area = next(iter(ovrs[ind])).to(hv.Area)
-        ovrs[ind] = hv.Overlay([area(style = dict(alpha = 0.5))] + list(ovrs[ind]),
+        ovrs[ind] = hv.Overlay([area.options(alpha = 0.5)] + list(ovrs[ind]),
                                label = ovrs[ind].label,
                                group = ovrs[ind].group)
         return ovrs

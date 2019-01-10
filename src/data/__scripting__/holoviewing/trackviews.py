@@ -57,8 +57,10 @@ class Display(BasicDisplay): # pylint: disable=abstract-method
         opts.update(self._opts)
         cdims = {i: opts[i] for i in ('kdims', 'vdims') if i in opts}
         tdims = (cdims['kdims']+opts.get('vdims', []))[:2]
-        txt   = (hv.Text(0.5, .9, str(args[0]), kdims = tdims)
-                 (plot = dict(finalize_hooks=[self._error_finalize_hook])))
+        txt   = (
+            hv.Text(0.5, .9, str(args[0]), kdims = tdims)
+            .options(finalize_hooks=[self._error_finalize_hook])
+        )
         return hv.Overlay([txt, self._tpe(([0., np.NaN, 1.],[0., np.NaN, 1.]), **cdims)])
 
     def _create(self, opts, good):
@@ -74,7 +76,7 @@ class Display(BasicDisplay): # pylint: disable=abstract-method
             crvs = [self._tpe(j, **opts) for _, j in good]
 
         if 0. <  self._alpha < 1.:
-            crvs = [i(style = dict(alpha = self._alpha)) for i in crvs]
+            crvs = [i.options(alpha = self._alpha) for i in crvs]
 
         if not any(isinstance(i, hv.Text) for i in crvs): # dummy text for warnings
             for i in crvs:

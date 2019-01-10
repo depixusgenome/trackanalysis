@@ -15,8 +15,10 @@ def display(self, colorbar = True):
     "displays the bead calibration"
     img = np.ones((64,64)) if self.image is None or self.image.size == 0 else self.image
     bnd = [0, 0] + list(img.shape)
-    return (hv.Image(img[::-1], bounds = bnd, kdims = ['z focus (pixel)', 'profile'])
-            (plot = dict(colorbar = colorbar)))
+    return (
+        hv.Image(img[::-1], bounds = bnd, kdims = ['z focus (pixel)', 'profile'])
+        .options(colorbar = colorbar)
+    )
 
 @addto(FoV)         # type: ignore
 def display(self,   # pylint: disable=too-many-arguments
@@ -35,9 +37,10 @@ def display(self,   # pylint: disable=too-many-arguments
     if len(beads) and np.isscalar(beads[0]):
         beads = (beads,)
 
-    itms  = [hv.Image(self.image[::-1], bounds = bnd)
-             (plot  = dict(colorbar = colorbar),
-              style = dict(cmap = cmap))]
+    itms  = [
+        hv.Image(self.image[::-1], bounds = bnd)
+        .options(colorbar = colorbar, cmap = cmap)
+    ]
     for grp in beads:
         if grp is None or grp is Ellipsis:
             grp = list(self.beads.keys())
@@ -45,10 +48,11 @@ def display(self,   # pylint: disable=too-many-arguments
         xvals = [i                 for i, _ in good.values()]
         yvals = [i                 for _, i in good.values()]
         txt   = [f'{i}'            for i    in good.keys()]
-        itms.append(hv.Points((xvals, yvals))(style = dict(size=10, alpha=.6)))
+        itms.append(hv.Points((xvals, yvals)))
         itms.extend(hv.Text(*i) for i in zip(xvals, yvals, txt))
 
     top = hv.Overlay(itms).redim(x = 'x (μm)', y = 'y (μm)')
+    top = top.options({"Points": {"size": 10, "alpha": .6}})
     if not calib:
         return top
 

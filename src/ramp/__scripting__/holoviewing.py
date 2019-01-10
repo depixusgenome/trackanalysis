@@ -80,16 +80,16 @@ class RampDisplay(BasicDisplay, ramp = Track):
         cols = [hv.Dimension(i, label = labl) for i in cols]
         tmp  = dict(opts)
         if ind == "consensus":
-            tmp['style'].pop('color', None)
+            tmp.pop('color', None)
         ind  = hv.Dimension(ind, label = labl)
         if len(cols) == 1 or len(cols) == 3:
-            crv = hv.Curve(data, "zmag", ind, label = ind.name)(**tmp)
+            crv = hv.Curve(data, "zmag", ind, label = ind.name).options(**tmp)
         if len(cols) == 1:
             return crv
         if len(cols) == 2:
-            return hv.Area(data, "zmag", cols, label = ind.name)(**tmp)
+            return hv.Area(data, "zmag", cols, label = ind.name).options(**tmp)
         if len(cols) == 3:
-            return hv.Area(data, "zmag", cols[1:], label = ind.name)(**tmp)*crv
+            return hv.Area(data, "zmag", cols[1:], label = ind.name).options(**tmp)*crv
         assert False
 
     def consensus(self, opts = None, hmap = True, normalize: bool = True, **kwa):
@@ -102,7 +102,7 @@ class RampDisplay(BasicDisplay, ramp = Track):
         cols         = [i for i in data.columns
                         if not any(j in i for j in ("zmag", "@low", "@high", "consensus"))]
         _crv = partial(self._crv, data,
-                       (dict(style = dict(color = "gray", alpha = .25))
+                       (dict(color = "gray", alpha = .25)
                         if opts is None else opts),
                        "Z (% bead length)" if normalize else "Z (µm)")
         if hmap:

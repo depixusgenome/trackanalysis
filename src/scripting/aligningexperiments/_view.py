@@ -29,7 +29,7 @@ def showresolutions(data, *keys: str, rng = (0., 8.), maxresolution = 1.):
         if  info.resolution.mean() < 1e-1:
             info = info.assign(resolution = data[key].resolution*1e3)
         box = hv.BoxWhisker(info, ['trackcount', 'bead'],  'resolution')
-        return box(plot= dict(finalize_hooks = [_fhook]))
+        return box.options(finalize_hooks = [_fhook])
 
     out = (hv.DynamicMap(_fcn, kdims = ['data'])
            .redim.values(data = list(keys))
@@ -76,7 +76,7 @@ def showidentifiedpeaks(data, # pylint: disable=too-many-arguments
     hmap = hv.HeatMap(vals.fillna(missingvalue), [ref, "bead"], "dist")
     if not adjoint:
         opts.pop('width')
-        return hmap(plot = opts)
+        return hmap.options(**opts)
 
     beads  = (hv.Bars(vals.delta.isna().sum(level=0)[::-1])
               .redim(x="bead", y="missbeads"))
@@ -84,9 +84,11 @@ def showidentifiedpeaks(data, # pylint: disable=too-many-arguments
                       .delta.isna().sum(level=0))
               .redim(x=ref, y="misspos"))
 
-    return (hmap(plot = opts)
-            << beads(plot=dict(width=height, yaxis = None))
-            << pos  (plot=dict(height=height, width=width, xaxis = None)))
+    return (
+        hmap    .options(**opts)
+        << beads.options(width  = height, yaxis = None)
+        << pos  .options(height = height, width = width, xaxis = None)
+    )
 
 def addsequenceticks(plot, seq, position):
     "add sequence ticks and possibly a new axis"
@@ -112,7 +114,7 @@ def addsequenceticks(plot, seq, position):
             _set(linaxis)
             plot.state.add_layout(linaxis, position)
         opts = _add
-    return plot(plot=dict(finalize_hooks=[opts]))
+    return plot.options(finalize_hooks=[opts])
 
 def showfalsepositives(itms, rng, precision = 1, scatter = False, **kwa):
     "display false positives"
@@ -125,10 +127,10 @@ def showfalsepositives(itms, rng, precision = 1, scatter = False, **kwa):
         beads = data.bead.unique()
         dtl   = cls.detailed(dico.config, data, precision = precision)
         disp  = getattr(Detailed(dico, dtl), 'display')(zero = False).display()
-        crv   = hv.Curve((list(rng), [3, 3]))(style=dict(linewidth=20, alpha=.5))
+        crv   = hv.Curve((list(rng), [3, 3])).options(linewidth = 20, alpha = .5)
         ovr   = hv.Overlay(list(disp)+[crv])
         if scatter:
-            scatt = (hv.Scatter(data, 'bead', 'z')(plot=dict(jitter=.8))
+            scatt = (hv.Scatter(data, 'bead', 'z').options(jitter = .8)
                      *hv.Scatter((np.concatenate([beads]*2),
                                   [rng[0]]*len(beads)+[rng[0]]*len(beads))))
             return (ovr+scatt).cols(1)
@@ -163,20 +165,35 @@ class PeaksAlignmentConfigMixin:
         cols = ['resolution', 'hybridisationrate', 'averageduration']
         dim  = hv.Dimension("z", label = "base pairs")
         args = ref, ['avg']+cols[1:]
-        opts = dict(plot  = dict(jitter = .75), style = dict(alpha  = .2))
+        opts = dict(jitter = .75, alpha  = .2)
         if 'reference' in data:
             isna = data.reference.isna()
-            out  = (hv.Scatter(data[~isna], *args, label = 'events')(**opts).redim(avg = dim)
-                    *hv.Scatter(data[isna], *args,
-                                label = 'unknown events')(**opts).redim(avg = dim))
-        else:
-            out  = hv.Scatter(data, *args, label = 'events')(**opts).redim(avg = dim)
+            out  = (
+                hv.Scatter(data[~isna], *args, label = 'events')
+                .options(**opts)
+                .redim(avg = dim)
 
-        out  *= (hv.Scatter(data, ref, ['peakposition']+cols[:1], label = 'peaks')
-                 (plot  = dict(size_index     = 'resolution',
-                               scaling_factor = scaling_factor),
-                  style = dict(alpha = .01, line_alpha=.1))
-                 ).redim(**{'peakposition': dim})
+                *hv.Scatter(data[isna], *args, label = 'unknown events')
+                .options(**opts)
+                .redim(avg = dim)
+            )
+        else:
+            out  = (
+                hv.Scatter(data, *args, label = 'events')
+                .options(**opts)
+                .redim(avg = dim)
+            )
+
+        out  *= (
+            hv.Scatter(data, ref, ['peakposition']+cols[:1], label = 'peaks')
+            .options(
+                size_index     = 'resolution',
+                scaling_factor = scaling_factor,
+                alpha          = .01,
+                line_alpha     =.1
+            )
+            .redim(peakposition = dim)
+        )
 
         args = dict(style = dict(color = 'gray', alpha = .5, size = 5), group = 'ref')
         for i, j in seqs.items():
@@ -185,7 +202,7 @@ class PeaksAlignmentConfigMixin:
         return out if self.hpalign else out
 
     @staticmethod
-    def showhpin(data, positions, ref = None, plot = None, style = None, **args):
+    def showhpin(data, positions, ref = None, style = None, **args):
         """
         display hairpin positions
         """
@@ -194,8 +211,7 @@ class PeaksAlignmentConfigMixin:
         xvals = list(set(data[ref].unique()))
         out   = hv.Scatter((xvals * len(positions),
                             np.repeat(positions, len(xvals))), **args)
-        return out(plot  = plot  if plot else dict(),
-                   style = style if style else dict())
+        return out.options(**(style if style else dict()))
 
     def show(self, data, # pylint: disable=too-many-arguments,too-many-locals
              keys       = (),
@@ -229,13 +245,15 @@ class PeaksAlignmentConfigMixin:
             pos    = self.hpin.pos # type: ignore
             tracks = list(pos.track.unique())
             rpos   = pos[pos.track == getreference(tracks)].position.values
-            out    = (out
-                      *hv.Scatter(pos[pos.target & pos.strand], 'track', 'position')
-                      (style ={'color':'green'})
-                      *hv.Scatter(pos[pos.target & ~pos.strand], 'track', 'position')
-                      (style ={'color':'red'})
-                      *hv.Scatter((np.repeat(tracks, rpos.size),
-                                   np.concatenate([rpos]*len(tracks))))
-                      (style ={'color':'gray'})
-                     )
+            out    = (
+                out
+                *hv.Scatter(pos[pos.target & pos.strand], 'track', 'position')
+                .options(color = 'green')
+                *hv.Scatter(pos[pos.target & ~pos.strand], 'track', 'position')
+                .options(color = 'red')
+                *hv.Scatter(
+                    (np.repeat(tracks, rpos.size), np.concatenate([rpos]*len(tracks)))
+                )
+                .options(color = 'gray')
+            )
         return out

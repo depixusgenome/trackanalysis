@@ -15,8 +15,7 @@ from   ._trackqc import TrackQC, mostcommonerror, beadqualitysummary
 
 class BeadTrackStatus:
     "display status per bead and track"
-    plotopts  = dict(xrotation = 40, colorbar  = True)
-    styleopts = dict(cmap      = 'RdYlGn')
+    styleopts = dict(xrotation = 40, colorbar  = True, cmap = 'RdYlGn')
     title     = "Most common error per track and bead"
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -57,10 +56,11 @@ class BeadTrackStatus:
                 tracks: List[str] = None,
                 beads:  List[int] = None) -> pd.DataFrame:
         "Outputs heatmap with the status of the beads per track"
-        return (hv.HeatMap(self.dataframe(data, tracks, beads),
-                           kdims = ['bead', 'track'],
-                           vdims = ['errorid', 'mostcommonerror', 'modification'])
-                (plot  = self.plotopts, style = self.styleopts))
+        return hv.HeatMap(
+            self.dataframe(data, tracks, beads),
+            kdims = ['bead', 'track'],
+            vdims = ['errorid', 'mostcommonerror', 'modification']
+        ).options(**self.styleopts)
 
 def displaybeadandtrackstatus(data: Union[TrackQC, pd.DataFrame],
                               tracks: List[str] = None,

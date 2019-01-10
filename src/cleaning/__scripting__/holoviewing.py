@@ -25,7 +25,8 @@ class TrackCleaningDisplay(ItemsDisplay):
 TrackCleaningScript.__doc__ += (
     """
     In **jupyter**, this object automatically displays the list messages.
-    """)
+    """
+)
 
 @addproperty(TrackCleaningScript, 'data')
 class TrackCleaningScriptData(_TrackCleaningScriptData):
@@ -143,14 +144,17 @@ class CleaningHeatMap:
         if self.hits != vdims[0]:
             vdims = vdims[::-1]
 
-        return (hv.HeatMap(grp, kdims = ['bead', 'key'], vdims = vdims + ['msg'])
-                (plot = dict(tools=['hover'])))
+        return (
+            hv.HeatMap(grp, kdims = ['bead', 'key'], vdims = vdims + ['msg'])
+            .options(tools=['hover'])
+        )
 
 TracksDictCleaningScript.__doc__ += (
     """
     In **jupyter**, this object automatically displays a heat map displaying
     beads versus tracks where colored squares indicates the number of bad beads
     per track.
-    """)
+    """
+)
 
 __all__: List[str] = []

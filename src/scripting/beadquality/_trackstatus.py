@@ -20,8 +20,7 @@ class TrackStatus:
     specific track.
     """
     params = 'ok', 'fixed', 'missing'
-    styleopts = dict(cmap  = 'RdYlGn')
-    plotopts  = dict(tools = ['hover'], xrotation = 40, colorbar  = True)
+    styleopts = dict(cmap = 'RdYlGn', tools = ['hover'], xrotation = 40, colorbar = True)
     title     = 'By track, the percentage of beads per status & error'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -73,12 +72,16 @@ class TrackStatus:
         disc   = self.dataframe(trackqc, tracks, normalize)
         value  = self.value(normalize)
         nbeads = len(trackqc.status.index)
-        hmap   = (hv.HeatMap(disc[~disc['error'].isna()],
-                             kdims = ['error', 'track'],
-                             vdims = [value, 'beads'])
-                  .redim.range(**{value: (-100, 100) if normalize else (-nbeads, nbeads)})
-                  .redim.label(**{'error': " "})
-                  (plot  = self.plotopts, style = self.styleopts))
+        hmap   = (
+            hv.HeatMap(
+                disc[~disc['error'].isna()],
+                kdims = ['error', 'track'],
+                vdims = [value, 'beads']
+            )
+            .redim.range(**{value: (-100, 100) if normalize else (-nbeads, nbeads)})
+            .redim.label(error = " ")
+            .options(**self.styleopts)
+        )
 
         fmt = (lambda x: f'{abs(x):.01f}') if normalize else (lambda x: f'{abs(x):.1f}')
         return ((hmap*hv.Labels(hmap).redim.value_format(**{value: fmt}))

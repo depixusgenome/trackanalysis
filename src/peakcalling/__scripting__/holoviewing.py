@@ -104,7 +104,10 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
             xvals = np.repeat(vals['position'], 3)
             yvals = np.concatenate([[(0., .1)[plus], (.9, 1.)[plus], np.NaN]
                                     for plus in vals['orientation']])
-            pks[key] = hv.Curve((xvals, yvals), **opts)(style = self._sequencestyle)
+            pks[key] = (
+                hv.Curve((xvals, yvals), **opts)
+                .options(**self._sequencestyle)
+            )
         return pks
 
 class _AutoHP(OligoMappingDisplay):
@@ -388,10 +391,12 @@ class _2DRef(PeaksTracksDictDisplay):
             ref = self.__quadmeshref(sp1, sp2)
 
         if len(sp1):
-            pks = hv.Curve((np.repeat(np.concatenate(sp1), 3), np.concatenate(sp2)),
-                           label = 'peaks')(style = self._peakstyle)
+            pks = hv.Curve(
+                (np.repeat(np.concatenate(sp1), 3), np.concatenate(sp2)),
+                label = 'peaks'
+            ).options(**self._peakstyle)
         else:
-            pks = hv.Curve(([], []), label = 'peaks')(style = self._peakstyle)
+            pks = hv.Curve(([], []), label = 'peaks').options(**self._peakstyle)
         if self._reference is not None:
             return (quad*ref*pks*text).redim(x = 'z', y = 'key', z ='events')
         return (quad*pks*text).redim(x = 'z', y = 'key', z ='events')
@@ -409,14 +414,13 @@ class _2DRef(PeaksTracksDictDisplay):
         normed = np.concatenate([_inte(j) for i, j in crvs]).reshape(-1, axis.size)
         if self._loglog:
             normed = np.log(normed+1.)
-        style  = dict(yaxis = None, logz  = self._logz)
         return hv.QuadMesh((np.append(axis, axis[-1]+axis[1]-axis[0]),
                             np.arange(normed.shape[0]+1),
-                            normed))(style = style)
+                            normed)).options(yaxis = None, logz = self._logz)
 
     def __quadmeshtext(self, crvs):
         color = self._textcolor
-        return hv.Overlay([hv.Text(0.01, i+.5, j)(style = dict(text_color=color))
+        return hv.Overlay([hv.Text(0.01, i+.5, j).options(text_color = color)
                            for i, (j, _) in enumerate(crvs)])
 
     def __quadmeshref(self, sp1, sp2):
@@ -424,7 +428,7 @@ class _2DRef(PeaksTracksDictDisplay):
         sp2.pop(ind)
         ref2 = (np.zeros((len(sp1[ind]),3))+[0., len(sp1), np.NaN]).ravel()
         ref  = hv.Curve((np.repeat(sp1.pop(ind), 3), ref2), label = f'{self._reference}')
-        return ref(style = self._refstyle)
+        return ref.options(**self._refstyle)
 
 class _ManualRef(PeaksTracksDictDisplay):
     """creates a DynamicMap with a reference to fit dynamically"""

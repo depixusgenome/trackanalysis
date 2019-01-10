@@ -96,10 +96,12 @@ class TrackQualityControlDisplay(ItemsDisplay, qc = Track):
                                    extension = np.concatenate(vals[1])*1e3,
                                    bead      = np.concatenate([ids*i for i in beads.keys()])))
         rng    = tuple(np.nanpercentile(dframe.extension, self._extensionrange))
-        return (hv.BoxWhisker(dframe, "cycle", ["extension"])
-                .redim(extension = hv.Dimension('extension', unit = 'nm'))
-                .redim.range(extension = rng)
-                (style = dict(box_color='lightblue')))
+        return (
+            hv.BoxWhisker(dframe, "cycle", ["extension"])
+            .redim(extension = hv.Dimension('extension', unit = 'nm'))
+            .redim.range(extension = rng)
+            .options(box_color='lightblue')
+        )
 
     def display(self, **_):
         "Displays qc items"
@@ -222,7 +224,7 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
         miss = list(set(ovr) - set(data.track.unique()))
         data = pd.concat([data, pd.DataFrame({'track': miss, 'extents': [0]*len(miss)})])
         return (hv.BoxWhisker(data, "track", dim)
-                +hv.NdOverlay(ovr)(plot = dict(show_grid = True))
+                +hv.NdOverlay(ovr).options(show_grid = True)
                ).cols(1)
 
     def _display(self, beads):
