@@ -9,6 +9,7 @@
 build/
 waf*-*
 pyenv/
+*.gch
 *.py~
 .ipynb_checkpoints*
 .dep*
