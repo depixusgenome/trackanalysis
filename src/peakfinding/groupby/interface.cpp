@@ -129,8 +129,4 @@ namespace peakfinding{
 		.def_readwrite("params", &OutputPy::params);
 	}
     }
-    
-    void pymodule(py::module &mod){
-	emutils::pymodule(mod);
-    }
 }

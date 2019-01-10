@@ -12,7 +12,10 @@
 #define DPX_PY2C(CLS, ATTRS) \
     _defaults<CLS>(mod, #CLS, doc BOOST_PP_SEQ_FOR_EACH(DPX_TO_PP, CLS, ATTRS));
 #define DPX_ADD_API(cls, CLS, ATTRS) \
-    dpx::pyinterface::addapi<CLS>(cls, BOOST_PP_SEQ_FOR_EACH(DPX_TO_PP, CLS, ATTRS));
+    dpx::pyinterface::addapi<CLS>(cls BOOST_PP_SEQ_FOR_EACH(DPX_TO_PP, CLS, ATTRS));
+#define DPX_WRAP(CLS, ATTRS) \
+    py::class_<CLS> cls(mod, #CLS, doc);\
+    dpx::pyinterface::addapi<CLS>(cls BOOST_PP_SEQ_FOR_EACH(DPX_TO_PP, CLS, ATTRS));
 
 namespace dpx { namespace pyinterface {
     namespace py = pybind11;
