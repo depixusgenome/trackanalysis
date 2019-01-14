@@ -195,7 +195,7 @@ namespace {
         {
             data[i] *= expv[0];
             for(long j = 1l; j <= je; ++j)
-                data[i] += (cpy[std::max(0l, i-j)]+cpy[std::min(ie, i+j)])*expv[j];
+                data[i] += (cpy[std::max(0l, i-j)]+cpy[std::min(ie-1l, i+j)])*expv[j];
         }
     }
 }
