@@ -106,7 +106,7 @@ namespace signalfilter { namespace stats
         if(items.size() % 2 == 1)
             return items[nth];
         else
-            return (typename T::value_type)(.5)*(items[nth]+items[nth-1]);
+            return (items[nth]+items[nth-1])/2;
     }
 
 

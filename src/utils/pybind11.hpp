@@ -8,6 +8,12 @@
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#ifndef PYBIND11_HAS_VARIANT
+# define PYBIND11_HAS_VARIANT 0      // remove compile-time warnings
+# define PYBIND11_HAS_EXP_OPTIONAL 0
+# define PYBIND11_HAS_OPTIONAL 0
+#endif
+
 #define DPX_TO_PP(_, CLS, ATTR) , dpx::pyinterface::pp(BOOST_PP_STRINGIZE(ATTR), &CLS::ATTR)
 #define DPX_PY2C(CLS, ATTRS) \
     _defaults<CLS>(mod, #CLS, doc BOOST_PP_SEQ_FOR_EACH(DPX_TO_PP, CLS, ATTRS));
@@ -16,6 +22,8 @@
 #define DPX_WRAP(CLS, ATTRS) \
     py::class_<CLS> cls(mod, #CLS, doc);\
     dpx::pyinterface::addapi<CLS>(cls BOOST_PP_SEQ_FOR_EACH(DPX_TO_PP, CLS, ATTRS));
+
+#define DPX_GIL_SCOPED(CODE) [&](){ py::gil_scoped_release _; return CODE; }();
 
 namespace dpx { namespace pyinterface {
     namespace py = pybind11;
@@ -44,6 +52,36 @@ namespace dpx { namespace pyinterface {
     {
         auto out = pybind11::array_t<T>(sz);
         std::copy(ptr, ptr+sz, out.mutable_data());
+        return out;
+    }
+
+    template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
+    inline ndarray<T> toarray(size_t sz, T val)
+    {
+        auto out = pybind11::array_t<T>(sz);
+        std::fill(out.mutable_data(), out.mutable_data()+sz, val);
+        return out;
+    }
+
+
+    template <typename T>
+    inline ndarray<T> toarray(ndarray<T> const & arr)
+    {
+        auto out = pybind11::array_t<T>(arr.size());
+        std::copy(arr.data(), arr.data()+arr.size(), out.mutable_data());
+        return out;
+    }
+
+    template <typename T>
+    auto toarray(size_t sz, T fcn)
+    -> ndarray<typename decltype(fcn())::value_type>
+    {
+        ndarray<typename decltype(fcn())::value_type> out(sz);
+        {
+            py::gil_scoped_release _;
+            auto arr = fcn();
+            std::copy(arr.begin(), arr.end(), out.mutable_data());
+        }
         return out;
     }
 
@@ -157,5 +195,38 @@ namespace dpx { namespace pyinterface {
                              [els...](py::dict   d) { return create<T>(d,  els...); }));
         cls.def("__eq__",    &equals<T>);
         mapto([&cls](auto x){ cls.def_readwrite(x.name, x.attr); return 0; }, els...);
+    }
+
+    inline py::object _cls(py::object o) { return o.attr("__class__"); }
+    inline py::object _cls(std::string)  { return py::str("").attr("__class__"); }
+    inline py::object _cls(char const *) { return py::str("").attr("__class__"); }
+    inline py::object _cls(float)  { return py::float_(0.).attr("__class__"); }
+    inline py::object _cls(double) { return py::float_(0.).attr("__class__"); }
+    inline py::object _cls(int)    { return py::int_(0).attr("__class__"); }
+    inline py::object _cls(size_t) { return py::int_(0).attr("__class__"); }
+
+    inline void _append(py::list &) {}
+
+    template <typename T0, typename T1, typename ...Args>
+    inline void _append(py::list & lst, T0 name, T1 val, Args ... args)
+    { lst.append(py::make_tuple(name, _cls(val))); _append(lst, args...); }
+
+    template <typename T0, typename T1, typename ...Args>
+    inline py::object make_namedtuple(T0 name, T1 mdl, Args ... args)
+    {
+        py::list lst;
+        _append(lst, args...);
+
+        auto cls(py::module::import("typing").attr("NamedTuple")(name, lst));
+        cls.attr("__module__") = mdl;
+        return cls;
+    }
+
+    template <typename T0, typename T1, typename ...Args>
+    inline py::object make_namedtuple(py::module & mdl, T0 name, T1 mdlname, Args ... args)
+    {
+        auto cls = make_namedtuple(name, mdlname, args...);
+        setattr(mdl, name, cls);
+        return cls;
     }
 }}
