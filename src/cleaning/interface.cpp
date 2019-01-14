@@ -491,12 +491,7 @@ A value at position *n* is aberrant if any:
             _defaults(cls);
         }
 
-        py::list lst;
-        auto partial(py::module::import("typing").attr("NamedTuple")("Partial", lst));
-        partial.attr("__module__") = "cleaning._core";
-        setattr(mod, "Partial", partial);
-        auto beadproj = dpx::pyinterface::make_namedtuple(mod,
-                "Partial", "cleaning._core",
+        auto partial = dpx::pyinterface::make_namedtuple(mod, "Partial",
                 "name",    "",
                 "min",     ndarray<float>(0),
                 "max",     ndarray<float>(0),

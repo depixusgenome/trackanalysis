@@ -89,7 +89,7 @@ namespace peakfinding { namespace projection {
                               pydata.data() + pyfirst.data()[i]);
 
         auto arr = DPX_GIL_SCOPED(self.compute(prec, data));
-        return cls(toarray(arr.histogram), arr.minvalue, arr.binwidth);
+        return cls(toarray(arr.histogram), toarray(arr.bias), arr.minvalue, arr.binwidth);
     }
 
     py::object _align(CycleAlignment       const & self,
@@ -174,8 +174,7 @@ the peak heights too much.)_";
             cls.def("compute", &_align, "digitizer"_a, "projector"_a, "histograms"_a);
         }
 
-        auto beadproj = dpx::pyinterface::make_namedtuple(mod,
-                "BeadProjectionData", "peakfinding._core",
+        auto beadproj = dpx::pyinterface::make_namedtuple(mod, "BeadProjectionData",
                 "histogram", ndarray<float>(0),
                 "bias",      ndarray<float>(0),
                 "minvalue",  0.f,

@@ -35,14 +35,15 @@ def test_cyclesdigitization():
     prj   = CycleProjection()
     out3  = prj.compute(out, data[0][10:40])
     out4  = prj.compute(out, *data)
-    assert_allclose(out3, out4[0,:])
+    assert_allclose(out3, out4[0,:], atol = 1e-6)
 
     prj   = ProjectionAggregator()
     out5  = prj.compute(out, out4)
 
     prj   = BeadProjection()
+    prj.align.repeats = 0
     out6  = prj.compute(1e-3, *data).histogram
-    assert_allclose(out5, out6)
+    assert_allclose(out5, out6, atol = 1e-6)
 
 def test_cyclealign():
     "test digitization"
@@ -76,4 +77,4 @@ def test_cyclealign():
     assert np.all(np.abs((out[0][:2]/digit.binwidth()).astype('i4')-[5, -5]) <= 2)
 
 if __name__ == '__main__':
-    test_cyclealign()
+    test_cyclesdigitization()

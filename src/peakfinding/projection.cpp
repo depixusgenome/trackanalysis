@@ -398,6 +398,6 @@ BeadProjectionData BeadProjection::compute(float prec, cycles_t const & data) co
         tmp.push_back(i.data());
 
     auto out   = align.compute(digit, aggregate, tmp); 
-    return { out.first, out.second, digit.minedge, digit.binwidth() };
+    return { out.second, out.first, digit.minedge, digit.binwidth() };
 }
 }}

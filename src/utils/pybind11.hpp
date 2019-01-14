@@ -7,12 +7,13 @@
 #include <boost/preprocessor/seq/cat.hpp>
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
 #ifndef PYBIND11_HAS_VARIANT
 # define PYBIND11_HAS_VARIANT 0      // remove compile-time warnings
 # define PYBIND11_HAS_EXP_OPTIONAL 0
 # define PYBIND11_HAS_OPTIONAL 0
 #endif
+#include <pybind11/numpy.h>
+#include <pybind11/stl.h>
 
 #define DPX_TO_PP(_, CLS, ATTR) , dpx::pyinterface::pp(BOOST_PP_STRINGIZE(ATTR), &CLS::ATTR)
 #define DPX_PY2C(CLS, ATTRS) \
@@ -211,8 +212,8 @@ namespace dpx { namespace pyinterface {
     inline void _append(py::list & lst, T0 name, T1 val, Args ... args)
     { lst.append(py::make_tuple(name, _cls(val))); _append(lst, args...); }
 
-    template <typename T0, typename T1, typename ...Args>
-    inline py::object make_namedtuple(T0 name, T1 mdl, Args ... args)
+    template <typename ...Args>
+    inline py::object make_namedtuple(std::string name, std::string mdl, Args ... args)
     {
         py::list lst;
         _append(lst, args...);
@@ -222,10 +223,10 @@ namespace dpx { namespace pyinterface {
         return cls;
     }
 
-    template <typename T0, typename T1, typename ...Args>
-    inline py::object make_namedtuple(py::module & mdl, T0 name, T1 mdlname, Args ... args)
+    template <typename T0, typename ...Args>
+    inline py::object make_namedtuple(py::module mdl, T0 name, Args ... args)
     {
-        auto cls = make_namedtuple(name, mdlname, args...);
+        auto cls = make_namedtuple(name, mdl.attr("__name__").cast<std::string>(), args...);
         setattr(mdl, name, cls);
         return cls;
     }
