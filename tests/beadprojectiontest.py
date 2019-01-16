@@ -3,9 +3,12 @@
 "Tests histogram creation and analysis"
 import numpy  as np
 from   numpy.testing          import assert_allclose
+from   control.taskcontrol    import create
 from   peakfinding.projection import (BeadProjection, CyclesDigitization,
                                       CycleProjection, ProjectionAggregator,
-                                      CycleAlignment)
+                                      CycleAlignment, EventExtractor, PeakListArray)
+from   peakfinding.processor.projection import PeakProjectorTask
+from   testingcore            import path as utfilepath
 
 def _data():
     data = np.concatenate(sum(
@@ -45,6 +48,26 @@ def test_cyclesdigitization():
     out6  = prj.compute(1e-3, *data).histogram
     assert_allclose(out5, out6, atol = 1e-6)
 
+    out7 = prj.compute(1e-3, *data)
+    assert len(out7.peaks) == 3
+
+def test_eventextraction():
+    "test digitization"
+    data  = _data()
+    prj   = BeadProjection()
+    prj.align.repeats = 0
+    out   = prj.compute(1e-3, *data)
+    assert len(out.peaks) == 3
+
+    evt   = EventExtractor()
+    vals  = evt.compute(1e-3, out, *data)
+    assert len(vals) == 100
+    assert all(len(i) == 3 for i in vals)
+
+    vals2 = evt.events(1e-3, out, *data)
+    assert len(vals2) == 100
+    assert all(len(i) == 3 for i in vals2)
+
 def test_cyclealign():
     "test digitization"
     np.random.seed(0)
@@ -76,5 +99,11 @@ def test_cyclealign():
     assert np.all(np.abs(out[0][2:]/digit.binwidth()).astype('i4') <= 2)
     assert np.all(np.abs((out[0][:2]/digit.binwidth()).astype('i4')-[5, -5]) <= 2)
 
+def test_task():
+    "test task"
+    data = next(create(utfilepath('big_selected'), PeakProjectorTask()).run())
+    bead = data[0]
+    assert isinstance(bead, PeakListArray)
+
 if __name__ == '__main__':
-    test_cyclesdigitization()
+    test_task()

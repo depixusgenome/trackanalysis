@@ -2,6 +2,7 @@
 #include <vector>
 #include <tuple>
 #include <algorithm>
+#include "peakfinding/peakfinding.h"
 
 namespace peakfinding { namespace projection {
     using cycles_t     = std::vector<std::pair<size_t, float const*>>;
@@ -12,6 +13,7 @@ namespace peakfinding { namespace projection {
         std::vector<float> bias;
         float              minvalue;
         float              binwidth;
+        std::vector<float> peaks;
     };
 
     struct DigitizedData
@@ -107,7 +109,17 @@ namespace peakfinding { namespace projection {
         CycleProjection         project;
         ProjectionAggregator    aggregate;
         CycleAlignment          align;
+        HistogramPeakFinder     find;
 
         BeadProjectionData      compute (float, cycles_t const &) const;
+    };
+
+    struct EventExtractor
+    {
+        size_t mincount = 2;
+        float  density  = 1.0f;
+        float  distance = 2.0f;
+        std::vector<std::vector<std::pair<size_t, size_t>>>
+        compute(float, size_t, float const *, float const *, cycles_t const &) const;
     };
 }}

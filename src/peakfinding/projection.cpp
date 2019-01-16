@@ -198,6 +198,46 @@ namespace {
                 data[i] += (cpy[std::max(0l, i-j)]+cpy[std::min(ie-1l, i+j)])*expv[j];
         }
     }
+
+    std::pair<size_t, size_t>
+    _events(EventExtractor const & self,
+            float                  minv,
+            float                  maxv,
+            int                    sz,
+            float          const * data)
+    {
+        std::list<int> inds;
+        auto test = [&](int & i)
+        {
+            if(data[i] >= minv && data[i] <= maxv)
+            {
+                inds.insert(inds.end(), i);
+                if(inds.size() == self.mincount)
+                {
+                    if(std::abs(i-inds.front())+1 >= self.mincount*self.density)
+                    {
+                        i = inds.front();
+                        inds.clear();
+                        return false;
+                    }
+                    inds.erase(inds.begin());
+                }
+            }
+            return true;
+        };
+
+        int first = 0u;
+        while(first < sz && test(first))
+            ++first;
+
+        int second = sz-1;
+        while(second >= first && test(second))
+            --second;
+
+        if(first > second)
+            return {0u, 0u};
+        return {size_t(first), size_t(second)+1u};
+    }
 }
 
 Digitizer
@@ -398,6 +438,29 @@ BeadProjectionData BeadProjection::compute(float prec, cycles_t const & data) co
         tmp.push_back(i.data());
 
     auto out   = align.compute(digit, aggregate, tmp); 
-    return { out.second, out.first, digit.minedge, digit.binwidth() };
+    auto bw    = digit.binwidth();
+    auto peaks = find.compute(prec, digit.minedge, bw,
+                              out.second.size(), out.second.data());
+    return { out.second, out.first, digit.minedge, bw, peaks};
+}
+
+std::vector<std::vector<std::pair<size_t, size_t>>>
+EventExtractor::compute(float            prec,
+                        size_t           npks,
+                        float    const * peaks,
+                        float    const * bias,
+                        cycles_t const & data) const
+{
+    std::vector<std::vector<std::pair<size_t, size_t>>> out(data.size());
+    float dist = prec * distance;
+    for(size_t icyc = 0u, ecyc = data.size(); icyc < ecyc; ++icyc)
+        for(size_t ipk = 0u; ipk < npks; ++ipk)
+            out[icyc].emplace_back(_events(
+                        *this,
+                        peaks[ipk]-dist+bias[icyc],
+                        peaks[ipk]+dist+bias[icyc],
+                        (int) data[icyc].first,
+                        data[icyc].second));
+    return out;
 }
 }}

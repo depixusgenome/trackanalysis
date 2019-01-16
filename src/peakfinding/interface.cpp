@@ -1,4 +1,5 @@
 #include "utils/pybind11.hpp"
+#include "peakfinding/peakfinding.h"
 #include "peakfinding/projection.h"
 using dpx::pyinterface::ndarray;
 using dpx::pyinterface::toarray;
@@ -32,6 +33,18 @@ namespace peakfinding { namespace projection {
                        });
     }
 
+    cycles_t _cycles(ndarray<float>  const & pydata,
+                     ndarray<int>    const & pyfirst,
+                     ndarray<int>    const & pylast)
+    {
+        cycles_t data;
+        for(size_t i = 0u, ie = pyfirst.size(); i < ie; ++i)
+            data.emplace_back(pylast.data()[i]-pyfirst.data()[i],
+                              pydata.data() + pyfirst.data()[i]);
+        return data;
+    }
+
+
     ndarray<float> _callall(CycleProjection const & self,
                             Digitizer       const & digitizer,
                             ndarray<float>  const & pydata,
@@ -41,19 +54,20 @@ namespace peakfinding { namespace projection {
         if(pydata.size() == 0 ||  pyfirst.size() == 0)
             return py::list();
 
-        float const * data  = pydata.data();
-        int   const * first = pyfirst.data();
-        int   const * last  = pylast.data();
-        size_t        sz    = pyfirst.size();
-        long          szf   = long(sizeof(float));
-        ndarray<float> out({sz, digitizer.nbins}, {long(digitizer.nbins)*szf, szf});
+        auto data = _cycles(pydata, pyfirst, pylast);
+        long szf  = long(sizeof(float));
+        ndarray<float> out(
+                {data.size(), digitizer.nbins},
+                {long(digitizer.nbins)*szf, szf});
         {
             py::gil_scoped_release _;
-            for(size_t i = 0; i < sz; ++i)
+            size_t k = 0u;
+            for(auto i: data)
             {
-                auto tmp = digitizer.compute(last[i]-first[i], data+first[i]);
+                auto tmp = digitizer.compute(i.first, i.second);
                 auto arr = self.compute(tmp);
-                std::copy(arr.begin(), arr.end(), out.mutable_data()+i*digitizer.nbins);
+                std::copy(arr.begin(), arr.end(), out.mutable_data()+k);
+                k += digitizer.nbins;
             }
         }
         return out;
@@ -77,19 +91,16 @@ namespace peakfinding { namespace projection {
     }
 
     py::object _all(py::object              cls,
-                    BeadProjection  const & self,
+                    BeadProjection const & self,
                     float                   prec,
                     ndarray<float>  const & pydata,
                     ndarray<int>    const & pyfirst,
                     ndarray<int>    const & pylast)
     {
-        cycles_t data;
-        for(size_t i = 0u, ie = pyfirst.size(); i < ie; ++i)
-            data.emplace_back(pylast.data()[i]-pyfirst.data()[i],
-                              pydata.data() + pyfirst.data()[i]);
-
-        auto arr = DPX_GIL_SCOPED(self.compute(prec, data));
-        return cls(toarray(arr.histogram), toarray(arr.bias), arr.minvalue, arr.binwidth);
+        auto data = _cycles(pydata, pyfirst, pylast);
+        auto arr  = DPX_GIL_SCOPED(self.compute(prec, data));
+        return cls(toarray(arr.histogram), toarray(arr.bias),
+                   arr.minvalue, arr.binwidth, toarray(arr.peaks));
     }
 
     py::object _align(CycleAlignment       const & self,
@@ -111,6 +122,70 @@ namespace peakfinding { namespace projection {
         return py::make_tuple(toarray(out.first), toarray(out.second));
     }
 
+    py::object _eventscompute(EventExtractor  const & self,
+                              float                   prec,
+                              py::object              proj,
+                              ndarray<float>  const & pydata,
+                              ndarray<int>    const & pyfirst,
+                              ndarray<int>    const & pylast)
+    {
+        auto data  = _cycles(pydata, pyfirst, pylast);
+        auto peaks = proj.attr("peaks").cast<ndarray<float>>();
+        auto bias  = proj.attr("bias").cast<ndarray<float>>();
+        auto arr   = DPX_GIL_SCOPED(self.compute(prec, peaks.size(),
+                    peaks.data(), bias.data(), data));
+        size_t szf = sizeof(int);
+        if(arr.size() == 0)
+            return py::none();
+
+        std::vector<size_t> shape   = {arr.size(), arr.front().size(), 2u};
+        std::vector<size_t> strides = {arr.front().size()*2u*szf, 2u*szf, szf};
+        ndarray<int> out(shape, strides);
+        auto ptr = out.mutable_data();
+        for(size_t icyc = 0u, ecyc = arr.size(); icyc < ecyc; ++icyc)
+            for(size_t ipks = 0u, epks = arr.front().size(); ipks < epks; ++ipks, ++ptr)
+            {
+                ptr[0]     = (int) arr[icyc][ipks].first;
+                (++ptr)[0] = (int) arr[icyc][ipks].second;
+            }
+        return out;
+    }
+
+    py::object _eventsextract(EventExtractor  const & self,
+                              float                   prec,
+                              py::object              proj,
+                              ndarray<float>  const & pydata,
+                              ndarray<int>    const & pyfirst,
+                              ndarray<int>    const & pylast)
+    {
+        auto dist  = self.distance * prec;
+        auto data  = _cycles(pydata, pyfirst, pylast);
+        auto bias  = proj.attr("bias").cast<ndarray<float>>();
+        auto peaks = proj.attr("peaks").cast<ndarray<float>>();
+        auto arr   = DPX_GIL_SCOPED(self.compute(prec, peaks.size(),
+                            peaks.data(), bias.data(), data));
+
+        py::list lst;
+        for(size_t icyc = 0u, ecyc = arr.size(); icyc < ecyc; ++icyc)
+        {
+            py::list  cur;
+            lst.append(cur);
+
+            for(size_t ipks = 0u, epks = arr[icyc].size(); ipks < epks; ++ipks)
+            {
+                auto rng  = arr[icyc][ipks];
+                auto minv = peaks.data()[ipks]+bias.data()[icyc]-dist;
+                auto maxv = peaks.data()[ipks]+bias.data()[icyc]+dist;
+                auto intv = toarray(rng.second-rng.first, data[icyc].second+rng.first);
+                for(auto ptr = intv.mutable_data(), eptr = ptr+intv.size(); ptr != eptr; ++ptr)
+                    if(ptr[0] < minv || ptr[0] >= maxv)
+                        ptr[0]  = std::numeric_limits<float>::quiet_NaN();
+                cur.append(py::make_tuple(rng.first, intv));
+            }
+        }
+        return lst;
+    }
+
     void pymodule(py::module & mod)
     {
         using namespace py::literals;
@@ -129,6 +204,7 @@ namespace peakfinding { namespace projection {
                     }, 
                     "data"_a);
         }
+
         {
             auto doc = R"_(Compute digitization configuration.)_";
             DPX_WRAP(CyclesDigitization, (oversampling)(precision)(minv)(maxv)(overshoot));
@@ -178,14 +254,16 @@ the peak heights too much.)_";
                 "histogram", ndarray<float>(0),
                 "bias",      ndarray<float>(0),
                 "minvalue",  0.f,
-                "binsize",   0.f);
+                "binsize",   0.f,
+                "peaks",     ndarray<float>(0)
+                );
 
         {
             auto doc = R"_(Projects all cycles onto a histogram with normalized peak heights.
 
 Normalized peak heights means that a hybridization duration don't affect
 the peak heights too much.)_";
-            DPX_WRAP(BeadProjection, (digitize)(project)(aggregate)(align));
+            DPX_WRAP(BeadProjection, (digitize)(project)(aggregate)(align)(find));
             cls.def("compute",
                     [beadproj](BeadProjection const & self,
                        float a,
@@ -195,14 +273,53 @@ the peak heights too much.)_";
                     ) { return _all(beadproj, self, a, b, c, d); },
                     "precision"_a, "data"_a, "measurestart"_a, "measureend"_a);
         }
+
+        {
+            auto doc = R"_(Extracts events from the data.
+
+Start & stop positions are as follows:
+
+* At least *mincount* frames are within ± `distance`∙σ[HF] of the peak position.
+* The density of such frames is above `density`.
+)_";
+                 
+            DPX_WRAP(EventExtractor, (mincount)(density)(distance));
+            cls.def("compute", _eventscompute,
+                    "precision"_a, "projection"_a, "data"_a,
+                    "measurestart"_a, "measureend"_a,
+                    "Compute event start and end positions");
+            cls.def("events", _eventsextract,
+                    "precision"_a, "projection"_a, "data"_a,
+                    "measurestart"_a, "measureend"_a,
+                    "Create events from data");
+        }
     }
 }}
 
 namespace peakfinding {
+    namespace
+    {
+        ndarray<float> _find(HistogramPeakFinder const & self,
+                             float                       prec,
+                             py::object                  data)
+        {
+            auto hist = data.attr("histogram").cast<ndarray<float>>();
+            auto minw = data.attr("minvalue").cast<float>();
+            auto bw   = data.attr("binsize").cast<float>();
+            std::vector<float> out = DPX_GIL_SCOPED(self.compute(prec, minw, bw, hist.size(), hist.data()));
+            return toarray(out);
+        }
+    }
     namespace emutils { void pymodule(py::module &); }
 
     void pymodule(py::module & mod)
     {
+        {
+            using namespace py::literals;
+            auto doc = R"_(Find peaks in a histogram)_";
+            DPX_WRAP(HistogramPeakFinder, (peakwidth)(threshold));
+            cls.def("compute", _find, "precision"_a, "histogram"_a);
+        }
         projection::pymodule(mod);
         emutils::pymodule(mod);
     }
