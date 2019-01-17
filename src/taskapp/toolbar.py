@@ -4,10 +4,10 @@
 from app.launcher  import setup
 from app.toolbar   import toolbarview
 from .default      import VIEWS, CONTROLS
-from .taskcontrol  import createview as _createview
+from .maincontrol  import createview as _createview
 
 def createview(main, controls, views):
     "Creates an app with a toolbar"
-    return _createview(toolbarview('view.toolbar.BeadToolbar', main), controls, views)
+    return _createview(toolbarview('taskview.toolbar.BeadToolbar', main), controls, views)
 
 setup(locals(), creator = createview, defaultcontrols = CONTROLS, defaultviews = VIEWS)

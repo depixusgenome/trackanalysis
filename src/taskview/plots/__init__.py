@@ -9,7 +9,7 @@ from .tasks                 import TaskPlotCreator, PlotModelType, TaskPlotModel
 
 class PlotError(_PlotError):
     "deals with cleaning errors"
-    def __init__(self, *args, **kwa):
-        super().__init__(self, *args, **kwa)
+    def __init__(self, fig, cnt, position = "above"):
+        super().__init__(fig, cnt, position = position)
         from cleaning.processor import DataCleaningException
         self._exceptions = DataCleaningException

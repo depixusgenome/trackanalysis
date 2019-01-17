@@ -30,11 +30,11 @@ def guimake_js(bld, viewname, modules, scriptname):
                 break
             modules.append(modules[-1]+'.'+i)
 
-    for i in (bld.path.parent.ant_glob('view/**/*.py')
-              +bld.path.parent.ant_glob('app/**/*.py')):
+    root = bld.bldnode.parent.find_node("core")
+    for i in root.ant_glob('view/**/*.py') +root.ant_glob('app/**/*.py'):
         i = i.srcpath()
         if Path(str(i)).name[:2] != '__':
-            modules.append(str(i)[4:-3].replace("/", ".").replace("\\", "."))
+            modules.append(str(i)[5:-3].replace("/", ".").replace("\\", "."))
     build_bokehjs(bld, scriptname, *(i for i in modules if i[:2] != '__'), 'undo')
 
 def guimake_doc(bld, scriptname):

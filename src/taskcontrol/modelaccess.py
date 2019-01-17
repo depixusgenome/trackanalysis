@@ -21,7 +21,7 @@ from .taskcontrol           import ProcessorController
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
-    from taskapp.taskcontrol import SuperController
+    from taskapp.maincontrol import SuperController
 
 class PlotModelAccess:
     "Default plot model"

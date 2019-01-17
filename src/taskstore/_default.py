@@ -65,12 +65,20 @@ def _v7(data:dict) -> dict:
                   dict(__name__ = 'peakfinding.processor.peakfiltering.SingleStrandTask'))
     return data
 
-__TASKS__        = Patches(_v0task, _v1, _v2, _v3, _v4tasks, _v5, _v6, _v7)
+def _v8(data:dict) -> dict:
+    modifyclasses(
+        data,
+        r'model.task.\(.*\)',  dict(__name__ = lambda x: x.replace('model.task',  'taskmodel')),
+        r'model.level.\(.*\)', dict(__name__ = lambda x: x.replace('model.', 'taskmodel.'))
+    )
+    return data
+
+__TASKS__        = Patches(_v0task, _v1, _v2, _v3, _v4tasks, _v5, _v6, _v7, _v8)
 PATCHES['tasks'] = __TASKS__
 
 def _v0cnf(data:dict) -> dict:
     data = _v0task(data)
     data.get('config', {}).pop('precision.max', None)
     return data
-__CONFIGS__       = Patches(_v0cnf, _v1, _v2, _v3, _v5, _v6, _v7)
+__CONFIGS__       = Patches(_v0cnf, _v1, _v2, _v3, _v5, _v6, _v7, _v8)
 PATCHES['config'] = __CONFIGS__

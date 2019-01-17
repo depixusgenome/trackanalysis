@@ -3,7 +3,6 @@
 "Runs an app"
 from   copy    import copy, deepcopy
 from   pathlib import Path
-from   time    import time
 import logging
 import sys
 import glob
@@ -108,46 +107,12 @@ def _debug(raiseerr, nothreading):
         from app.maincontrol import DisplayController
         DisplayController.CATCHERROR = False
 
-def _files(directory, files, bead):
-    def _started(_, start = time()):
-        LOGS.info("done loading in %d seconds", time()-start)
-    INITIAL_ORDERS.append(_started)
-
-    if len(directory):
-        def _opentracks(ctrl):
-            ctrl.tasks.opentrack(dict(zip(('tracks', 'grs', 'match'),
-                                          (i if i else None for i in directory))))
-        INITIAL_ORDERS.append(_opentracks)
-
-    if len(files):
-        def _open(ctrl):
-            if "filedialog" in ctrl.theme:
-                storage = dict(ctrl.theme.get("filedialog", "storage", {}))
-                storage['open'] = files[0]
-                ctrl.theme.update("filedialog", storage = storage)
-            ctrl.tasks.opentrack(files)
-        INITIAL_ORDERS.append(_open)
-
-    if (len(files) or len(directory)) and  bead is not None:
-        def _setbead(ctrl):
-            ctrl.display.update("tasks", bead = bead)
-        INITIAL_ORDERS.append(_setbead)
-
-def _launch(view, app, gui, kwa):
+def _launch(filtr, view, app, gui, kwa):
     viewcls = _from_path(view)
     if viewcls is None:
         viewcls = _from_module(view)
 
-    if 'app.' not in app:
-        app += 'app.'+app
-
-    if 'toolbar' in viewcls.__name__.lower() or 'toolbar' in viewcls.__module__:
-        app = 'app.default'
-
-    if (('daq' in viewcls.__name__.lower() or 'daq' in viewcls.__module__)
-            and 'daq' not in app):
-        app = 'daq.'+app
-
+    app            = filtr(app, viewcls)
     kwa['runtime'] = gui
     lfcn           = 'launch' if gui.endswith('app') else 'serve'
     if '.' in app and 'A' <= app[app.rfind('.')+1] <= 'Z':
@@ -211,13 +176,14 @@ def _version(ctx, _, value):
     ctx.exit()
 
 # pylint: disable=too-many-arguments
-def defaultmain(view, gui, port, raiseerr, nothreading, defaultapp):
+def defaultmain(filtr, config, view, gui, port, raiseerr, nothreading, defaultapp):
     "Launches an view"
+    _config(config)
     _debug(raiseerr, nothreading)
     _win_opts()
 
     kwargs = dict(port = _port(port), apponly = False)
-    server = _launch(view, defaultapp, gui, kwargs)
+    server = _launch(filtr, view, defaultapp, gui, kwargs)
 
     if gui == 'default':
         gui = 'browser'
@@ -294,24 +260,3 @@ class Warnings:
             warnings.resetwarnings()
 
 WARNINGS = Warnings()
-
-@defaultclick(click.option('-b', "--bead",
-                           type       = int,
-                           default    = None,
-                           help       = 'Opens to this bead'),
-              click.option("--tracks",
-                           type       = str,
-                           nargs      = 3,
-                           help       = 'track path, gr path and match'),
-              click.argument('files', nargs = -1, type = click.Path()))
-def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
-         gui, config, wall, port, raiseerr, nothreading):
-    "Launches an view"
-    if wall:
-        WARNINGS.set(True)
-    _files(tracks, files, bead)
-    _config(config)
-    return defaultmain(view, gui, port, raiseerr, nothreading, "app.toolbar")
-
-if __name__ == '__main__':
-    main()   # pylint: disable=no-value-for-parameter

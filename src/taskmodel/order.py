@@ -4,10 +4,10 @@
 from typing import Iterable, Iterator, Type
 from .base  import Task
 
-TASK_ORDER = ['model.task.RootTask',
-              'model.task.track.CycleSamplingTask',
+TASK_ORDER = ['taskmodel.RootTask',
+              'taskmodel.track.CycleSamplingTask',
               'cleaning.processor.BeadSubtractionTask',
-              'model.task.DataSelectionTask',
+              'taskmodel.DataSelectionTask',
               'cleaning.processor.DataCleaningTask',
               'eventdetection.processor.ExtremumAlignmentTask',
               'cleaning.processor.ClippingTask',

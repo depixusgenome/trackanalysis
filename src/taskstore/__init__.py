@@ -6,7 +6,7 @@ Track Analysis inputs and outputs.
 This does not include track files io.
 """
 from anastore import (
-    Patches, LocalPatch, dump, dumps, load, loads, isana, version, iterversions,
-    TPE, CNT
+    Patches, dump, dumps, load, loads, isana, version, iterversions, TPE, CNT
 )
-import _default
+from ._default  import __TASKS__, __CONFIGS__
+from ._local    import LocalPatch

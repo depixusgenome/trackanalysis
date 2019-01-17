@@ -137,7 +137,7 @@ class _CondaApp(BuildContext):
 
         mods = [path/Path(mod).name for mod in mods]
         zips = [mod for mod in mods
-                if (mod.exists() and mod.name != 'app'
+                if (mod.exists() and mod.name != 'taskapp'
                     and next(mod.glob("_core"+dll), None) is None)]
 
         out = Path("build")/"OUTPUT"

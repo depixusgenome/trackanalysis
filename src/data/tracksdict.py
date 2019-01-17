@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from copy               import copy as shallowcopy
 import re
 
-from anastore           import LocalPatch
+from taskstore          import LocalPatch
 from .views             import isellipsis, BEADKEY
 from .track             import Track
 from .trackio           import LegacyGRFilesIO, LegacyTrackIO, PATHTYPES

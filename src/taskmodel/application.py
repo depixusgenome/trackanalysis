@@ -158,8 +158,8 @@ class TaskIOTheme(ConfigObject):
     name = "tasks.io"
     tasks:      List[str] = []
     inputs:     List[str] = ['taskstore.control.ConfigAnaIO',
-                             'control.taskio.ConfigGrFilesIO',
-                             'control.taskio.ConfigTrackIO']
+                             'taskcontrol.taskio.ConfigGrFilesIO',
+                             'taskcontrol.taskio.ConfigTrackIO']
     outputs:    List[str] = ['taskstore.control.ConfigAnaIO']
     processors: List[str] = []
     clear                 = True
