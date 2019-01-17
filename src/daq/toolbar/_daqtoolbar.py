@@ -8,7 +8,7 @@ from   view.static          import route
 
 class DpxDAQToolbar(Widget):
     "Toolbar model"
-    __css__            = route("view.css")
+    __css__            = route("view.css", "daqtoolbar.css")
     __javascript__     = route()
     __implementation__ = '_daqtoolbar.coffee'
     protocol    = props.String("manual")
