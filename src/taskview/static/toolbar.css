@@ -1,0 +1,58 @@
+/* the toolbar */
+.dpx-tb-layout { margin-top: -10px!important; }
+.bk-root {margin-left: -10px!important; }
+
+.dpx-tb { float: left; height:30px; }
+.dpx-tb  button { width: 30px; min-width: unset !important; }
+#dpx-tb-bead    { width: 50px; height: 28px; }
+#dpx-tb-discard { width: 120px; height: 28px; min-width: unset; }
+#dpx-tb-selection { width: 30px; }
+#dpx-tb-message {
+    margin-right:5px;
+    margin-left:5px;
+    text-align:center;
+    width:auto; 
+    min-width:100%; 
+    height:28px;
+}
+#dpx-tb-quit { width: 60px; }
+
+#dpx-tb-flist {
+    overflow: hidden;
+    height:50px;
+    z-index:500;
+}
+
+#dpx-tb-flist:hover #dpx-tb-flist-menu {
+    display: block;
+}
+
+#dpx-tb-flist-menu {
+    display: none;
+    position: absolute;
+    background-color: white;
+    min-width: 400px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1000;
+}
+
+#dpx-tb-flist-menu label {
+    float:none;
+    padding: 6px 16px;
+    text-align: left;
+}
+
+#dpx-tb-flist-menu label:hover {
+    background-color: lightgray;
+}
+
+#dpx-tb-flist-menu input{
+  position: relative;
+  bottom: 7px;
+}
+
+.dpx-alignment-widget::before { content: "Alignment "; }
+.dpx-drift-widget::before { content: "Drift Removal "; }
+
+#dpx-tb-flist-menu button { width: 10px; float: right; padding-left: 3px;}
+#dpx-tb-flist-menu td { width: 100%; }
