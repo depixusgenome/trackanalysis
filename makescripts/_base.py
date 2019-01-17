@@ -20,7 +20,7 @@ def build(bld, mods = None):
     if mods is None:
         mods = MODULES(bld)
     bld.build_python_version_file()
-    MODULES.build_static()
+    MODULES.build_static(bld)
     bld.add_group('bokeh', move = False)
     wafbuilder.build(bld) # pylint: disable=no-member
     wafbuilder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
