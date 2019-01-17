@@ -65,7 +65,7 @@ def guimake_doc(bld, scriptname):
         target = bld.path.find_or_declare(target+f'/{scriptname}.html')
     )
 
-def guimake(viewname, locs, scriptname = None):
+def guimake(viewname, locs, scriptname = None, modules = ('taskview.toolbar',)):
     "default make for a gui"
     make(locs)
     name = locs['APPNAME'] if scriptname is None else scriptname
@@ -80,7 +80,7 @@ def guimake(viewname, locs, scriptname = None):
     def build(bld):
         "build gui"
         old(bld)
-        guimake_js(bld, viewname, [locs['APPNAME']], name)
+        guimake_js(bld, viewname, list(modules)+[locs['APPNAME']], name)
         guimake_doc(bld, name)
 
     locs['build'] = build
