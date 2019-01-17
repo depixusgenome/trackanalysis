@@ -10,20 +10,20 @@ from   functools                    import partial
 import pandas                       as     pd
 import numpy                        as     np
 
-from   utils.decoration             import addto, addproperty
-from   utils.attrdefaults           import setdefault, deepcopy
-from   model                        import Task
-from   model.__scripting__          import Tasks
-from   model.__scripting__.parallel import Parallel
-from   control.processor.dataframe  import SafeDataFrameProcessor
-from   control.processor.base       import register
+from   taskmodel                        import Task
+from   taskmodel.__scripting__          import Tasks
+from   taskmodel.__scripting__.parallel import Parallel
+from   taskcontrol.processor.dataframe  import SafeDataFrameProcessor
+from   taskcontrol.processor.base       import register
+from   utils.decoration                 import addto, addproperty
+from   utils.attrdefaults               import setdefault, deepcopy
 
-from   ..track                      import Track
-from   ..views                      import BEADKEY
-from   ..trackio                    import savetrack, PATHTYPE, Handler
-from   ..trackops                   import clone
-from   ..tracksdict                 import TracksDict as _TracksDict
-from   ..views                      import isellipsis
+from   ..track                          import Track
+from   ..views                          import BEADKEY
+from   ..trackio                        import savetrack, PATHTYPE, Handler
+from   ..trackops                       import clone
+from   ..tracksdict                     import TracksDict as _TracksDict
+from   ..views                          import isellipsis
 
 @addto(Handler)
 def __call__(self, track = None, __old__ = Handler.__call__) -> Track:

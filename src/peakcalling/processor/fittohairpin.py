@@ -7,15 +7,15 @@ from   typing                      import (Dict, List, Sequence, NamedTuple,
 
 import numpy                       as     np
 
-from   control.processor.taskview  import TaskViewProcessor
-from   control.processor.dataframe import DataFrameFactory
 from   data.views                  import BEADKEY, TaskView, TrackView
-from   model                       import Task, Level
 from   peakfinding.peaksarray      import (Output as PeakFindingOutput,
                                            PeakListArray, PeaksArray)
 from   peakfinding.processor       import (PeaksDict, SingleStrandTask,
                                            BaselinePeakTask, SingleStrandProcessor,
                                            BaselinePeakProcessor)
+from   taskmodel                       import Task, Level
+from   taskcontrol.processor.taskview  import TaskViewProcessor
+from   taskcontrol.processor.dataframe import DataFrameFactory
 from   utils                       import (StreamUnion, initdefaults, updatecopy,
                                            asobjarray, DefaultValue, isint)
 from   ..tohairpin                 import (HairpinFitter, PeakGridFit, Distance,

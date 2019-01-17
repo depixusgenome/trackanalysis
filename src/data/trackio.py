@@ -396,7 +396,7 @@ class Handler:
         self.__fov (state, kwargs)
         self.__data(state, kwargs)
         if isinstance(kwargs.get("tasks", None), str):
-            import anastore.api as _ana
+            import taskstore as _ana
             kwargs['tasks'] = _ana.loads(kwargs['tasks'])
 
         state.update(kwargs)
@@ -415,7 +415,7 @@ class Handler:
         data = dict(track.data) # get the data first because of lazy instantiations
         data.update(track.__getstate__())
         if 'tasks' in data:
-            import anastore.api as _ana
+            import taskstore as _ana
             data['tasks'] = _ana.dumps(data['tasks'])
 
         data['fov']          = track.fov.image

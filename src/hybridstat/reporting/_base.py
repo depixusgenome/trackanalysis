@@ -8,14 +8,14 @@ from abc                    import abstractmethod
 
 import numpy as np
 
-from utils                  import initdefaults
-from model                  import PHASE
 from excelreports.creation  import Reporter as _Reporter, column_method, FILEOBJ
 from data.track             import Track, BEADKEY
 from signalfilter           import rawprecision
 from sequences              import read as readsequence
 from peakcalling.tohairpin  import HairpinFitter
 from peakcalling.processor  import ByHairpinGroup as Group, ByHairpinBead as Bead
+from taskmodel              import PHASE
+from utils                  import initdefaults
 
 class HasLengthPeak:
     "Deals with the number of peaks"

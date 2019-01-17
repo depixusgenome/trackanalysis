@@ -8,7 +8,7 @@ from typing           import Iterator, Tuple, Sequence, Optional, cast
 
 import numpy          as     np
 
-from model            import PHASE, Level
+from taskmodel        import PHASE, Level
 from data.views       import ITrackView, Cycles, CYCLEKEY, Beads, BEADKEY
 from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview, EventsArray
 from .                import EventDetectionConfig

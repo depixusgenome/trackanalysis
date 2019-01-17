@@ -7,14 +7,14 @@ from   copy                             import copy as shallowcopy
 import pandas                           as pd
 import numpy                            as np
 
-from   utils.decoration                 import addto
-from   model.__scripting__              import Tasks
 from   data                             import Track
 from   data.tracksdict                  import TracksDict
 from   data.__scripting__.dataframe     import adddataframe
 from   peakfinding.__scripting__        import (Detailed,
                                                 PeaksTracksDictOperator as _PTDO)
-from   control.processor.dataframe      import DataFrameProcessor
+from   taskcontrol.processor.dataframe  import DataFrameProcessor
+from   taskmodel.__scripting__          import Tasks
+from   utils.decoration                 import addto
 from   ..toreference                    import HistogramFit, ChiSquareHistogramFit
 from   ..processor                      import (FitToHairpinDict, FitToReferenceDict,
                                                 FitToReferenceTask, FitToHairpinTask)

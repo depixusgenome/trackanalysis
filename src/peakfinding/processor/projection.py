@@ -3,15 +3,14 @@
 """
 Deals with tasks & processors for finding peaks
 """
+from   typing                         import Optional, cast
 
-from   typing                     import Optional, cast
-
-from   model                      import Level, Task, PHASE
-from   data                       import Track
-from   data.views                 import BEADKEY, TaskView
-from   control.processor.taskview import TaskViewProcessor
-from   ..peaksarray               import PeakListArray
-from   ..projection               import PeakProjector
+from   data                           import Track
+from   data.views                     import BEADKEY, TaskView
+from   taskmodel                      import Level, Task, PHASE
+from   taskcontrol.processor.taskview import TaskViewProcessor
+from   ..peaksarray                   import PeakListArray
+from   ..projection                   import PeakProjector
 
 class PeakProjectorTask(PeakProjector, Task):
     """

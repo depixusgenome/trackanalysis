@@ -8,10 +8,10 @@ from   typing                   import Dict, Any, Optional, List, Set
 
 import pandas                   as     pd
 
-from   control.beadscontrol     import DataSelectionBeadController
-from   control.modelaccess      import TaskAccess, TaskPlotModelAccess
 from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
-from   model.task.application   import TasksDisplay
+from   taskcontrol.beadscontrol import DataSelectionBeadController
+from   taskcontrol.modelaccess  import TaskAccess, TaskPlotModelAccess
+from   taskmodel.application    import TasksDisplay
 from   utils                    import initdefaults
 from   view.base                import spawn
 from   ..processor              import RampConsensusBeadProcessor, RampDataFrameProcessor

@@ -9,9 +9,9 @@ import numpy                        as     np
 import pandas                       as     pd
 
 from   data.views                   import Cycles, Beads, BEADKEY
-from   model                        import PHASE
 from   signalfilter                 import nanhfsigma
 from   utils                        import initdefaults
+from   taskmodel                    import PHASE
 from   .datacleaning                import AberrantValuesRule, HFSigmaRule, ExtentRule
 from   ._core                       import (reducesignals, # pylint: disable=import-error
                                             phasebaseline, dztotalcount)

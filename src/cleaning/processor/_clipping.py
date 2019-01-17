@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "all cleaning related tasks"
-from   functools          import partial
-from   typing             import Optional
-import numpy              as     np
-from   data               import Track
-from   model.level        import Level, PHASE
-from   model.task         import Task
-from   control.processor  import Processor
-from   utils              import initdefaults
-from   ._datacleaning     import DataCleaningErrorMessage, DataCleaningException
+from   functools                import partial
+from   typing                   import Optional
+import numpy                    as     np
+from   data                     import Track
+from   taskmodel                import Level, PHASE, Task
+from   taskcontrol.processor    import Processor
+from   utils                    import initdefaults
+from   ._datacleaning           import DataCleaningErrorMessage, DataCleaningException
 
 class ClippingTask(Task):
     "Task discarding phase 5 data below phase 1 or above phase 3"

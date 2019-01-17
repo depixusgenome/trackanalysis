@@ -6,12 +6,12 @@ Adds shortcuts for using holoview
 from   typing            import List, cast
 from   functools         import partial
 import numpy             as     np
-from   utils.holoviewing import addto, addproperty, hv
 
-from   model.__scripting__                          import Tasks
 from   data.__scripting__                           import TracksDict
 from   data.__scripting__.holoviewing.trackviews    import CycleDisplay
 from   data.__scripting__.holoviewing.tracksdict    import TracksDictDisplay
+from   taskmodel.__scripting__                      import Tasks
+from   utils.holoviewing                            import addto, addproperty, hv
 
 from   ..data                                       import Events
 

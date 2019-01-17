@@ -9,11 +9,11 @@ from itertools                import product
 import os
 import sys
 
-from model.task               import Task, RootTask, Level
-from data.views               import TrackView
-from control.processor        import Processor
-from control.processor.runner import Cache, pooledinput, run, poolchunk
-from testingcore              import DummyPool
+from data.views                   import TrackView
+from taskcontrol.processor        import Processor
+from taskcontrol.processor.runner import Cache, pooledinput, run, poolchunk
+from taskmodel                    import Task, RootTask, Level
+from testingcore                  import DummyPool
 
 class _RootTask(RootTask):
     pass

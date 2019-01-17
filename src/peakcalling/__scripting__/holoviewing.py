@@ -18,7 +18,7 @@ from   peakfinding.__scripting__.holoviewing import (PeaksDisplay as _PeaksDispl
                                                      PeaksTracksDictDisplay as _PTDDisplay)
 
 
-from   model.__scripting__          import Tasks
+from   taskmodel.__scripting__      import Tasks
 from   cleaning.processor           import DataCleaningException
 from   data.__scripting__           import TracksDict   # pylint: disable=unused-import
 from   ..processor.fittoreference   import (FitToReferenceProcessor,

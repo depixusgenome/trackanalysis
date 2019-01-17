@@ -3,14 +3,14 @@
 u"Processes TrackSimulatorTask"
 from typing             import Optional
 import numpy as np
-from utils              import initdefaults, EventsArray
-from model.task         import RootTask
-from model.level        import Level, PHASE
-from control.processor  import Processor
-from data.track         import Track
-from data.views         import TrackView
-from .track             import TrackSimulator
-from .bindings          import Experiment
+
+from data.track            import Track
+from data.views            import TrackView
+from taskcontrol.processor import Processor
+from taskmodel             import RootTask, Level, PHASE
+from utils                 import initdefaults, EventsArray
+from .track                import TrackSimulator
+from .bindings             import Experiment
 
 class _SimulatorTask(TrackSimulator, RootTask):
     u"Class indicating that a track file should be added to memory"

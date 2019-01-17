@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 u"tests opening, reading and analysis of a ramp.trk file"
 #from   legacy import readtrack   # pylint: disable=import-error,no-name-in-module
-from control.taskcontrol        import create
-from model.task                 import TrackReaderTask
+from taskcontrol.taskcontrol    import create
+from taskmodel                  import TrackReaderTask
 from ramp.processor             import RampStatsTask
 from ramp.view._widget          import DpxRamp, Slider # pylint: disable=protected-access
 from testingcore                import path

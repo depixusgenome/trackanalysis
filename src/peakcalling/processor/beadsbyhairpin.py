@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Matching experimental peaks to hairpins: tasks and processors"
-from typing                   import Sequence, NamedTuple, Iterator, cast
-from functools                import partial
-from data.views               import BEADKEY, TrackView
-from control.processor        import Processor
-from control.processor.runner import pooledinput, pooldump
-from peakfinding.peaksarray   import Output as PeakFindingOutput, PeaksArray
-from .._base                  import Distance, DEFAULT_BEST
-from .fittohairpin            import (FitToHairpinTask, FitToHairpinProcessor,
-                                      Fitters, Constraints, Matchers, Input,
-                                      PeakEventsTuple)
+from typing                       import Sequence, NamedTuple, Iterator, cast
+from functools                    import partial
+from data.views                   import BEADKEY, TrackView
+from taskcontrol.processor        import Processor
+from taskcontrol.processor.runner import pooledinput, pooldump
+from peakfinding.peaksarray       import Output as PeakFindingOutput, PeaksArray
+from .._base                      import Distance, DEFAULT_BEST
+from .fittohairpin                import (
+    FitToHairpinTask, FitToHairpinProcessor, Fitters, Constraints,
+    Matchers, Input, PeakEventsTuple
+)
 
 
 class BeadsByHairpinTask(FitToHairpinTask):

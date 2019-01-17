@@ -12,22 +12,22 @@ from bokeh.models               import (DataTable, TableColumn, CustomJS,
 
 
 from cleaning.view              import BeadSubtractionModalDescriptor
-from control.beadscontrol       import TaskWidgetEnabler
 from eventdetection.view        import AlignmentModalDescriptor
 from excelreports.creation      import writecolumns
 from modaldialog.view           import tab
 from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
 from peakfinding.groupby        import FullEm, ByHistogram
-from sequences.view             import (SequenceTicker, SequenceHoverMixin,
-                                        OligoListWidget, SequencePathWidget)
 from signalfilter               import rawprecision
+from tasksequences.view         import (SequenceTicker, SequenceHoverMixin,
+                                        OligoListWidget, SequencePathWidget)
+from taskcontrol.beadscontrol   import TaskWidgetEnabler
+from taskview.toolbar           import FileList
 from utils                      import dflt, dataclass
 from utils.gui                  import startfile
+from view.plots                 import DpxNumberFormatter, CACHE_TYPE
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
-from view.plots                 import DpxNumberFormatter, CACHE_TYPE
 from view.static                import ROUTE, route
-from view.toolbar               import FileList
 from ._model                    import (PeaksPlotModelAccess, FitToReferenceStore,
                                         PeaksPlotTheme, PeaksPlotDisplay)
 from ._model                    import SingleStrandConfig

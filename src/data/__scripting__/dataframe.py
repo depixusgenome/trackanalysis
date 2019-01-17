@@ -6,7 +6,7 @@ from   copy                        import copy as shallowcopy
 import pandas                      as     pd
 import numpy                       as     np
 from   utils.decoration            import addto
-from   control.processor.dataframe import SafeDataFrameProcessor
+from   taskcontrol.processor.dataframe import SafeDataFrameProcessor
 from   ..views                     import Cycles, Beads
 
 @addto(Beads)

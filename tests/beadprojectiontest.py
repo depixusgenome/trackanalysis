@@ -3,7 +3,7 @@
 "Tests histogram creation and analysis"
 import numpy  as np
 from   numpy.testing          import assert_allclose
-from   control.taskcontrol    import create
+from   taskcontrol.taskcontrol import create
 from   peakfinding.projection import (BeadProjection, CyclesDigitization,
                                       CycleProjection, ProjectionAggregator,
                                       CycleAlignment, EventExtractor, PeakListArray)

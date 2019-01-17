@@ -3,9 +3,9 @@
 """
 Default configurations for each task
 """
-from model.task.application import setupdefaulttask
-from .                      import (BeadSubtractionTask, DataCleaningTask,
-                                    ClippingTask)
+from taskmodel.application import setupdefaulttask
+from .                     import (BeadSubtractionTask, DataCleaningTask,
+                                   ClippingTask)
 setupdefaulttask(BeadSubtractionTask)
 setupdefaulttask(DataCleaningTask)
 setupdefaulttask(ClippingTask,

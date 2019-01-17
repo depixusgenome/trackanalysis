@@ -7,9 +7,9 @@ from itertools                         import product
 import numpy                           as     np
 
 from control.decentralized             import Indirection
-from model                             import InstrumentType
 from model.plots                       import PlotTheme, PlotModel, PlotDisplay, PlotAttrs
 from peakfinding.processor.__config__  import PeakSelectorTask
+from taskmodel                         import InstrumentType
 from utils                             import initdefaults
 from utils.array                       import EventsArray, EVENTS_DTYPE
 from .._model                          import PeaksPlotModelAccess, PeaksPlotTheme

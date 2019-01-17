@@ -9,8 +9,8 @@ import numpy  as np
 from   numpy.testing             import assert_allclose
 from   scipy.stats.distributions import chi2
 
-from model                    import PHASE
-from model.task.dataframe     import DataFrameTask
+from taskmodel                import PHASE
+from taskmodel.dataframe      import DataFrameTask
 from eventdetection.merging   import (KnownSigmaEventMerger,
                                       HeteroscedasticEventMerger,
                                       PopulationMerger, ZRangeMerger,
@@ -28,7 +28,7 @@ from eventdetection.processor import (ExtremumAlignmentProcessor, AlignmentTacti
                                       EventDetectionTask)
 from eventdetection.data      import Events
 from eventdetection           import samples
-from control.taskcontrol      import create
+from taskcontrol.taskcontrol  import create
 from simulator                import randtrack
 from testingcore              import path as utfilepath
 

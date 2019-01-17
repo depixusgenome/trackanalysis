@@ -9,7 +9,7 @@ from   copy              import deepcopy
 import pandas            as     pd
 import numpy             as     np
 
-from   model.level       import PHASE
+from   taskmodel         import PHASE
 from   utils.holoviewing import displayhook, BasicDisplay, hv
 from   ...views          import Beads, Cycles
 

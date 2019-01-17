@@ -5,13 +5,14 @@ from   enum               import Enum
 from   functools          import partial
 from   typing             import Optional, NamedTuple # pylint: disable=unused-import
 
-import numpy              as     np
-from   utils              import initdefaults
-from   model              import Task, Level, PHASE
-from   control.processor  import Processor
-from   .._core            import (translate, medianthreshold, # pylint: disable=import-error
-                                  ExtremumAlignment, ExtremumAlignmentMode,
-                                  PhaseEdgeAlignment, PhaseEdgeAlignmentMode)
+import numpy                 as     np
+from   utils                 import initdefaults
+from   taskmodel             import Task, Level, PHASE
+from   taskcontrol.processor import Processor
+from   .._core               import (# pylint: disable=import-error
+    translate, medianthreshold, ExtremumAlignment, ExtremumAlignmentMode,
+    PhaseEdgeAlignment, PhaseEdgeAlignmentMode
+)
 
 def _min_extension():
     try:

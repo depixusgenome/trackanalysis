@@ -27,14 +27,14 @@ For each of these objects, a detailed documentation is available. Start with
 `Track?`, `Track.cycles?` or for example.
 """
 run(locals(),
-    direct  = ('sequences', 'anastore'),
+    direct  = ('sequences', 'anastore', 'taskstore'),
     star    = ("signalfilter", "utils.datadump", "utils.scripting",
-               *(f"{i}.__scripting__" for i in ("model", "app", "data", "cleaning",
+               *(f"{i}.__scripting__" for i in ("taskmodel", "taskapp", "data", "cleaning",
                                                 "eventdetection", "peakfinding",
                                                 "peakcalling"))),
     jupyter = (f"{i}.__scripting__.holoviewing"
                for i in ("data", "cleaning", "eventdetection", "peakfinding", "peakcalling",
-                         "qualitycontrol", "ramp", "model")))
+                         "qualitycontrol", "ramp", "taskmodel")))
 
 
 if Path("Tutorial.ipynb").exists():

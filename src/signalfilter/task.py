@@ -5,8 +5,8 @@ Classes defining a type of data treatment.
 
 **Warning** Those definitions must remain data-independant.
 """
-from model.task import DataFunctorTask, Level
-from .          import ForwardBackwardFilter, NonLinearFilter
+from taskmodel import DataFunctorTask, Level
+from .         import ForwardBackwardFilter, NonLinearFilter
 
 class ForwardBackwardFilterTask(DataFunctorTask, ForwardBackwardFilter):
     u"Filters time series using the forward-backward algorithm"

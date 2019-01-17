@@ -11,9 +11,9 @@ from    bokeh.models   import LinearAxis, ColumnDataSource, CustomJS, Range1d
 import  numpy                   as     np
 from    numpy.lib.index_tricks  import as_strided
 
-from    view.plots              import CACHE_TYPE
-from    ._bokehext              import DpxHoverModel
-from    ._model                 import CyclesPlotTheme, CyclesModelAccess
+from    view.plots      import CACHE_TYPE
+from    ._bokehext      import DpxHoverModel
+from    ._model         import CyclesPlotTheme, CyclesModelAccess
 
 class RawMixin(ABC):
     "Building the graph of cycles"

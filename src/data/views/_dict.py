@@ -4,7 +4,7 @@
 from    abc         import abstractmethod, abstractproperty
 from    typing      import Tuple, Union, Iterator, TypeVar, cast, Dict, Optional
 import  numpy as np
-from    model       import Level
+from    taskmodel   import Level
 
 _m_ALL   = None, all, Ellipsis, slice(None) # type: tuple
 _m_INTS  = int, cast(type, np.integer)

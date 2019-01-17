@@ -5,12 +5,12 @@ from   typing                      import Dict, List, Tuple, Callable, cast
 from   functools                   import partial
 import numpy                       as     np
 
-from   model                       import PHASE
-from   data.views                  import selectparent
-from   control.processor.dataframe import DataFrameFactory
-from   eventdetection.data         import Events, EventDetectionConfig
-from   ..probabilities             import Probability
-from   .selector                   import PeaksDict
+from   data.views                      import selectparent
+from   eventdetection.data             import Events, EventDetectionConfig
+from   taskcontrol.processor.dataframe import DataFrameFactory
+from   taskmodel                       import PHASE
+from   ..probabilities                 import Probability
+from   .selector                       import PeaksDict
 
 @DataFrameFactory.adddoc
 class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):

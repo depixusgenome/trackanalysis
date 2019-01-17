@@ -1,29 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "IO for peaksplot"
-from typing                          import Optional, Tuple, Union, List
-from pathlib                         import Path
-from copy                            import deepcopy
-from concurrent.futures              import ProcessPoolExecutor, ThreadPoolExecutor
+from typing                               import Optional, Tuple, Union, List
+from pathlib                              import Path
+from copy                                 import deepcopy
+from concurrent.futures                   import ProcessPoolExecutor, ThreadPoolExecutor
 
-from control.processor.utils         import ExceptionCatchingTask
-from control.taskcontrol             import create as _createdata
-from control.taskio                  import ConfigTrackIO, ConfigGrFilesIO, TaskIO
-from cleaning.processor              import DataCleaningTask, DataCleaningException
-from peakfinding.processor           import PeakSelectorTask
-from peakfinding.reporting.processor import PeakFindingExcelTask
-from peakcalling.processor           import FitToHairpinTask, BeadsByHairpinTask
+from cleaning.processor                   import DataCleaningTask, DataCleaningException
+from peakfinding.processor                import PeakSelectorTask
+from peakfinding.reporting.processor      import PeakFindingExcelTask
+from peakcalling.processor                import FitToHairpinTask, BeadsByHairpinTask
 from peakcalling.processor.fittoreference import (FitToReferenceTask, FitToReferenceDict,
                                                   TaskViewProcessor, BEADKEY)
+from taskcontrol.processor.utils          import ExceptionCatchingTask
+from taskcontrol.taskcontrol              import create as _createdata
+from taskcontrol.taskio                   import ConfigTrackIO, ConfigGrFilesIO, TaskIO
+from utils.logconfig                      import getLogger
+from utils.gui                            import startfile
+from view.base                            import spawn, threadmethod
+from view.dialog                          import FileDialogTheme
 
-from view.base                       import spawn, threadmethod
-from view.dialog                     import FileDialogTheme
-
-from utils.logconfig                 import getLogger
-from utils.gui                       import startfile
-
-from ..reporting.processor           import HybridstatExcelTask
-from ._model                         import PeaksPlotModelAccess
+from ..reporting.processor                import HybridstatExcelTask
+from ._model                              import PeaksPlotModelAccess
 
 LOGS = getLogger(__name__)
 

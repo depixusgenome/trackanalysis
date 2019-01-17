@@ -9,9 +9,9 @@ from numpy.testing               import assert_equal, assert_allclose
 
 import pandas as pd
 
-from model.task.dataframe        import DataFrameTask
-from model.task.track            import InMemoryTrackTask
-from control.taskcontrol         import create
+from taskmodel.dataframe         import DataFrameTask
+from taskmodel.track             import InMemoryTrackTask
+from taskcontrol.taskcontrol     import create
 from data                        import Track
 from simulator                   import randpeaks
 from simulator.processor         import EventSimulatorTask, TrackSimulatorTask

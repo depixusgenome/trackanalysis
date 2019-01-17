@@ -16,17 +16,17 @@ from   typing               import List, cast
 
 import numpy                as     np
 
-from   utils.decoration     import addproperty, extend
-from   utils.attrdefaults   import addattributes
-from   model                import PHASE, Task
-from   model.__scripting__  import Tasks
+from   taskmodel               import PHASE, Task
+from   taskmodel.__scripting__ import Tasks
+from   utils.decoration        import addproperty, extend
+from   utils.attrdefaults      import addattributes
 
-from   ..trackio            import savetrack
-from   ..views              import TrackView, Cycles, Beads
-from   ..track              import Track, LazyProperty, BEADKEY, isellipsis
-from   ..trackops           import (selectbeads, dropbeads, selectcycles,
-                                    concatenatetracks, renamebeads, clone)
-from   .tracksdict          import TracksDict
+from   ..trackio               import savetrack
+from   ..views                 import TrackView, Cycles, Beads
+from   ..track                 import Track, LazyProperty, BEADKEY, isellipsis
+from   ..trackops              import (selectbeads, dropbeads, selectcycles,
+                                       concatenatetracks, renamebeads, clone)
+from   .tracksdict             import TracksDict
 
 @addproperty(Track, 'pathinfo')
 class PathInfo:

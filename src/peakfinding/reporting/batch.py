@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Batch creator for peakfinding reports"
+from copy                       import deepcopy
 from typing                     import Optional, Iterator, Sequence
 
-from copy                       import deepcopy
-from utils                      import initdefaults
-from data.trackio               import checkpath
-from model.task                 import Task, TrackReaderTask
-from control.processor.batch    import BatchTemplate, PathIO, BatchTask, BatchProcessor
-from cordrift.processor         import DriftTask
-from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
-from peakfinding.processor      import PeakSelectorTask
-from .processor                 import PeakFindingExcelTask
+from cordrift.processor          import DriftTask
+from data.trackio                import checkpath
+from eventdetection.processor    import EventDetectionTask, ExtremumAlignmentTask
+from peakfinding.processor       import PeakSelectorTask
+from taskmodel                   import Task, TrackReaderTask
+from taskcontrol.processor.batch import BatchTemplate, PathIO, BatchTask, BatchProcessor
+from utils                       import initdefaults
+from .processor                  import PeakFindingExcelTask
 
 class PeakFindingBatchTemplate(BatchTemplate):
     "Template of tasks to run"

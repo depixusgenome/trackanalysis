@@ -6,9 +6,9 @@ from bokeh            import layouts
 from bokeh.plotting   import Figure
 from bokeh.models     import Range1d, ColumnDataSource, HoverTool
 
+from taskview.plots   import TaskPlotCreator
 from view.colors      import tohex
-from view.plots.base  import themed, PlotView, CACHE_TYPE, GroupStateDescriptor
-from view.plots.tasks import TaskPlotCreator
+from view.plots       import PlotView, GroupStateDescriptor, themed, CACHE_TYPE
 from .._io            import setupio
 from ..cyclehistplot  import BaseHistPlotCreator
 from ._model          import (ConsensusModelAccess, ConsensusScatterModel,

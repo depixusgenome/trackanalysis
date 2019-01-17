@@ -10,13 +10,13 @@ import  bokeh.core.properties   as     props
 from    bokeh.models            import (Widget, DataTable, TableColumn,
                                         ColumnDataSource, Slider)
 
-from    utils                   import dataclass, dflt
-from    control.beadscontrol    import TaskWidgetEnabler
-from    view.static             import route
-from    view.plots              import CACHE_TYPE, DpxNumberFormatter
-from    qualitycontrol.view     import QCBeadStatusWidget, QCHairpinSizeWidget
-from    ._model                 import RampPlotModel
-from    ..processor             import RampStatsTask
+from    qualitycontrol.view      import QCBeadStatusWidget, QCHairpinSizeWidget
+from    taskcontrol.beadscontrol import TaskWidgetEnabler
+from    utils                    import dataclass, dflt
+from    view.plots               import CACHE_TYPE, DpxNumberFormatter
+from    view.static              import route
+from    ._model                  import RampPlotModel
+from    ..processor              import RampStatsTask
 
 class DpxRamp(Widget):
     "Interface to filters needed for cleaning"

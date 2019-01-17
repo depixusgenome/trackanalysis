@@ -13,7 +13,7 @@ from   sequences                            import (Translator,
                                                     peaks as _seqpeaks)
 from   peakcalling.toreference              import Range, CorrectedHistogramFit, Pivot
 from   peakcalling.tohairpin                import ChiSquareFit, HairpinFitter
-from   model.__scripting__.tasks            import Tasks, Task
+from   taskmodel.__scripting__.tasks        import Tasks, Task
 
 def getreference(tracks) -> Optional[str]:
     "returns the reference track"

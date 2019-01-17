@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Hybridstat excel reporting processor"
-from   typing               import Sequence, Dict, Optional
-from   pathlib              import Path
-from   functools            import partial
+from   functools             import partial
+from   pathlib               import Path
+from   typing                import Sequence, Dict, Optional
 import pickle
 
-from utils                  import initdefaults
-from model                  import Task, Level
-from control.processor      import Processor
-from excelreports.creation  import fileobj
+from   data.views            import TrackView, BEADKEY
+from   eventdetection        import EventDetectionConfig
+from   excelreports.creation import fileobj
+from   peakcalling.processor import FitToHairpinTask
+from   taskmodel             import Task, Level
+from   taskcontrol.processor import Processor
+from   utils                 import initdefaults
 
-from eventdetection         import EventDetectionConfig
-from peakcalling.processor  import FitToHairpinTask
-from data.views             import TrackView, BEADKEY
-
-from ._base                 import ReporterInfo
-from ._summary              import SummarySheet
-from ._peaks                import PeaksSheet
+from   ._base                import ReporterInfo
+from   ._summary             import SummarySheet
+from   ._peaks               import PeaksSheet
 
 class HybridstatExcelTask(Task):
     "Reporter for Hybridstat"

@@ -4,13 +4,13 @@
 Deals with tasks & processors for finding peaks
 """
 
-from   typing                     import Optional
+from   typing                         import Optional
 
-from   model                      import Level, Task
-from   data.views                 import BEADKEY, TaskView, Beads
-from   control.processor.taskview import TaskViewProcessor
-from   ..peaksarray               import PeakListArray
-from   ..selector                 import PeakSelector
+from   data.views                     import BEADKEY, TaskView, Beads
+from   taskcontrol.processor.taskview import TaskViewProcessor
+from   taskmodel                      import Level, Task
+from   ..peaksarray                   import PeakListArray
+from   ..selector                     import PeakSelector
 
 class PeakSelectorTask(PeakSelector, Task):
     """

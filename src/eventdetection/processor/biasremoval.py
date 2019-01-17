@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
-from   functools          import partial
+from   functools              import partial
 
-import numpy              as     np
-from   model              import Task, Level, PHASE
-from   control.processor  import Processor
+import numpy                  as     np
+from   taskcontrol.processor  import Processor
+from   taskmodel              import Task, Level, PHASE
 
 class BiasRemovalTask(Task):
     "removes the bias from the whole bead"

@@ -10,7 +10,7 @@ import holoviews    as     hv
 from   bokeh.models                         import (LinearAxis,FuncTickFormatter,
                                                     FixedTicker)
 
-from   model.__scripting__                  import Tasks
+from   taskmodel.__scripting__              import Tasks
 from   peakfinding.processor                import PeaksDict, PeakSelectorTask
 from   peakfinding.__scripting__            import Detailed
 from   utils.decoration                     import extend

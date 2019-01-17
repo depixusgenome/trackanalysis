@@ -8,12 +8,11 @@ from   functools          import partial
 
 import numpy                  as np
 
-from   utils              import initdefaults
-from   model.task         import Task
-from   model.level        import PHASE, Level
-from   data.track         import Track
-from   data.views         import Beads, Cycles, BEADKEY, TrackView
-from   control.processor  import Processor
+from   data.track            import Track
+from   data.views            import Beads, Cycles, BEADKEY, TrackView
+from   taskcontrol.processor import Processor
+from   taskmodel             import Task, PHASE, Level
+from   utils                 import initdefaults
 if TYPE_CHECKING:
     # pylint: disable=unused-import
     from peakfinding.processor.selector import Output

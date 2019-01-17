@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing all messages concerning discarded beads"
-from    typing            import cast
-from    bokeh             import layouts
-from    model.plots       import PlotState
-from    utils             import initdefaults
-from    view.plots        import PlotView, CACHE_TYPE
-from    view.plots.tasks  import TaskPlotCreator
-from    ._widgets         import QualityControlWidgets
-from    ._plots           import QualityControlPlots
-from    ._model           import QualityControlModelAccess
+from    typing               import cast
+from    bokeh                import layouts
+from    model.plots          import PlotState
+from    taskview.plots       import PlotView, CACHE_TYPE, TaskPlotCreator
+from    utils                import initdefaults
+from    ._widgets            import QualityControlWidgets
+from    ._plots              import QualityControlPlots
+from    ._model              import QualityControlModelAccess
 
 class _StateDescriptor:
     def __get__(self, inst, owner):

@@ -3,7 +3,7 @@
 """
 Default configurations for each task
 """
-from model.task.application import setupdefaulttask
-from .                      import ExtremumAlignmentTask, EventDetectionTask
+from taskmodel.application import setupdefaulttask
+from .                     import ExtremumAlignmentTask, EventDetectionTask
 setupdefaulttask(ExtremumAlignmentTask)
 setupdefaulttask(EventDetectionTask)

@@ -9,10 +9,8 @@ from   typing                   import Set, Optional, Dict, Tuple, Any, Sequence
 
 import numpy                    as     np
 
-from control.decentralized      import Indirection
-from control.modelaccess        import TaskAccess
 from cleaning.view              import DataCleaningModelAccess
-from model.task                 import RootTask, DataSelectionTask
+from control.decentralized      import Indirection
 from model.plots                import PlotModel, PlotTheme, PlotAttrs, PlotDisplay
 from peakfinding.histogram      import interpolator
 from peakcalling                import match
@@ -22,7 +20,9 @@ from peakcalling.processor.fittoreference   import FitData
 from peakcalling.processor.fittohairpin     import (Constraints, HairpinFitter,
                                                     PeakMatching, Range,
                                                     DistanceConstraint)
-from sequences.modelaccess      import SequencePlotModelAccess
+from taskcontrol.modelaccess    import TaskAccess
+from taskmodel                  import RootTask, DataSelectionTask
+from tasksequences.modelaccess  import SequencePlotModelAccess
 from utils                      import updatecopy, initdefaults, NoArgs
 from view.base                  import spawn
 from view.colors                import tohex

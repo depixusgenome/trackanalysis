@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Batch creator for hybridstat tasks"
-from typing                         import (Optional, Dict, Iterator, Union,
-                                            Sequence, Iterable, cast)
+from typing                         import (
+    Optional, Dict, Iterator, Union, Sequence, Iterable, cast
+)
 from copy                           import deepcopy
 from pathlib                        import Path
 import re
 
-from utils                          import initdefaults
 from data.trackio                   import checkpath, PATHTYPE
-
-from model.task                     import Task, TrackReaderTask
-from control.processor.batch        import BatchTask, BatchProcessor, PathIO
 from peakfinding.reporting.batch    import PeakFindingBatchTemplate
 from peakcalling                    import Range
-from peakcalling.processor          import (BeadsByHairpinTask, FitToHairpinTask,
-                                            DistanceConstraint, Constraints)
+from peakcalling.processor          import (
+    BeadsByHairpinTask, FitToHairpinTask, DistanceConstraint, Constraints
+)
+from taskmodel                      import Task, TrackReaderTask
+from taskcontrol.processor.batch    import BatchTask, BatchProcessor, PathIO
+from utils                          import initdefaults
 from .processor                     import HybridstatExcelTask
 from .identification                import readparams
 

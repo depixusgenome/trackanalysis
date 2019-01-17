@@ -9,10 +9,10 @@ from   typing            import (NamedTuple, Callable, Union, Tuple, Dict, Any,
 import numpy             as np
 import pandas            as pd
 
-from   control.processor import Processor, ProcessorException
-from   model             import Task, Level
-from   signalfilter      import nanhfsigma
-from   utils             import initdefaults
+from   signalfilter          import nanhfsigma
+from   taskcontrol.processor import Processor, ProcessorException
+from   taskmodel             import Task, Level
+from   utils                 import initdefaults
 
 class RampStatsTask(Task):
     """

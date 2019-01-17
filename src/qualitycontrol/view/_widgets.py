@@ -9,12 +9,12 @@ from    bokeh.models        import (ColumnDataSource, DataTable, TableColumn,
 from    bokeh               import layouts
 import  numpy               as     np
 
-from    cleaning.processor      import DataCleaningErrorMessage
-from    control.beadscontrol    import TaskWidgetEnabler
-from    utils                   import dataclass, dflt
-from    utils.gui               import intlistsummary
-from    view.plots              import DpxNumberFormatter
-from    ._model                 import QualityControlModelAccess
+from    cleaning.processor       import DataCleaningErrorMessage
+from    taskcontrol.beadscontrol import TaskWidgetEnabler
+from    utils                    import dataclass, dflt
+from    utils.gui                import intlistsummary
+from    view.plots               import DpxNumberFormatter
+from    ._model                  import QualityControlModelAccess
 
 def addtodoc(ctrl, theme, data) -> Tuple[Any, ColumnDataSource, DataTable]:
     "creates the widget"

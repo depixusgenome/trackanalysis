@@ -10,16 +10,16 @@ from    bokeh.models        import (ColumnDataSource, Slider, CustomJS, DataTabl
                                     TableColumn, IntEditor, NumberEditor,
                                     CheckboxButtonGroup, Widget)
 
-from    utils                   import initdefaults
-from    control.beadscontrol    import TaskWidgetEnabler
-from    model.task              import RootTask
-from    model.task.application  import TasksDisplay
-from    sequences.view          import OligoListWidget, SequencePathWidget
-from    view.plots              import DpxNumberFormatter, CACHE_TYPE
-from    modaldialog.view        import tab
-from    eventdetection.view     import AlignmentWidget, EventDetectionWidget
-from    ._model                 import (CyclesModelAccess, CyclesPlotTheme,
-                                        CyclesModelConfig, CyclesPlotDisplay)
+from    eventdetection.view      import AlignmentWidget, EventDetectionWidget
+from    modaldialog.view         import tab
+from    tasksequences.view       import OligoListWidget, SequencePathWidget
+from    taskcontrol.beadscontrol import TaskWidgetEnabler
+from    taskmodel                import RootTask
+from    taskmodel.application    import TasksDisplay
+from    utils                    import initdefaults
+from    view.plots               import DpxNumberFormatter, CACHE_TYPE
+from    ._model                  import (CyclesModelAccess, CyclesPlotTheme,
+                                         CyclesModelConfig, CyclesPlotDisplay)
 
 class PeaksTableTheme:
     "peaks table theme"

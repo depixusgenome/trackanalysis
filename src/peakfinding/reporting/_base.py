@@ -8,12 +8,12 @@ from abc                    import abstractmethod
 
 import numpy as np
 
-from utils                  import initdefaults
-from model                  import PHASE
 from excelreports.creation  import Reporter as _Reporter, column_method, FILEOBJ
 from data.views             import Beads
 from data.track             import Track, BEADKEY
 from signalfilter           import rawprecision
+from taskmodel              import PHASE
+from utils                  import initdefaults
 from ..peaksarray           import Output as PeakOutput
 
 class ChartCreator:

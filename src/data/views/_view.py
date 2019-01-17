@@ -6,8 +6,8 @@ from    typing      import (Optional, Tuple, Union, Any, Sequence, TypeVar,
                             Iterable, Iterator, Generator, Type, cast)
 import  numpy as np
 
+from    taskmodel   import Level
 from    utils       import initdefaults, isfunction, NoArgs
-from    model       import Level
 from    ._config    import TrackViewConfigMixin
 from    ._dict      import ITrackView, isellipsis
 

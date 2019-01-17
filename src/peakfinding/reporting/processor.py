@@ -5,18 +5,18 @@ from   typing               import Optional
 from   pathlib              import Path
 import pickle
 
-from utils                      import initdefaults
-from model                      import Task, Level
-from control.processor          import Processor
-from control.processor.runner   import pooledinput, pooldump
-from excelreports.creation      import fileobj
+from data.views                   import TrackView
+from excelreports.creation        import fileobj
 
-from eventdetection             import EventDetectionConfig
-from data.views                 import TrackView
+from eventdetection               import EventDetectionConfig
+from taskmodel                    import Task, Level
+from taskcontrol.processor        import Processor
+from taskcontrol.processor.runner import pooledinput, pooldump
+from utils                        import initdefaults
 
-from ._base                     import ReporterInfo
-from ._summary                  import SummarySheet
-from ._peaks                    import PeaksSheet
+from ._base                       import ReporterInfo
+from ._summary                    import SummarySheet
+from ._peaks                      import PeaksSheet
 
 class PeakFindingExcelTask(Task):
     u"Reporter for PeakFinding"

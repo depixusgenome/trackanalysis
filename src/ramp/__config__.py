@@ -3,7 +3,7 @@
 """
 Default configurations for each task
 """
-from model.task.application import setupdefaulttask
-from .processor             import RampConsensusBeadTask, RampStatsTask
+from taskmodel.application import setupdefaulttask
+from .processor            import RampConsensusBeadTask, RampStatsTask
 setupdefaulttask(RampConsensusBeadTask)
 setupdefaulttask(RampStatsTask)

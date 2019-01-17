@@ -6,23 +6,23 @@ from typing                 import Dict, TypeVar, Optional, cast
 
 import numpy as np
 
-from bokeh                  import layouts
-from bokeh.plotting         import Figure
-from bokeh.models           import (ColumnDataSource, Range1d, LinearAxis,
-                                    NumeralTickFormatter, HoverTool)
-from model.level            import PHASE
-from model.plots            import (PlotTheme, PlotDisplay, PlotModel, PlotAttrs,
-                                    PlotState)
-from peakfinding.histogram  import interpolator
-from sequences.modelaccess  import SequenceAnaIO
-from utils                  import initdefaults
-from view.plots             import PlotView
-from view.plots.ploterror   import PlotError
-from view.plots.tasks       import TaskPlotCreator, PlotModelType, CACHE_TYPE
-from ._model                import (PeaksPlotModelAccess, PeaksPlotTheme,
-                                    createpeaks, resetrefaxis)
-from ._widget               import PeaksPlotWidgets, PeakListTheme
-from ._io                   import setupio
+from bokeh                     import layouts
+from bokeh.plotting            import Figure
+from bokeh.models              import (ColumnDataSource, Range1d, LinearAxis,
+                                       NumeralTickFormatter, HoverTool)
+from model.plots               import (PlotTheme, PlotDisplay, PlotModel, PlotAttrs,
+                                       PlotState)
+from peakfinding.histogram     import interpolator
+from taskview.plots            import (
+    PlotError, PlotView, TaskPlotCreator, PlotModelType, CACHE_TYPE
+)
+from taskmodel                 import PHASE
+from tasksequences.modelaccess import SequenceAnaIO
+from utils                     import initdefaults
+from ._model                   import (PeaksPlotModelAccess, PeaksPlotTheme,
+                                       createpeaks, resetrefaxis)
+from ._widget                  import PeaksPlotWidgets, PeakListTheme
+from ._io                      import setupio
 
 CurveData = Dict[str, np.ndarray]
 HistData  = Dict[str, CurveData]

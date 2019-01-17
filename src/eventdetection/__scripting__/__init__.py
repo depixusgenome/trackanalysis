@@ -10,18 +10,18 @@ from   functools                    import partial
 import numpy                        as     np
 import pandas                       as     pd
 
-from   utils.decoration             import addto, addproperty, extend
-from   control.processor.dataframe  import DataFrameProcessor
-from   model.level                  import PHASE
-from   model.__scripting__          import Tasks
-from   data.track                   import Track, Axis
-from   data.tracksdict              import TracksDict
-from   data.views                   import Cycles
-from   data.__scripting__.dataframe import adddataframe
-from   ..processor                  import (ExtremumAlignmentTask,
-                                            BiasRemovalTask,
-                                            EventDetectionTask)
-from   ..data                       import Events
+from   utils.decoration                import addto, addproperty, extend
+from   taskcontrol.processor.dataframe import DataFrameProcessor
+from   taskmodel                       import PHASE
+from   taskmodel.__scripting__         import Tasks
+from   data.track                      import Track, Axis
+from   data.tracksdict                 import TracksDict
+from   data.views                      import Cycles
+from   data.__scripting__.dataframe    import adddataframe
+from   ..processor                     import (
+    ExtremumAlignmentTask, BiasRemovalTask, EventDetectionTask
+)
+from   ..data                          import Events
 
 _ReturnType = FrozenSet[Tuple[int, int]]
 class Comparator:

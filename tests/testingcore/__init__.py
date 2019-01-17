@@ -15,7 +15,7 @@ warnings.filterwarnings('ignore', category = DeprecationWarning,
 np.seterr(all='raise')
 
 def _trackreadertask(fpath):
-    from model.task     import TrackReaderTask
+    from taskmodel      import TrackReaderTask
     from data.trackio   import checkpath
     return TrackReaderTask(path = checkpath(fpath).path)
 

@@ -11,11 +11,11 @@ from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 
 import  numpy          as np
 
-from    model.level    import PHASE
-from    sequences.view import SequenceTicker, estimatebias
-from    view.plots     import checksizes, CACHE_TYPE
-from    ._bokehext     import DpxHoverModel
-from    ._model        import CyclesModelAccess, CyclesPlotTheme
+from    taskmodel          import PHASE
+from    tasksequences.view import SequenceTicker, estimatebias
+from    view.plots         import checksizes, CACHE_TYPE
+from    ._bokehext         import DpxHoverModel
+from    ._model            import CyclesModelAccess, CyclesPlotTheme
 
 class HistMixin(ABC):
     "Building a projection of phase 5 onto the Z axis"

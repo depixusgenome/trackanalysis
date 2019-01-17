@@ -9,22 +9,22 @@ from   functools                    import partial
 import pandas                       as     pd
 import numpy                        as     np
 
-from utils.decoration               import addto, addproperty, extend
-from control.processor.dataframe    import DataFrameProcessor
-from eventdetection                 import EventDetectionConfig
-from eventdetection.data            import Events
-from model                          import PHASE
-from model.__scripting__            import Tasks
-from data.track                     import Track, Axis
-from data.views                     import Cycles
-from data.tracksdict                import TracksDict
-from data.__scripting__.dataframe   import adddataframe
-from data.__scripting__.tracksdict  import TracksDictOperator
-from ..selector                     import PeakSelectorDetails
-from ..probabilities                import Probability
-from ..processor.selector           import PeaksDict, PeakListArray
-from ..processor                    import (PeakSelectorTask, PeakCorrelationAlignmentTask,
-                                            PeakProbabilityTask)
+from data.track                      import Track, Axis
+from data.views                      import Cycles
+from data.tracksdict                 import TracksDict
+from data.__scripting__.dataframe    import adddataframe
+from data.__scripting__.tracksdict   import TracksDictOperator
+from eventdetection                  import EventDetectionConfig
+from eventdetection.data             import Events
+from taskcontrol.processor.dataframe import DataFrameProcessor
+from taskmodel                       import PHASE
+from taskmodel.__scripting__         import Tasks
+from utils.decoration                import addto, addproperty, extend
+from ..selector                      import PeakSelectorDetails
+from ..probabilities                 import Probability
+from ..processor.selector            import PeaksDict, PeakListArray
+from ..processor                     import (PeakSelectorTask, PeakCorrelationAlignmentTask,
+                                             PeakProbabilityTask)
 
 @addto(Track) # type: ignore
 @property

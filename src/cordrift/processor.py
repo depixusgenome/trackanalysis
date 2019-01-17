@@ -7,17 +7,17 @@ from typing                 import (Iterator, Dict, Union, Sequence, Tuple, Any,
 
 import numpy as np
 
-from utils                      import initdefaults
-from model                      import Task, Level, PHASE
-from control.processor          import Processor
-from control.processor.runner   import pooledinput, poolchunk, pooldump
-from data                       import Cycles
-from signalfilter               import rawprecision
-from eventdetection             import EventDetectionConfig
-from eventdetection.detection   import EventDetector
-from eventdetection.data        import Events
-from .collapse                  import Range, Profile, CollapseAlg, CollapseToSock
-from .stitching                 import StitchAlg, SingleFitStitch
+from   data                         import Cycles
+from   eventdetection               import EventDetectionConfig
+from   eventdetection.detection     import EventDetector
+from   eventdetection.data          import Events
+from   signalfilter                 import rawprecision
+from   taskmodel                    import Task, Level, PHASE
+from   taskcontrol.processor        import Processor
+from   taskcontrol.processor.runner import pooledinput, poolchunk, pooldump
+from   utils                        import initdefaults
+from   .collapse                    import Range, Profile, CollapseAlg, CollapseToSock
+from   .stitching                   import StitchAlg, SingleFitStitch
 
 class DriftTask(Task, EventDetectionConfig):
     "Removes correlations between cycles"

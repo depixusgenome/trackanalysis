@@ -9,8 +9,8 @@ from numpy.testing              import assert_allclose, assert_equal
 from pytest                     import approx
 
 
-from control.taskcontrol        import create
-from model.task.dataframe       import DataFrameTask
+from taskcontrol.taskcontrol    import create
+from taskmodel.dataframe        import DataFrameTask
 from simulator.processor        import ByPeaksEventSimulatorTask
 from eventdetection.processor   import EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask

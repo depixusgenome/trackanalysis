@@ -11,16 +11,16 @@ from    bokeh.models    import (ColumnDataSource, DataTable, TableColumn,
 
 import  numpy       as     np
 
-from    control.beadscontrol    import TaskWidgetEnabler
-from    utils                   import initdefaults
-from    utils.gui               import parseints, intlistsummary
-from    modaldialog.view        import tab
-from    view.static             import route
-from    view.plots              import DpxNumberFormatter, CACHE_TYPE
-from    eventdetection.view     import (AlignmentWidget, # pylint: disable=unused-import
-                                        AlignmentModalDescriptor)
-from    ._model                 import (DataCleaningModelAccess, DataCleaningTask,
-                                        CleaningPlotModel, FixedBeadDetectionConfig)
+from    eventdetection.view      import (AlignmentWidget, # pylint: disable=unused-import
+                                         AlignmentModalDescriptor)
+from    modaldialog.view         import tab
+from    taskcontrol.beadscontrol import TaskWidgetEnabler
+from    utils                    import initdefaults
+from    utils.gui                import parseints, intlistsummary
+from    view.static              import route
+from    view.plots               import DpxNumberFormatter, CACHE_TYPE
+from    ._model                  import (DataCleaningModelAccess, DataCleaningTask,
+                                         CleaningPlotModel, FixedBeadDetectionConfig)
 
 class BeadSubtractionModalDescriptor:
     "for use with modal dialogs"

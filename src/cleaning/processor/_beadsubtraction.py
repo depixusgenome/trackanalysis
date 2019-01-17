@@ -7,9 +7,9 @@ from   itertools                    import repeat
 
 import numpy                        as     np
 
-from   control.processor            import Processor
+from   taskcontrol.processor        import Processor
 from   data.views                   import Cycles, Beads
-from   model                        import Task, Level
+from   taskmodel                    import Task, Level
 from   signalfilter.noisereduction  import Filter
 from   utils                        import initdefaults
 from   ..beadsubtraction            import aggtype, SubtractMedianSignal, AggType

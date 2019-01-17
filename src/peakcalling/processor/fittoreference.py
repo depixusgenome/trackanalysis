@@ -6,15 +6,15 @@ from   typing                           import (Optional, Iterable, Sequence,
                                                 NamedTuple, Generator, cast)
 import numpy                            as     np
 
-from   utils                            import initdefaults
 from   data.views                       import TaskView, BEADKEY
-from   model.task                       import Task, Level
-from   control.processor.runner         import run as _runprocessors
-from   control.processor.taskview       import TaskViewProcessor
 from   eventdetection.data              import Events
 from   peakfinding.histogram            import HistogramData
 from   peakfinding.processor.dataframe  import PeaksDataFrameFactory, DataFrameFactory
 from   peakfinding.processor.selector   import PeakListArray, PeaksDict
+from   taskcontrol.processor.runner     import run as _runprocessors
+from   taskcontrol.processor.taskview   import TaskViewProcessor
+from   taskmodel                        import Task, Level
+from   utils                            import initdefaults
 from   ..toreference                    import ReferenceFit, ChiSquareHistogramFit
 from   ..tohairpin                      import HairpinFitter
 from   .._core                          import match as _match # pylint: disable=import-error

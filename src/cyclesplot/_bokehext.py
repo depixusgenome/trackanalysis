@@ -5,7 +5,7 @@ import  bokeh.core.properties as     props
 from    bokeh.models          import (ColumnDataSource, CustomJS, TapTool,
                                       HoverTool, Renderer)
 
-from    sequences.view        import SequenceHoverMixin
+from    tasksequences.view    import SequenceHoverMixin
 from    view.plots            import DpxHoverTool, PlotAttrsView, themed
 
 class DpxHoverModel(HoverTool,  # pylint: disable=too-many-instance-attributes,too-many-ancestors

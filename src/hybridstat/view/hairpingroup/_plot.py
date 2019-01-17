@@ -11,18 +11,18 @@ from bokeh.models           import (ColumnDataSource, Range1d, FactorRange,
                                     ToolbarBox)
 from bokeh.transform        import jitter
 
-from sequences.modelaccess  import SequenceAnaIO
-from view.colors            import tohex
-from view.plots             import PlotView
-from view.plots.base        import GroupStateDescriptor, themed
-from view.plots.ploterror   import PlotError
-from view.plots.tasks       import TaskPlotCreator, CACHE_TYPE
-from .._model               import resetrefaxis, PeaksPlotTheme, PoolComputationsDisplay
-from .._io                  import setupio
-from ._model                import (HairpinGroupScatterModel, HairpinGroupModelAccess,
-                                    HairpinGroupScatterTheme, HairpinGroupHistModel,
-                                    HairpinGroupHistTheme, PlotDisplay)
-from ._widget               import HairpinGroupPlotWidgets
+from tasksequences.modelaccess import SequenceAnaIO
+from taskview.plots            import TaskPlotCreator, PlotError
+from view.colors               import tohex
+from view.plots                import PlotView, GroupStateDescriptor, themed, CACHE_TYPE
+from .._model                  import resetrefaxis, PeaksPlotTheme, PoolComputationsDisplay
+from .._io                     import setupio
+from ._model                   import (
+    HairpinGroupScatterModel, HairpinGroupModelAccess,
+    HairpinGroupScatterTheme, HairpinGroupHistModel,
+    HairpinGroupHistTheme, PlotDisplay
+)
+from ._widget                  import HairpinGroupPlotWidgets
 
 ColumnData = Dict[str, np.ndarray]
 FigData    = Dict[str, ColumnData]

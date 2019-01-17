@@ -10,7 +10,7 @@ from   bokeh.plotting       import Figure
 import numpy                as     np
 
 from   data                 import Beads, Track
-from   view.plots.tasks     import TaskPlotCreator, CACHE_TYPE
+from   taskview.plots       import TaskPlotCreator, CACHE_TYPE
 
 from   ..computations       import extensions
 from   ._model              import (QualityControlModelAccess,

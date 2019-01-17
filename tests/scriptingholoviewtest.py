@@ -18,7 +18,7 @@ from peakfinding.processor.selector             import PeaksDict
 from utils.holoviewing                          import ItemsDisplay
 
 if TYPE_CHECKING:
-    from model.__scripting__                        import Tasks
+    from taskmodel.__scripting__                    import Tasks
     from data.__scripting__.holoviewing.tracksdict  import TracksDict
 
 assert Beads                         in  CLASSES

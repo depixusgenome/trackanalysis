@@ -12,14 +12,15 @@ from   typing                           import (Dict, Optional, Iterator, List, 
                                                 Set, Union, Tuple, Sequence, cast)
 import numpy                            as     np
 import pandas                           as     pd
-from   utils.decoration                 import addproperty, addto
-from   control.processor.dataframe      import DataFrameFactory
-from   model.__scripting__              import Tasks
-from   model.__scripting__.track        import LocalTasks
+
 from   data.views                       import BEADKEY, Beads, Cycles
 from   data.trackops                    import dropbeads
 from   data.__scripting__.track         import Track
 from   data.__scripting__.tracksdict    import TracksDict
+from   utils.decoration                 import addproperty, addto
+from   taskcontrol.processor.dataframe  import DataFrameFactory
+from   taskmodel.__scripting__          import Tasks
+from   taskmodel.__scripting__.track    import LocalTasks
 from   ..processor                      import (DataCleaningProcessor,
                                                 DataCleaningErrorMessage,
                                                 BeadSubtractionTask,

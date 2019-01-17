@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot"
-from    typing              import TYPE_CHECKING
-from    bokeh               import layouts
+from    typing               import TYPE_CHECKING
+from    bokeh                import layouts
 
-from    control             import Controller
-from    control.taskio      import ConfigTrackIO, GrFilesIO
-
-from    view.plots          import PlotView, CACHE_TYPE
-from    view.plots.tasks    import TaskPlotCreator
-
-from   ._bokehext           import DpxHoverModel
-from   ._model              import CyclesModelAccess, CyclesPlotModel
-from   ._raw                import RawMixin
-from   ._hist               import HistMixin
-from   ._widget             import WidgetMixin
+from    taskcontrol.taskio   import ConfigTrackIO, GrFilesIO
+from    taskview.plots       import PlotView, CACHE_TYPE, TaskPlotCreator
+from   ._bokehext            import DpxHoverModel
+from   ._model               import CyclesModelAccess, CyclesPlotModel
+from   ._raw                 import RawMixin
+from   ._hist                import HistMixin
+from   ._widget              import WidgetMixin
 
 class CyclesPlotCreator( # pylint: disable=too-many-ancestors
         TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # type: ignore
@@ -23,7 +19,7 @@ class CyclesPlotCreator( # pylint: disable=too-many-ancestors
     "Displays cycles and their projection"
     _model: CyclesModelAccess
     _hover: DpxHoverModel
-    def __init__(self, ctrl:Controller) -> None:
+    def __init__(self, ctrl) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl, noerase = False)
         RawMixin   .__init__(self)

@@ -6,12 +6,12 @@ from   functools            import partial
 
 import numpy                as     np
 
-from   model                import Task, Level
-from   control.processor    import Processor
-from   signalfilter         import rawprecision
-from   data.views           import BEADKEY
-from   ..alignment          import (PeakCorrelationAlignment, MinBiasPeakAlignment,
-                                    GELSPeakAlignment)
+from   data.views            import BEADKEY
+from   signalfilter          import rawprecision
+from   taskmodel             import Task, Level
+from   taskcontrol.processor import Processor
+from   ..alignment           import (PeakCorrelationAlignment, MinBiasPeakAlignment,
+                                     GELSPeakAlignment)
 
 class PeakCorrelationAlignmentTask(PeakCorrelationAlignment, Task):
     """

@@ -4,11 +4,11 @@
 from typing                         import Optional
 from functools                      import partial
 
-from utils                          import initdefaults
-from model                          import Task, Level, PHASE
-from control.processor              import Processor
 from data.views                     import selectparent
 from eventdetection.data            import Events, EventDetectionConfig
+from taskcontrol.processor          import Processor
+from taskmodel                      import Task, Level, PHASE
+from utils                          import initdefaults
 from ..probabilities                import Probability
 
 class PeakProbabilityTask(Task):

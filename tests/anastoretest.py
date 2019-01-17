@@ -5,13 +5,12 @@ from   typing           import cast
 import sys
 import numpy
 
-import anastore
+import taskstore as anastore
 import anastore.api
-from anastore._patches  import (modifyclasses, # pylint: disable=protected-access
-                                TPE, DELETE, RESET)
+from anastore           import modifyclasses, TPE, DELETE, RESET
 from testingcore        import path as _utpath, Path
-from model.task.track   import TrackReaderTask, CycleCreatorTask
-from model.task.tagging import TaggingTask
+from taskmodel.track    import TrackReaderTask, CycleCreatorTask
+from taskmodel.tagging  import TaggingTask
 
 BEENTHERE = []
 class _Toto(TaggingTask):

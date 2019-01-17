@@ -4,13 +4,13 @@
 from typing                         import Optional, List, Dict, cast
 import numpy as np
 
-from utils                          import NoArgs, initdefaults
-from model.task                     import RootTask
-from model.plots                    import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
-from control.decentralized          import Indirection
 # pylint: disable=unused-import
-from control.modelaccess                 import TaskPlotModelAccess, TaskAccess
+from control.decentralized               import Indirection
 from eventdetection.processor.__config__ import ExtremumAlignmentTask
+from model.plots                         import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
+from taskcontrol.modelaccess             import TaskPlotModelAccess, TaskAccess
+from taskmodel                           import RootTask
+from utils                               import NoArgs, initdefaults
 from ..beadsubtraction                   import FixedBeadDetection, FixedList
 from ..processor.__config__              import (DataCleaningTask,
                                                  BeadSubtractionTask, ClippingTask)

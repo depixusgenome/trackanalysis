@@ -3,7 +3,7 @@
 """
 Default configurations for each task
 """
-from model.task.application import setupdefaulttask
+from taskmodel.application  import setupdefaulttask
 from .                      import (FitToHairpinTask, FitToReferenceTask,
                                     BeadsByHairpinTask)
 setupdefaulttask(FitToHairpinTask)

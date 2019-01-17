@@ -60,14 +60,14 @@ class _CondaApp(BuildContext):
         for optext, opts in (('', ' -g app '),):
             fname = str(self.options.STARTSCRIPT_PATH.make_node(name+optext+ext))
             with open(fname, 'w', encoding = 'utf-8') as stream:
-                print(cmd + r" app/cmdline.pyc " + val + opts + r' --port random',
+                print(cmd + r" taskapp/cmdline.pyc " + val + opts + r' --port random',
                       file = stream)
 
         if iswin:
             cmd   = 'cd code\r\n'+r'%~dp0\code\python -I '
             fname = str(self.options.STARTSCRIPT_PATH.make_node(name+"_debug"+ext))
             with open(fname, 'w', encoding = 'utf-8') as stream:
-                print(cmd + r" app/cmdline.pyc " + val + r' -g browser --port random',
+                print(cmd + r" taskapp/cmdline.pyc " + val + r' -g browser --port random',
                       file = stream)
                 print(r"pause", file = stream)
 

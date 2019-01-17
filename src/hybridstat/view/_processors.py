@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors for storing gui data"
-from   typing                     import Tuple, List, Optional, Sequence
-from   copy                       import copy
+from   typing                         import Tuple, List, Optional, Sequence
+from   copy                           import copy
 
-from   data                       import BEADKEY
-from   cleaning.processor         import DataCleaningException
-from   control.processor.taskview import TaskViewProcessor
-from   control.modelaccess        import ReplaceProcessors
-from   model.task                 import RootTask
-from   peakfinding.selector       import PeakSelectorDetails
-from   peakfinding.processor      import (PeakSelectorProcessor, PeakSelectorTask,
-                                          PeaksDict, SingleStrandProcessor)
-from   peakcalling.processor      import (FitToReferenceTask, FitToReferenceDict,
-                                          FitToHairpinTask)
+from   data                           import BEADKEY
+from   cleaning.processor             import DataCleaningException
+from   peakfinding.selector           import PeakSelectorDetails
+from   peakfinding.processor          import (PeakSelectorProcessor, PeakSelectorTask,
+                                              PeaksDict, SingleStrandProcessor)
+from   peakcalling.processor          import (FitToReferenceTask, FitToReferenceDict,
+                                              FitToHairpinTask)
+from   taskcontrol.processor.taskview import TaskViewProcessor
+from   taskcontrol.modelaccess        import ReplaceProcessors
+from   taskmodel                      import RootTask
 
 class GuiPeakSelectorDetails(PeakSelectorDetails):
     "gui version of PeakSelectorDetails"

@@ -9,8 +9,8 @@ from    copy        import deepcopy
 from    enum        import Enum
 import  numpy       as     np
 
+from    taskmodel   import levelprop, Level, PHASE, InstrumentType
 from    utils       import initdefaults
-from    model       import levelprop, Level, PHASE, InstrumentType
 from   .views       import Beads, Cycles, BEADKEY, isellipsis, TrackView
 from   .trackio     import opentrack, PATHTYPES
 

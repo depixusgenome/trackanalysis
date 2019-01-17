@@ -1,26 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"all FoV view aspects here"
-from typing                 import Dict, List, Optional, Set
+from typing                   import Dict, List, Optional, Set
 import numpy as np
-from bokeh.layouts          import column as collayout
-from bokeh.models           import (ColumnDataSource, Range1d, TapTool, HoverTool,
-                                    Selection)
-from bokeh.plotting         import Figure
+from bokeh.layouts            import column as collayout
+from bokeh.models             import (ColumnDataSource, Range1d, TapTool, HoverTool,
+                                      Selection)
+from bokeh.plotting           import Figure
 
-from control                import Controller
-from control.action         import Action
-from control.beadscontrol   import DataSelectionBeadController
-from cleaning.processor     import DataCleaningErrorMessage
-from data                   import BEADKEY
-from model.plots            import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
-from qualitycontrol.view    import QualityControlModelAccess
-from signalfilter           import rawprecision
-from utils                  import initdefaults
-from view.colors            import tohex
-from view.plots.tasks       import (TaskPlotCreator, TaskPlotModelAccess,
-                                    TModelType, PlotModelType)
-from view.plots.base        import PlotView, CACHE_TYPE
+from control.action           import Action
+from cleaning.processor       import DataCleaningErrorMessage
+from data                     import BEADKEY
+from model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
+from qualitycontrol.view      import QualityControlModelAccess
+from signalfilter             import rawprecision
+from taskcontrol.beadscontrol import DataSelectionBeadController
+from taskview.plots           import TaskPlotCreator, TaskPlotModelAccess, PlotModelType
+from taskview.plots.tasks     import TModelType
+from utils                    import initdefaults
+from view.colors              import tohex
+from view.plots               import PlotView, CACHE_TYPE
 
 class FoVPlotTheme(PlotTheme):
     "FoV plot theme"
@@ -78,7 +77,7 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
     _beadssource: ColumnDataSource
     _imgsource:   ColumnDataSource
     _calibsource: ColumnDataSource
-    def __init__(self,  ctrl:Controller) -> None:
+    def __init__(self,  ctrl) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
         self._idfov: Optional[int] = None

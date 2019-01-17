@@ -3,8 +3,8 @@
 "Creates a dataframe"
 from   typing                      import Dict
 import numpy  as np
-from   control.processor.dataframe import DataFrameFactory
-from   .data                       import Events, EventsArray
+from   taskcontrol.processor.dataframe import DataFrameFactory
+from   .data                           import Events, EventsArray
 
 @DataFrameFactory.adddoc
 class EventsDataFrameFactory(DataFrameFactory[Events]):

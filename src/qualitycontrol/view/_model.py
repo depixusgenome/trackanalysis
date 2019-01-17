@@ -6,12 +6,12 @@ from   typing                   import List, Dict, Set, Tuple, Iterator
 
 from   data                     import BEADKEY
 from   control.decentralized    import Indirection
-from   control.beadscontrol     import DataSelectionBeadController
 from   cleaning.view            import DataCleaningModelAccess
 from   cleaning.processor       import (DataCleaningProcessor, ClippingProcessor,
                                         ClippingTask)
-from   model.level              import PHASE
 from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
+from   taskmodel                import PHASE
+from   taskcontrol.beadscontrol import DataSelectionBeadController
 from   utils                    import initdefaults
 
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports

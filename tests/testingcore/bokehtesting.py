@@ -379,9 +379,9 @@ class _ManagedServerLoop:
     def savedconfig(self):
         "return the saved config"
         from app.configuration          import ConfigurationIO
-        import anastore
-        path = ConfigurationIO(self.ctrl).configpath(next(anastore.iterversions('config')))
-        return anastore.load(path)
+        import taskstore
+        path = ConfigurationIO(self.ctrl).configpath(next(taskstore.iterversions('config')))
+        return taskstore.load(path)
 
 class BokehAction:
     "All things to make gui testing easy"

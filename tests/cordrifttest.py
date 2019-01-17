@@ -17,8 +17,8 @@ from cordrift.processor         import DriftTask, DriftProcessor
 from simulator                  import TrackSimulator
 from simulator.processor        import TrackSimulatorTask
 from eventdetection.processor   import ExtremumAlignmentTask
-from model.task                 import DataSelectionTask
-from control.taskcontrol        import create
+from taskmodel                  import DataSelectionTask
+from taskcontrol.taskcontrol    import create
 from testingcore                import path as utpath, DummyPool
 
 def test_singlefitstitch():

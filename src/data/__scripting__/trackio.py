@@ -6,14 +6,14 @@ import sys
 from   pathlib                   import Path
 from   typing                    import Optional, Union, Any, Dict, cast
 
-import anastore
-from   model.__scripting__.track import LocalTasks
+import taskstore
+from   taskmodel.__scripting__.track import LocalTasks
 from   ..trackio                 import Handler, _TrackIO # pylint: disable=protected-access
 from   ..trackio                 import PATHTYPES, PATHTYPE, instrumenttype
 from   .track                    import Track
 
 class ScriptAnaIO(_TrackIO):
-    "checks and opens anastore paths"
+    "checks and opens taskstore paths"
     EXT = '.ana'
     @classmethod
     def check(cls, path:PATHTYPES, **_) -> Optional[PATHTYPES]:
@@ -22,7 +22,7 @@ class ScriptAnaIO(_TrackIO):
 
     @staticmethod
     def __open(path):
-        mdl = anastore.load(str(path))['tasks'][0]
+        mdl = taskstore.load(str(path))['tasks'][0]
         cnf = mdl[0].config()
         rep = lambda x: x
         if sys.platform == 'linux':

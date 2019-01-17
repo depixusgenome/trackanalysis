@@ -8,7 +8,7 @@ import numpy                 as     np
 from   xlsxwriter.utility    import xl_col_to_name
 
 import version
-from   anastore              import dumps
+from   taskstore             import dumps
 from   excelreports.creation import column_method, sheet_class
 from ..probabilities         import Probability
 from ._base                  import BEADKEY, PeakOutput, Reporter

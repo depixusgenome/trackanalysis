@@ -12,13 +12,12 @@ from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
 import numpy                    as     np
 
 from peakfinding.histogram      import interpolator
-from sequences.modelaccess      import SequenceAnaIO
-from sequences.view             import SequenceTicker, SequenceHoverMixin
+from tasksequences.modelaccess  import SequenceAnaIO
+from tasksequences.view         import SequenceTicker, SequenceHoverMixin
 from view.colors                import tohex
-from view.plots                 import PlotView, CACHE_TYPE
-from view.plots.base            import themed
-from view.plots.ploterror       import PlotError
-from view.plots.tasks           import TaskPlotCreator
+from taskview.plots             import (
+    PlotError, themed, PlotView, CACHE_TYPE, TaskPlotCreator
+)
 
 from ._model                    import (PeaksPlotModelAccess, PeaksPlotTheme,
                                         PeaksPlotModel, createpeaks)

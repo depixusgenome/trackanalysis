@@ -1,28 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot view for cleaning data"
-from    functools               import partial
-from    typing                  import Dict
-from    bokeh.plotting          import Figure
-from    bokeh.models            import LinearAxis, ColumnDataSource, Range1d
-from    bokeh                   import layouts
+from    functools                   import partial
+from    typing                      import Dict
+from    bokeh.plotting              import Figure
+from    bokeh.models                import LinearAxis, ColumnDataSource, Range1d
+from    bokeh                       import layouts
 
-import  numpy                   as     np
+import  numpy                       as     np
 
-from    utils.array             import repeat
-from    utils.logconfig         import getLogger
-from    view.plots              import PlotView, DpxHoverTool, CACHE_TYPE
-from    view.plots.tasks        import TaskPlotCreator
-from    view.colors             import tohex
-from    view.plots.ploterror    import PlotError
-from    control                 import Controller
+from    utils.array                 import repeat
+from    utils.logconfig             import getLogger
+from    view.colors                 import tohex
+from    taskview.plots              import (
+    PlotError, PlotView, DpxHoverTool, CACHE_TYPE, TaskPlotCreator
+)
 
-from    ._model                 import (DataCleaningModelAccess, CleaningPlotModel,
-                                        CleaningPlotTheme)
-from    ._widget                import WidgetMixin
-from    ..datacleaning          import DataCleaning
-from    ..processor             import (DataCleaningProcessor,
-                                        ClippingProcessor, ClippingTask)
+from    ._model                     import (DataCleaningModelAccess, CleaningPlotModel,
+                                            CleaningPlotTheme)
+from    ._widget                    import WidgetMixin
+from    ..datacleaning              import DataCleaning
+from    ..processor                 import (DataCleaningProcessor,
+                                            ClippingProcessor, ClippingTask)
 LOGS = getLogger(__name__)
 
 class GuiClippingProcessor(ClippingProcessor):
@@ -91,7 +90,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
     _errors:  PlotError
     __source: ColumnDataSource
     __fig:    Figure
-    def __init__(self,  ctrl:Controller) -> None:
+    def __init__(self,  ctrl) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl, noerase = False)
         WidgetMixin.__init__(self, ctrl, self._model)

@@ -4,5 +4,5 @@
 from wafbuilder.modules import Modules, basecontext
 
 BaseContext = basecontext('../build')
-MODULES     = Modules()
+MODULES     = Modules(src = ['core', 'src'])
 __all__     = ['MODULES']

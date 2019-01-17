@@ -10,9 +10,7 @@ from    bokeh          import layouts
 import  numpy                   as     np
 
 from    data.views              import Beads
-from    view.plots              import PlotView, CACHE_TYPE
-from    view.plots.tasks        import TaskPlotCreator
-from    control                 import Controller
+from    taskview.plots          import PlotView, CACHE_TYPE, TaskPlotCreator
 
 from    ._model                 import (RampPlotModel, RampPlotTheme,
                                         RampPlotDisplay, RampTaskPlotModelAccess,
@@ -27,7 +25,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
     _plotmodel:     RampPlotModel
     __src:          Tuple[ColumnDataSource,...]
     __fig:          Figure
-    def __init__(self,  ctrl:Controller) -> None:
+    def __init__(self,  ctrl) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl, noerase = False)
         self.__widgets = RampWidgets(ctrl, self._plotmodel)

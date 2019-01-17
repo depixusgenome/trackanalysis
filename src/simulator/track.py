@@ -10,9 +10,9 @@ from    collections     import OrderedDict
 import  numpy as np
 from    numpy.lib.index_tricks  import as_strided
 
-from    utils           import initdefaults, kwargsdefaults, EVENTS_DTYPE
-from    model           import Level, PHASE
 from    data            import Track, Cycles, TrackView
+from    taskmodel       import Level, PHASE
+from    utils           import initdefaults, kwargsdefaults, EVENTS_DTYPE
 
 class SingleStrandClosing:
     "Closes the strand in phase 4"

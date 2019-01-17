@@ -9,11 +9,11 @@ from   itertools                     import chain
 import numpy                         as     np
 import pandas                        as     pd
 
-from   utils.holoviewing             import hv, ItemsDisplay
-from   model.level                   import PHASE
 from   data.views                    import isellipsis
 from   data.track                    import Secondaries, Track  # pylint: disable=unused-import
 from   data.__scripting__.tracksdict import TracksDict          # pylint: disable=unused-import
+from   taskmodel                     import PHASE
+from   utils.holoviewing             import hv, ItemsDisplay
 from   ..computations                import extensions
 from   .                             import TrackQualityControl as _TQC
 

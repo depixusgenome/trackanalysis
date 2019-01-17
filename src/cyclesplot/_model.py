@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "access to the model"
+from typing                    import Optional, Dict, cast
 
-from typing                   import Optional, Dict, cast
-from utils                    import NoArgs, initdefaults
-from model.task               import RootTask
-from model.task.application   import TasksDisplay
-from model.plots              import PlotTheme, PlotModel, PlotAttrs, PlotDisplay
-from control.modelaccess      import TaskAccess
-from sequences.modelaccess    import SequencePlotModelAccess
+from model.plots               import PlotTheme, PlotModel, PlotAttrs, PlotDisplay
+from taskcontrol.modelaccess   import TaskAccess
+from taskmodel                 import RootTask
+from taskmodel.application     import TasksDisplay
+from tasksequences.modelaccess import SequencePlotModelAccess
+from utils                     import NoArgs, initdefaults
 
 # pylint: disable=unused-import
 from cordrift.__config__                 import DriftTask
