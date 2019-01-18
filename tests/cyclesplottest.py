@@ -3,10 +3,9 @@
 # pylint: disable=redefined-outer-name
 """ Tests cycles views """
 import warnings
-from pytest                     import approx       # pylint: disable=no-name-in-module
-
-from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
-from view.plots                 import DpxKeyedRow
+from pytest                 import approx       # pylint: disable=no-name-in-module
+from testutils.bokehtesting import bokehaction  # pylint: disable=unused-import
+from view.plots             import DpxKeyedRow
 
 def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
     "test cyclesplot basic stuff"

@@ -24,6 +24,7 @@ _utils.DEFAULT   = str(Path(__file__).parent.parent/"wscript")
 
 BaseContext = basecontext('../build')
 MODULES     = Modules(src = ['core', 'src'])
+EXCLUDED    = "tests", "testutils", 'scripting', 'daq'
 
 locals().update(MODULES.simple('../build/').items())
 
@@ -42,7 +43,7 @@ def build(bld, mods = None):
     MODULES.build_static(bld)
     bld.add_group('bokeh', move = False)
     _build(bld) # pylint: disable=no-member
-    findpyext(bld, set(mod for mod in mods if mod != 'tests'))
+    findpyext(bld, list(set(mods)-set(EXCLUDED)))
     bld.recurse(mods, 'build')
 
 def linting(bld):
@@ -64,7 +65,7 @@ def guimake(viewname, locs, scriptname = None):
 
 locals().update(package(
     BaseContext, MODULES, build,
-    excluded      = ('tests', 'scripting', 'daq'),
+    excluded      = EXCLUDED,
     libname       = "trackanalysis",
     resourcepaths = ["makescripts/"+i for i in ("index.gif", "application.desktop")],
     appdir        = "taskapp"

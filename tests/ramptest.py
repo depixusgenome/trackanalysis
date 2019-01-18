@@ -7,7 +7,7 @@ from taskmodel                  import TrackReaderTask
 from ramp.processor             import RampStatsTask
 from ramp.view._widget          import DpxRamp, Slider # pylint: disable=protected-access
 from testingcore                import path
-from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
+from testutils.bokehtesting     import bokehaction  # pylint: disable=unused-import
 
 def test_dataframe():
     "test ramp dataframe"

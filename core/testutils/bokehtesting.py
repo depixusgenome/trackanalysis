@@ -259,8 +259,7 @@ class _ManagedServerLoop:
     @staticmethod
     def path(path: Union[Sequence[str], str]) -> Union[str, Sequence[str]]:
         "returns the path to testing data"
-        from testingcore import path as _testpath
-        return _testpath(path)
+        return __import__("testingcore").path(path)
 
     def cmd(self, fcn, *args, andstop = True, andwaiting = 2., rendered = False, **kwargs):
         "send command to the view"

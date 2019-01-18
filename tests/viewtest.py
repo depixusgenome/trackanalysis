@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
-from testingcore.bokehtesting import bokehaction
+from testutils.bokehtesting   import bokehaction  # pylint: disable=unused-import
+from testingcore              import path as _utpath
 from taskcontrol.beadscontrol import DataSelectionBeadController
 
 def test_toolbar(bokehaction):
@@ -18,7 +19,7 @@ def test_toolbar(bokehaction):
         def _checkpath(name):
             track = curr()
             assert not tbar.frozen
-            assert str(track.path[0]) == server.path(name)
+            assert str(track.path[0]) == _utpath(name)
 
         def _checkopen():
             _checkpath('small_legacy')
@@ -46,7 +47,7 @@ def test_toolbar(bokehaction):
 
         server.load('CTGT_selection', rendered = False)
         assert len(curr().path) == 2
-        assert str(curr().path[1]) == server.path('CTGT_selection')
+        assert str(curr().path[1]) == _utpath('CTGT_selection')
         _checkpath('big_legacy')
 
         _reset()
@@ -54,7 +55,7 @@ def test_toolbar(bokehaction):
         server.load('CTGT_selection/test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.cgr',
                     rendered = False)
         assert len(curr().path) == 2
-        assert str(curr().path[1]) == server.path('CTGT_selection')
+        assert str(curr().path[1]) == _utpath('CTGT_selection')
         _checkpath('big_legacy')
 
         _reset()
@@ -63,7 +64,7 @@ def test_toolbar(bokehaction):
                      'CTGT_selection/Z(t)bd0track10.gr'),
                     rendered = False)
         assert len(curr().path) == 2
-        assert str(curr().path[1]) == server.path('CTGT_selection/Z(t)bd0track10.gr')
+        assert str(curr().path[1]) == _utpath('CTGT_selection/Z(t)bd0track10.gr')
         _checkpath('big_legacy')
 
         server.quit()

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Testing DAQ view"
-from daq.server.simulator      import runfovsimulator
+from daq.server.simulator   import runfovsimulator
+from testutils.bokehtesting import bokehaction  # pylint: disable=unused-import
 
-def test_serverview(bokehaction):
+def test_serverview(bokehaction): # pylint: disable=redefined-outer-name
     "test the view"
     with bokehaction.launch('daq.server.dataview.DAQFoVServerView',
                             'daq.app.default') as server:
@@ -31,5 +32,4 @@ def test_serverview(bokehaction):
         assert len(daq.data.fov.view()) == cnt[0]
 
 if __name__ == '__main__':
-    from testingcore.bokehtesting import bokehaction as _
-    test_serverview(_(None))
+    test_serverview(bokehaction(None))
