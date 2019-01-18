@@ -6,7 +6,7 @@ import numpy as np
 from   numpy.testing            import assert_equal, assert_allclose
 
 from   testingcore              import path as utpath
-from   testutils.bokehtesting   import bokehaction  # pylint: disable=unused-import
+from   testingcore.bokehtesting import bokehaction  # pylint: disable=unused-import
 
 from   cleaning.processor       import (DataCleaningTask, DataCleaningException,
                                         DataCleaningProcessor, BeadSubtractionTask,

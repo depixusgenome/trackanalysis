@@ -13,7 +13,7 @@ from tornado.gen                import sleep
 from tornado.ioloop             import IOLoop
 
 from testingcore                import path as utfilepath
-from testutils.bokehtesting     import bokehaction  # pylint: disable=unused-import
+from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 from view.plots                 import DpxKeyedRow
 
 from peakfinding.reporting.batch         import createmodels as _pmodels

@@ -1,2 +1,0 @@
-require(python = dict(websockets = '4.0.1'))
-make(locals())
