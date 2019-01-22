@@ -1,11 +1,4 @@
-#include<pybind11/pybind11.h>
-#ifndef PYBIND11_HAS_VARIANT
-# define PYBIND11_HAS_VARIANT 0      // remove compile-time warnings
-# define PYBIND11_HAS_EXP_OPTIONAL 0
-# define PYBIND11_HAS_OPTIONAL 0
-#endif
-#include<pybind11/numpy.h>
-#include<pybind11/stl.h>
+#include "utils/pybind11.hpp"
 #include"emutils.h"
 
 /*
@@ -28,7 +21,7 @@ namespace peakfinding{
 	}
 
 	struct 
-#if __GNUC__ == 7 && __GNUC_MINOR__ == 3
+#if (__GNUC__ == 7 && __GNUC_MINOR__ == 3) || (__GNUC__ == 8 && __GNUC_MINOR__ == 2)
     __attribute__ ((visibility("hidden")))
 #endif
     OutputPy

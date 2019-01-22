@@ -1,5 +1,5 @@
 #include <limits>
-#if __GNUC__ == 7 && __GNUC_MINOR__ == 3
+#if (__GNUC__ == 7 && __GNUC_MINOR__ == 3) || (__GNUC__ == 8 && __GNUC_MINOR__ == 2)
 # ifndef __cpp_noexcept_function_type
 #   define __cpp_noexcept_function_type 0
 # endif
@@ -14,7 +14,7 @@
 #include <boost/accumulators/statistics/min.hpp>
 #include <boost/accumulators/statistics/max.hpp>
 #include <boost/math/distributions/chi_squared.hpp>
-#if __GNUC__ == 7 && __GNUC_MINOR__ == 3
+#if (__GNUC__ == 7 && __GNUC_MINOR__ == 3) || (__GNUC__ == 8 && __GNUC_MINOR__ == 2)
 # pragma GCC diagnostic pop
 #endif
 #include "signalfilter/accumulators.hpp"

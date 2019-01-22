@@ -7,6 +7,10 @@
 # undef max
 # undef min
 #endif
+#if (__GNUC__ == 8 && __GNUC_MINOR__ == 2)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wstringop-truncation"
+#endif
 
 #include <regex>
 #include <fstream>

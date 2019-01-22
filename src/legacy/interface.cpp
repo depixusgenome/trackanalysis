@@ -1,8 +1,7 @@
 #include <cstdio>
 #include <fstream>
 #include <algorithm>
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "utils/pybind11.hpp"
 #include "legacy/legacyrecord.h"
 #include "legacy/legacygr.h"
 namespace legacy

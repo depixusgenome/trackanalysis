@@ -11,7 +11,7 @@
 # include <nlopt.hpp>
 # pragma GCC diagnostic pop
 #endif
-#include <pybind11/pybind11.h>
+#include "utils/pybind11.hpp"
 #include "peakcalling/optimize.h"
 
 namespace peakcalling { namespace optimizer

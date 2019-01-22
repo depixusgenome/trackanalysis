@@ -1,5 +1,4 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "utils/pybind11.hpp"
 #include "peakcalling/costfunction.h"
 #include "peakcalling/listmatching.h"
 namespace peakcalling

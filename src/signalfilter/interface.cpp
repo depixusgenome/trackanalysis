@@ -1,6 +1,5 @@
 #include <type_traits>
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "utils/pybind11.hpp"
 #include "signalfilter/signalfilter.h"
 #include "signalfilter/accumulators.hpp"
 namespace

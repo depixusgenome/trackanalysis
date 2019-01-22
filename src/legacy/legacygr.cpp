@@ -3,6 +3,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+#if (__GNUC__ == 8 && __GNUC_MINOR__ == 2)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wstringop-truncation"
+# pragma GCC diagnostic ignored "-Wformat-truncation"
+#endif
 #ifdef _MSC_VER
 # pragma warning( disable : 4996 4244 4267 4305 4800 4477 4653)
 #endif
