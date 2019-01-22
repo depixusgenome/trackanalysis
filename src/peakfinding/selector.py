@@ -146,6 +146,7 @@ class PeakSelector(PrecisionAlg):
     align:      Optional[PeakCorrelationAlignment] = PeakCorrelationAlignment()
     peakalign:  Optional[PeakPostAlignment]        = None
     finder:     PeakFinder                         = ByHistogram()
+    zmeasure:   Optional[str]                      = Histogram.zmeasure
 
     if __doc__:
         __doc__ += "\n    # Default algorithms\n"
@@ -203,7 +204,7 @@ class PeakSelector(PrecisionAlg):
         "return results from precomputed details"
         if dtl is None:
             dtl = PeakSelectorDetails([], [], 0., 1., 0., [], [], []) # type: ignore
-        return dtl.output(self.histogram.zmeasure)
+        return dtl.output(self.zmeasure)
 
     def __call__(self, evts: Input, precision: PRECISION = None) -> PeakListArray:
         return self.details2output(self.detailed(evts, precision))

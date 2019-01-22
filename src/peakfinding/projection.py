@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Finds peak positions using beads as the starting data"
-from typing       import Optional
+from typing       import Optional, Callable
 import numpy as np
 
 from signalfilter import PrecisionAlg
@@ -24,10 +24,11 @@ class PeakProjector(PrecisionAlg):
 
     * `projector`: algorithm for projecting frames onto the z axis.
     """
-    rawfactor = 2.
-    projector = BeadProjection()
-    extractor = EventExtractor()
-    zmeasure  = np.nanmean
+    rawfactor  : float              = 2.
+    projector  : BeadProjection     = BeadProjection()
+    extractor  : EventExtractor     = EventExtractor()
+    zmeasure   : Callable           = np.nanmean
+    peakmeasure: Optional[Callable] = None
 
     @initdefaults(frozenset(locals()) - {'rawfactor'})
     def __init__(self, **_):
@@ -73,7 +74,7 @@ class PeakProjector(PrecisionAlg):
         "return results from precomputed details"
         if dtl is None:
             dtl = PeakSelectorDetails([], [], 0., 1., 0., [], [], []) # type: ignore
-        return dtl.output(self.zmeasure)
+        return dtl.output(self.peakmeasure)
 
     def __call__(self, evts, precision: PRECISION = None) -> PeakListArray:
         return self.details2output(self.detailed(evts, precision))

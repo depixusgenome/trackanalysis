@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Tasks related to peakfinding"
-from typing                         import Optional
+from typing                         import Optional, Iterable
 from functools                      import partial
 
 from data.views                     import selectparent
@@ -42,6 +42,22 @@ class PeakProbabilityProcessor(Processor[PeakProbabilityTask]):
 
         return toframe.withaction(partial(cls._action, minduration, framerate))
 
+    @staticmethod
+    def extractminduration(tasks: Iterable[Task]) -> Optional[float]:
+        "get event min duration from tasks configuration"
+        for i in tasks:
+            if isinstance(i, EventDetectionConfig):
+                return i.events.select.minduration
+
+            proj = getattr(i, 'project', None)
+            if hasattr(proj, 'countthreshold'):
+                return proj.countthreshold
+        return None
+
     def run(self, args):
         "updates frames"
+        cnf = self.config()
+        if cnf.get('minduration', None) is None:
+            cnf['minduration'] = self.extractminduration(args.data.model)
+
         args.apply(partial(self.apply, **self.config()))
