@@ -62,14 +62,15 @@ class PeakBenchmarkJob:
         data: Dict[str, List[np.ndarray]] = {
             _: [] for _ in (
                 'z', 'truez', 'r', 'truer', 't', 'truet', 'config',
-                'run', 'track', 'bead', 'delta', 'clock'
+                'run', 'track', 'bead', 'delta', 'clock', 'peaktype'
             )
         }
 
         for itrk in range(self.ntracks):
             exp, trk = self.track()
             theo     = [
-                np.array(getattr(exp, i)[-2::-1], dtype = 'f4')
+                # add the baseline peak
+                np.insert(np.array(getattr(exp, i)[::-1], dtype = 'f4'), 0, 0.)
                 for i in ('positions', 'onrates', 'offrates')
             ]
 
@@ -91,25 +92,44 @@ class PeakBenchmarkJob:
             self.__copy(data, ids, "z", pks,                                  theo[0])
             self.__copy(data, ids, "t", [i.averageduration for i in probs],   theo[1])
             self.__copy(data, ids, "r", [i.hybridisationrate for i in probs], theo[2])
-            self.__deltas(data, pks, ids, theo[0])
+            self.__deltas(data, ids, theo[0])
+            self.__peaktype(data, theo[0])
 
             data['clock'].append(np.full(sum(len(i) for i in data['z'][-2:]), dur))
             data['config'].append(np.full(sum(len(i) for i in data['z'][-2:]), name))
         self.__ident(data, 'bead', cnt, ibd)
 
     @staticmethod
-    def __deltas(data, pks, ids, theo):
-        deltas        = np.full((len(pks), 3), 1e6, dtype = 'f4')
-        deltas[:,1]   = pks
-        tmp           = ids > 0
-        deltas[tmp,0] = theo[ids[tmp]-1]
-        tmp           = (ids >= 0) & (ids < (len(theo)-1))
-        deltas[tmp,2] = theo[ids[tmp]+1]
-        deltas        = np.nanmin(np.abs(np.diff(deltas, axis = 1)), axis = 1)
+    def __set_deltas(theo, pks, ids):
+        deltas         = np.full((len(pks), 3), 1e6, dtype = 'f4')
+        inds           = ids > 0
+        deltas[inds,0] = theo[ids[inds]-1]
+        inds           = ids >= 0
+        deltas[inds,1] = theo[ids[inds]]
+        inds           = (ids >= 0) & (ids < (len(theo)-1))
+        deltas[inds,2] = theo[ids[inds]+1]
+        deltas                 = np.nanmin(np.abs(np.diff(deltas, axis = 1)), axis = 1)
         deltas[deltas > 1e5]   = np.NaN
         deltas[deltas <= 1e-5] = np.NaN
-        data['delta'].append(deltas)
-        data['delta'].append(np.full(len(data['z'][-1]), np.NaN, dtype = 'f4'))
+        return deltas
+
+    @classmethod
+    def __deltas(cls, data, ids, theo):
+        data['delta'].append(cls.__set_deltas(theo, data['truez'][-2], ids))
+        data['delta'].append(cls.__set_deltas(
+            theo,
+            data['truez'][-1],
+            np.searchsorted(theo, data['truez'][-1])
+        ))
+
+    @classmethod
+    def __peaktype(cls, data, theo):
+        for i in (-2, -1):
+            arr = data['truez'][i]
+            out = np.full(len(arr), 'bind', dtype = '<U4')
+            out[arr == theo[-1]] = 'ss'
+            out[arr == theo[0]]  = 'base'
+            data['peaktype'].append(out)
 
     @staticmethod
     def __copy(data, ids, name, exp, true):
