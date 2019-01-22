@@ -408,6 +408,7 @@ class _SingleStrandBinding:
             inst.bindings[ind] = val
 
 class BeadTruth(NamedTuple):
+    experiment:    'Experiment'
     strandclosing: Optional[StrandClosingTruth]
     events:        Optional[np.ndarray]
     baseline:      Optional[np.ndarray]
@@ -547,9 +548,16 @@ class Experiment(Object):
         """
         rnd    = randstate(seed)
 
-        base   = (self.baseline    (self, rnd)      if callable(self.baseline) else
-                  np.zeros(self.ncycles*self.phases.indexes('length')[0], dtype = 'f4'))
-        drift  = self.thermaldrift(self, base, rnd) if callable(self.baseline) else None
+        base   = (
+            self.baseline    (self, rnd)
+            if callable(self.baseline) else
+            np.zeros(self.ncycles*self.phases.indexes('length')[0], dtype = 'f4')
+        )
+        drift  = (
+            self.thermaldrift(self, base, rnd)
+            if callable(self.thermaldrift) else
+            None
+        )
 
         itms   = [self.bead(..., drift, base, rnd) for i in range(nbeads)]
         itms  += [self.fixedbead(drift, base, rnd) for i in range(nfixed)]
@@ -596,7 +604,7 @@ class Experiment(Object):
         if base is not None:
             bead.ravel()[:] += base
 
-        return BeadTruth(closing, evts, base, drift), bead.ravel()
+        return BeadTruth(self, closing, evts, base, drift), bead.ravel()
 
     def __beadstructure(self, events: Optional[np.ndarray], fixed: bool) -> np.ndarray:
         """
@@ -659,7 +667,7 @@ class ExperimentCreator(Object):
         size       = rnd(self.size)
         bins       = self.bins[1]*scale
         maxv       = min(self.bins[0]-bias, int(size/bins))
-        pos        = []
+        pos        = np.empty(0, 'f4')
         while len(pos) != nbindings:
             pos = np.unique(rndstate.randint(0, maxv, nbindings))
         pos        = np.append(pos, int(size/bins))
