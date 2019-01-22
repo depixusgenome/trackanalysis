@@ -31,11 +31,14 @@ class PeakBenchmarkJob:
     def __init__(self, **_):
         pass
 
-    def run(self, counts, ntracks = 1, nbeads = 1, nthreads = None):
+    def run(self, counts, ntracks = None, nbeads = None, nthreads = None):
         "run experiments"
-        cpy = copy(self)
-        cpy.ntracks = ntracks
-        cpy.nbeads  = nbeads
+        if ntracks or nbeads:
+            cpy         = copy(self)
+            cpy.ntracks = ntracks if ntracks else cpy.ntracks
+            cpy.nbeads  = nbeads  if nbeads  else cpy.nbeads
+        else:
+            cpy = self
 
         if nthreads in (1, 0):
             out = [cpy(i) for i in range(counts)]
