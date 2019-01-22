@@ -55,7 +55,8 @@ class PeakBenchmarkJob:
     def track(self):
         "create a track"
         exp = self.experiment.experiment()
-        trk = Track(**exp.track(self.nbeads))
+        trk = Track()
+        trk.__setstate__(exp.track(self.nbeads))
         return exp, trk
 
     def __call__(self, ident: int):
@@ -68,24 +69,19 @@ class PeakBenchmarkJob:
 
         for itrk in range(self.ntracks):
             exp, trk = self.track()
-            theo     = [
-                # add the baseline peak
-                np.insert(np.array(getattr(exp, i)[::-1], dtype = 'f4'), 0, 0.)
-                for i in ('positions', 'onrates', 'offrates')
-            ]
-
             ntrk     = len(data['z'])
             for ibd in trk.beads.keys():
-                self.__onebead(data, trk, theo, ibd)
+                self.__onebead(data, trk, exp, ibd)
 
             self.__ident(data, 'track', ntrk, itrk)
 
         self.__ident(data, 'run', 0, ident)
         return pd.DataFrame({i: np.concatenate(j) for i, j in data.items()})
 
-    def __onebead(self, data, trk, theo, ibd):
+    def __onebead(self, data, trk, exp, ibd):
         cnt = len(data['z'])
         for name, tasks in self.configurations.items():
+            theo            = self.__theo(exp, trk, ibd)
             dur             = clock()
             ids, pks, probs = self.__run(theo[0], trk, tasks, ibd)
             dur             = clock()-dur
@@ -93,7 +89,7 @@ class PeakBenchmarkJob:
             self.__copy(data, ids, "t", [i.averageduration for i in probs],   theo[1])
             self.__copy(data, ids, "r", [i.hybridisationrate for i in probs], theo[2])
             self.__deltas(data, ids, theo[0])
-            self.__peaktype(data, theo[0])
+            self.__peaktype(data, ids, theo[3])
 
             data['clock'].append(np.full(sum(len(i) for i in data['z'][-2:]), dur))
             data['config'].append(np.full(sum(len(i) for i in data['z'][-2:]), name))
@@ -123,13 +119,11 @@ class PeakBenchmarkJob:
         ))
 
     @classmethod
-    def __peaktype(cls, data, theo):
-        for i in (-2, -1):
-            arr = data['truez'][i]
-            out = np.full(len(arr), 'bind', dtype = '<U4')
-            out[arr == theo[-1]] = 'ss'
-            out[arr == theo[0]]  = 'base'
-            data['peaktype'].append(out)
+    def __peaktype(cls,data,  ids, theo):
+        out           = np.full(len(data['truez'][-2]), 'FP', dtype = '<U4')
+        out[ids >= 0] = theo[ids[ids >= 0]]
+        data['peaktype'].append(out)
+        data['peaktype'].append(np.full(len(data['truez'][-1]), 'FN', dtype = '<U4'))
 
     @staticmethod
     def __copy(data, ids, name, exp, true):
@@ -142,6 +136,27 @@ class PeakBenchmarkJob:
 
         data['true'+name].append(itms)
         data['true'+name].append(true[np.setdiff1d(np.arange(len(true)), ids)])
+
+    @staticmethod
+    def __theo(exp, trk, ibd) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        truth    = trk.truth[ibd].events[:,::-1]
+        rates    = (truth>0).sum(axis = 0)
+        good     = rates>0
+        rates    = rates[good]/truth.shape[0]
+        pos      = np.array([i.position for i in exp.bindings[::-1]])[good]
+
+        factor   = 1./(trk.framerate*truth.shape[0])
+        duration = truth.sum(axis = 0)[good]/rates * factor
+        tpe      = np.array(["bind"]*(truth.shape[1]-1)+["ss"])[good]
+
+        base     = exp.phases[exp.phases.measure] - truth.sum(axis = 1)
+        if any(base > 0):
+            pos      = np.insert(pos,      0, 0)
+            rates    = np.insert(rates,    0, (base>0).sum()/len(base))
+            duration = np.insert(duration, 0, base.sum()/rates[0]*factor)
+            tpe      = np.insert(tpe,      0, "base")
+
+        return pos, duration, rates, tpe
 
     def __run(self, theo, trk, tasks, ibd) -> Tuple[np.ndarray, np.ndarray, List[Probability]]:
         try:
