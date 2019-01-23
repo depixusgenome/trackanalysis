@@ -91,7 +91,7 @@ def save(cls, task: Task):
     "saves the task to the default config"
     cpy = deepcopy(task)
     if getattr(cpy, '__scripting_save__', lambda: True)():
-        name = cls._cnv(cls(task).name)
+        name = getattr(cls, '_cnv')(cls(task).name)
         mdl  = cls.tasksmodel()
         out  = dict(mdl.tasks)
         out[name] = cpy

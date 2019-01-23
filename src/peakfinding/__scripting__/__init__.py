@@ -23,6 +23,7 @@ from utils.decoration                import addto, addproperty, extend
 from ..selector                      import PeakSelectorDetails
 from ..probabilities                 import Probability
 from ..processor.selector            import PeaksDict, PeakListArray
+from ..processor.projection          import PeakProjectorDict
 from ..processor                     import (PeakSelectorTask, PeakCorrelationAlignmentTask,
                                              PeakProbabilityTask)
 
@@ -205,12 +206,11 @@ class Detailed:
 
     def yaxis(self, norm = 'events'):
         "returns the histogram's y-axis"
-        if norm == 'events' and self.frame is not None:
+        val = 1.
+        if norm == 'events' and self.frame is not None and hasattr(self.frame.config, 'histogram'):
             val = 1./self.frame.config.histogram.kernelarray().max()
         elif norm in (1., 'probability') and len(self.histogram):
             val = 1./self.histogram.sum()
-        else:
-            val = 1.
         return self.histogram*val
 
 @addto(PeaksDict)
@@ -221,13 +221,40 @@ def detailed(self, ibead, precision: float = None) -> Union[Iterator[Detailed], 
     if isinstance(ibead, Iterable):
         return iter(self.detailed(i, precision) for i in set(self.keys) & set(ibead))
 
-    prec = self._precision(ibead, precision) # pylint: disable=protected-access
     if isinstance(self.data, PeaksDict):
         if self.actions:
             raise NotImplementedError()
         return self.data.detailed(ibead, precision) # type: ignore
+    prec = self._precision(ibead, precision) # pylint: disable=protected-access
     evts = iter(i for _, i in self.data[ibead,...])
     return Detailed(self, self.config.detailed(evts, prec))
+
+# pylint: disable=function-redefined
+@addto(PeakProjectorDict) # type: ignore
+def detailed(self, ibead, precision: float = None) -> Union[Iterator[Detailed], Detailed]:
+    "detailed output from config"
+    if ibead is Ellipsis:
+        return iter(self.detailed(i, precision) for i in self.keys())
+    if isinstance(ibead, Iterable):
+        return iter(self.detailed(i, precision) for i in set(self.keys) & set(ibead))
+
+    if isinstance(self.data, PeakProjectorDict):
+        if self.actions:
+            raise NotImplementedError()
+        return self.data.detailed(ibead, precision) # type: ignore
+
+    phase = cast(Track, self.track).phase.select
+    return Detailed(
+        self,
+        self.config.detailed(
+            (
+                cast(dict, self.data)[ibead],
+                phase(..., PHASE.measure),
+                phase(..., PHASE.measure+1),
+            ),
+            getattr(self, '_precision')(ibead, precision)
+        )
+    )
 
 class PeaksTracksDictOperator(TracksDictOperator, peaks = TracksDict):
     "Add dataframe method to tracksdict"

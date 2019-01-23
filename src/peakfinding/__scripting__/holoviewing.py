@@ -11,9 +11,10 @@ from   taskmodel.__scripting__   import Tasks
 from   data.__scripting__    import TracksDict # pylint: disable=unused-import
 from   data.__scripting__.holoviewing.trackviews import CycleDisplay as _CycleDisplay
 from   data.__scripting__.holoviewing.tracksdict import TracksDictDisplay
-from   ..probabilities       import Probability
-from   ..processor           import PeaksDict, SingleStrandProcessor, SingleStrandTask
-from   .                     import Detailed, PeaksTracksDictOperator
+from   ..probabilities        import Probability
+from   ..processor            import PeaksDict, SingleStrandProcessor, SingleStrandTask
+from   ..processor.projection import PeakProjectorDict
+from   .                      import Detailed, PeaksTracksDictOperator
 
 displayhook(PeaksDict)
 class PeaksDisplay(_CycleDisplay, display = PeaksDict): # type: ignore
@@ -175,7 +176,22 @@ class PeaksDisplay(_CycleDisplay, display = PeaksDict): # type: ignore
                                        if self._items.isbead(i)})),)
         return None
 
-displayhook(PeaksDict)
+displayhook(PeakProjectorDict)
+class PeakProjectorDictDisplay(PeaksDisplay, display = PeakProjectorDict): # type: ignore
+    """
+    Displays peaks.
+
+    Arguments are:
+
+    * *labels*: if *False*, no labels are added. If *None*, labels are added
+    if 3 or less beads are shown.
+    * *stretch* and *bias* values can be provided manually
+    * *zero* set to *True* will set the x-axis zero to the first peak position.
+    * *eventstyle*, *peakstyle* can be used to set the style
+    of corresponding graph elements.
+    """
+
+displayhook(Detailed)
 class DetailedDisplay(PeaksDisplay, display = Detailed): # type: ignore
     """
     Displays peaks.
