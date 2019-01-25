@@ -3,9 +3,11 @@
 "Processors apply tasks to a data flow"
 from   enum               import Enum
 from   functools          import partial
-from   typing             import Optional, NamedTuple # pylint: disable=unused-import
+from   typing             import Optional, NamedTuple, Tuple
+import warnings
 
 import numpy                 as     np
+from   data                  import Cycles
 from   utils                 import initdefaults
 from   taskmodel             import Task, Level, PHASE
 from   taskcontrol.processor import Processor
@@ -79,8 +81,8 @@ class ExtremumAlignmentTask(Task):
     """
     level      = Level.bead
     window     = 15
-    edge       = 'right' # type: Optional[str]
-    phase      = AlignmentTactic.pull  # type: AlignmentTactic
+    edge: Optional[str]    = 'right'
+    phase: AlignmentTactic = AlignmentTactic.pull
     percentile = 25.
     fiveratio  = .4
     outlier    = .9
@@ -277,6 +279,62 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
         def _apply(frame):
             return frame.withaction(partial(action, kwa))
         return _apply if toframe is None else _apply(toframe)
+
+    def run(self, args):
+        "updates frames"
+        args.apply(self.apply(**self.config()))
+
+class MeasureEndAlignmentTask(Task):
+    "align usng phase 5"
+    level                                    = Level.bead
+    biasphase:    int                        = PHASE.measure
+    biasrange:    int                        = -10
+    discardphase: int                        = PHASE.relax
+    discardrange: int                        = -30
+    percentiles:  Tuple[float, float, float] = (33., 50., 66.)
+    distance:     Optional[float]            = 3.
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
+
+class MeasureEndAlignmentProcessor(Processor[MeasureEndAlignmentTask]):
+    "align usng the end of phase 5 and discard items too far away in phase 7"
+    @staticmethod
+    def _act(tsk, frame, info):
+        cycs = Cycles(track = frame.track, data = {0: info[1]})
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore',
+                                    category = RuntimeWarning,
+                                    message  = '.*slice.*')
+
+            rng  = tsk.biasrange
+            pos  = [np.nanmean(i[rng:]) for _, i in cycs.withphases(tsk.biasphase)]
+            for (_, i), j in zip(cycs.withphases(...), pos):
+                i[:] -= j
+
+            if tsk.distance is None:
+                return info
+
+            rng  = tsk.discardrange
+            pos  = np.array(
+                [np.nanmean(i[rng:]) for _, i in cycs.withphases(tsk.discardphase)],
+                dtype = 'f4'
+            )
+
+        med  = np.nanpercentile(pos, tsk.percentiles)
+        delt = np.minimum(np.abs(med[2]-med[1]), np.abs(med[1]-med[0]))*tsk.distance
+        pos[np.isnan(pos)] = med[0]+delt*2
+        for i in np.nonzero((pos-med[0]) > delt)[0]:
+            cycs.withphases(...)[0, i][:] = np.NaN
+        return info
+
+    @classmethod
+    def apply(cls, toframe = None, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        if toframe is None:
+            return partial(cls.apply, **kwa)
+        return toframe.withaction(partial(cls._act, cls.tasktype(**kwa)))
 
     def run(self, args):
         "updates frames"
