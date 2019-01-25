@@ -17,7 +17,8 @@ from peakfinding.processor      import PeakSelectorTask
 from peakfinding.histogram      import HistogramData
 from peakcalling                import cost, match, Range
 from peakcalling.tohairpin      import (PeakMatching, GaussianProductFit,
-                                        ChiSquareFit, PeakGridFit, EdgePeaksGridFit)
+                                        ChiSquareFit, PeakGridFit, EdgePeaksGridFit,
+                                        PiecesPeakGridFit)
 from peakcalling.toreference    import HistogramFit, ChiSquareHistogramFit, Pivot
 from peakcalling.processor      import (BeadsByHairpinProcessor, BeadsByHairpinTask,
                                         DistanceConstraint, FitToReferenceTask)
@@ -81,6 +82,24 @@ def test_ref_peaksgrid():
     ret  = fit.optimize(arr2)
     ret  = ret[1]*8.8e-4, ret[2]
     assert_allclose(ret, (.96, 0.05), rtol = 5e-4, atol = 5e-4)
+
+def test_ref_piecespeaksgrid():
+    "tests peaks grid with a single read"
+    bias    = Range(0, 60.*8.8e-4, 60.*8.8e-4)
+    top     = PeakGridFit(bias = bias, pivot = Pivot.top)
+    bottom  = PeakGridFit(bias = bias, pivot = Pivot.top)
+    fit     = PiecesPeakGridFit(pieces = [top, bottom])
+    for i in product([.96, 1., 1.04], [-.05, 0., .05], [.1, .05]):
+        arr1 = [np.array([.1, .5,  1.]), np.array([2., 2.25,  3.])]
+        arr2 = [j/i[0]+i[1] for j in arr1]
+        arr1 = [j/8.8e-4 for j in arr1]
+
+        bottom.peaks = arr1[0]
+        top.peaks    = arr1[1]
+        pks          = np.concatenate([arr2[0], arr2[1]-arr2[1][0]+arr2[0][-1]+i[2]])
+        ret = fit.optimize(pks)
+        assert len(ret) == 2
+        assert_allclose([i[0]/8.8e-4]*2, [k[1] for k in ret], rtol=1e-3, atol=1e-3)
 
 def test_ref_peaksgrid_2D():
     "tests peaks grid with a top and a bottom fraction read"
@@ -283,4 +302,4 @@ def test_peakiterator():
     assert_allclose([i for _, i in vals], [0., 1./3.], rtol = 1e-3)
 
 if __name__ == '__main__':
-    test_constrainedhairpincost()
+    test_ref_piecespeaksgrid()
