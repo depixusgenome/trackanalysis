@@ -22,6 +22,13 @@ class HairpinFitter(OptimizationParams):
     pivot      = Pivot.bottom
     strandsize = 0
 
+    def __delayed_init__(self, _):
+        self.peaks = np.asarray(self.peaks, dtype = "f4")
+        for i in ('stretch', 'bias'):
+            val = getattr(self, i)
+            if not isinstance(val, Range):
+                setattr(self, i, Range(**val) if isinstance(val, dict) else Range(*val))
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -114,7 +121,7 @@ class HairpinFitter(OptimizationParams):
             hpdelta = 0
             hpin    = self.peaks
 
-        return delta, peaks, hpdelta, hpin
+        return delta, peaks.astype('f4'), hpdelta, hpin.astype('f4')
 
 class GaussianProductFit(HairpinFitter, GriddedOptimization):
     """
@@ -248,6 +255,11 @@ class PeakGridFit(HairpinFitter):
     """
     window    = 10.
     symmetry  = Symmetry.left
+    bounds    = 10.
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
     def iterate(self, peaks:np.ndarray) -> Iterator[Distance]:
         "computes stretch and bias for potential pairings"
         if len(self.peaks) == 0:
@@ -262,7 +274,12 @@ class PeakGridFit(HairpinFitter):
         args  = rng(self.stretch)+rng(self.bias)
         centr = sum(args[:2])*.5, sum(args[2:])*.5
 
-        itr   = tuple(i for i in _match.PeakIterator(hpin, peaks, *args)) + (centr,)
+        if self.bounds > 0.:
+            itr = tuple(_match.BoundedPeakIterator(hpin, peaks, self.bounds, *args))
+        else:
+            itr = tuple(_match.PeakIterator(hpin, peaks, *args))
+        itr  += (centr,)
+
         chi   = ChiSquare(hpin, peaks, self.window,
                           symmetry     = self.symmetry,
                           singlestrand = self.hassinglestrand)
@@ -278,6 +295,7 @@ class PeakGridFit(HairpinFitter):
               stretch: Union[float, np.ndarray],
               bias:    Union[float, np.ndarray]) -> float:
         "computes the cost value at a given stretch and bias"
+        peaks = np.asarray(peaks, dtype = 'f4')
         if any(isinstance(i, (np.ndarray, Sequence)) for i in  (stretch, bias)):
             fcn = np.frompyfunc(partial(self._cost_function, self.peaks, peaks), 2, 1)
             return fcn(stretch, bias)
@@ -343,6 +361,24 @@ class EdgePeaksGridFit(HairpinFitter):
     symmetry  = Symmetry.left
     def optimize(self, peaks:np.ndarray) -> Distance:
         "computes stretch and bias for potential pairings"
+        if self.pivot in (Pivot.top, Pivot.bottom):
+            delta     = peaks[-1          if self.pivot is Pivot.top else 0]
+            hpdelta   = self.peaks[1][-1] if self.pivot is Pivot.top else self.peaks[0][0]
+
+            cpy       = copy(self)
+            cpy.peaks = [i - hpdelta for i in self.peaks]
+            out       = getattr(cpy, '_optimize')(peaks-delta)
+            return Distance(out[0], out[1], out[2]+(delta-hpdelta/out[1]))
+        return self._optimize(peaks)
+
+    def value(self, peaks:np.ndarray,
+              stretch: Union[float, np.ndarray],
+              bias:    Union[float, np.ndarray]) -> float:
+        "computes the cost value at a given stretch and bias"
+        raise NotImplementedError()
+
+    def _optimize(self, peaks:np.ndarray) -> Distance:
+        "computes stretch and bias for potential pairings"
         rng  = lambda val: ((val.center if val.center else 0.) - val.size,
                             (val.center if val.center else 0.) + val.size)
         bias, stretch = rng(self.bias), rng(self.stretch)
@@ -366,19 +402,6 @@ class EdgePeaksGridFit(HairpinFitter):
         minv = min((self.__chisquare(nref, pks, inds) for inds in product(*itrs)),
                    default = self._defaultdistance())
         return Distance(minv[0], minv[1], -(np.asarray(minv[2])/minv[1]))
-
-    def value(self, peaks:np.ndarray,
-              stretch: Union[float, np.ndarray],
-              bias:    Union[float, np.ndarray]) -> float:
-        "computes the cost value at a given stretch and bias"
-        if any(isinstance(i, (np.ndarray, Sequence)) for i in  (stretch, bias)):
-            fcn = np.frompyfunc(partial(self._cost_function, self.peaks, peaks), 2, 1)
-            return fcn(stretch, np.asarray(bias))
-        return self._cost_function(self.peaks, peaks, stretch, bias)
-
-    def _cost_function(self, left, right, stretch: float, bias: float):
-        return ChiSquare(left, right, self.window, stretch, bias, self.symmetry,
-                         self.hassinglestrand, True).value()[0]
 
     def __selection(self, peaks:Sequence[np.ndarray], inds: Sequence[np.ndarray]):
         return ([i[j[:,0]] for i, j in zip(self.peaks, inds)],
@@ -444,12 +467,17 @@ class PiecesPeakGridFit:
     defaultstretch: float      = OptimizationParams.defaultstretch
     pieces : List[PeakGridFit] = []
     window : float             = 10.
-    stretch: Range             = Range(None, defaultstretch*.1, defaultstretch*.1)
-    bias:    Range             = Range(None, 1e5, 1e5)
+    stretch: Range             = Range(None, 10., 10.)
+    bias:    Range             = Range(None, 3, 3)
+    ordered: bool              = True
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
+
+    def appendpiece(self, **kwa):
+        "adds a fit to the list"
+        self.pieces.append(PeakGridFit(**kwa))
 
     def optimize(self, peaks:np.ndarray) -> List[Distance]:
         "computes stretch and bias for potential pairings"
@@ -457,32 +485,46 @@ class PiecesPeakGridFit:
         dflt: List[Distance]          = [i.defaultdistance(peaks) for i in self.pieces]
         return min(itr, default = dflt, key = lambda x: sum(j[0] for j in x))
 
-    def iterate(
-            self,
-            peaks,
-            stretch: Range = None,
-            bias:    Range = None
-    ) -> Iterator[List[Distance]]:
+    def iterate(self, peaks, **kwa) -> Iterator[List[Distance]]:
         "iterate over stretch & bias options"
         cur = copy(self)
-        for i, j in enumerate(self.pieces):
-            if stretch is not None or bias is not None:
-                j         = copy(j)
-                j.stretch = j.stretch if stretch is None else stretch
-                j.bias    = j.bias if bias is None else bias
+        if self.ordered and len(self.pieces) > 2:
+            raise NotImplementedError()
 
-            if len(cur.pieces) == 1:
+        for i, j in enumerate(self.pieces):
+            if len(kwa):
+                j = copy(j)
+                for _ in kwa.items():
+                    setattr(j, *_)
+
+            if len(self.pieces) == 1:
                 yield from ([dist] for dist in j.iterate(peaks))
-            else:
-                cur.pieces = self.pieces[:i]+self.pieces[i+1:]
-                for dist in j.iterate(peaks):
-                    ids   = matchpeaks(j.peaks, (peaks-dist[2])*dist[1], self.window)
-                    cstrs = (
-                        Range(dist[1], self.stretch[1], self.stretch[2]),
-                        Range(dist[2], self.bias[1],    self.bias[2])
-                    )
-                    for dist2 in cur.iterate(peaks[ids<0], *cstrs):
-                        yield dist2[:i]+[dist]+dist2[i:]
+                continue
+
+            cur.pieces = self.pieces[:i]+self.pieces[i+1:]
+            for dist in j.iterate(peaks):
+                ids = matchpeaks(j.peaks, (peaks-dist[2])*dist[1], self.window) >= 0
+                if not np.any(ids):
+                    continue
+                rem = (
+                    peaks[~ids]                      if not self.ordered else
+                    peaks[np.nonzero(ids)[0][-1]+1:] if i == 0           else
+                    peaks[:np.nonzero(ids)[0][0]]
+                )
+                if len(rem) < 2:
+                    continue
+
+                cstrs = dict(
+                    stretch = Range(dist[1], self.stretch[1], self.stretch[2]),
+                    bias    = Range(dist[2], self.bias[1],    self.bias[2])
+                )
+                t2e  = j.peaks[-1 if i == 0 else 0]/dist[1]+dist[2]
+                for dist2 in cur.iterate(rem, **cstrs):
+                    if self.ordered:
+                        t2e2  = cur.pieces[0].peaks[0 if i == 0 else -1]/dist2[0][1]+dist2[0][2]
+                        if (i == 0 and t2e >= t2e2) or (i == 1 and t2e2 >= t2e):
+                            continue
+                    yield dist2[:i]+[dist]+dist2[i:]
 
     def reconstruct(self, distances: Sequence[Distance]):
         "return the list of theoretical peaks on a single axis"
@@ -493,7 +535,6 @@ class PiecesPeakGridFit:
                 for i, j in zip(self.pieces[1:], distances[1:])
             )
         ]
-
 
 def matchpeaks(ref, peaks, window):
     """"
