@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Finds peak positions using beads as the starting data"
-from typing       import Optional, Callable
+from typing       import Optional, Callable, Union, Tuple
 import numpy as np
 
 from signalfilter import PrecisionAlg
@@ -14,7 +14,12 @@ from .peaksarray  import PeakListArray, EventsArray, PeaksArray
 from ._core       import (BeadProjection, CyclesDigitization, Digitizer,
                           CycleProjectionDzPattern, CycleProjectionWeightPattern,
                           CycleProjection, ProjectionAggregator,
-                          CycleAlignment, EventExtractor)
+                          CycleAlignment, EventExtractor, BeadProjectionData)
+
+INPUTS = Union[
+    Tuple[np.ndarray, np.ndarray, np.ndarray], # bead data, phase starts, phase stops
+    EventsArray
+]
 
 class PeakProjector(PrecisionAlg):
     """
@@ -34,23 +39,15 @@ class PeakProjector(PrecisionAlg):
     def __init__(self, **_):
         super().__init__(**_)
 
-    def detailed(self, evts, precision: PRECISION = None) -> PeakSelectorDetails:
+    def detailed(self, data: INPUTS, precision: PRECISION = None) -> PeakSelectorDetails:
         "returns computation details"
-        if all(getattr(i, 'dtype', None) == 'f4' for i in evts):
-            precision = self.getprecision(precision, evts)
-            ints      = np.array([0]+[len(i) for i in evts]).cumsum()
-            evts      = np.concatenate(evts), ints[:-1], ints[1:]
-        else:
-            assert len(evts) == 3
-            precision = self.getprecision(precision, evts[0])
-
-        proj = self.projector.compute(precision, *evts)
-        evts = [
+        proj, tmp, prec = self.__compute(data, precision)
+        evts            = [
             (
                 np.array([j[0] for j in enumerate(i) if len(j[1][1])], dtype = 'i4'),
                 EventsArray([j for j in i if len(j[1])])
             )
-            for i in self.extractor.events(precision, proj, *evts)
+            for i in self.extractor.events(prec, proj, *tmp)
         ]
 
         return PeakSelectorDetails(
@@ -78,3 +75,31 @@ class PeakProjector(PrecisionAlg):
 
     def __call__(self, evts, precision: PRECISION = None) -> PeakListArray:
         return self.details2output(self.detailed(evts, precision))
+
+    def __compute(
+            self, evts: INPUTS, precision: PRECISION
+    )-> Tuple[BeadProjectionData, Tuple[np.ndarray, np.ndarray, np.ndarray], float]:
+        if all(getattr(i, 'dtype', None) == 'f4' for i in evts):
+            if (
+                    len(evts)
+                    and getattr(evts[0], 'dtype', np.dtype('f4')).names
+                    and 'data' in evts[0].dtype.names
+            ):
+                evts  = [i['data'] for i in evts]
+
+            precision = self.getprecision(precision, evts)
+            data      = [
+                np.concatenate(i).astype('f4') if len(i) else np.empty(0, dtype = 'f4')
+                for i in evts
+            ]
+            ints      = (
+                np.array([0]+[len(i) for i in data], dtype = 'i4')
+                .cumsum(dtype = 'i4')
+            )
+            evts      = np.concatenate(evts), ints[:-1], ints[1:]
+        else:
+            assert len(evts) == 3
+            precision = self.getprecision(precision, evts[0])
+
+        proj = self.projector.compute(precision, *evts)
+        return proj, evts, precision
