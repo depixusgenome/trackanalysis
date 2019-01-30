@@ -254,8 +254,8 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
         if self.__bias:
             meas[self.__bias]    = np.full(len(arr), peaks.params[1], dtype = 'f4')
 
-        ref   = self.__peaks[key]
-        cur   = np.unique(meas['peakposition'])
+        ref   = np.asarray(self.__peaks[key], dtype = 'f4')
+        cur   = np.unique(meas['peakposition']).astype('f4')
         pairs = _match.compute(ref, cur, frame.config.window)
 
         allv  = meas['peakposition']

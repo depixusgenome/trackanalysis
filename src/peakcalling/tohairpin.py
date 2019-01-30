@@ -100,7 +100,6 @@ class HairpinFitter(OptimizationParams):
         raise NotImplementedError()
 
     def _applypivot(self, peaks: np.ndarray) -> Tuple[float, np.ndarray, float, np.ndarray]:
-        peaks = np.asarray(peaks, dtype = 'f4')
         if len(peaks) < 2:
             return 0., [], 0., []
 
@@ -359,8 +358,20 @@ class EdgePeaksGridFit(HairpinFitter):
     """
     window    = 10.
     symmetry  = Symmetry.left
+
+    def __delayed_init__(self, _):
+        self.peaks = [np.asarray(i, dtype = "f4") for i in self.peaks]
+        if len(self.peaks) > 2:
+            raise NotImplementedError()
+
+        for i in ('stretch', 'bias'):
+            val = getattr(self, i)
+            if not isinstance(val, Range):
+                setattr(self, i, Range(**val) if isinstance(val, dict) else Range(*val))
+
     def optimize(self, peaks:np.ndarray) -> Distance:
         "computes stretch and bias for potential pairings"
+        peaks = np.asarray(peaks, dtype = 'f4')
         if self.pivot in (Pivot.top, Pivot.bottom):
             delta     = peaks[-1          if self.pivot is Pivot.top else 0]
             hpdelta   = self.peaks[1][-1] if self.pivot is Pivot.top else self.peaks[0][0]
@@ -383,13 +394,9 @@ class EdgePeaksGridFit(HairpinFitter):
                             (val.center if val.center else 0.) + val.size)
         bias, stretch = rng(self.bias), rng(self.stretch)
 
-
-        if len(self.peaks) > 2:
-            raise NotImplementedError()
-
         extr = [(i[-1]-i[0])/stretch[0]+bias[1] for i in self.peaks]
-        pks  = [np.asarray(peaks[:np.searchsorted(peaks, peaks[0]+extr[0])]),
-                np.asarray(peaks[np.searchsorted(peaks,  peaks[-1]-extr[1]):])
+        pks  = [np.asarray(peaks[:np.searchsorted(peaks, peaks[0]+extr[0])], dtype = 'f4'),
+                np.asarray(peaks[np.searchsorted(peaks,  peaks[-1]-extr[1]):], dtype = 'f4')
                ]
         if any(len(i) < 2 for i in pks):
             return self._defaultdistance()
@@ -548,8 +555,10 @@ def matchpeaks(ref, peaks, window):
     assert tuple(out) == (0, np.iinfo('i4').max, 1, np.iinfo('i4').max)
     ```
     """
-    ids = _match.compute(ref, peaks, window)
-    arr = np.full(len(peaks), np.iinfo('i4').min, dtype = 'i4')
+    ref   = np.asarray(ref,   dtype = 'f4')
+    peaks = np.asarray(peaks, dtype = 'f4')
+    ids   = _match.compute(ref, peaks, window)
+    arr   = np.full(len(peaks), np.iinfo('i4').min, dtype = 'i4')
     arr[ids[:,1]] = ids[:,0]
     return arr
 

@@ -20,8 +20,8 @@ class ChiSquare: # pylint: disable=too-many-instance-attributes
                  symmetry:     Symmetry = Symmetry.both,
                  singlestrand: bool     = False,
                  convert:      bool     = False) -> None:
-        self.ref          = ref
-        self.exp          = exp
+        self.ref          = np.asarray(ref, dtype = 'f4')
+        self.exp          = np.asarray(exp, dtype = 'f4')
         self.window       = window
         self.stretch      = stretch
         self.bias         = -bias*stretch if convert else bias

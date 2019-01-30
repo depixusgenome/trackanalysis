@@ -88,7 +88,7 @@ def test_ref_piecespeaksgrid():
     bias    = Range(0, 60.*8.8e-4, 60.*8.8e-4)
     top     = PeakGridFit(bias = bias, pivot = Pivot.top)
     bottom  = PeakGridFit(bias = bias, pivot = Pivot.top)
-    fit     = PiecesPeakGridFit(pieces = [top, bottom])
+    fit     = PiecesPeakGridFit(pieces = [top, bottom], ordered = False)
     for i in product([.96, 1., 1.04], [-.05, 0., .05], [.1, .05]):
         arr1 = [np.array([.1, .5,  1.]), np.array([2., 2.25,  3.])]
         arr2 = [j/i[0]+i[1] for j in arr1]
@@ -106,7 +106,7 @@ def test_ref_peaksgrid_2D():
     bias = Range(0, 60.*8.8e-4, 60.*8.8e-4)
     fit  = EdgePeaksGridFit(firstpeak = True, lastpeak = True, bias = bias)
     for i in product([.96, 1., 1.04], [-.05, 0., .05]):
-        seq  = np.array([.01, .02,  .035, .7, .85, .95])
+        seq  = np.array([.01, .02,  .035, .7, .85, .95], dtype = 'f4')
         arr2 = seq/i[0]+i[1]
         fit.peaks = [seq[:3]/ 8.8e-4, (seq[3:]-.5)/ 8.8e-4]
         ret  = fit.optimize(arr2)
@@ -152,9 +152,9 @@ def test_toref_controller():
 
 def test_cost_value():
     u"Tests peakcalling.cost.compute"
-    bead1 = np.arange(10)
-    bead2 = np.arange(10)+10.
-    bead3 = np.arange(10)*.5+5.
+    bead1 = np.arange(10, dtype = 'f4')
+    bead2 = np.arange(10, dtype = 'f4')+10.
+    bead3 = np.arange(10, dtype = 'f4')*.5+5.
     truth = approx((0., 0., 0.))
     for sym in (False, True):
         assert cost.compute(bead1, bead1, sym, .01, 1., 0.)   == truth
