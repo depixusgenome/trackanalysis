@@ -68,6 +68,8 @@ The following alphabet is recognized, allowing for more complex expressions:
 * u: t
 * n or x or .: any
 * !: allows setting the blocking position to the next base, as explained bellow.
+* +: can be set in front of an oligo to select bindings on the forward strand only.
+* -: can be set in front of an oligo to select bindings on the backward strand only.
 
 Structural Blockings
 ^^^^^^^^^^^^^^^^^^^^

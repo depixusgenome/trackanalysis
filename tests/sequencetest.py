@@ -6,10 +6,30 @@ from sequences import peaks, overlap, splitoligos, Translator
 def test_peaks():
     "tests peaks"
     seq = "atcgATATATgtcgCCCaaGGG"
+    res = peaks(seq, ('+ATAT', 'CCC'))
+    assert len(res) == 4
+    assert all(a == b for a, b in zip(res['position'],    [8, 10, 17, 22]))
+    assert all(a == b for a, b in zip(res['orientation'], [True]*3+[False]))
+
+    res = peaks(seq, ('-ATAT', 'CCC'))
+    assert len(res) == 4
+    assert all(a == b for a, b in zip(res['position'],    [8, 10, 17, 22]))
+    assert all(a == b for a, b in zip(res['orientation'], [False]*2+[True, False]))
+
     res = peaks(seq, ('ATAT', 'CCC'))
     assert len(res) == 4
     assert all(a == b for a, b in zip(res['position'],    [8, 10, 17, 22]))
     assert all(a == b for a, b in zip(res['orientation'], [True]*3+[False]))
+
+    res = peaks(seq, ('ATAT', '+CCC'))
+    assert len(res) == 3
+    assert all(a == b for a, b in zip(res['position'],    [8, 10, 17]))
+    assert all(a == b for a, b in zip(res['orientation'], [True]*3))
+
+    res = peaks(seq, ('ATAT', '-CCC'))
+    assert len(res) == 3
+    assert all(a == b for a, b in zip(res['position'],    [8, 10, 22]))
+    assert all(a == b for a, b in zip(res['orientation'], [True]*2+[False]))
 
     res = peaks(seq, 'ATAT')
     assert len(res) == 2

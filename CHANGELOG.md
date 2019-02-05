@@ -1,4 +1,13 @@
 # CycleApp
+## cycles_v6.6
+
+* 2019-02-05 15:58:19 +0100  (tag: cycles_v6.6)
+
+### Oligos
+
+Bindings on the forward (backward) strand can be selected on an oligo basis by
+prefixing the oligo with + (-).
+
 ## cycles_v6.5
 
 * 2018-12-21 11:58:19 +0100  (tag: cycles_v6.5)
