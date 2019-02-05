@@ -99,6 +99,14 @@ def test_splits():
     assert splitoligos('AtG;ttt') == ['atg', 'ttt']
     assert splitoligos('AtG;ttt;') == ['atg', 'ttt']
     assert splitoligos('AtG;ttwt;') == ['atg', 'ttwt']
+    assert splitoligos('-AtG;ttwt;') == ['-atg', 'ttwt']
+    assert splitoligos('+AtG;ttwt;') == ['+atg', 'ttwt']
+    assert splitoligos('AtG;-ttwt;') == ['-ttwt', 'atg']
+    assert splitoligos('AtG;+ttwt;') == ['+ttwt', 'atg']
+    assert splitoligos('+AtG') == ['+atg']
+    assert splitoligos(':-AtG;') == ['-atg']
+    assert splitoligos('-AtG') == ['-atg']
+    assert splitoligos(':+AtG;') == ['+atg']
 
 if __name__ == '__main__':
-    test_peaks()
+    test_splits()
