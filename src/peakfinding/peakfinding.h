@@ -5,8 +5,8 @@ namespace peakfinding
 {
     struct HistogramPeakFinder
     {
-        float peakwidth = .8;
-        float threshold = .05;
+        float peakwidth = .8f;
+        float threshold = .05f;
         std::vector<float> compute(float, float, float, size_t, float const *) const;
     };
 }

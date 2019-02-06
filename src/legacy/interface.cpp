@@ -120,7 +120,7 @@ namespace legacy
         auto calibpos = rec.pos();
         for(size_t ibead = size_t(0), ebead = rec.nbeads(); ibead < ebead; ++ibead)
             if((notall == false || !rec.islost(int(ibead)))
-                && (calibpos.find(ibead) != calibpos.end()))
+                && (calibpos.find((int) ibead) != calibpos.end()))
                 add(ibead, [&]() { return rec.bead(ibead, axis); });
 
         add("t",    [&]() { return rec.t(); });

@@ -132,7 +132,7 @@ namespace {
         if(!_init)
         {
             for(size_t i = 0u; i < _nexp; ++i)
-                const_cast<float*>(_expvdata)[i] = std::exp(-i*i/(_expratio*_expratio*2));
+                const_cast<float*>(_expvdata)[i] = std::exp(-float(i*i)/(_expratio*_expratio*2));
             _expvdata[_nexp] = 0.0f;
             _init            = true;
         }
@@ -150,8 +150,8 @@ namespace {
     {
         _expinit();
         std::vector<float> out  (weights.size());
-        long               hsz  (cnf.tsmoothinglen/2u);
-        float              ebin (_rnd(data, cnf.tsmoothingratio)/(1<<data.oversampling));
+        long               hsz  ((long) (cnf.tsmoothinglen/2u));
+        float              ebin (_rnd(data, cnf.tsmoothingratio)/float(1<<data.oversampling));
         for(long i = 0u, ie  = (long) data.digits.size(); i < ie; ++i)
         {
             if(data.digits[i] < 0l)
@@ -178,15 +178,15 @@ namespace {
         return out;
     }
 
-    void _smoothing(size_t size, float delta, std::vector<float> & data)
+    void _smoothing(size_t size, long delta, std::vector<float> & data)
     {
-        if(delta <= 0.0f)
+        if(delta <= 0l)
             return;
 
         std::vector<float> expv(size+1);
         float norm = 0.0f;
         for(long i = 0l, ie = long(size); i < ie; ++i)
-            norm += (expv[i] = std::exp(-i*i/(delta*delta*2)));
+            norm += (expv[i] = std::exp(-float(i*i)/float(delta*delta*2l)));
         for(long i = 0l, ie = long(size); i < ie; ++i)
             expv[i] /= norm;
 

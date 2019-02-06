@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "peakcalling/peakiterator.h"
 
 namespace peakcalling { namespace match {
@@ -10,7 +11,7 @@ bool _next(T1 & self, T2 && fcn, size_t *inds, float *params)
     while(!good && self.i2r < self.nref)
     {
         stretch = (self.ref[self.i2r] - self.ref[self.i1r])/(self.exp[self.i2e]-self.exp[self.i1e]);
-        bias    = self.exp[self.i1e]  - self.ref[self.i1r]/(stretch != 0.0f ? stretch : 1e-7);
+        bias    = self.exp[self.i1e]  - self.ref[self.i1r]/(stretch != 0.0f ? stretch : 1e-7f);
         good    = fcn(stretch, bias);
 
         if(inds != nullptr)
