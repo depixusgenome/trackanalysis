@@ -1,7 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Runs an app"
-from time            import time
+from   time    import time
+from   pathlib import Path
+import sys
+import glob
+
+def _add_sys_paths():
+    paths = (str(Path(__file__).parent.parent.resolve()),)+tuple(glob.glob("*.pyz"))
+    for path in paths:
+        if path not in sys.path:
+            sys.path.append(path)
+_add_sys_paths()
+# pylint: disable=wrong-import-position
 from app.cmdline     import defaultclick, defaultmain, click, WARNINGS, INITIAL_ORDERS
 from utils.logconfig import getLogger
 LOGS = getLogger()
