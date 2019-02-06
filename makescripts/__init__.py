@@ -32,8 +32,8 @@ def configure(cnf):
     "configure wafbuilder"
     cnf.load('msvs')
     cnf.find_program("sphinx-build", var="SPHINX_BUILD", mandatory=False)
-    cnf.env.append_unique('INCLUDES',  ['../../core'])
     MODULES.run_configure(cnf)
+    cnf.env.append_unique('INCLUDES',  ['../../core'])
 
 def build(bld, mods = None):
     "compile sources"
