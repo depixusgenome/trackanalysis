@@ -25,6 +25,15 @@ namespace peakfinding { namespace projection {
         std::vector<int> digits;
     };
 
+    /* Digitize data.
+     *
+     * Values become:
+     *
+     *                                                   (x-minedge)
+     *  for minedge ≤ x < maxedge:      ix =  _____________________________________
+     *                                          (maxedge-minedge)*nbins*2^oversampling                            
+     *  for x < minedge or x ≥ maxedge: ix = -1
+     */
     struct Digitizer
     {
         size_t oversampling;
@@ -36,25 +45,34 @@ namespace peakfinding { namespace projection {
         DigitizedData compute(size_t, float const *) const;
     };
 
+    /* Configure a digitizer such that the bin size, notwithstanding oversampling,
+     * is *precision* beyond the HF noise in the data.
+     */
     struct CyclesDigitization
     {
         size_t oversampling = 5;
+
+        /* ratio to apply to the provided HF noise*/
         float  precision    = 1.0f/3.0f;
+
+        /* percentile value for finding the min edge */
         float  minv         = 1.0f;
+        /* percentile value for finding the max edge */
         float  maxv         = 99.0f;
+
+        /* factor to apply to the provided HF noise guiding the edge extension */
         float  overshoot    = 5.0f;
         Digitizer compute (float, cycles_t const &) const;
     };
 
+    /* Projects *digitized* data from a single cycle to a histogram with
+     * normalized peak heights.
+     *
+     * Normalized peak heights means that a hybridization duration don't affect
+     * the peak heights too much.
+     */
     struct CycleProjection
     {
-        /*
-         *  Projects *digitized* data from a single cycle to a histogram with
-         *  normalized peak heights.
-         *
-         *  Normalized peak heights means that a hybridization duration don't affect
-         *  the peak heights too much.
-         */
         enum struct DzPattern     { symmetric1 };
         enum struct WeightPattern { ones, inv };
 
@@ -77,6 +95,13 @@ namespace peakfinding { namespace projection {
         std::vector<std::vector<float>> compute(Digitizer const &, cycles_t const &) const;
     };
 
+    /* Projects cycle histograms to a single histogram representing
+     * hybridisation rates as a function of z.
+     *
+     * The cycle histograms are projected using the provided z-bias.
+     * Output values are normalized to the number of cycles with non-zero values
+     * at the same height.
+     */
     struct ProjectionAggregator
     {
         float               cycleminvalue       = 0.0f;
@@ -92,6 +117,11 @@ namespace peakfinding { namespace projection {
                                    ) const;
     };
 
+    /* Align cycles by maximizing the correlation between a consensus histogram and
+     * cycle histograms.
+     *
+     * The maximum is found using a simple grid search.
+     */
     struct CycleAlignment
     {
         float  halfwindow = 5.0f;

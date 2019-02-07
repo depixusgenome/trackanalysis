@@ -73,6 +73,8 @@ namespace {
         return hist;
     }
 
+    /* Map a function to a moving sum of along a histogram.
+     */
     template <typename T>
     std::vector<float> _toweights(CycleProjection const &  cnf,
                                   DigitizedData   const &  data,
@@ -83,28 +85,32 @@ namespace {
         size_t size  = (size_t) _rnd(data, cnf.countratio);
 
         std::vector<float> weights(nbins);
-        if(size == 0)
+        if(size == 0)                   /* no summing of multiple indexes */
         {
             for(size_t i = 0u; i < nbins; ++i)
                 if(hist[i] >= cnf.countthreshold)
                     weights[i] = fcn(hist[i]);
-        } else if(2*size+1 >= nbins)
+        } else if(2*size+1 >= nbins)    /* summing *all* indexes */
         {
             float  rng = (cnf.countthreshold*hist.size())/float(2u*size+1u);
             size_t sum = std::accumulate(hist.begin(), hist.end(), size_t(0));
             weights.assign(weights.size(), sum >= rng ? 1.0f : 0.f);
-        } else
+        } else                          /* moving sum of indexes */
         {
             size_t sum = std::accumulate(hist.begin(), hist.begin()+(size-1u), size_t(0));
             size_t i   = 0u;
             size_t ie  = size >= nbins ? 0u : nbins-size-1u;
             float  rng = cnf.countthreshold/float(2u*size+1u);
+
+            /* moving sum: lower edge */
             for(; i < ie && i < size; ++i)
             {
                 sum += hist[i+size];
                 if(float(sum) >= (i+size)*rng)
                     weights[i] = fcn(sum);
             }
+
+            /* moving sum: middle */
             for(; i < ie; ++i)
             {
                 sum += hist[i+size];
@@ -112,6 +118,8 @@ namespace {
                     weights[i] = fcn(sum);
                 sum -= hist[i-size];
             }
+
+            /* moving sum: higher edge */
             for(; i < nbins; ++i)
             {
                 if(float(sum) >= (nbins-i+size)*rng)
@@ -122,33 +130,42 @@ namespace {
         return weights;
     }
 
-    static size_t  const _expratio = 20u;
-    static long    const _nexp     = 120l;
-    static bool          _init     = false;
-    static float         _expvdata[_nexp+1u];
+    static size_t  const _gaussianratio = 20u;
+    static long    const _nexp          = 120l;
+    static bool          _init          = false;
+    static float         _gaussianvdata[_nexp+1u];
 
-    void _expinit()
+    void _gaussianinit()
     {
         if(!_init)
         {
             for(size_t i = 0u; i < _nexp; ++i)
-                const_cast<float*>(_expvdata)[i] = std::exp(-float(i*i)/(_expratio*_expratio*2));
-            _expvdata[_nexp] = 0.0f;
+                const_cast<float*>(_gaussianvdata)[i] = 
+                    std::exp(-float(i*i)/(_gaussianratio*_gaussianratio*2));
+            _gaussianvdata[_nexp] = 0.0f;
             _init            = true;
         }
     }
 
-    float _exp(float val)
+    float _gaussian(float val)
     {
-        auto iwgt = std::lround(std::abs(val)*_expratio);
-        return _expvdata[std::max(0l, std::min(_nexp, iwgt))];
+        auto iwgt = std::lround(std::abs(val)*_gaussianratio);
+        return _gaussianvdata[std::max(0l, std::min(_nexp, iwgt))];
     }
 
+    /* Smooth weights according to their proximity in time (data index) and z (data values).
+     * The formula is:
+     *
+     *                 Sum_{T-δt, T+δt} (weights(t) * gaussian(data(T)-data(t)))
+     *  w_new(T) =     _______________________________________________________
+     *                  
+     *                          Sum_{T-δt, T+δt} (gaussian(data(T)-data(t)))
+     */
     std::vector<float> _tsmoothing(CycleProjection const & cnf,
                                    DigitizedData   const & data,
-                                   std::vector<float>     & weights)
+                                   std::vector<float>    & weights)
     {
-        _expinit();
+        _gaussianinit();
         std::vector<float> out  (weights.size());
         long               hsz  ((long) (cnf.tsmoothinglen/2u));
         float              ebin (_rnd(data, cnf.tsmoothingratio)/float(1<<data.oversampling));
@@ -165,7 +182,7 @@ namespace {
                 if(data.digits[ind] < 0l)
                     continue;
 
-                auto wgt  = _exp((data.digits[ind]-data.digits[i])*ebin);
+                auto wgt  = _gaussian((data.digits[ind]-data.digits[i])*ebin);
 
                 assert(data.digits[ind]>>data.oversampling < weights.size());
                 sum      += wgt * weights[data.digits[ind]>>data.oversampling];
@@ -178,6 +195,14 @@ namespace {
         return out;
     }
 
+    /* Smoothes data according to their in z (data index).
+     * The formula is:
+     *
+     *                 Sum_{T-δt, T+δt} (data(t) * gaussian((T-t)/delta))
+     *  d_new(T) =     _______________________________________________________
+     *                  
+     *                          Sum_{T-δt, T+δt} (gaussian((T-t)/delta))
+     */
     void _smoothing(size_t size, long delta, std::vector<float> & data)
     {
         if(delta <= 0l)
@@ -295,26 +320,37 @@ std::vector<float> CycleProjection::compute(DigitizedData const & data) const
     if(data.nbins == 0u || data.digits.size() == 0u)
         return std::vector<float>(data.nbins, 1.0f);
 
-    std::vector<size_t> hist;
+    std::vector<size_t> hist; // Histogram of values
     if(dzratio > 0.0f)
+        /* Histogram of values selected such that the derivative is
+         * below a given threshold
+         */
         switch(dzpattern)
         {
             case DzPattern::symmetric1:
+                /* derivative is: (X(n+1)+X(n-1))/2 - X(n)
+                 * where values i such that X(i) == -1 are silently ignored.
+                 */
                 hist = _apply<_Symm1Iterator>(*this, data);
                 break;
             default:
                 assert(false);
         }
     else
+        /* Histogram of *all* values */
         hist = _apply<_DummyIterator>(*this, data);
 
     std::vector<float> weights;
     switch(weightpattern)
     {
         case WeightPattern::ones:
+            /* Apply a moving sum to the histogram */
             weights = _toweights(*this, data, std::move(hist), [](auto) { return 1.0f; });
             break;
         case WeightPattern::inv:
+            /* Normalize histogram values using a moving sum.
+             * Maxima should all be reduced to 1.
+             */
             weights = _toweights(*this, data, std::move(hist), [](auto x){ return 1.0f/x; });
             break;
         default:
@@ -322,6 +358,7 @@ std::vector<float> CycleProjection::compute(DigitizedData const & data) const
     }
 
     if(tsmoothingratio > 0.0f)
+        /* Smooth the weights using proximate value both in time and z */
         return _tsmoothing(*this, data, weights);
     return weights;
 }
@@ -357,9 +394,13 @@ std::vector<float> ProjectionAggregator::compute(Digitizer                  cons
     std::vector<float> out(data[0], data[0]+project.nbins);
     std::vector<float> cnt(project.nbins);
     int                sz = (int) cnt.size();
+
+
+    /* Compute 2 histograms, sum and number of hits, using cycle histograms, each
+     * with it's own bias.
+     */
     for(int j = delta[0] < 0 ? -delta[0] : 0, ie = delta[0] < 0 ? sz : sz-delta[0]; j < ie; ++j)
         cnt[j] = out[j+delta[0]] > cycleminvalue ? 1.0f : 0.0f;
-
     for(size_t i = 1u, ie = data.size(); i < ie; ++i)
     {
         auto cur = data[i];
@@ -372,9 +413,16 @@ std::vector<float> ProjectionAggregator::compute(Digitizer                  cons
             }
     }
 
+    /* smooth the number of hits using a gaussian kernel */
     _smoothing(smoothinglen, _rnd(project, countsmoothingratio), cnt);
+
+    /* normalize the sums using hits: we'll now have a estimation of
+     * hybridisation rates
+     */
     for(size_t j = 0u, je = cnt.size(); j < je; ++j)
         out[j] = cnt[j] > cyclemincount ? out[j]/cnt[j] : 0.0f;
+
+    /* smooth the hybridization rates using a gaussian kernel */
     _smoothing(smoothinglen, _rnd(project, zsmoothingratio), out);
     return out;
 }
