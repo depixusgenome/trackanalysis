@@ -14,7 +14,7 @@ from model.plots         import PlotState
 from qualitycontrol.view import QualityControlView
 from utils               import dataclass
 from view.base           import BokehView
-from view.tabs           import TabsView, TabsTheme, initsubclass
+from taskview.tabs       import TabsView, TabsTheme, initsubclass
 
 from ._io                import setupio
 from .peaksplot          import PeaksPlotView

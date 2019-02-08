@@ -6,7 +6,7 @@ from typing                 import Set, Dict
 from control.decentralized  import Indirection
 from fov                    import BaseFoVPlotCreator, FoVPlotModel
 from view.plots             import PlotView
-from view.tabs              import TabsView, TabsTheme, initsubclass
+from taskview.tabs          import TabsView, TabsTheme, initsubclass
 from ._plot                 import RampPlotView
 from ._model                import RampTaskPlotModelAccess, RampPlotDisplay
 

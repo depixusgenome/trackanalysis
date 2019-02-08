@@ -8,14 +8,18 @@ from    taskmodel.application   import TaskIOTheme
 from    view.plots.base         import (
     CACHE_TYPE, themed, checksizes, GroupStateDescriptor, PlotAttrsView,
     PlotThemeView, PlotUpdater, AxisOberver, PlotCreator as _PlotCreator,
-    PlotView, PlotModelType, ControlModel, ControlModelType
+    PlotView as _PlotView, PlotModelType, ControlModel, ControlModelType
 )
 
-ModelType = TypeVar('ModelType',        bound = PlotModelAccess)
+ModelType = TypeVar('ModelType', bound = PlotModelAccess)
 ControlModel.register(PlotModelAccess)
 
 class PlotCreator(_PlotCreator[ControlModelType, PlotModelType]):
     "Base plotter class"
+
+PlotType  = TypeVar('PlotType',  bound = PlotCreator)
+class PlotView(_PlotView[PlotType]):
+    "plot view"
     def _ismain(self, ctrl, tasks = None, ioopen = None, iosave = None):
         "Set-up things if this view is the main one"
         self._plotter.ismain(ctrl)
