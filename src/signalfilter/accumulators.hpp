@@ -18,6 +18,7 @@
 # ifndef __clang__
 #  pragma GCC diagnostic ignored "-Wmisleading-indentation"
 #  pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#  pragma GCC diagnostic ignored "-Wparentheses"
 # endif
 #endif
 #include <boost/accumulators/statistics/rolling_mean.hpp>

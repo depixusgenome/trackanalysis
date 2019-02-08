@@ -8,6 +8,7 @@
 #   define __NVCC__ 0
 # endif
 # pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
+# pragma GCC diagnostic ignored "-Wparentheses"
 #endif
 #include <boost/accumulators/statistics/rolling_variance.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
