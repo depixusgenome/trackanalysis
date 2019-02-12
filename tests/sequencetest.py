@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "All sequences-related stuff"
+from numpy.testing import assert_allclose
 from sequences import peaks, overlap, splitoligos, Translator
+from sequences.meltingtime import StateMatrixComputer
 
 def test_peaks():
     "tests peaks"
@@ -56,7 +58,6 @@ def test_peaks():
     res = tuple(tuple(i) for i in peaks(seq, 't!a!tt')) == ((6, False), (7, False))
     res = tuple(tuple(i) for i in peaks(seq, 'a!t!aa')) == ((5, True), (6, True))
 
-
 def test_overlap():
     "tests overlaps"
     assert  not overlap('ATAT', '')
@@ -108,5 +109,15 @@ def test_splits():
     assert splitoligos('-AtG') == ['-atg']
     assert splitoligos(':+AtG;') == ['+atg']
 
+def test_mt():
+    "test melting times"
+    cnf = StateMatrixComputer()
+    cnf.setmode("fork")
+    assert_allclose(
+        cnf("TATA", "ATAT"),
+        [1.276847256e-05, 78317.9033, 0.10428532, -0.2863544, -90.25861],
+        atol = 5e-4, rtol = 5e-4
+    )
+
 if __name__ == '__main__':
-    test_splits()
+    test_mt()
