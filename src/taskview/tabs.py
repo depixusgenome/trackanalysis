@@ -18,9 +18,7 @@ class TabsView(_TView[TThemeType]):
     def ismain(self, ctrl):
         "Allows setting-up stuff only when the view is the main one"
         for i in self.TASKS_CLASSES:
-            print(i, self.__select(i))
             self.__select(i).ismain(ctrl)
-        print("------------>", self, self.TASKS)
         ctrl.theme.updatedefaults("tasks.io", tasks = self.TASKS)
         super().ismain(ctrl)
 

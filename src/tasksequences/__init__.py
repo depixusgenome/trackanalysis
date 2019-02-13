@@ -9,5 +9,5 @@ import  re
 import  numpy       as np
 from    sequences   import (
     read, PEAKS_DTYPE, PEAKS_TYPE, Translator, peaks, splitoligos,
-    marksequence, markedoligos, overlap, NonLinearities, LNAHairpin, Strand
+    marksequence, markedoligos, overlap, Strand
 )
