@@ -4,7 +4,6 @@ u"Signal Analysis: filters for removing noise"
 # pylint: disable=no-name-in-module,import-error
 from typing     import Union
 #from functools  import wraps
-from pandas     import Series
 from ._core     import ForwardBackwardFilter, NonLinearFilter # pylint: disable=import-error
 
 class RollingFilter:
@@ -15,7 +14,7 @@ class RollingFilter:
         self.mode   = mode
 
     def __call__(self, data):
-        series = Series(data).rolling(self.window, center = True)
+        series = __import__('pandas').Series(data).rolling(self.window, center = True)
         imin   = self.window//2 + (self.window % 2)
         imax   = -self.window//2
 

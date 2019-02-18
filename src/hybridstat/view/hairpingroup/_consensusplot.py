@@ -22,17 +22,17 @@ class ConsensusHistPlotCreator(
 ):
     "Creates hist for a consensus bead"
     _model: ConsensusModelAccess
-    def _createpeaks(self, dtls, data):
-        peaks, allpks, factor = self._model.consensuspeaks(dtls)
+    def _createpeaks(self, itms, out):
+        peaks, allpks, factor = self._model.consensuspeaks(itms)
         colors = [tohex(themed(self._model.themename, self._theme.pkcolors)[i])
                   for i in ('found', 'missing')]
-        if dtls is not None:
-            dtls.histogram /= factor
+        if itms is not None:
+            itms.histogram /= factor
         peaks['color']  = np.where(np.isfinite(peaks['id']), *colors[:2])
         allpks['color'] = np.where(np.isfinite(allpks['id']), *colors[:2])
-        data['peaks']   = peaks
-        data['events']  = allpks
-        data['events']['rate'] = data['events']['count']
+        out['peaks']    = peaks
+        out['events']   = allpks
+        out['events']['rate'] = out['events']['count']
         return True
 
     def create(self, ctrl, doc, *_):
@@ -108,9 +108,9 @@ class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
         "return figure list"
         return [self._hist, self._scatter]
 
-    def observe(self, ctrl):
+    def observe(self, ctrl, noerase = True):
         "observes the model"
-        super().observe(ctrl)
+        super().observe(ctrl, noerase = noerase)
         self._widgets.observe(ctrl)
         setpoolobservers(self, ctrl, self._model, "consensus.plot.scatter")
 
@@ -123,7 +123,7 @@ class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
         self._scatter.addto(ctrl, noerase=noerase)
         self._hist.addto(ctrl, noerase=noerase)
 
-    def _addtodoc(self, ctrl, doc):
+    def _addtodoc(self, ctrl, doc, *_):
         "returns the figure"
         hist    = self._hist.create(ctrl, doc)
         scatter = self._scatter.create(self._hist.events)

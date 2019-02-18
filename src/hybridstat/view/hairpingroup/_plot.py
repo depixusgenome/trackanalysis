@@ -62,7 +62,7 @@ class GBScatterCreator(TaskPlotCreator[HairpinGroupModelAccess, HairpinGroupScat
         self._errors = PlotError(self._fig, self._theme)
         return self._fig
 
-    def _addtodoc(self, *_):
+    def _addtodoc(self, *_): # pylint: disable=arguments-differ
         raise NotImplementedError()
 
     @property
@@ -154,7 +154,7 @@ class GBHistCreator(TaskPlotCreator[HairpinGroupModelAccess, HairpinGroupHistMod
         self.linkmodeltoaxes(self._fig)
         return self._fig
 
-    def _addtodoc(self, *_):
+    def _addtodoc(self, *_): # pylint: disable=arguments-differ
         raise NotImplementedError()
 
     def _reset(self, cache: CACHE_TYPE):
@@ -290,9 +290,9 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
         "return figure list"
         return [self._scatter, self._duration, self._rate]
 
-    def observe(self, ctrl):
+    def observe(self, ctrl, noerase = False):
         "observes the model"
-        super().observe(ctrl)
+        super().observe(ctrl, noerase = noerase)
         setpoolobservers(self, ctrl, self._model, "hairpingroup.plot")
 
         self._widgets.observe(ctrl)
@@ -317,7 +317,7 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
         "specific setup for when this view is the main one"
         self._widgets.advanced.ismain(_)
 
-    def _addtodoc(self, ctrl, doc):
+    def _addtodoc(self, ctrl, doc, *_):
         "returns the figure"
         plots = [i.create() for i in self.plots]
         self._duration.setpeaks(self._scatter.peaks)

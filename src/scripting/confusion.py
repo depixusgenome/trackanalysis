@@ -9,7 +9,8 @@ import pandas         as pd
 
 from   scipy.stats    import percentileofscore
 
-from   sequences      import LNAHairpin, Strand, peaks as _peaks, Translator
+from   sequences      import Strand, peaks as _peaks, Translator
+from   sequences.io   import LNAHairpin
 
 from   utils          import initdefaults
 
