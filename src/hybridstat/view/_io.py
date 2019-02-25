@@ -59,7 +59,9 @@ class _SafeDict(FitToReferenceDict): # pylint: disable=too-many-ancestors
             out = True
         return out
 
-class _SafeProc(TaskViewProcessor[_SafeTask, _SafeDict, BEADKEY]):
+class _SafeProc( # pylint: disable=duplicate-bases
+        TaskViewProcessor[_SafeTask, _SafeDict, BEADKEY]
+):
     "Changes the Z axis to fit the reference"
 
 FileDialogTheme.types['pkz'] = (u'pickled report', '.pkz')
@@ -126,6 +128,7 @@ class ConfigXlsxIO(TaskIO):
             self.__msg(self.__theme.start)
         return ret
 
+    __TASKS = 'singlestrand', 'baselinefilter', 'fittoreference', 'identification'
     def __complete_model(self, model, pksmdl):
         ind = next((i for i, j in enumerate(model) if isinstance(j, DataCleaningTask)),
                    None)
@@ -133,14 +136,11 @@ class ConfigXlsxIO(TaskIO):
             model.insert(ind+1, ExceptionCatchingTask(exceptions = [DataCleaningException]))
 
         if not isinstance(model[-1], pksmdl.identification.tasktype):
-            missing: tuple = (pksmdl.eventdetection, pksmdl.peakselection)
-            if pksmdl.singlestrand.task is not None:
-                missing += (pksmdl.singlestrand,)
-            if pksmdl.fittoreference.task is not None:
-                missing += (pksmdl.fittoreference,)
-            if pksmdl.identification.task is not None:
-                missing += (pksmdl.identification,)
-
+            missing: tuple = (
+                pksmdl.eventdetection,
+                pksmdl.peakselection,
+                *(getattr(pksmdl, i) for i in self.__TASKS if getattr(pksmdl, i).task)
+            )
             while len(missing):
                 if not isinstance(model[-1], tuple(i.tasktype for i in missing)):
                     return model + [deepcopy(i.configtask) for i in missing]
