@@ -3,7 +3,7 @@
 "All sequences-related stuff"
 from numpy.testing import assert_allclose
 from sequences import peaks, overlap, splitoligos, Translator
-from sequences.meltingtime import StateMatrixComputer
+from sequences.meltingtime import OldStatesTransitions
 
 def test_peaks():
     "tests peaks"
@@ -111,7 +111,7 @@ def test_splits():
 
 def test_mt():
     "test melting times"
-    cnf = StateMatrixComputer()
+    cnf = OldStatesTransitions()
     cnf.setmode("fork")
     for i in [
             ("CTAG",  "GATC",   6.785250875e-05, 14737.8485, 0.37559711, -3.2380981, -57.58380),
