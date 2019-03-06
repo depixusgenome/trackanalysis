@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Runs an app"
-from   time    import time
 from   pathlib import Path
 import sys
 import glob
@@ -13,9 +12,7 @@ def _add_sys_paths():
             sys.path.append(path)
 _add_sys_paths()
 # pylint: disable=wrong-import-position
-from app.cmdline     import defaultclick, defaultmain, click, WARNINGS, INITIAL_ORDERS
-from utils.logconfig import getLogger
-LOGS = getLogger()
+from app.cmdline     import defaultclick, defaultmain, defaultinit, click, INITIAL_ORDERS
 
 def _filtr(app, viewcls):
     if 'app.' not in app:
@@ -30,10 +27,6 @@ def _filtr(app, viewcls):
     return app
 
 def _files(directory, files, bead):
-    def _started(_, start = time()):
-        LOGS.info("done loading in %d seconds", time()-start)
-    INITIAL_ORDERS.append(_started)
-
     if len(directory):
         def _opentracks(ctrl):
             ctrl.tasks.opentrack(dict(zip(('tracks', 'grs', 'match'),
@@ -54,23 +47,22 @@ def _files(directory, files, bead):
             ctrl.display.update("tasks", bead = bead)
         INITIAL_ORDERS.append(_setbead)
 
-@defaultclick(click.option('-b', "--bead",
-                           type       = int,
-                           default    = None,
-                           help       = 'Opens to this bead'),
-              click.option("--tracks",
-                           type       = str,
-                           nargs      = 3,
-                           help       = 'track path, gr path and match'),
-              click.argument('files', nargs = -1, type = click.Path()))
+@defaultclick("TrackAnalysis", defaultview = "hybridistat.view.HybridStatView")
+@click.option('-b', "--bead",
+              type       = int,
+              default    = None,
+              help       = 'Opens to this bead')
+@click.option("--tracks",
+              type       = str,
+              nargs      = 3,
+              help       = 'track path, gr path and match')
+@click.argument('files', nargs = -1, type = click.Path())
 def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
          gui, config, wall, port, raiseerr, nothreading):
     "Launches an view"
-    if wall:
-        WARNINGS.set(True)
+    defaultinit(config, wall, raiseerr, nothreading)
     _files(tracks, files, bead)
-    return defaultmain(_filtr, config, view, gui, port, raiseerr, nothreading,
-                       "taskapp.toolbar")
+    return defaultmain(_filtr, view, gui, port, "taskapp.toolbar")
 
 if __name__ == '__main__':
     main()   # pylint: disable=no-value-for-parameter

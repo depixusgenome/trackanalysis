@@ -3,7 +3,7 @@
 "All sequences-related stuff"
 from numpy.testing import assert_allclose
 from sequences import peaks, overlap, splitoligos, Translator
-from sequences.meltingtime import OldStatesTransitions
+from sequences.meltingtime import OldStatesTransitions, StatesTransitions
 
 def test_peaks():
     "tests peaks"
@@ -109,7 +109,7 @@ def test_splits():
     assert splitoligos('-AtG') == ['-atg']
     assert splitoligos(':+AtG;') == ['+atg']
 
-def test_mt():
+def test_oldmt():
     "test melting times"
     cnf = OldStatesTransitions()
     cnf.setmode("fork")
@@ -141,6 +141,23 @@ def test_mt():
             ('CGGGG', 'CCCCC',  0.001460713,     684.596864, 0.93851525, -7.2232242, -31.68077)
     ]:
         assert_allclose(cnf(i[0], i[1]), list(i[2:]), rtol=5e-4, atol=5e-8)
+
+def test_mt():
+    "test melting times"
+    for i in [
+            ("CTAG",  "GATC",   6.785250875e-05, 14737.8485, 0.37559711, -3.2380981, -57.58380),
+            ("GATC",  "CTAG",   5.061968773e-05, 19755.1593, 0.27757623, -2.6426809, -62.03634),
+            ("TATA",  "ATAT",   1.641822285e-05, 60907.9319, 0.12756376, -0.7392529, -88.47045),
+            ("CCCCC", "GGGGG",  0.001813628,     551.380913, 8.92013390, -9.6913956, -16.72818),
+            ("GGGGG", "CCCCC",  0.001813628,     551.380913, 8.92013390, -9.6913956, -16.72818),
+            ("GGGGC", "CCCCC",  0.0004454839728, 2244.74966, 0.37245830, -5.1115310, -45.86585),
+            ("GGGCG", "CCCCC",  6.865708639e-05, 14565.1389, 0.01494411, -0.0256863, -107.1183),
+            ("GGCGG", "CCCCC",  6.900976316e-05, 14490.7032, 0.01486773, -0.0256863, -107.1183),
+            ("GCGGG", "CCCCC",  6.353794618e-05, 15738.6264, 0.01614813, -0.0256863, -107.1183),
+            ("CGGGG", "CCCCC",  0.0004952853667, 2019.03804, 3.47707491, -7.4513254, -31.68077)
+    ]:
+        cnf = StatesTransitions(i[0], i[1], 0)
+        assert_allclose(cnf.statistics(), list(i[2:]), rtol=5e-4, atol=5e-8)
 
 if __name__ == '__main__':
     test_mt()
