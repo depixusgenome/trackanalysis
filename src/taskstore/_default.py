@@ -68,8 +68,8 @@ def _v7(data:dict) -> dict:
 def _v8(data:dict) -> dict:
     modifyclasses(
         data,
-        r'model.task.\(.*\)',  dict(__name__ = lambda x: x.replace('model.task',  'taskmodel')),
-        r'model.level.\(.*\)', dict(__name__ = lambda x: x.replace('model.', 'taskmodel.'))
+        r'.*model.task.*',  dict(__name__ = lambda x: x.replace('model.task',  'taskmodel')),
+        r'.*model.level.*', dict(__name__ = lambda x: x.replace('model.', 'taskmodel.'))
     )
     return data
 

@@ -4,6 +4,7 @@ u"Testing anastore"
 from   typing           import cast
 import sys
 import numpy
+import warnings
 
 import taskstore as anastore
 import anastore.api
@@ -56,7 +57,7 @@ def test_storetasks(monkeypatch):
     for _ in range(5):
         patch.patch(_vers(_))
 
-    monkeypatch.setattr(anastore.api, '__TASKS__', patch)
+    monkeypatch.setattr(anastore.api, 'PATCHES', {'tasks': patch})
     dumped = anastore.dumps(tasks)
     assert dumped[:len('[{"version": 5},')] == '[{"version": 5},'
 
@@ -116,9 +117,12 @@ def test_modifyclass():
 
 def test_file():
     "tests a ana file"
-    for i in Path(cast(str, _utpath())).glob("*.ana"):
-        assert anastore.load(i) is not None
-    assert anastore.load(_utpath("reportv2.xlsx"), fromxlsx = True) is not None
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category = DeprecationWarning,
+                                message  = '.*the imp module is .*')
+        for i in Path(cast(str, _utpath())).glob("*.ana"):
+            assert anastore.load(i) is not None
+        assert anastore.load(_utpath("reportv2.xlsx"), fromxlsx = True) is not None
 
 if __name__ == '__main__':
     test_file()
