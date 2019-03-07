@@ -4,7 +4,7 @@
 from concurrent.futures         import ProcessPoolExecutor
 from copy                       import copy
 from typing                     import Dict, List, Tuple
-from time                       import clock
+from time                       import process_time as clock
 
 import numpy  as np
 import pandas as pd
