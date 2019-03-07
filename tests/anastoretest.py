@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 u"Testing anastore"
 from   typing           import cast
+import warnings
 import sys
 import numpy
-import warnings
 
 import taskstore as anastore
 import anastore.api
