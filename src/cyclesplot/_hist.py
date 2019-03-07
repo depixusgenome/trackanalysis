@@ -71,24 +71,25 @@ class HistMixin(ABC):
                     top     = bins[1:])
 
     def _createhist(self, doc, data, shape, yrng):
-        self._hist = self.figure(x_axis_label     = self._theme.histxlabel,
-                                 y_axis_location = None,
-                                 x_range         = Range1d(0, 5e4),
-                                 y_range         = yrng,
-                                 tooltips        = None,
-                                 name            = 'Cycles:Hist')
+        self._hist = fig = self.figure(
+            x_axis_label     = self._theme.histxlabel,
+            y_axis_location = None,
+            x_range         = Range1d(0, 5e4),
+            y_range         = yrng,
+            tooltips        = None,
+            name            = 'Cycles:Hist',
+            extra_x_ranges  = dict(cycles = Range1d(start = 0., end = 100.)),
+            extra_y_ranges  = dict(bases  = Range1d(start = 0., end = 0.))
+        )
 
         hist             = self.__data(data, shape)
         self._histsource = ColumnDataSource(hist)
-        self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 100.)}
-
-
-        self.addtofig(self._hist, 'histframes',
+        self.addtofig(fig, 'histframes',
                       source = self._histsource,
                       bottom = "bottom", top   = "top",
                       left   = "left",   right = "frames")
 
-        rend = self.addtofig(self._hist, 'histcycles',
+        rend = self.addtofig(fig, 'histcycles',
                              source = self._histsource,
                              bottom = "bottom", top   = "top",
                              left   = "left",   right = "cycles",
@@ -97,12 +98,12 @@ class HistMixin(ABC):
         axis  = LinearAxis(x_range_name          = "cycles",
                            axis_label            = self._theme.histxtoplabel,
                            axis_label_text_color = rend.glyph.line_color)
-        self._hist.add_layout(axis, 'above')
+        fig.add_layout(axis, 'above')
 
-        self._ticker = SequenceTicker(self._ctrl, self._hist, self._model,
+        self._ticker = SequenceTicker(self._ctrl, fig, self._model,
                                       self._model.cycles.theme.yrightlabel, "right")
-        self._hover = DpxHoverModel.create(self._ctrl, doc, self._hist, self._model, 'cycles')
-        self._hover.slaveaxes(self._hist, self._histsource)
+        self._hover = DpxHoverModel.create(self._ctrl, doc, fig, self._model, 'cycles')
+        self._hover.slaveaxes(fig, self._histsource)
 
     def _oncyclessequence(self, **_):
         if self.isactive():

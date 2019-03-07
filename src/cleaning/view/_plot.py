@@ -98,9 +98,12 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
     def _addtodoc(self, ctrl, doc, *_):
         self.__source = ColumnDataSource(data = self.__data(None, None))
 
-        self.__fig = fig = self.figure(y_range = Range1d,
-                                       x_range = Range1d,
-                                       name    = 'Clean:Cycles')
+        self.__fig = fig = self.figure(
+            y_range        = Range1d,
+            x_range        = Range1d,
+            name           = 'Clean:Cycles',
+            extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
+        )
         self.addtofig(fig, 'lines', x = 't', y = 'z', source = self.__source)
         glyph = self.addtofig(fig, 'points', x = 't', y = 'z', source = self.__source)
         hover = fig.select(DpxHoverTool)
@@ -108,7 +111,6 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
             hover[0].tooltips  = self._theme.tooltips
             hover[0].renderers = [glyph]
 
-        fig.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
         axis = LinearAxis(x_range_name = "time", axis_label = self._theme.xtoplabel)
         fig.add_layout(axis, 'above')
 

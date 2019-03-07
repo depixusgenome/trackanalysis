@@ -109,7 +109,10 @@ def addsequenceticks(plot, seq, position):
     else:
         rng = 'x_range' if position in ('above', 'bottom') else 'y_range'
         def _add(plot, _):
-            plot.state.extra_x_ranges = {"seq":  getattr(plot.state, rng)}
+            plot.state.extra_x_ranges = {
+                **plot.state.extra_x_ranges,
+                "seq":  getattr(plot.state, rng)
+            }
             linaxis = LinearAxis(**{'axis_label' : "sequence", f'{rng}_name': 'seq'})
             _set(linaxis)
             plot.state.add_layout(linaxis, position)

@@ -91,15 +91,17 @@ class RawMixin(ABC):
         self._hover.on_change("bias",    fcn)
 
     def _createraw(self):
-        self._raw = self.figure(y_range = Range1d,
-                                tools   = self._theme.toolbar['raw'],
-                                name    = 'Cycles:Raw')
+        self._raw = self.figure(
+            y_range        = Range1d,
+            tools          = self._theme.toolbar['raw'],
+            name           = 'Cycles:Raw',
+            extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
+        )
         raw, shape      = self._DEFAULT_DATA
         self._rawsource = ColumnDataSource(data = raw)
 
         self.attrs(self._theme.raw).addto(self._raw, x = 't', y = 'z', source = self._rawsource)
 
-        self._raw.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
 
         axis = LinearAxis(x_range_name="time", axis_label = self._theme.xtoplabel)
         self._raw.add_layout(axis, 'above')

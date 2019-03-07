@@ -14,7 +14,7 @@ def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
         if 'ybounds' in old:
             vals[:2] = [0. if i is None else i for i in model.ybounds]
 
-    with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.toolbar',
+    with bokehaction.launch('cyclesplot.CyclesPlotView', 'taskapp.toolbar',
                             runtime = "browser") as server:
         server.ctrl.display.observe("cycles", _printrng)
         server.load('big_legacy')
@@ -77,7 +77,7 @@ def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
 
 def test_cyclesplot2(bokehaction):
     "test cyclesplot data actions"
-    with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.toolbar',
+    with bokehaction.launch('cyclesplot.CyclesPlotView', 'taskapp.toolbar',
                             runtime = "browser") as server:
         server.load('big_legacy')
 
@@ -110,4 +110,5 @@ def test_cyclesplot2(bokehaction):
         server.wait()
 
 if __name__ == '__main__':
-    test_cyclesplot2(bokehaction(None))
+    from testutils.bokehtesting import BokehAction
+    test_cyclesplot(BokehAction(None))

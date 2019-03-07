@@ -53,16 +53,23 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 
     __implementation__ = "sequenceticker.coffee"
 
-    def __init__(self, ctrl, # pylint: disable=too-many-arguments
-                 fig     = None,
-                 mdl     = None,
-                 axlabel = None,
-                 loc     = 'right'):
+    def __init__( # pylint: disable=too-many-arguments
+            self,
+            ctrl    = None,
+            fig     = None,
+            mdl     = None,
+            axlabel = None,
+            loc     = 'right',
+            **kwa
+    ):
         "Sets the ticks according to the configuration"
-        super().__init__()
+        super().__init__(**kwa)
         self.__defaults = dict()
         self.__withbase = []
-        self.__theme    = ctrl.theme.add(SequenceTickerTheme(), False)
+        if ctrl:
+            self.__theme = ctrl.theme.add(SequenceTickerTheme(), False)
+        else:
+            self.__theme = SequenceTickerTheme()
         if mdl is None:
             return
 
@@ -70,7 +77,8 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
         self.__fig   = fig
         self.__axis  = type(self)(ctrl)
 
-        fig.extra_y_ranges        = {"bases": Range1d(start = 0., end = 1.)}
+        if 'bases' not in fig.extra_y_ranges:
+            fig.extra_y_ranges = dict(fig.extra_y_ranges, bases = Range1d(start = 0., end = 0.))
         fig.add_layout(LinearAxis(y_range_name = "bases",
                                   axis_label   = axlabel,
                                   ticker       = self.__axis),
