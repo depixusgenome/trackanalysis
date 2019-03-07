@@ -398,12 +398,11 @@ def test_fixedbeadsorting():
     B.BeadSubtractionTask = BeadSubtractionTask
     beads  = next(iter(create(TrackReaderTask(path = utpath("fixedbeads.pk"))).run()))
     lst    = FixedBeadDetection()(beads)
-    assert len(lst) == 2
+    assert len(lst) == 1
     assert lst[0][-1] == 4
-    assert lst[1][-1] == 0
     frames = FixedBeadDetection().dataframe(beads)
     assert frames.shape == (4, 16)
-    assert set(frames[frames.good].bead.values) == {4, 0}
+    assert set(frames[frames.good].bead.values) == {4}
 
 def test_clippingtask():
     "tests clipping task"
