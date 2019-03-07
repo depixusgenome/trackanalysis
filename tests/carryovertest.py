@@ -2,9 +2,11 @@
 # -*- coding: utf-8 -*-
 "Tests carryover detection"
 
+import sys
 import pandas as pd
 
-from scripting import carryover
+sys.modules['ACCEPT_SCRIPTING'] = 'jupyter' # type: ignore
+from scripting import carryover # pylint: disable=import-error,wrong-import-position
 
 CARRY = carryover.CarryOver(cleanprop=0.6)
 
