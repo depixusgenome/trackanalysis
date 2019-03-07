@@ -3,6 +3,7 @@
 # pylint: disable=arguments-differ
 "Loading and save tracks"
 import  sys
+from    importlib          import import_module
 from    typing             import (Sequence, Any, Union, Tuple, Optional,
                                    Iterator, Dict, cast, overload, TypeVar,
                                    TYPE_CHECKING)
@@ -79,32 +80,45 @@ class PickleIO(_TrackIO):
     @staticmethod
     def open(path:PATHTYPE, **_) -> Dict[Union[str, int], Any]:
         "opens a track file"
-        out = None
+        out   = None
+        names = {
+            "cleaning.processor": None,
+            "cleaning.beadsubtraction": None,
+            "peakfinding.processor.peakfiltering": "peakfinding.processor.singlestrand",
+            "taskmodel":                           "model.task",
+            "taskmodel.level":                     "model.level"
+        }
         try:
-            from cleaning.processor import BeadSubtractionTask
-            import cleaning.beadsubtraction as mdl
-            import peakfinding.processor.peakfiltering as mdl2
-            import taskmodel as mdl4
-            import taskmodel.level as mdl5
-            sys.modules["model.level"] = mdl5
-            sys.modules["model.task"] = mdl4
-            sys.modules["peakfinding.processor.singlestrand"] = mdl2
-            mdl.BeadSubtractionTask = BeadSubtractionTask # type: ignore
+            for i, j in names.items():
+                mdl = import_module(i)
+                if j:
+                    sys.modules[j] = mdl
+
+            setattr(
+                import_module("cleaning.beadsubtraction"),
+                "BeadSubtractionTask",
+                getattr(import_module("cleaning.processor"), "BeadSubtractionTask")
+            )
             try:
                 with open(path, 'rb') as stream:
                     out = pickle.load(stream)
             except ModuleNotFoundError:
-                import taskmodel.__scripting__ as mdl3
-                sys.modules["model.__scripting__"] = mdl3
+                names["taskmodel.__scripting__"] = "model.__scripting__"
+                for i, j in names.items():
+                    mdl = import_module(i)
+                    if j:
+                        sys.modules[j] = mdl
+
+
                 with open(path, 'rb') as stream:
                     out = pickle.load(stream)
 
         finally:
-            del sys.modules["peakfinding.processor.singlestrand"]
-            del sys.modules["model.level"]
-            del sys.modules["model.task"]
-            sys.modules.pop("model.__scripting__", None)
-            del mdl.BeadSubtractionTask # type: ignore
+            if hasattr(import_module("cleaning.beadsubtraction"), "BeadSubtractionTask"):
+                delattr(import_module("cleaning.beadsubtraction"), "BeadSubtractionTask")
+            for j in names.values():
+                if j:
+                    sys.modules.pop(j, None)
         return out
 
     @classmethod

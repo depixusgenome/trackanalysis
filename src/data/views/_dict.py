@@ -86,7 +86,10 @@ def createTrackView(level:Optional[Level] = Level.none, **kwargs):
     subs = list(ITrackView.__subclasses__())
     while len(subs):
         cur = subs.pop()
-        if not getattr(cur, '__abstractmethods__') and level is getattr(cur, 'level', '?'):
+        if (
+                not getattr(cur, '__abstractmethods__', None)
+                and level is getattr(cur, 'level', '?')
+        ):
             return cur(**kwargs) # type: ignore
         subs.extend(cur.__subclasses__())
     raise TypeError(f"Could not find a subclass for level {level}")

@@ -150,7 +150,7 @@ def test_task_mutations():
         return dum, proc
 
     cnt = [0]
-    _DummyTask0, _DummyProcess0 = _make(0, lambda i, j: j.setcacheDefault(i, list(cnt)))
+    _DummyTask0, _DummyProcess0 = _make(0, lambda i, j: j.setcachedefault(i, list(cnt)))
     _DummyTask1, _DummyProcess1 = _make(1, lambda i, j: None)
     _DummyTask2, _DummyProcess2 = _make(2, lambda i, j: j.setcache(i, list(cnt)))
 
@@ -404,14 +404,14 @@ def test_replacement():
     def _test(good, *order):
         cache = Cache(list(order))
         lst.clear()
-        Runner(cache)()
+        Runner(cache)(copy = False)
         assert ''.join(lst) == good
         with CacheReplacement(cache, Proc1B):
             lst.clear()
-            Runner(cache)()
+            Runner(cache)(copy = False)
             assert ''.join(lst) == good.replace('1', '1b')
         lst.clear()
-        Runner(cache)()
+        Runner(cache)(copy = False)
         assert ''.join(lst) == good
 
     _test('123', Proc1(), Proc2(), Proc3())
