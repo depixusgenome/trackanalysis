@@ -221,16 +221,18 @@ class FixedBeadDetection:
         cnt  = sum(len(i) for i in cycs.values())
         return vals/max(1,cnt)*100.
 
-    def dataframe(self, beads: Beads) -> pd.DataFrame:
+    def dataframe(self, beads: Beads) -> pd.DataFrame: # pylint: disable=too-many-locals
         """
         Creates a dataframe for all beads in  a track.
         """
-        ext: Tuple[List[float],...] = ([], [] ,[])
-        var: Tuple[List[float],...] = ([], [] ,[])
-        sig: Tuple[List[float],...] = ([], [] ,[])
+        ext1: Tuple[List[float],...] = ([], [] ,[])
+        ext2: Tuple[List[float],...] = ([], [] ,[])
+        var:  Tuple[List[float],...] = ([], [] ,[])
+        sig:  Tuple[List[float],...] = ([], [] ,[])
         pop:    List[float] = []
         drops:  List[float] = []
         isgood: List[bool]  = []
+        extfast, extslow = self.__exts(beads)
         def _append(vals, itms):
             itms[0].append(np.nanmean(vals))
             itms[1].append(np.nanstd (vals))
@@ -244,13 +246,15 @@ class FixedBeadDetection:
                 cycs = self.__cycles(beads, data)
                 pop.append(self.population(cycs))
                 drops.append(self.drops.measure(cycs.track, cast(dict, cycs.data)[0]))
-                _append(self.extents(cycs), ext)
+                _append(extslow(cycs), ext1)
+                _append(extfast(data), ext2)
                 _append(np.diff(self.cyclesock(cycs), axis = 0).ravel(), var)
                 _append([nanhfsigma(i) for i in cycs.values()], sig)
                 isgood.append(
-                    ext[-1][-1] < self.maxextent
-                    and var[-1][-1] < self.maxdiff
-                    and not (self.minhfsigma <= sig[-1][-1] <= self.maxhfsigma)
+                    ext1[-1][-1] <= self.maxextent
+                    and ext2[0][-1] <= self.maxextent
+                    and var[-1][-1] <= self.maxdiff
+                    and self.minhfsigma <= sig[-1][-1] <= self.maxhfsigma
                 )
 
         _vals = lambda i, j: {i+k: l for k, l in zip(('mean', 'std', 'percentile'), j)}
@@ -258,7 +262,8 @@ class FixedBeadDetection:
                                  good = isgood,
                                  pop  = pop,
                                  drops= drops,
-                                 **_vals('ext', ext),
+                                 **_vals('slowext', ext1),
+                                 **_vals('fastext', ext2),
                                  **_vals('var', var),
                                  **_vals('sig', sig)))
 
@@ -276,7 +281,10 @@ class FixedBeadDetection:
                                     message  = '.*All-NaN slice encountered.*')
             for beadid, data in beads:
                 hfs = beads.track.rawprecision(beadid)
-                if extfast(data) or not self.minhfsigma <= hfs <= self.maxhfsigma:
+                if  (
+                        extfast(data) > self.maxextent
+                        or not self.minhfsigma <= hfs <= self.maxhfsigma
+                ):
                     continue
 
                 cycs   = self.__cycles(beads, data)
@@ -321,17 +329,18 @@ class FixedBeadDetection:
     def __exts(self, beads: Beads) -> Tuple[Callable[[Cycles], bool],
                                             Callable[[Cycles], np.ndarray]]:
         phases  = beads.track.phase.select
-        getext  = ExtentRule(maxextent   = self.maxextent,
-                             minextent   = 0.,
-                             percentiles = (50,50) ).extent
+        getext  = ExtentRule(
+            maxextent   = self.maxextent,
+            minextent   = 0.,
+            percentiles = [100-self.threshold, self.threshold]
+        ).extent
         extph   = (phases(..., self.extentphases[0]+1),
                    phases(..., self.extentphases[1]),
                    phases(..., self.extentphases[0]),
                    phases(..., self.extentphases[1]+1))
 
         def _fast(data: np.ndarray):
-            height = np.nanpercentile(data[extph[1]]-data[extph[0]], self.threshold)
-            return height > self.maxextent
+            return np.nanpercentile(data[extph[1]]-data[extph[0]], self.threshold)
 
         def _slow(cycs: Cycles):
             return getext(cast(Dict, cycs.data)[0], extph[2], extph[3]).values

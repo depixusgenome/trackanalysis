@@ -372,7 +372,7 @@ def test_message_creation():
 
 def test_cleaningview(bokehaction):
     "test the view"
-    with bokehaction.launch('cleaning.view.CleaningView', 'app.toolbar') as server:
+    with bokehaction.launch('cleaning.view.CleaningView', 'taskapp.toolbar') as server:
         server.load('big_legacy')
 
         assert 'config.tasks' not in server.savedconfig
@@ -392,17 +392,18 @@ def test_cleaningview(bokehaction):
         server.change('Cleaning:Filter', 'subtracted', "11,30")
         server.wait()
 
-def test_fixedbeadsorting(monkeypatch):
+def test_fixedbeadsorting():
     "test fixed bead detection"
     import cleaning.beadsubtraction as B
-    monkeypatch.setattr(B, 'BeadSubtractionTask', BeadSubtractionTask)
+    B.BeadSubtractionTask = BeadSubtractionTask
     beads  = next(iter(create(TrackReaderTask(path = utpath("fixedbeads.pk"))).run()))
     lst    = FixedBeadDetection()(beads)
-    assert len(lst) == 1
+    assert len(lst) == 2
     assert lst[0][-1] == 4
+    assert lst[1][-1] == 0
     frames = FixedBeadDetection().dataframe(beads)
-    assert frames.shape == (4, 11)
-    assert list(frames[frames.good].bead.values) == [4]
+    assert frames.shape == (4, 16)
+    assert set(frames[frames.good].bead.values) == {4, 0}
 
 def test_clippingtask():
     "tests clipping task"
@@ -432,4 +433,5 @@ def test_clippingtask():
     assert np.all(np.isnan(arr[nzer]))
 
 if __name__ == '__main__':
-    test_cleaningview(bokehaction(None))
+    test_fixedbeadsorting()
+    test_clippingtask()
