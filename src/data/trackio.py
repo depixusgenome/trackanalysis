@@ -84,12 +84,26 @@ class PickleIO(_TrackIO):
             from cleaning.processor import BeadSubtractionTask
             import cleaning.beadsubtraction as mdl
             import peakfinding.processor.peakfiltering as mdl2
+            import taskmodel as mdl4
+            import taskmodel.level as mdl5
+            sys.modules["model.level"] = mdl5
+            sys.modules["model.task"] = mdl4
             sys.modules["peakfinding.processor.singlestrand"] = mdl2
             mdl.BeadSubtractionTask = BeadSubtractionTask # type: ignore
-            with open(path, 'rb') as stream:
-                out = pickle.load(stream)
+            try:
+                with open(path, 'rb') as stream:
+                    out = pickle.load(stream)
+            except ModuleNotFoundError:
+                import taskmodel.__scripting__ as mdl3
+                sys.modules["model.__scripting__"] = mdl3
+                with open(path, 'rb') as stream:
+                    out = pickle.load(stream)
+
         finally:
             del sys.modules["peakfinding.processor.singlestrand"]
+            del sys.modules["model.level"]
+            del sys.modules["model.task"]
+            sys.modules.pop("model.__scripting__", None)
             del mdl.BeadSubtractionTask # type: ignore
         return out
 

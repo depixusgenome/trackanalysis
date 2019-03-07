@@ -21,8 +21,8 @@ from taskcontrol.processor.utils import ActionTask
 from utils                       import update
 from utils.decoration            import addto
 from utils.attrdefaults          import toenum
-from ..                          import Task, Level
-from ..application               import TasksConfig
+from taskmodel                   import Task, Level
+from taskmodel.application       import TasksConfig
 
 def _update(self, *args, **kwa):
     info = dict(*args, **kwa)
