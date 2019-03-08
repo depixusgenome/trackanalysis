@@ -19,32 +19,28 @@ def test_track():
     assert 'scripting.jupyter' not in sys.modules
 
     track = Track(path = utpath("big_legacy"))
-    assert track.path == (utpath("big_legacy"),)
+    assert track.path == utpath("big_legacy")
 
-    track = Track(utpath("big_legacy"))
-    assert track.path == (utpath("big_legacy"),)
-    assert set(track.data.keys()) == {'t', 'zmag'} | set(list(range(0,39)))
+    assert set(track.data.keys()) == set(list(range(0,39)))
     assert isinstance(track.cleancycles,    Cycles)
     assert isinstance(track.measures,       Cycles)
     assert isinstance(track.events,         Events)
     assert isinstance(track.peaks,          PeaksDict)
-    assert isinstance(track.tasks.config(), dict)
-    assert not track.tasks.config()
     assert track.cleaned is False
 
-    assert ([Tasks(i) for i in Tasks.defaulttasklist(None, Tasks.alignment, False)]
-            == [Tasks.cleaning, Tasks.alignment])
-    assert ([Tasks(i) for i in Tasks.defaulttasklist(track, Tasks.alignment)]
-            == [Tasks.cleaning, Tasks.alignment])
+    assert ([Tasks(i) for i in Tasks.defaulttasklist(None, Tasks.clipping, False)]
+            == [Tasks.cleaning, Tasks.alignment, Tasks.clipping])
+    assert ([Tasks(i) for i in Tasks.defaulttasklist(track, Tasks.clipping)]
+            == [Tasks.cleaning, Tasks.alignment, Tasks.clipping])
     assert ([Tasks(i) for i in Tasks.defaulttasklist(track, ...)]
-            == [Tasks.cleaning, Tasks.alignment, Tasks.eventdetection,
+            == [Tasks.cleaning, Tasks.alignment, Tasks.clipping, Tasks.eventdetection,
                 Tasks.peakselector, Tasks.fittohairpin])
     assert ([Tasks(i) for i in Tasks.defaulttasklist(None, Tasks.alignment, True)]
             == [Tasks.alignment])
     track.cleaned = True
     assert ([Tasks(i) for i in Tasks.defaulttasklist(track, Tasks.alignment)]
             == [Tasks.alignment])
-    with localcontext().update(config = {'tasks.scripting.alignment.always': False}):
+    with localcontext(scripting = {'alignalways': False}):
         assert ([Tasks(i) for i in Tasks.defaulttasklist(track, Tasks.alignment)]
                 == [])
 
@@ -72,4 +68,4 @@ def test_confusion():
 
 
 if __name__ == '__main__':
-    test_confusion()
+    test_track()

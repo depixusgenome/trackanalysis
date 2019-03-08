@@ -442,8 +442,11 @@ class Tasks(Enum):
     def __tasklist__(cls):
         cleaning = cls.__cleaning__()
         assert cleaning[0] is cls.subtraction
-        return ((cls.cyclesampling, cleaning[0], cls.selection)
-                + cleaning[1:] + cls.__taskorder__())
+        tasks    = (cls.cyclesampling, cleaning[0], cls.selection) + cleaning[1:]
+        ords     = cls.__taskorder__()
+        if tasks[-1] == cls.clipping and ords[0] == cls.alignment:
+            return tasks[:-1] + ords[:1] + tasks[-1:] + ords[1:]
+        return tasks + ords
 
     @classmethod
     def __nodefault__(cls):
