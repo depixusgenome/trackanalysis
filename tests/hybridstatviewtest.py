@@ -5,7 +5,7 @@
 from typing                     import cast
 from tempfile                   import mktemp, gettempdir
 from pathlib                    import Path
-from pytest                     import approx       # pylint: disable=no-name-in-module
+import warnings
 import numpy as np
 
 from bokeh.models               import Tabs, FactorRange
@@ -113,7 +113,7 @@ def _t_e_s_t_peaks(server, bkact): # pylint: disable=too-many-statements
 
     menu = server.widget['Cycles:Sequence'].menu
     lst  = tuple(i if i is None else i[0] for i in list(menu))
-    assert lst == ('₁ GF4', '₂ GF1', '₃ GF2', '₄ GF3', '₅ 015',
+    assert lst == ('₁ GF4', '₂ GF1', '₃ GF2', '₄ GF3', '✗ 015',
                    None, 'Select a hairpin path')
 
     def _hascstr(yes):
@@ -155,43 +155,49 @@ def _t_e_s_t_peaks(server, bkact): # pylint: disable=too-many-statements
 def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-locals
     "test peaksplot"
     vals = [0.]*2
+    prev = [1.]*2
     def _printrng(old = None, model = None, **_):
         if 'ybounds' in old:
             vals[:2] = [0. if i is None else i for i in model.ybounds]
 
     with bokehaction.launch('hybridstat.view.peaksplot.PeaksPlotView',
-                            'app.toolbar') as server:
+                            'taskapp.toolbar') as server:
         server.ctrl.display.observe("hybridstat.peaks", _printrng)
         server.load('big_legacy')
 
         krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
-        def _press(val, *truth):
+        def _press(val):
             server.press(val, krow)
-            assert vals == approx(truth, abs = 2e-2)
+            for _ in range(5):
+                if vals != prev:
+                    break
+                server.wait()
+            assert vals != prev
+            prev[:2] = vals
 
         fig = server.widget['Peaks:fig']()
         for _ in range(5):
             if fig.extra_x_ranges['duration'].end is None:
                 server.wait()
-        _press('Shift- ',         0.,       0.)
-        _press('Shift-ArrowUp',   0.312381, 0.476166)
-        _press('Alt-ArrowUp',     0.345138, 0.508923)
-        _press('Alt-ArrowDown',   0.312381, 0.476166)
-        _press('Shift-ArrowDown', 0.,       0.)
+        _press('Shift- ')
+        _press('Shift-ArrowUp')
+        _press('Alt-ArrowUp')
+        _press('Alt-ArrowDown')
+        _press('Shift-ArrowDown')
 
         _t_e_s_t_peaks(server, bokehaction)
 
 def test_cyclehistplot(bokehaction): # pylint: disable=too-many-statements,too-many-locals
     "test peaksplot"
     with bokehaction.launch('hybridstat.view.cyclehistplot.CycleHistPlotView',
-                            'app.toolbar') as server:
+                            'taskapp.toolbar') as server:
         server.load('big_legacy')
         _t_e_s_t_peaks(server, bokehaction)
 
 def test_hairpingroup(bokehaction): # pylint: disable=too-many-statements,too-many-locals
     "test peaksplot"
     with bokehaction.launch('hybridstat.view.hairpingroup.HairpinGroupPlotView',
-                            'app.toolbar') as server:
+                            'taskapp.toolbar') as server:
         server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
         server.load('big_legacy')
         rng  = server.widget.get(FactorRange)
@@ -234,7 +240,7 @@ def test_hairpingroup(bokehaction): # pylint: disable=too-many-statements,too-ma
 def test_reference(bokehaction):
     "test peaksplot"
     with bokehaction.launch('hybridstat.view.peaksplot.PeaksPlotView',
-                            'app.toolbar') as server:
+                            'taskapp.toolbar') as server:
 
         server.load('100bp_4mer/ref.pk')
         ref = server.ctrl.display.get("tasks", "roottask")
@@ -255,30 +261,46 @@ def test_reference(bokehaction):
 
 def test_hybridstat(bokehaction):
     "test hybridstat"
-    with bokehaction.launch('hybridstat.view.HybridStatView', 'app.toolbar') as server:
-        tabs = next(iter(server.doc.select({'type': Tabs})))
-        for i in range(len(tabs.tabs)):
-            server.change(tabs, 'active', i)
-            server.wait()
-
-        mdl         = server.ctrl.theme.model("app.tabs")
-        assert list(mdl.titles.values()) == [i.title for i in tabs.tabs]
-        indcleaning = next(i for i, j in enumerate(mdl.titles) if j == 'cleaning')
-        indcyc      = next(i for i, j in enumerate(mdl.titles) if j == 'cycles')
-        server.change(tabs, 'active', indcleaning)
-        server.load('big_legacy')
-
-        for i in range(len(tabs.tabs)):
-            server.change(tabs, 'active', i, rendered = i != indcleaning)
-            if i == indcleaning:
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            'ignore',
+            category = DeprecationWarning,
+            message  = ".*elementwise comparison failed; this will raise an error i.*"
+        )
+        warnings.filterwarnings(
+            'ignore',
+            category = RuntimeWarning,
+            message  = ".*All-NaN slice encountered.*"
+        )
+        with bokehaction.launch(
+                'hybridstat.view.HybridStatView',
+                'taskapp.toolbar'
+        ) as server:
+            server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
+            tabs = next(iter(server.doc.select({'type': Tabs})))
+            for i in range(len(tabs.tabs)):
+                server.change(tabs, 'active', i)
                 server.wait()
 
-        server.change(tabs, 'active', indcleaning)
-        server.wait()
-        server.change('Cleaning:Filter', 'subtracted', "38", rendered = True)
-        server.change('Main:toolbar', 'discarded', '38', rendered = True)
-        server.change(tabs, 'active', indcyc)
-        server.wait()
+            mdl         = server.ctrl.theme.model("app.tabs")
+            assert list(mdl.titles.values()) == [i.title for i in tabs.tabs]
+            indcleaning = next(i for i, j in enumerate(mdl.titles) if j == 'cleaning')
+            indcyc      = next(i for i, j in enumerate(mdl.titles) if j == 'cycles')
+            server.change(tabs, 'active', indcleaning)
+            server.load('big_legacy')
+
+            for i in range(len(tabs.tabs)):
+                server.change(tabs, 'active', i, rendered = i != indcleaning)
+                if i == indcleaning:
+                    server.wait()
+
+            server.change(tabs, 'active', indcleaning)
+            server.wait()
+            server.change('Cleaning:Filter', 'subtracted', "38", rendered = True)
+            server.change('Main:toolbar', 'discarded', '38', rendered = True)
+            server.change(tabs, 'active', indcyc)
+            server.wait()
 
 if __name__ == '__main__':
-    test_hairpingroup(bokehaction(None))
+    from testutils.bokehtesting import BokehAction
+    test_hybridstat(BokehAction(None))

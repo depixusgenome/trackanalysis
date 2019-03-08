@@ -14,7 +14,7 @@ from hybridstat.reporting           import (run, HybridstatExcelProcessor,
 from hybridstat.reporting.identification  import writeparams, readparams
 from hybridstat.reporting.batch           import (HybridstatBatchTask,
                                                   computereporters)
-from control.taskcontrol            import create
+from taskcontrol.taskcontrol        import create
 from testingcore                    import path as utfilepath
 
 def test_excel():
