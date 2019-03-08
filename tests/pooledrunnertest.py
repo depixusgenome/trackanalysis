@@ -18,7 +18,7 @@ from testingcore                  import DummyPool
 class _RootTask(RootTask):
     pass
 
-class _RootProcessor(Processor):
+class _RootProcessor(Processor[_RootTask]):
     CNT  = 0
     @classmethod
     def _run(cls):
@@ -40,7 +40,7 @@ class _ATask(Task):
         self.pool = kwa['pool']
         self.name = kwa['name']
 
-class _AProcessor(Processor):
+class _AProcessor(Processor[_ATask]):
     DONE_POOL = [] # type: List[str]
     DONE_NORM = [] # type: List[str]
     def canpool(self):
