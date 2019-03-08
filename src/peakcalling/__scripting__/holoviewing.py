@@ -141,7 +141,11 @@ class _AutoHP(OligoMappingDisplay):
 
         hpc  = self.__pins[key]
         data = np.copy(hpc.data)
-        data[:,1] *= np.nanmax(next(iter(crv)).data[['events']])
+        tmp  = next(iter(crv)).data
+        if isinstance(tmp, np.ndarray):
+            data[:,1] *= np.nanmax(tmp[:,1])
+        else:
+            data[:,1] *= np.nanmax(tmp['events'])
 
         pos  = lambda x: .8*np.nanmax(x)+.2*np.nanmin(x)
         pars = np.round(dist.stretch, 1), np.round(dist.bias, 4)
@@ -180,7 +184,10 @@ class _ManualHP(OligoMappingDisplay):
         if sequence != cache[2]:
             hpc        = self.__pins[sequence]
             data       = np.copy(hpc.data)
-            data[:,1] *= np.nanmax(clones[0].data[['events']])
+            if isinstance(clones[0].data, np.ndarray):
+                data[:,1] *= np.nanmax(clones[0].data[:,1])
+            else:
+                data[:,1] *= np.nanmax(clones[0].data['events'])
             cache[2]   = sequence
             cache[3]   = [hpc.clone(data = data)]
 
@@ -275,8 +282,12 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
         ovrs  = list(ovrs)
         first = next(iter(tuple(ovrs[ind])))
         kdims = first.kdims + first.vdims
-        minv  = [np.nanmin(first.data[:,k]) for k in range(2)]
-        maxv  = [np.nanmax(first.data[:,k]) for k in range(2)]
+        if isinstance(first.data, np.ndarray):
+            minv  = [np.nanmin(first.data[:,k]) for k in range(2)]
+            maxv  = [np.nanmax(first.data[:,k]) for k in range(2)]
+        else:
+            minv  = [np.nanmin(first.data[k]) for k in first.data.columns[:2]]
+            maxv  = [np.nanmax(first.data[k]) for k in first.data.columns[:2]]
 
         ovrs.append(hv.Text(minv[0]*.7+maxv[0]*.3, minv[1]*.3+maxv[1]*.7,
                             '\n'.join(txt), kdims = kdims))
@@ -376,6 +387,14 @@ class _2DRef(PeaksTracksDictDisplay):
         if isinstance(itms, PeaksTracksDictDisplay):
             self.__fcn: Callable = _PTDDisplay.getmethod(itms)
 
+    @staticmethod
+    def __getx(elem):
+        return elem[:,0] if isinstance(elem, np.ndarray) else elem['z'].values
+
+    @staticmethod
+    def __gety(elem):
+        return elem[:,1] if isinstance(elem, np.ndarray) else elem['events'].values
+
     def run(self, bead):
         "Creates the display"
         plot  = self.__fcn(bead) if np.isscalar(bead) else bead
@@ -383,7 +402,7 @@ class _2DRef(PeaksTracksDictDisplay):
         quad  = self.__quadmesh(crvs)
         text  = self.__quadmeshtext(crvs)
 
-        sp1 = [j.data[:,0] for i, j in plot.data.items() if i[0] == 'Scatter'][1::2]
+        sp1 = [self.__getx(j.data) for i, j in plot.data.items() if i[0] == 'Scatter'][1::2]
         sp2 = [(np.ones((len(j),3))*(i+.5)+[-.5,.5, np.NaN]).ravel()
                for i, j in enumerate(sp1)]
 
@@ -402,11 +421,13 @@ class _2DRef(PeaksTracksDictDisplay):
         return (quad*pks*text).redim(x = 'z', y = 'key', z ='events')
 
     def __quadmesh(self, crvs):
-        axis  = crvs[0][1].data[:,0]
+        axis  = self.__getx(crvs[0][1].data)
         def _inte(other):
-            if other.data[:,0].size == 0:
+            xvals = self.__getx(other.data)
+            if xvals.size == 0:
                 return np.zeros(axis.size, dtype = 'f4')
-            return interp1d(other.data[:,0], other.data[:,1],
+            yvals = self.__gety(other.data)
+            return interp1d(xvals, yvals,
                             fill_value = 0.,
                             bounds_error = False,
                             assume_sorted = True)(axis)
