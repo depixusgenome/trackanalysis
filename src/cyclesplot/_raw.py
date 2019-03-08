@@ -17,10 +17,11 @@ from    ._model         import CyclesPlotTheme, CyclesModelAccess
 
 class RawMixin(ABC):
     "Building the graph of cycles"
-    _theme: CyclesPlotTheme
-    _model: CyclesModelAccess
-    _hover: DpxHoverModel
-    attrs: Callable
+    _theme    : CyclesPlotTheme
+    _model    : CyclesModelAccess
+    _hover    : DpxHoverModel
+    attrs     : Callable
+    newbounds : Callable
     def __init__(self):
         "sets up this plotter's info"
         self._rawsource: ColumnDataSource = None
@@ -97,8 +98,9 @@ class RawMixin(ABC):
             name           = 'Cycles:Raw',
             extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
         )
-        raw, shape      = self._DEFAULT_DATA
-        self._rawsource = ColumnDataSource(data = raw)
+        self._raw.x_range.bounds = 'auto'
+        raw, shape       = self._DEFAULT_DATA
+        self._rawsource  = ColumnDataSource(data = raw)
 
         self.attrs(self._theme.raw).addto(self._raw, x = 't', y = 'z', source = self._rawsource)
 
@@ -114,4 +116,6 @@ class RawMixin(ABC):
         finally:
             cache[self._rawsource]['data'] = data
             self._hover.resetraw(self._raw, data, shape, cache)
+            bnds                     = self.newbounds('x', data['t'])
+            cache[self._raw.x_range] = {'bounds': (bnds['reset_start'], bnds['reset_end'])}
         return shape

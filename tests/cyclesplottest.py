@@ -19,31 +19,38 @@ def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
         server.ctrl.display.observe("cycles", _printrng)
         server.load('big_legacy')
 
-        def _press(val, *truth):
+        old = [None, None]
+        def _press(val):
             krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
             with warnings.catch_warnings():
                 warnings.filterwarnings('ignore', category = DeprecationWarning)
                 server.press(val, krow)
-            assert vals == approx(truth, rel = 1e-2)
+                server.wait()
+            assert vals != old
+            old.clear()
+            old.extend(val)
 
         fig  = server.widget['Cycles:Hist']()
         for _ in range(5):
             if fig.extra_x_ranges['cycles'].end == 0.0:
                 server.wait()
         assert fig.x_range.end                  > 2000.
-        assert fig.extra_x_ranges['cycles'].end > 30.
+        assert fig.extra_x_ranges['cycles'].end > 50.
 
-        _press('Shift- ',           0.,       0.)
-        _press('Shift-ArrowUp',     0.359869, 0.564043)
-        assert fig.x_range.end                  == approx(530, abs=.1)
-        assert fig.extra_x_ranges['cycles'].end == approx(17,   abs=.1)
-        _press('Alt-ArrowUp',       0.400703, 0.604878)
-        _press('Alt-ArrowDown',     0.359869, 0.564043)
-        _press('Shift-ArrowDown',   0.,       0.)
+        _press('Shift- ')
+        _press('Shift-ArrowUp')
+        for _ in range(5):
+            if fig.extra_x_ranges['cycles'].end > 1500.0:
+                server.wait()
+        assert fig.x_range.end                  < 1500.
+        assert fig.extra_x_ranges['cycles'].end < 30.
+        _press('Alt-ArrowUp')
+        _press('Alt-ArrowDown')
+        _press('Shift-ArrowDown')
 
         curr = server.ctrl.display.model("tasks")
         assert curr.bead in (None, 0)
-        server.press('PageUp', andstop = False)
+        server.press('PageUp', andstop = False, rendered = True)
         assert curr.bead == 1
 
         server.change('Cycles:Oligos', 'value', ' TGGC  , aatt')
