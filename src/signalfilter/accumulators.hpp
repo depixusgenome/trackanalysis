@@ -616,7 +616,7 @@ namespace signalfilter { namespace stats
                 --last;
 
         out[0] = last >= threshold;
-        for(size_t i = 1, e = width > sz ? 0 : sz-width; i < e; ++i)
+        for(size_t i = 1, e = width > sz ? 0 : sz-width+1; i < e; ++i)
         {
             if(!std::isfinite(dt[i+width-1]))
             {
@@ -628,7 +628,7 @@ namespace signalfilter { namespace stats
         }
 
         if(sz > width)
-            for(size_t i = sz-width; i < sz; ++i)
+            for(size_t i = sz-width+1; i < sz; ++i)
             {
                 if(std::isfinite(dt[i-1]))
                     ++last;

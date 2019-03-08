@@ -60,9 +60,12 @@ def test_nancount():
     out[-2:] += 1
     assert_allclose(nancount(arr, 3), out)
 
-    assert_allclose(nanthreshold(arr, 1, 1), np.zeros(10, dtype = 'bool'))
-    assert_allclose(nanthreshold(arr, 2, 1), np.zeros(10, dtype = 'bool'))
-    assert_allclose(nanthreshold(arr, 3, 1), np.zeros(10, dtype = 'bool'))
+    out = np.zeros(10, dtype = 'bool')
+    assert_allclose(nanthreshold(arr, 1, 1), out)
+    out[-1] = 1
+    assert_allclose(nanthreshold(arr, 2, 1), out)
+    out[-2] = 1
+    assert_allclose(nanthreshold(arr, 3, 1), out)
 
 
     arr[5] = np.NaN
@@ -87,4 +90,4 @@ def test_nancount():
     assert_allclose(nanthreshold(arr, 2, 1), np.array(vals[1], dtype = 'bool'))
     assert_allclose(nanthreshold(arr, 3, 1), np.array(vals[2], dtype = 'bool'))
 if __name__ == '__main__':
-    test_hfsigma()
+    test_nancount()
