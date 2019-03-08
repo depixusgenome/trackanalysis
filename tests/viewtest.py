@@ -8,7 +8,7 @@ from taskcontrol.beadscontrol import DataSelectionBeadController
 
 def test_toolbar(bokehaction):
     "test the toolbar"
-    with bokehaction.launch('view.toolbar.BeadToolbar', 'app.default') as server:
+    with bokehaction.launch('taskview.toolbar.BeadToolbar', 'taskapp.default') as server:
         tbar = server.widget['Main:toolbar']
         ctrl = server.ctrl
         curr = lambda: ctrl.display.get('tasks', 'roottask')
@@ -71,7 +71,7 @@ def test_toolbar(bokehaction):
 
 def test_beadtoolbar(bokehaction):
     "test the toolbar"
-    with bokehaction.launch('view.toolbar.BeadToolbar', 'app.default') as server:
+    with bokehaction.launch('taskview.toolbar.BeadToolbar', 'taskapp.default') as server:
         # pylint: disable=protected-access
         beads = DataSelectionBeadController(server.ctrl)
 
