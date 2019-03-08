@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"tests opening, reading and analysis of a ramp.trk file"
-#from   legacy import readtrack   # pylint: disable=import-error,no-name-in-module
+import warnings
 from taskcontrol.taskcontrol    import create
 from taskmodel                  import TrackReaderTask
 from ramp.processor             import RampStatsTask
@@ -22,35 +22,52 @@ def test_rampview(bokehaction): # pylint: disable=redefined-outer-name
             done[0] += 1
         else:
             done[0] -= 1
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            'ignore',
+            category = FutureWarning,
+            message  = ".*elementwise comparison failed.*"
+        )
+        warnings.filterwarnings(
+            'ignore',
+            category = DeprecationWarning,
+            message  = ".*elementwise comparison failed.*"
+        )
+        warnings.filterwarnings(
+            'ignore',
+            category = RuntimeWarning,
+            message  = ".*All-NaN slice encountered.*"
+        )
 
-    with bokehaction.launch('ramp.view.RampPlotView', 'app.toolbar') as server:
-        server.ctrl.display.observe("ramp.pool", _ondone)
-        server.load('ramp_5HPs_mix.trk')
+        with bokehaction.launch('ramp.view.RampPlotView', 'taskapp.toolbar') as server:
+            server.ctrl.display.observe("ramp.pool", _ondone)
+            server.load('ramp_5HPs_mix.trk')
 
-        assert 'config.tasks' not in server.savedconfig
+            assert 'config.tasks' not in server.savedconfig
 
-        cnf = lambda: server.ctrl.theme.get("ramp", "dataframe")
-        assert cnf().hfsigma == RampStatsTask.hfsigma
-        server.change(DpxRamp, 'maxhfsigma', 0.006)
-        server.wait()
-        assert server.widget[DpxRamp].maxhfsigma == 0.006
-        assert cnf().hfsigma[-1] == 0.006
-        assert server.savedconfig['config.ramp']['dataframe'].hfsigma[-1] == 0.006
-
-        while done[0] != 0:
+            cnf = lambda: server.ctrl.theme.get("ramp", "dataframe")
+            assert cnf().hfsigma == RampStatsTask.hfsigma
+            server.change(DpxRamp, 'maxhfsigma', 0.006)
             server.wait()
+            assert server.widget[DpxRamp].maxhfsigma == 0.006
+            assert cnf().hfsigma[-1] == 0.006
+            assert server.savedconfig['config.ramp']['dataframe'].hfsigma[-1] == 0.006
 
-        root = server.ctrl.display.get("tasks", "roottask")
-        cns  = server.ctrl.display.get('ramp', 'consensus')
-        assert root in cns
-        assert len(cns[root])
-        server.change(DpxRamp, 'displaytype', 1, rendered = True)
-        server.change(DpxRamp, 'displaytype', 2, rendered = True)
+            while done[0] != 0:
+                server.wait()
 
-        for slider in server.doc.select({'type': Slider}):
-            server.change(slider, 'value', slider.start)
-            server.change(slider, 'value', slider.end)
-            server.change(slider, 'value', (slider.start + slider.end)*.5)
+            root = server.ctrl.display.get("tasks", "roottask")
+            cns  = server.ctrl.display.get('ramp', 'consensus')
+            assert root in cns
+            assert len(cns[root])
+            server.change(DpxRamp, 'displaytype', 1, rendered = True)
+            server.change(DpxRamp, 'displaytype', 2, rendered = True)
+
+            for slider in server.doc.select({'type': Slider}):
+                server.change(slider, 'value', slider.start)
+                server.change(slider, 'value', slider.end)
+                server.change(slider, 'value', (slider.start + slider.end)*.5)
 
 if __name__ == '__main__':
-    test_rampview(bokehaction(None))
+    from testutils.bokehtesting import BokehAction
+    test_rampview(BokehAction(None))

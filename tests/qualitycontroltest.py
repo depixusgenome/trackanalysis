@@ -15,8 +15,13 @@ def test_view_fov(bokehaction):
     with warnings.catch_warnings():
         warnings.filterwarnings(
             'ignore',
+            category = FutureWarning,
+            message  = ".*elementwise comparison failed;.*"
+        )
+        warnings.filterwarnings(
+            'ignore',
             category = DeprecationWarning,
-            message  = ".*elementwise comparison failed; this will raise an error i.*"
+            message  = ".*elementwise comparison failed.*"
         )
         warnings.filterwarnings(
             'ignore',

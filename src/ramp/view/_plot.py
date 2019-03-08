@@ -33,7 +33,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
     def observe(self, ctrl, noerase = True):
         "sets-up model observers"
         super().observe(ctrl, noerase = noerase)
-        self.__widgets.observe(ctrl)
+        self.__widgets.observe(self, ctrl)
         observetracks(self._plotmodel, ctrl)
 
         @ctrl.display.observe(self._display)

@@ -246,11 +246,11 @@ class RampWidgets:
                               zmag      = RampZMagResultsWidget(ctrl, model),
                               extension = RampHairpinSizeWidget(ctrl, model))
 
-    def observe(self, ctrl):
+    def observe(self, mainview, ctrl):
         "observe the controller"
         for widget in self.__widgets.values():
             if hasattr(widget, 'observe'):
-                widget.observe(self, ctrl)
+                widget.observe(mainview, ctrl)
 
     def create(self, view, ctrl):
         "add to the gui"
