@@ -2,17 +2,31 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
+import warnings
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 
 def test_view_messages(bokehaction):
     "test the view"
-    with bokehaction.launch('qualitycontrol.view', 'app.toolbar') as server:
+    with bokehaction.launch('qualitycontrol.view', 'taskapp.toolbar') as server:
         server.load('big_legacy')
 
 def test_view_fov(bokehaction):
     "test the view"
-    with bokehaction.launch('fov.FoVPlotView', 'app.toolbar') as server:
-        server.load('big_legacy')
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            'ignore',
+            category = DeprecationWarning,
+            message  = ".*elementwise comparison failed; this will raise an error i.*"
+        )
+        warnings.filterwarnings(
+            'ignore',
+            category = RuntimeWarning,
+            message  = ".*All-NaN slice encountered.*"
+        )
+
+        with bokehaction.launch('fov.FoVPlotView', 'taskapp.toolbar') as server:
+            server.load('big_legacy')
 
 if __name__ == '__main__':
-    test_view_messages(bokehaction(None))
+    from testutils.bokehtesting import BokehAction
+    test_view_messages(BokehAction(None))

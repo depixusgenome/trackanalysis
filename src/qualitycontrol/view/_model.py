@@ -89,29 +89,30 @@ class QualityControlModelAccess(DataCleaningModelAccess):
     def buildmessages(self):
         "creates beads and warnings where applicable"
         default: Dict[str, List] = {i: [] for i in ('type', 'message', 'bead', 'cycles')}
-        tasks = self.cleaning.task, self.clipping.task
-        ncy   = self.track.ncycles
-        if any(i is not None for i in tasks):
-            ctx = self.runcontext(GuiDataCleaningProcessor, GuiClippingProcessor)
-            with ctx as view:
-                if view is not None:
-                    for _ in view:
-                        pass
+        if self.track is not None:
+            tasks = self.cleaning.task, self.clipping.task
+            ncy   = self.track.ncycles
+            if any(i is not None for i in tasks):
+                ctx = self.runcontext(GuiDataCleaningProcessor, GuiClippingProcessor)
+                with ctx as view:
+                    if view is not None:
+                        for _ in view:
+                            pass
 
-                for tsk in tasks:
-                    if tsk is None:
-                        pass
+                    for tsk in tasks:
+                        if tsk is None:
+                            continue
 
-                    mem = ctx.taskcache(tsk).pop('messages', None)
-                    # pylint: disable=unsupported-membership-test
-                    mem = [i for i in mem if i[0] not in default['bead']]
-                    if not mem:
-                        pass
+                        mem = ctx.taskcache(tsk).pop('messages', None)
+                        # pylint: disable=unsupported-membership-test
+                        mem = [i for i in mem if i[0] not in default['bead']]
+                        if not mem:
+                            pass
 
-                    default['bead']    += [i[0] for i in mem]
-                    default['cycles']  += [ncy if i[1] is None else i[1] for i in mem]
-                    default['type']    += [i[2] for i in mem]
-                    default['message'] += [i[3] for i in mem]
+                        default['bead']    += [i[0] for i in mem]
+                        default['cycles']  += [ncy if i[1] is None else i[1] for i in mem]
+                        default['type']    += [i[2] for i in mem]
+                        default['message'] += [i[3] for i in mem]
         self._ctrl.display.update(self.__display, messages = default)
 
     def badbeads(self) -> Set[BEADKEY]:
