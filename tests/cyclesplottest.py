@@ -7,6 +7,22 @@ from pytest                   import approx       # pylint: disable=no-name-in-m
 from testingcore.bokehtesting import bokehaction  # pylint: disable=unused-import
 from view.plots               import DpxKeyedRow
 
+def _check(server, name, value):
+    if callable(value):
+        for _ in range(5):
+            if value():
+                break
+            server.wait()
+        else:
+            assert value()
+        return
+    for _ in range(5):
+        if server.widget[name].value == value:
+            break
+        server.wait()
+    else:
+        assert server.widget[name].value == value
+
 def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
     "test cyclesplot basic stuff"
     vals = [0.]*2
@@ -52,34 +68,44 @@ def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
         assert curr.bead in (None, 0)
         server.press('PageUp', andstop = False, rendered = True)
         assert curr.bead == 1
-
         server.change('Cycles:Oligos', 'value', ' TGGC  , aatt')
-        assert server.widget['Cycles:Oligos'].value == 'aatt, tggc'
+        _check(server, 'Cycles:Oligos', 'aatt, tggc')
+
         cnf  = server.savedconfig
         assert cnf['config.sequence']['probes'] == ['aatt', 'tggc']
         assert cnf['config.sequence']['history'] == [['aatt', 'tggc']]
 
         server.change('Cycles:Oligos', 'value', '')
-        assert server.widget['Cycles:Oligos'].value == ''
+        _check(server, 'Cycles:Oligos', '')
         cnf  = server.savedconfig
         assert not cnf['config.sequence'].get('probes', None)
         assert cnf['config.sequence']['history'] == [['aatt', 'tggc']]
 
         server.load('hairpins.fasta', rendered = False, andpress = False)
         server.change('Cycles:Sequence', 'value', '←')
-        assert (server.widget['Cycles:Peaks'].source.data['bases']
-                == approx([0, 1000], abs = 1.))
+        _check(
+            server, '',
+            lambda: (
+                server.widget['Cycles:Peaks'].source.data['bases']
+                == approx([0, 1000], abs = 1.)
+            )
+        )
 
         server.change('Cycles:Oligos',   'value', 'TgGC ')
-        assert (server.widget['Cycles:Peaks'].source.data['bases']
-                == approx([166, 1113], abs = 1.))
+        _check(
+            server, '',
+            lambda: (
+                server.widget['Cycles:Peaks'].source.data['bases']
+                == approx([166, 1113], abs = 1.)
+            )
+        )
 
         assert server.widget['Cycles:Stretch'].value == approx(1./8.8e-4, abs = 1e-1)
         assert server.widget['Cycles:Bias'].value == approx(.0014, abs = 5e-4)
         server.change('Cycles:Bias',     'value', -.05)
-        assert server.widget['Cycles:Bias'].value == approx(-.05, abs = 1e-5)
+        _check(server, 'Cycles:Bias', approx(-.05, abs = 1e-5))
         server.change('Cycles:Stretch',  'value', 1050.)
-        assert server.widget['Cycles:Stretch'].value == approx(1050., abs = 1e-5)
+        _check(server, 'Cycles:Stretch', approx(1050., abs = 1e-5))
         server.press('Control-z')
 
 def test_cyclesplot2(bokehaction):
@@ -92,11 +118,11 @@ def test_cyclesplot2(bokehaction):
         assert fig.extra_x_ranges['cycles'].end > 70
         server.change('Cycles:Alignment', 'active', 0, rendered = True)
         assert server.widget['Cycles:Alignment'].active == 0
-        assert fig.extra_x_ranges['cycles'].end < 70
+        _check(server, '', lambda: fig.extra_x_ranges['cycles'].end < 70)
 
         server.press('Control-z', rendered = True)
         assert server.widget['Cycles:Alignment'].active == 1
-        assert fig.extra_x_ranges['cycles'].end > 70
+        _check(server, '', lambda: fig.extra_x_ranges['cycles'].end > 70)
 
         rng  = server.widget['Cycles:Raw']().x_range
         vals = rng.start, rng.end
