@@ -1,14 +1,24 @@
-#if (__GNUC__ == 7 && __GNUC_MINOR__ == 3) || (__GNUC__ == 8 && __GNUC_MINOR__ == 2)
+#ifdef __GNUC__
 # ifndef __cpp_noexcept_function_type
 #   define __cpp_noexcept_function_type 0
+# endif 
+# ifndef __clang__
+#   if(__GNUC__ == 7) || (__GNUC__ == 8 && __GNUC_MINOR__ <= 3)
+#     pragma GCC diagnostic push
+#     pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
+#     pragma GCC diagnostic ignored "-Wparentheses"
+#   endif
 # endif
-# pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
 #endif
 #include <boost/math/distributions/students_t.hpp>
 #include <boost/math/distributions/normal.hpp>
 #include "eventdetection/stattests.h"
-#if (__GNUC__ == 7 && __GNUC_MINOR__ == 3) || (__GNUC__ == 8 && __GNUC_MINOR__ == 2)
-# pragma GCC diagnostic pop
+#ifdef __GNUC__
+# ifndef __clang__
+#   if(__GNUC__ == 7) || (__GNUC__ == 8 && __GNUC_MINOR__ <= 3)
+#     pragma GCC diagnostic pop
+#   endif
+# endif
 #endif
 
 namespace bm = boost::math;

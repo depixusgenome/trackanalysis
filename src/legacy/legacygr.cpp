@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
-#if (__GNUC__ == 8 && __GNUC_MINOR__ == 2)
+#if (__GNUC__ == 8 && __GNUC_MINOR__ <= 3)
 # pragma GCC diagnostic push
 # pragma GCC diagnostic ignored "-Wstringop-truncation"
 # pragma GCC diagnostic ignored "-Wformat-truncation"
@@ -1340,7 +1340,7 @@ namespace legacy { namespace {
         float *array = NULL;
         FILE *binfp;
         data_set *ds = NULL;
-        static char previous_file[512];
+        static char previous_file[512*2];
         static int first = 1;
         static long int cz = 0;
 

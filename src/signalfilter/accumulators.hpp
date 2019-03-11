@@ -13,12 +13,29 @@
 #include <limits>
 #include <type_traits>
 #ifdef __GNUC__
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+# ifndef __cpp_noexcept_function_type
+#   define __cpp_noexcept_function_type 0
+# endif
+# ifndef __NVCC___WORKAROUND_GUARD
+#   define __NVCC___WORKAROUND_GUARD 0
+#   define __NVCC__ 0
+# endif
 # ifndef __clang__
-#  pragma GCC diagnostic ignored "-Wmisleading-indentation"
-#  pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-#  pragma GCC diagnostic ignored "-Wparentheses"
+#   if (__GNUC__ == 7 || (__GNUC__ == 8 && __GNUC_MINOR__ <= 3))
+#     pragma GCC diagnostic push
+#     pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#     pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
+#     pragma GCC diagnostic ignored "-Wmisleading-indentation"
+#     pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#     pragma GCC diagnostic ignored "-Wparentheses"
+#   endif
+# else
+#   if (__clang_major__ == 6)
+#     pragma GCC diagnostic push
+#     pragma GCC diagnostic ignored "-Wmissing-noreturn"
+#     pragma GCC diagnostic ignored "-Wunused-parameter"
+#     pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#   endif
 # endif
 #endif
 #include <boost/accumulators/statistics/rolling_mean.hpp>
@@ -35,7 +52,15 @@
 #include <boost/accumulators/framework/accumulator_base.hpp>
 #include <boost/accumulators/framework/parameters/sample.hpp>
 #ifdef __GNUC__
-# pragma GCC diagnostic pop
+# ifndef __clang__
+#   if (__GNUC__ == 7 || (__GNUC__ == 8 && __GNUC_MINOR__ <= 3))
+#     pragma GCC diagnostic pop
+#   endif
+# else
+#   if (__clang_major__ == 6)
+#     pragma GCC diagnostic pop
+#   endif
+# endif
 #endif
 
 #include "signalfilter/accumulators.h"

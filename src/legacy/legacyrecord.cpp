@@ -7,7 +7,7 @@
 # undef max
 # undef min
 #endif
-#if (__GNUC__ == 8 && __GNUC_MINOR__ == 2)
+#if (__GNUC__ == 8 && __GNUC_MINOR__ <= 3)
 # pragma GCC diagnostic push
 # pragma GCC diagnostic ignored "-Wstringop-truncation"
 #endif
@@ -532,7 +532,7 @@ namespace legacy
         constexpr static int const IS_FLOAT_IMAGE                = 512;
         constexpr static int const IS_COMPLEX_IMAGE              = 64;
         constexpr static int const IS_RGB_PICTURE                = 16384;   // 0x4000
-        constexpr static int const IS_BW_PICTURE                 = 32768;  // 0x8000
+        //constexpr static int const IS_BW_PICTURE                 = 32768;  // 0x8000
         constexpr static int const IS_UINT_IMAGE                 = 131072;  // 0x20000
         constexpr static int const IS_LINT_IMAGE                 = 262144;  // 0x40000
         constexpr static int const IS_RGBA_PICTURE               = 524288;  // 0x80000
@@ -4727,7 +4727,7 @@ namespace legacy
         {
             fclose(fp);
             fclose(fpo);
-            return NULL;
+            return false;
         }
 
         st = strstr(test, "image data");
@@ -4744,7 +4744,7 @@ namespace legacy
             {
                 fclose(fp);
                 fclose(fpo);
-                return NULL;
+                return false;
             }
         }
 

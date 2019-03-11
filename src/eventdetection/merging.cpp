@@ -246,11 +246,11 @@ void PopulationMerger::run(float const * data, ints_t & intervals) const
 {
     using namespace rangemerging;
     auto fcn  = [](PopulationMerger const & self,
-                   float            const * data,
+                   float            const *,
                    PopStats         const & left,
                    PopStats         const & right)
     {
-        auto  check = [&self, data](PopStats const & one, PopStats const & other)
+        auto  check = [&self](PopStats const & one, PopStats const & other)
         {
             auto ngood = 0u, nboth = 0u;
             auto minv  = std::get<2>(one), maxv = std::get<3>(one);

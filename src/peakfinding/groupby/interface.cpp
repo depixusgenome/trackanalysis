@@ -21,7 +21,7 @@ namespace peakfinding{
 	}
 
 	struct 
-#if (__GNUC__ == 7 && __GNUC_MINOR__ == 3) || (__GNUC__ == 8 && __GNUC_MINOR__ == 2)
+#if (__GNUC__ == 7 && __GNUC_MINOR__ == 3) || (__GNUC__ == 8 && __GNUC_MINOR__ <= 3)
     __attribute__ ((visibility("hidden")))
 #endif
     OutputPy

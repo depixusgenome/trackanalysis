@@ -1,5 +1,5 @@
 #include <limits>
-#if (__GNUC__ == 7 && __GNUC_MINOR__ == 3) || (__GNUC__ == 8 && __GNUC_MINOR__ == 2)
+#ifdef __GNUC__
 # ifndef __cpp_noexcept_function_type
 #   define __cpp_noexcept_function_type 0
 # endif
@@ -7,16 +7,36 @@
 #   define __NVCC___WORKAROUND_GUARD 0
 #   define __NVCC__ 0
 # endif
-# pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
-# pragma GCC diagnostic ignored "-Wparentheses"
+# ifndef __clang__
+#   if(__GNUC__ == 7) || (__GNUC__ == 8 && __GNUC_MINOR__ <= 3)
+#     pragma GCC diagnostic push
+#     pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
+#     pragma GCC diagnostic ignored "-Wparentheses"
+#   endif
+# endif
+# ifdef __clang__
+#   if(__clang_major__ == 6)
+#     pragma GCC diagnostic push
+#     pragma clang diagnostic ignored "-Wunused-parameter"
+#   endif
+# endif
 #endif
 #include <boost/accumulators/statistics/rolling_variance.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/min.hpp>
 #include <boost/accumulators/statistics/max.hpp>
 #include <boost/math/distributions/chi_squared.hpp>
-#if (__GNUC__ == 7 && __GNUC_MINOR__ == 3) || (__GNUC__ == 8 && __GNUC_MINOR__ == 2)
-# pragma GCC diagnostic pop
+#ifdef __GNUC__
+# ifndef __clang__
+#   if(__GNUC__ == 7) || (__GNUC__ == 8 && __GNUC_MINOR__ <= 3)
+#     pragma GCC diagnostic pop
+#   endif
+# endif
+# ifdef __clang__
+#   if(__clang_major__ == 6)
+#     pragma GCC diagnostic pop
+#   endif
+# endif
 #endif
 #include "signalfilter/accumulators.hpp"
 #include "eventdetection/splitting.h"
@@ -339,7 +359,7 @@ void MultiGradeSplitDetector::grade(float precision, grade_t & grade) const
     auto first = 0_s, last = 0_s;
     _apply( 0_s, sz,
             [&grade](size_t i) { return grade[i] >= 1.0f; },
-            [&first, &last, &found, &patch, sz, hlen, wmin](size_t i1, size_t i2)
+            [&first, &last, &found, &patch, hlen, wmin](size_t i1, size_t i2)
             {
                 auto cur = i2-i1 >= wmin;
                 if(!(found && cur && last+hlen > i1))
