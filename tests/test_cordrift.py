@@ -19,7 +19,7 @@ from simulator.processor        import TrackSimulatorTask
 from eventdetection.processor   import ExtremumAlignmentTask
 from taskmodel                  import DataSelectionTask
 from taskcontrol.taskcontrol    import create
-from testingcore                import path as utpath, DummyPool
+from tests.testingcore          import path as utpath, DummyPool
 
 def test_singlefitstitch():
     "Tests single fit sticht"

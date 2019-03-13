@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
-from testingcore              import path as _utpath
-from testingcore.bokehtesting import bokehaction  # pylint: disable=unused-import
+from tests.testingcore              import path as _utpath
+from tests.testingcore.bokehtesting import bokehaction  # pylint: disable=unused-import
 from taskcontrol.beadscontrol import DataSelectionBeadController
 
 def test_toolbar(bokehaction):

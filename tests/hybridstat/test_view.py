@@ -12,8 +12,8 @@ from bokeh.models               import Tabs, FactorRange
 from tornado.gen                import sleep
 from tornado.ioloop             import IOLoop
 
-from testingcore                import path as utfilepath
-from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
+from tests.testingcore                import path as utfilepath
+from tests.testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 from view.plots                 import DpxKeyedRow
 
 from peakfinding.reporting.batch         import createmodels as _pmodels

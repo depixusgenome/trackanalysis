@@ -7,12 +7,12 @@ import  numpy
 from    control.event           import Event, EmitPolicy
 from    control.decentralized   import DecentralizedController
 from    data.views              import Cycles, Beads, TrackView
-from    taskcontrol.taskcontrol     import TaskController
-from    taskcontrol.processor       import Processor, Cache, Runner
+from    taskcontrol.taskcontrol import TaskController
+from    taskcontrol.processor   import Processor, Cache, Runner
 from    taskcontrol.processor.cache import CacheReplacement
 import  taskmodel               as tasks
 
-from    testingcore             import path as utpath
+from    tests.testingcore       import path as utpath
 
 def test_evt():
     "test event stuff"

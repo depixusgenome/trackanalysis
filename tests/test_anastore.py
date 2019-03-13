@@ -9,7 +9,7 @@ import numpy
 import taskstore as anastore
 import anastore.api
 from anastore           import modifyclasses, TPE, DELETE, RESET
-from testingcore        import path as _utpath, Path
+from tests.testingcore  import path as _utpath, Path
 from taskmodel.track    import TrackReaderTask, CycleCreatorTask
 from taskmodel.tagging  import TaggingTask
 

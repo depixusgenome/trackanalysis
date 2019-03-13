@@ -22,7 +22,7 @@ from peakcalling.tohairpin      import (PeakMatching, GaussianProductFit,
 from peakcalling.toreference    import HistogramFit, ChiSquareHistogramFit, Pivot
 from peakcalling.processor      import (BeadsByHairpinProcessor, BeadsByHairpinTask,
                                         DistanceConstraint, FitToReferenceTask)
-from testingcore                import DummyPool, path as utpath
+from tests.testingcore          import DummyPool, path as utpath
 
 def test_toref():
     "tests reference comparison"

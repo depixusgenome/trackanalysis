@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 "Tests histogram creation and analysis"
 import numpy  as np
-from   numpy.testing          import assert_allclose
+from   numpy.testing           import assert_allclose
 from   taskcontrol.taskcontrol import create
-from   peakfinding.projection import (BeadProjection, CyclesDigitization,
-                                      CycleProjection, ProjectionAggregator,
-                                      CycleAlignment, EventExtractor, PeakListArray)
+from   peakfinding.projection  import (BeadProjection, CyclesDigitization,
+                                       CycleProjection, ProjectionAggregator,
+                                       CycleAlignment, EventExtractor, PeakListArray)
 from   peakfinding.processor.projection import PeakProjectorTask
-from   testingcore            import path as utfilepath
+from   tests.testingcore       import path as utfilepath
 
 def _data():
     data = np.concatenate(sum(

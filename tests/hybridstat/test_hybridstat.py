@@ -15,7 +15,7 @@ from hybridstat.reporting.identification  import writeparams, readparams
 from hybridstat.reporting.batch           import (HybridstatBatchTask,
                                                   computereporters)
 from taskcontrol.taskcontrol        import create
-from testingcore                    import path as utfilepath
+from tests.testingcore              import path as utfilepath
 
 def test_excel():
     "tests reporting"

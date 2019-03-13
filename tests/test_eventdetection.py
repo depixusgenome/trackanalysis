@@ -30,7 +30,7 @@ from eventdetection.data      import Events
 from eventdetection           import samples
 from taskcontrol.taskcontrol  import create
 from simulator                import randtrack
-from testingcore              import path as utfilepath
+from tests.testingcore        import path as utfilepath
 
 def test_cpp_splits():
     "test cpp splits"

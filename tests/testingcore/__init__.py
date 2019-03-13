@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """ access to files """
-from testutils import ResourcePath, getmonkey, DummyPool, Path, cast
+from ..testutils import ResourcePath, getmonkey, DummyPool, Path, cast
 
 def _trackreadertask(fpath):
     from taskmodel      import TrackReaderTask
@@ -27,4 +27,4 @@ PATHS = dict(small_pickle   = "small_pickle.pk",
              big_selected   = big_selected,
              big_all        = big_all)
 
-path = ResourcePath("../tests/testingcore/", PATHS) # pylint: disable=invalid-name
+path = ResourcePath("../data/", PATHS) # pylint: disable=invalid-name

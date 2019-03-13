@@ -12,7 +12,7 @@ from data                  import Cycles
 from eventdetection.data   import Events
 from peakfinding.processor import PeaksDict
 from scripting.confusion   import ConfusionMatrix, LNAHairpin
-from testingcore           import path as utpath
+from tests.testingcore     import path as utpath
 
 def test_track():
     "test scripting enhanced track"

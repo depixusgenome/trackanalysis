@@ -10,7 +10,7 @@ import numpy as np
 from numpy.testing       import assert_allclose
 
 from peakfinding.groupby import MaxCov
-from testingcore         import path as utfilepath
+from tests.testingcore   import path as utfilepath
 
 EMFITTER = MaxCov()
 DATA     = pickle.load(open(utfilepath('smallemdata'),"rb"))

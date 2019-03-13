@@ -7,7 +7,7 @@ def build(bld):
     pysrc = bld.path.ant_glob('**/*.py')
     cfe   = bld.path.ant_glob('**/*.coffee')
 
-    builder.checkpy  (bld, 'tests', pysrc)
+    builder.checkpy  (bld, 'tests', pysrc, 'pylint')
     builder.copyfiles(bld, builder.appname(), pysrc)
     builder.copyfiles(bld, builder.appname(), cfe)
 

@@ -53,7 +53,7 @@ def test_hv():
     REFS   = ("gccttacaca,gcctaatacc,cgtacggtta,acggatctca,aacatgaagg,"
               "cattctcagg,cagaatagct,accttctagg,cctaactgta,taacacgtcc,"
               "cctatcatgg,cgcatacaca").split(',')
-    CLEAN = TracksDict("../tests/testingcore/100bp_4mer/*.pk", # type: ignore
+    CLEAN = TracksDict("../data/100bp_4mer/*.pk", # type: ignore
                        match = r".*/(.*)\.pk")
     CLEAN.cleaned = True
 

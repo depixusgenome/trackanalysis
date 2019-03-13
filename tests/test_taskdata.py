@@ -15,7 +15,7 @@ from   data.trackio     import LegacyGRFilesIO, savetrack, PickleIO, LegacyTrack
 from   data.track       import FoV, Track
 from   data.trackops    import concatenatetracks, selectcycles, dropbeads, clone
 from   data.tracksdict  import TracksDict
-from   testingcore      import path as utpath
+from   tests.testingcore      import path as utpath
 
 # pylint: disable=missing-docstring,protected-access
 class _MyItem(ITrackView):

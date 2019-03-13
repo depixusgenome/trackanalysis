@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 u""" Tests legacy data """
 
-from legacy         import readtrack, readgr # pylint: disable=import-error,no-name-in-module
-from testingcore    import path
+from legacy            import readtrack, readgr # pylint: disable=import-error,no-name-in-module
+from tests.testingcore import path
 
 def test_opengr():
     u"test a .gr file"

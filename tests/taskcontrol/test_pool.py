@@ -13,7 +13,7 @@ from data.views                   import TrackView
 from taskcontrol.processor        import Processor
 from taskcontrol.processor.runner import Cache, pooledinput, run, poolchunk
 from taskmodel                    import Task, RootTask, Level
-from testingcore                  import DummyPool
+from tests.testingcore            import DummyPool
 
 class _RootTask(RootTask):
     pass
@@ -135,5 +135,5 @@ def test_pooled(monkeypatch):
     assert set(''.join(j[-1] for j in i) for _, i in processed) == {'rabcd'}
 
 if __name__ == '__main__':
-    from testingcore import getmonkey
+    from tests.testingcore import getmonkey
     test_pooled(getmonkey())

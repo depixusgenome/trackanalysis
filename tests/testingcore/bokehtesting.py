@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=protected-access
 """ access to files """
-from testutils.bokehtesting import bokehaction, _ManagedServerLoop # pylint: disable=unused-import
+from ..testutils.bokehtesting import bokehaction, _ManagedServerLoop # pylint: disable=unused-import
 
 def savedconfig(self):
     "return the saved config"

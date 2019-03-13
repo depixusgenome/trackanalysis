@@ -3,7 +3,7 @@
 # pylint: disable=redefined-outer-name
 """ Tests views """
 import warnings
-from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
+from tests.testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 
 def test_view_messages(bokehaction):
     "test the view"
