@@ -26,7 +26,7 @@ from peakfinding.histogram       import Histogram
 from peakfinding.groupby         import CWTPeakFinder,ZeroCrossingPeakFinder, PeakFlagger
 from peakfinding.alignment       import PeakCorrelationAlignment, PeakExpectedPositionAlignment
 from peakfinding.reporting.batch import computereporters
-from testingcore                 import path as utfilepath
+from tests.testingcore           import path as utfilepath
 from signalfilter                import NonLinearFilter
 
 CORR = lambda f, a, b, c, d, e, g: PeakCorrelationAlignment.run(f,
