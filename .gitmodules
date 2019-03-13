@@ -1,9 +1,9 @@
 [submodule "wafbuilder"]
 	path = wafbuilder
-	url = http://gitlab.picoseq.org/build-system/wafbuilder.git
+	url = https://gitlab.picoseq.org/build-system/wafbuilder.git
 [submodule "linting"]
 	path = linting
-	url = http://gitlab.picoseq.org/build-system/linting.git
+	url = https://gitlab.picoseq.org/build-system/linting.git
 [submodule "core"]
 	path = core
 	url = https://gitlab.picoseq.org/analysis/libanalysis.git
