@@ -2,7 +2,6 @@ buildgcc:
   stage: build
   script:
     - export CXX=g++-8
-    - python waf clean
     - python waf configure --cxxflags "-std=c++17 -g -Werror"
     - python waf build
 
@@ -10,16 +9,21 @@ buildclang:
   stage: build
   script:
     - export CXX=clang++
-    - python waf clean
     - python waf configure --cxxflags "-std=c++17 -g -Werror"
     - python waf build --nolinting
 
-test:
-  stage: test
+unittest:
+  stage: unittest
   script: 
     - export CXX=g++-8
-    - python waf clean
-    - python waf configure --cxxflags "-std=c++17 -g -Werror"
+    - python waf configure
     - python waf build --nolinting
-    - cd build
-    - pytest tests/*.py
+    - python waf unittest
+
+integrationtest:
+  stage: integrationtest
+  script: 
+    - export CXX=g++-8
+    - python waf configure
+    - python waf build --nolinting
+    - python waf integrationtest
