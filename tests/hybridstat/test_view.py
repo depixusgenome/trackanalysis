@@ -152,6 +152,7 @@ def _t_e_s_t_peaks(server, bkact): # pylint: disable=too-many-statements
     assert Path(out).exists()
     _hascstr(1)
 
+@integrationmark
 def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-locals
     "test peaksplot"
     vals = [0.]*2
