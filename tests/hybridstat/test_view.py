@@ -5,13 +5,13 @@
 from typing                     import cast
 from tempfile                   import mktemp, gettempdir
 from pathlib                    import Path
-import warnings
 import numpy as np
 
 from bokeh.models               import Tabs, FactorRange
 from tornado.gen                import sleep
 from tornado.ioloop             import IOLoop
 
+from tests.testutils                  import integrationmark
 from tests.testingcore                import path as utfilepath
 from tests.testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 from view.plots                 import DpxKeyedRow
@@ -187,6 +187,7 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-
 
         _t_e_s_t_peaks(server, bokehaction)
 
+@integrationmark
 def test_cyclehistplot(bokehaction): # pylint: disable=too-many-statements,too-many-locals
     "test peaksplot"
     with bokehaction.launch('hybridstat.view.cyclehistplot.CycleHistPlotView',
@@ -194,6 +195,7 @@ def test_cyclehistplot(bokehaction): # pylint: disable=too-many-statements,too-m
         server.load('big_legacy')
         _t_e_s_t_peaks(server, bokehaction)
 
+@integrationmark
 def test_hairpingroup(bokehaction): # pylint: disable=too-many-statements,too-many-locals
     "test peaksplot"
     with bokehaction.launch('hybridstat.view.hairpingroup.HairpinGroupPlotView',
@@ -237,6 +239,7 @@ def test_hairpingroup(bokehaction): # pylint: disable=too-many-statements,too-ma
         server.change(tbar, 'bead', 4, rendered = True)
         assert rng.factors == ['4', '2']
 
+@integrationmark
 def test_reference(bokehaction):
     "test peaksplot"
     with bokehaction.launch('hybridstat.view.peaksplot.PeaksPlotView',
@@ -259,47 +262,41 @@ def test_reference(bokehaction):
         server.change('Cycles:Oligos', 'value', 'ctgt', rendered = True)
         server.wait()
 
+@integrationmark
 def test_hybridstat(bokehaction):
     "test hybridstat"
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            'ignore',
-            category = DeprecationWarning,
-            message  = ".*elementwise comparison failed; this will raise an error i.*"
-        )
-        warnings.filterwarnings(
-            'ignore',
-            category = RuntimeWarning,
-            message  = ".*All-NaN slice encountered.*"
-        )
-        with bokehaction.launch(
-                'hybridstat.view.HybridStatView',
-                'taskapp.toolbar'
-        ) as server:
-            server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
-            tabs = next(iter(server.doc.select({'type': Tabs})))
-            for i in range(len(tabs.tabs)):
-                server.change(tabs, 'active', i)
+    with bokehaction.launch(
+        'hybridstat.view.HybridStatView',
+        'taskapp.toolbar',
+        filters = [
+            (RuntimeWarning,     ".*All-NaN slice encountered.*"),
+            (DeprecationWarning, ".*elementwise comparison failed;*"),
+        ]
+    ) as server:
+        server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
+        tabs = next(iter(server.doc.select({'type': Tabs})))
+        for i in range(len(tabs.tabs)):
+            server.change(tabs, 'active', i)
+            server.wait()
+
+        mdl         = server.ctrl.theme.model("app.tabs")
+        assert list(mdl.titles.values()) == [i.title for i in tabs.tabs]
+        indcleaning = next(i for i, j in enumerate(mdl.titles) if j == 'cleaning')
+        indcyc      = next(i for i, j in enumerate(mdl.titles) if j == 'cycles')
+        server.change(tabs, 'active', indcleaning)
+        server.load('big_legacy')
+
+        for i in range(len(tabs.tabs)):
+            server.change(tabs, 'active', i, rendered = i != indcleaning)
+            if i == indcleaning:
                 server.wait()
 
-            mdl         = server.ctrl.theme.model("app.tabs")
-            assert list(mdl.titles.values()) == [i.title for i in tabs.tabs]
-            indcleaning = next(i for i, j in enumerate(mdl.titles) if j == 'cleaning')
-            indcyc      = next(i for i, j in enumerate(mdl.titles) if j == 'cycles')
-            server.change(tabs, 'active', indcleaning)
-            server.load('big_legacy')
-
-            for i in range(len(tabs.tabs)):
-                server.change(tabs, 'active', i, rendered = i != indcleaning)
-                if i == indcleaning:
-                    server.wait()
-
-            server.change(tabs, 'active', indcleaning)
-            server.wait()
-            server.change('Cleaning:Filter', 'subtracted', "38", rendered = True)
-            server.change('Main:toolbar', 'discarded', '38', rendered = True)
-            server.change(tabs, 'active', indcyc)
-            server.wait()
+        server.change(tabs, 'active', indcleaning)
+        server.wait()
+        server.change('Cleaning:Filter', 'subtracted', "38", rendered = True)
+        server.change('Main:toolbar', 'discarded', '38', rendered = True)
+        server.change(tabs, 'active', indcyc)
+        server.wait()
 
 if __name__ == '__main__':
     from testutils.bokehtesting import BokehAction

@@ -17,3 +17,18 @@ require(python = {'pybind11'    : '2.2.1',
         rtime  = False)
 
 MODULES.addbuild(locals())
+
+def unittest(_):
+    "do unit tests"
+    import os
+    from   pytest import cmdline
+    os.chdir("build")
+    cmdline.main(["tests/", "-m", '"not integration"'])
+
+def integrationtest(_):
+    "do integration tests"
+    import os
+    from   pytest import cmdline
+    os.chdir("build")
+    cmdline.main(["tests/", "-m", 'integration'])
+

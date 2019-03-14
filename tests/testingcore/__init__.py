@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """ access to files """
-from ..testutils import ResourcePath, getmonkey, DummyPool, Path, cast
+from ..testutils import (
+        ResourcePath, getmonkey, DummyPool, Path, cast
+)
 
 def _trackreadertask(fpath):
     from taskmodel      import TrackReaderTask

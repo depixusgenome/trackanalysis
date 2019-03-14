@@ -4,19 +4,17 @@
 # pylint: disable=wrong-import-position,ungrouped-imports,no-member
 "Tests interval detection"
 from   typing              import cast
-import sys
-sys.modules['ACCEPT_SCRIPTING'] = True # type: ignore
 import pickle
-from scripting             import Track, Tasks, localcontext #pylint: disable=no-name-in-module
-from data                  import Cycles
-from eventdetection.data   import Events
-from peakfinding.processor import PeaksDict
-from scripting.confusion   import ConfusionMatrix, LNAHairpin
-from tests.testingcore     import path as utpath
+from   tests.testutils     import integrationmark
 
-def test_track():
+@integrationmark
+def test_track(scriptingcleaner):
     "test scripting enhanced track"
-    assert 'scripting.jupyter' not in sys.modules
+    from scripting             import Track, Tasks, localcontext #pylint: disable=no-name-in-module
+    from data                  import Cycles
+    from eventdetection.data   import Events
+    from peakfinding.processor import PeaksDict
+    from tests.testingcore     import path as utpath
 
     track = Track(path = utpath("big_legacy"))
     assert track.path == utpath("big_legacy")
@@ -56,8 +54,12 @@ def test_track():
     assert track.op[:,:5].ncycles == 5
     assert set(track.op[[1,2]].beads.keys()) == {1,2}
 
-def test_confusion():
+@integrationmark
+def test_confusion(scriptingcleaner):
     "test the confusion matrix"
+    from scripting             import Track #pylint: disable=no-name-in-module
+    from scripting.confusion   import ConfusionMatrix, LNAHairpin
+    from tests.testingcore     import path as utpath
     peaks = pickle.load(open(cast(str, utpath("hp6jan2018.peaks")), "rb"))
     peaks = peaks[peaks.track != 'ref']
     cnf   = ConfusionMatrix(oligos  = peaks.track.unique(),
@@ -65,7 +67,6 @@ def test_confusion():
     det   = cnf.detection(peaks)
     conf  = cnf.confusion(det)
     return det, conf
-
 
 if __name__ == '__main__':
     test_track()

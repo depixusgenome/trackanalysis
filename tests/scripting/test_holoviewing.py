@@ -4,24 +4,23 @@
 # pylint: disable=wrong-import-position,ungrouped-imports,no-member,invalid-name
 "Tests interval detection"
 import sys
-from   typing  import TYPE_CHECKING
-sys.modules['ACCEPT_SCRIPTING'] = 'jupyter' # type: ignore
-from scripting import *
-from IPython   import get_ipython # pylint:disable=import-error,wrong-import-order
+from   tests.testutils import integrationmark
 
-CLASSES = list(get_ipython().display_formatter.formatters['text/html'].type_printers.keys())
-
-from data.views                                 import Beads, Cycles
-from data.track                                 import Bead, FoV
-from data.__scripting__.holoviewing.tracksdict  import TracksDictFovDisplayProperty
-from peakfinding.processor.selector             import PeaksDict
-
-if TYPE_CHECKING:
-    from taskmodel.__scripting__                    import Tasks
-    from data.__scripting__.holoviewing.tracksdict  import TracksDict
-
-def test_hv():
-    "test hv views"
+@integrationmark
+def test_holoviewing(holoviewingcleaner):
+    from scripting import TracksDict, Tasks
+    from IPython   import get_ipython # pylint:disable=import-error,wrong-import-order
+    from data.views                                 import Beads, Cycles
+    from data.track                                 import Bead, FoV
+    from data.__scripting__.holoviewing.tracksdict  import TracksDictFovDisplayProperty
+    from peakfinding.processor.selector             import PeaksDict
+    CLASSES = list(
+        get_ipython()
+        .display_formatter
+        .formatters['text/html']
+        .type_printers
+        .keys()
+    )
     assert Beads                         in  CLASSES
     assert Cycles                        in  CLASSES
     assert Bead                          in  CLASSES
@@ -204,6 +203,5 @@ def test_hv():
              .Text.II     :Text   [z,key]
              .Text.III    :Text   [z,key]
           """, DMAP[12], DMAP[25])
-
 if __name__ == '__main__':
-    test_hv()
+    test_holoviewing()

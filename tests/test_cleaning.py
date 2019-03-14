@@ -5,6 +5,7 @@
 import numpy as np
 from   numpy.testing            import assert_equal, assert_allclose
 
+from   tests.testutils                import integrationmark
 from   tests.testingcore              import path as utpath
 from   tests.testingcore.bokehtesting import bokehaction  # pylint: disable=unused-import
 
@@ -370,6 +371,7 @@ def test_message_creation():
     else:
         assert False
 
+@integrationmark
 def test_cleaningview(bokehaction):
     "test the view"
     with bokehaction.launch('cleaning.view.CleaningView', 'taskapp.toolbar') as server:

@@ -2,10 +2,12 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
+from tests.testutils                import integrationmark
 from tests.testingcore              import path as _utpath
 from tests.testingcore.bokehtesting import bokehaction  # pylint: disable=unused-import
 from taskcontrol.beadscontrol import DataSelectionBeadController
 
+@integrationmark
 def test_toolbar(bokehaction):
     "test the toolbar"
     with bokehaction.launch('taskview.toolbar.BeadToolbar', 'taskapp.default') as server:
@@ -69,6 +71,7 @@ def test_toolbar(bokehaction):
 
         server.quit()
 
+@integrationmark
 def test_beadtoolbar(bokehaction):
     "test the toolbar"
     with bokehaction.launch('taskview.toolbar.BeadToolbar', 'taskapp.default') as server:

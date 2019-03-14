@@ -4,6 +4,7 @@
 """ Tests cycles views """
 import warnings
 from pytest                   import approx       # pylint: disable=no-name-in-module
+from tests.testutils          import integrationmark
 from tests.testingcore.bokehtesting import bokehaction  # pylint: disable=unused-import
 from view.plots               import DpxKeyedRow
 
@@ -23,6 +24,7 @@ def _check(server, name, value):
     else:
         assert server.widget[name].value == value
 
+@integrationmark
 def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
     "test cyclesplot basic stuff"
     vals = [0.]*2
@@ -108,6 +110,7 @@ def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
         _check(server, 'Cycles:Stretch', approx(1050., abs = 1e-5))
         server.press('Control-z')
 
+@integrationmark
 def test_cyclesplot2(bokehaction):
     "test cyclesplot data actions"
     with bokehaction.launch('cyclesplot.CyclesPlotView', 'taskapp.toolbar',

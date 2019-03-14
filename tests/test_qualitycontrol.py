@@ -3,13 +3,16 @@
 # pylint: disable=redefined-outer-name
 """ Tests views """
 import warnings
+from tests.testingcore                import integrationmark
 from tests.testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 
+@integrationmark
 def test_view_messages(bokehaction):
     "test the view"
     with bokehaction.launch('qualitycontrol.view', 'taskapp.toolbar') as server:
         server.load('big_legacy')
 
+@integrationmark
 def test_view_fov(bokehaction):
     "test the view"
     with warnings.catch_warnings():
