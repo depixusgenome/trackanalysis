@@ -269,12 +269,12 @@ class LegacyGRFilesIO(_TrackIO):
             if direct == 0:
                 raise err("No .gr files in directory:")
 
-            elif direct > 1:
+            if direct > 1:
                 raise err("All sub-directories have .gr files:")
 
             return paths[1 if grs[0] else 0], paths[0 if grs[0] else 1]/grdir
 
-        elif direct > 1:
+        if direct > 1:
             raise err("All directories have .gr files:")
 
         return paths[1 if grs[0] else 0], paths[0 if grs[0] else 1]
