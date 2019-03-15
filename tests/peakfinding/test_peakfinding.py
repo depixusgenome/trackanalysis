@@ -132,7 +132,7 @@ def test_histogram():
     assert xmin     == -7
     assert delta    == .2
     assert len(out) == 81
-    assert_allclose(out[40::-1], out[40:], rtol = 1e-5, atol = 1e-10)
+    assert_allclose(out[40::-1], out[40:], rtol = 1e-5, atol = 1e-8)
     assert max(out) == out[40]
 
 def test_peakfinder():
