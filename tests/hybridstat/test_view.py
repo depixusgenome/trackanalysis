@@ -23,6 +23,7 @@ from hybridstat.reporting.batch          import createmodels as _hmodels
 from hybridstat.view._io                 import ConfigXlsxIO
 from peakcalling.processor.__config__    import FitToHairpinTask
 
+@integrationmark
 def test_hybridstat_xlsxio():
     "tests xlxs production"
     path  = cast(Path, utfilepath("big_legacy"))
@@ -55,6 +56,7 @@ def test_hybridstat_xlsxio():
     assert Path(out).exists()
     assert cnt > 0
 
+@integrationmark
 def test_peaks_xlsxio():
     "tests xlxs production"
     path = cast(Path, utfilepath("big_legacy"))
