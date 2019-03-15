@@ -1,6 +1,7 @@
 buildgcc:
   stage: build
   script:
+    - conda list --explicit
     - export CXX=g++-8
     - python waf configure --cxxflags "-std=c++17 -g -Werror"
     - python waf build
@@ -16,7 +17,6 @@ unittest:
   stage: unittest
   script: 
     - export CXX=g++-8
-    - conda list
     - python waf configure
     - python waf build --nolinting
     - python waf test
@@ -27,4 +27,4 @@ integrationtest:
     - export CXX=g++-8
     - python waf configure
     - python waf build --nolinting
-    - python waf test --it --headless
+    - python waf test --it
