@@ -18,17 +18,35 @@ require(python = {'pybind11'    : '2.2.1',
 
 MODULES.addbuild(locals())
 
-def unittest(_):
+def options(ctx, __old__ = locals().pop('options')):
+    "add options"
+    __old__(ctx)
+    grp = ctx.add_option_group('Test options')
+    grp.add_option(
+        "--it",
+        help    = "Run integration tests only",
+        default = False,
+        dest    = "TEST_INTEGRATION",
+        action  = "store_true",
+    )
+    grp.add_option(
+        "--noheadless",
+        help    = "Run browsers in without headless mode",
+        default = False,
+        dest    = "TEST_HEADLESS",
+        action  = "store_false",
+    )
+
+def test(_):
     "do unit tests"
     import os
     from   pytest import cmdline
     os.chdir("build")
-    cmdline.main(["tests/", "-m", 'not integration'])
-
-def integrationtest(_):
-    "do integration tests"
-    import os
-    from   pytest import main
-    os.chdir("build")
-    main(["tests/", "-m", 'integration'])
-
+    if _.options.TEST_HEADLESS:
+        from importlib import import_module
+        import_module("tests.testutils.bokehtesting").HEADLESS = True
+    cmdline.main([
+        "tests/",
+        "-m",
+        ('' if _.options.TEST_INTEGRATION else 'not ')+'integration',
+    ])
