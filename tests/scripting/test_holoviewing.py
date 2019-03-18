@@ -4,11 +4,18 @@
 # pylint: disable=wrong-import-position,ungrouped-imports,no-member,invalid-name
 "Tests interval detection"
 import sys
+import warnings
 from   tests.testutils import integrationmark
 
-@integrationmark
-def test_holoviewing(holoviewingcleaner):
-    from scripting import TracksDict, Tasks
+
+def _comp(txt, *itms):
+    fcn = lambda x: str(x).replace('\n', '').replace(' ', '')
+    txt = fcn(txt)
+    for itm in itms:
+        assert fcn(itm) == fcn(txt)
+
+def _callbacks():
+    import scripting
     from IPython   import get_ipython # pylint:disable=import-error,wrong-import-order
     from data.views                                 import Beads, Cycles
     from data.track                                 import Bead, FoV
@@ -28,41 +35,16 @@ def test_holoviewing(holoviewingcleaner):
     assert PeaksDict                     in  CLASSES
     assert TracksDictFovDisplayProperty  in  CLASSES
 
-    HPIN   = (
-        "gtcttttggtctttctggtgctcttcgaatAGCCTTCCAGCTGATATCTTCATAATAACCTATTACATATAAGCTTCAGG"
-        "CTATACACCTTCAATGCCTATAACTAAGCGTAACATACCAGGTCCAATTACACAGCCTTACACACATATCTGGACTTGGT"
-        "GCCTAATACCAGAATCATTATACTAGATTGATTCTTCCTTAATACCTAACAATCTAGCCAGGATAACACATATACCAGCC"
-        "TATACACGGACCATTGTTACGGAAGGTTAGCCATAATATCTTAACCGTCCTAAAGCCTTCCAGCGTTGCTCCCCCGCCCT"
-        "CGATGTCACTACCCACCCTCCCCGCAGCAAGACATCGTTCGACCCTCTCCCCACTGCTCGCCCGCAACGAACCCTCACCC"
-        "ACTCATCCTAGCAGATATCATAGGATACACGGAAGTACCGTACGGTTATATACAATCATATAGGCATACTATAAcacgGA"
-        "TCTCAGCCTGGTTATATATATCATAACATACACAGATACACGGAAGCCGGACTTGGTGCATATAACAGGTAAGTAATCTA"
-        "ATCAATAACTAATCATAACACAGCTATACATAGATAACCTAACATAATCTTAGAATTAACATGAAGGATTAACACCGGAT"
-        "ACACATTCTCAGGTACCAATACAGTACTAATAGCCAACATCCTAGCAGCGTTGCTCCCCCGCCCTCGATGTCACTACCCA"
-        "CCCTCCCCGCAGCAAGACATCGTTCGACCCTCTCCCCACTGCTCGCCCGCAACGAACCCTCACCCACTCATCCTAGCAGA"
-        "TTAACCATTACATAGATATACAGAATAGCTTCTAACATAACCTAATAACCAATAACCTTCTAGGCCTGATACACACCGGC"
-        "CATTACTAAGTACACCTAATAACCGTACATACAGAATGGACTTGGTGCGTACTATGTAAccagATAAGATCATAACCTAA"
-        "CTGTATCCAATAATCTAATCCTAACATGGTACTAGATAACACGTCCATACGTAACACAATGCCAATTACCAGGACTTGGT"
-        "GCCGTTGCTCCCCCGCCCTCGATGTCACTACCCACCCTCCCCGCAGCAAGACATCGTTCGACCCTCTCCCCACTGCTCGC"
-        "CCGCAACGAACCCTCACCCACTGACTTGGTGCCAATCTGTAACCATAAGGCCTAATAGCTAAGATACACCAGCGCATAAT"
-        "CCTTACCATACCTAGCCTAACTCAGATAGCGTCCTTACACACATTGATACTGATCCAGCCGTCCTTACATACCTATCATG"
-        "GACTTGGTGCATTCAATACGCATACACATTCCATAACCGGTTAACTTACTTCCATACAATCCAATATAACACAGCGCTAT"
-        "CAGCTTAATAACTAAGAAGATAATATCATAACATAGAAGGATAATGGACTTGGTGCgcttGCCACTTGAAGAttttt"
-    ).lower()
-
-    REFS   = ("gccttacaca,gcctaatacc,cgtacggtta,acggatctca,aacatgaagg,"
-              "cattctcagg,cagaatagct,accttctagg,cctaactgta,taacacgtcc,"
-              "cctatcatgg,cgcatacaca").split(',')
-    CLEAN = TracksDict("../data/100bp_4mer/*.pk", # type: ignore
+def _data():
+    from scripting import TracksDict
+    tracks = TracksDict("../data/100bp_4mer/*.pk", # type: ignore
                        match = r".*/(.*)\.pk")
-    CLEAN.cleaned = True
+    tracks.cleaned = True
+    return tracks
 
-    def _test(txt, *itms):
-        fcn = lambda x: str(x).replace('\n', '').replace(' ', '')
-        txt = fcn(txt)
-        for itm in itms:
-            assert fcn(itm) == fcn(txt)
-
-    _test("""
+def _holoviewing():
+    tracks = _data()
+    _comp("""
           :Overlay
              .Image.I    :Image   [x (μm),y (μm)]   (z)
              .Points.I   :Points   [x (μm),y (μm)]
@@ -90,23 +72,52 @@ def test_holoviewing(holoviewingcleaner):
              .Text.XXII  :Text   [x (μm),y (μm)]
              .Text.XXIII :Text   [x (μm),y (μm)]
              .Text.XXIV  :Text   [x (μm),y (μm)]
-          """, CLEAN.fov.display()['ref'])
+          """, tracks.fov.display()['ref'])
 
-    _test("""
+    _comp("""
           :Overlay
              .Text.I  :Text   [frames,z]
              .Curve.I :Curve   [frames]   (z)
           """,
-          CLEAN.cycles.display()['ref', 12],
-          CLEAN.cycles[...,25].display()['ref', 25],
-          CLEAN.cleancycles.display()['ref', 12],
-          CLEAN.measures.display()['ref', 12],
-          CLEAN.events.display()['ref', 12])
+          tracks.cycles.display()['ref', 12],
+          tracks.cycles[...,25].display()['ref', 25],
+          tracks.cleancycles.display()['ref', 12],
+          tracks.measures.display()['ref', 12],
+          tracks.events.display()['ref', 12])
 
-    REF  = CLEAN['ref'].apply(Tasks.alignment,       # type: ignore
-                              Tasks.eventdetection,  # type: ignore
-                              Tasks.peakselector)    # type: ignore
-    _test("""
+def _holoviewing_hpin():
+    from scripting import Tasks
+    tracks = _data()
+    ref    = tracks['ref'].apply(
+        Tasks.alignment,    # type: ignore
+        Tasks.eventdetection,  # type: ignore
+        Tasks.peakselector     # type: ignore
+    )
+    hpin   = (
+        "gtcttttggtctttctggtgctcttcgaatAGCCTTCCAGCTGATATCTTCATAATAACCTATTACATATAAGCTTCAGG"
+        "CTATACACCTTCAATGCCTATAACTAAGCGTAACATACCAGGTCCAATTACACAGCCTTACACACATATCTGGACTTGGT"
+        "GCCTAATACCAGAATCATTATACTAGATTGATTCTTCCTTAATACCTAACAATCTAGCCAGGATAACACATATACCAGCC"
+        "TATACACGGACCATTGTTACGGAAGGTTAGCCATAATATCTTAACCGTCCTAAAGCCTTCCAGCGTTGCTCCCCCGCCCT"
+        "CGATGTCACTACCCACCCTCCCCGCAGCAAGACATCGTTCGACCCTCTCCCCACTGCTCGCCCGCAACGAACCCTCACCC"
+        "ACTCATCCTAGCAGATATCATAGGATACACGGAAGTACCGTACGGTTATATACAATCATATAGGCATACTATAAcacgGA"
+        "TCTCAGCCTGGTTATATATATCATAACATACACAGATACACGGAAGCCGGACTTGGTGCATATAACAGGTAAGTAATCTA"
+        "ATCAATAACTAATCATAACACAGCTATACATAGATAACCTAACATAATCTTAGAATTAACATGAAGGATTAACACCGGAT"
+        "ACACATTCTCAGGTACCAATACAGTACTAATAGCCAACATCCTAGCAGCGTTGCTCCCCCGCCCTCGATGTCACTACCCA"
+        "CCCTCCCCGCAGCAAGACATCGTTCGACCCTCTCCCCACTGCTCGCCCGCAACGAACCCTCACCCACTCATCCTAGCAGA"
+        "TTAACCATTACATAGATATACAGAATAGCTTCTAACATAACCTAATAACCAATAACCTTCTAGGCCTGATACACACCGGC"
+        "CATTACTAAGTACACCTAATAACCGTACATACAGAATGGACTTGGTGCGTACTATGTAAccagATAAGATCATAACCTAA"
+        "CTGTATCCAATAATCTAATCCTAACATGGTACTAGATAACACGTCCATACGTAACACAATGCCAATTACCAGGACTTGGT"
+        "GCCGTTGCTCCCCCGCCCTCGATGTCACTACCCACCCTCCCCGCAGCAAGACATCGTTCGACCCTCTCCCCACTGCTCGC"
+        "CCGCAACGAACCCTCACCCACTGACTTGGTGCCAATCTGTAACCATAAGGCCTAATAGCTAAGATACACCAGCGCATAAT"
+        "CCTTACCATACCTAGCCTAACTCAGATAGCGTCCTTACACACATTGATACTGATCCAGCCGTCCTTACATACCTATCATG"
+        "GACTTGGTGCATTCAATACGCATACACATTCCATAACCGGTTAACTTACTTCCATACAATCCAATATAACACAGCGCTAT"
+        "CAGCTTAATAACTAAGAAGATAATATCATAACATAGAAGGATAATGGACTTGGTGCgcttGCCACTTGAAGAttttt"
+    ).lower()
+    refs   = ("gccttacaca,gcctaatacc,cgtacggtta,acggatctca,aacatgaagg,"
+              "cattctcagg,cagaatagct,accttctagg,cctaactgta,taacacgtcc,"
+              "cctatcatgg,cgcatacaca").split(',')
+
+    _comp("""
           :Overlay
              .Curve.Histogram   :Curve   [z]   (events)
              .Scatter.Histogram :Scatter   [z]   (events)
@@ -114,11 +125,11 @@ def test_holoviewing(holoviewingcleaner):
              .Curve.Peaks       :Curve   [z]   (events)
              .Curve.Sequence    :Curve   [z]   (events)
           """,
-          (REF
-           .display(sequence=HPIN, oligos=REFS, fit = False)
+          (ref
+           .display(sequence=hpin, oligos=refs, fit = False)
            .display())[25, 'hairpin 1', 1/8.8e-4, 0.])
 
-    _test("""
+    _comp("""
           :Overlay
              .Hairpin_1.Histogram.I  :Curve   [z]   (events)
              .Hairpin_1.Histogram.II :Scatter   [z]   (events)
@@ -127,10 +138,13 @@ def test_holoviewing(holoviewingcleaner):
              .Curve.Sequence         :Curve   [z]   (events)
              .Text.I                 :Text   [z,events]
           """,
-          REF.display(sequence=HPIN, oligos=REFS, fit = True).display()[25])
+          ref.display(sequence=hpin, oligos=refs, fit = True).display()[25])
 
-    DMAP = CLEAN.peaks[['AACG', 'CCTC'], [12, 25]](format = None, reference = 'ref').display()
-    _test("""
+def _holoviewing_ref_1d():
+    from scripting import Tasks
+    tracks = _data()
+    dmap = tracks.peaks[['AACG', 'CCTC'], [12, 25]](format = None, reference = 'ref').display()
+    _comp("""
           :Overlay
              .Area.Ref    :Area   [z]   (events)
              .Curve.Ref   :Curve   [z]   (events)
@@ -142,10 +156,10 @@ def test_holoviewing(holoviewingcleaner):
              .Scatter.II  :Scatter   [z]   (events)
              .Curve.II    :Curve   [z]   (events)
              .Text.I      :Text   [z,events]
-          """, DMAP['AACG',12], DMAP['CCTC',25])
+          """, dmap['AACG',12], dmap['CCTC',25])
 
-    DMAP = CLEAN.peaks[['AACG', 'CCCC'], [12, 25]](format = '1d', reference = 'ref').display()
-    _test("""
+    dmap = tracks.peaks[['AACG', 'CCCC'], [12, 25]](format = '1d', reference = 'ref').display()
+    _comp("""
           :Overlay
              .Area.Ref     :Area   [z]   (events)
              .Curve.Ref    :Curve   [z]   (events)
@@ -161,10 +175,10 @@ def test_holoviewing(holoviewingcleaner):
              .Scatter.III  :Scatter   [z]   (events)
              .Curve.III    :Curve   [z]   (events)
              .Text.I       :Text   [z,events]
-          """, DMAP[12], DMAP[25])
+          """, dmap[12], dmap[25])
 
-    DMAP = CLEAN.peaks[['AACG', 'CCTC'], [12, 25]](format = '1d', reference = 'ref').display()
-    _test("""
+    dmap = tracks.peaks[['AACG', 'CCTC'], [12, 25]](format = '1d', reference = 'ref').display()
+    _comp("""
           :Overlay
              .Area.Ref     :Area   [z]   (events)
              .Curve.Ref    :Curve   [z]   (events)
@@ -180,10 +194,13 @@ def test_holoviewing(holoviewingcleaner):
              .Scatter.III  :Scatter   [z]   (events)
              .Curve.III    :Curve   [z]   (events)
              .Text.I       :Text   [z,events]
-          """, DMAP[12], DMAP[25])
+          """, dmap[12], dmap[25])
 
-    DMAP = CLEAN.peaks[['AACG', 'CCCC'], [12, 25]](format = '2d', reference = 'ref').display()
-    _test("""
+def _holoviewing_ref_2d():
+    from scripting import Tasks
+    tracks = _data()
+    dmap = tracks.peaks[['AACG', 'CCCC'], [12, 25]](format = '2d', reference = 'ref').display()
+    _comp("""
           :Overlay
              .QuadMesh.I  :QuadMesh   [z,key]   (events)
              .Curve.Ref   :Curve   [z]   (key)
@@ -191,10 +208,10 @@ def test_holoviewing(holoviewingcleaner):
              .Text.I      :Text   [z,key]
              .Text.II     :Text   [z,key]
              .Text.III    :Text   [z,key]
-          """, DMAP[12], DMAP[25])
+          """, dmap[12], dmap[25])
 
-    DMAP = CLEAN.peaks[['AACG', 'CCTC'], [12, 25]](format = '2d', reference = 'ref').display()
-    _test("""
+    dmap = tracks.peaks[['AACG', 'CCTC'], [12, 25]](format = '2d', reference = 'ref').display()
+    _comp("""
           :Overlay
              .QuadMesh.I  :QuadMesh   [z,key]   (events)
              .Curve.Ref   :Curve   [z]   (key)
@@ -202,6 +219,48 @@ def test_holoviewing(holoviewingcleaner):
              .Text.I      :Text   [z,key]
              .Text.II     :Text   [z,key]
              .Text.III    :Text   [z,key]
-          """, DMAP[12], DMAP[25])
+          """, dmap[12], dmap[25])
+
+def _run_holoviewing(fcn):
+    with warnings.catch_warnings():
+        for i in [
+            ".*Using or importing the ABCs from 'collections'.*",
+            ".*In future, it will be an error for 'np.bool_.*",
+            ".*he truth value of an.*"
+        ]:
+            warnings.filterwarnings(
+                'ignore',
+                category = DeprecationWarning,
+                message  = i
+        )
+        fcn()
+
+@integrationmark
+def test_holoviewing_callbacks(holoviewingcleaner):
+    "test jupyter callbacks"
+    _run_holoviewing(_callbacks)
+
+@integrationmark
+def test_holoviewing_simple(holoviewingcleaner):
+    "test simple graphs"
+    _run_holoviewing(_holoviewing)
+
+@integrationmark
+def test_holoviewing_hpin(holoviewingcleaner):
+    "test hpin graphs"
+    _run_holoviewing(_holoviewing_hpin)
+
+@integrationmark
+def test_holoviewing_ref1d(holoviewingcleaner):
+    "test hpin graphs"
+    _run_holoviewing(_holoviewing_ref_1d)
+
+@integrationmark
+def test_holoviewing_ref2d(holoviewingcleaner):
+    "test hpin graphs"
+    _run_holoviewing(_holoviewing_ref_2d)
+
 if __name__ == '__main__':
-    test_holoviewing()
+    from tests.testutils.modulecleanup import modulecleanup
+    for x in modulecleanup(pairs = [('ACCEPT_SCRIPTING', 'jupyter')]):
+        test_holoviewing_simple(x)
