@@ -1,9 +1,10 @@
+#!/usr/bin/env python3
+# encoding: utf-8
 import wafbuilder as builder
 
-require('python', pytest = '3.0.4', rtime  = False)
+require('python', pytest = '4.3.0', coverage = '4.5.3', rtime  = False)
 
 def build(bld):
-    name  = builder.appname()
     pysrc = bld.path.ant_glob('**/*.py')
     cfe   = bld.path.ant_glob('**/*.coffee')
 
