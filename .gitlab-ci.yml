@@ -1,5 +1,7 @@
 buildgcc:
   stage: build
+  tags:
+    - linux
   script:
     - conda list --explicit
     - export CXX=g++-8
@@ -8,6 +10,8 @@ buildgcc:
 
 buildclang:
   stage: build
+  tags:
+    - linux
   script:
     - export CXX=clang++
     - python waf configure --cxxflags "-std=c++17 -g -Werror"
@@ -15,6 +19,8 @@ buildclang:
 
 unittest:
   stage: test
+  tags:
+    - linux
   script: 
     - export CXX=g++-8
     - python waf configure
@@ -23,6 +29,8 @@ unittest:
 
 integrationtest:
   stage: test
+  tags:
+    - linux
   script: 
     - export CXX=g++-8
     - python waf configure
