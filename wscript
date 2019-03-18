@@ -22,11 +22,31 @@ def options(ctx, __old__ = locals().pop('options')):
     "add options"
     __old__(ctx)
     grp = ctx.add_option_group('Test options')
+    for i, j, k in [
+            ('i', 'integration', ('-m', 'integration')),
+            ('u', 'unit',        ('-m', 'not integration')),
+            ('a', 'all',         ())
+    ]:
+        grp.add_option(
+            f'-{i}', f'--{j}tests',
+            help    = f"Run {j} tests",
+            default = ("-m", "not integration"),
+            dest    = "TEST_GROUP",
+            action  = "store_const",
+            const   = k
+        )
     grp.add_option(
-        "--it",
-        help    = "Run integration tests only",
+        "--coverage",
+        help    = "Run tests with coverage",
         default = False,
-        dest    = "TEST_INTEGRATION",
+        dest    = "TEST_COV",
+        action  = "store_true",
+    )
+    grp.add_option(
+        "--coverage",
+        help    = "Create coverage",
+        default = True,
+        dest    = "TEST_COV",
         action  = "store_true",
     )
     grp.add_option(
@@ -40,13 +60,20 @@ def options(ctx, __old__ = locals().pop('options')):
 def test(_):
     "do unit tests"
     import os
-    from   pytest import cmdline
+    from   pathlib   import Path
+    from   importlib import import_module
     os.chdir("build")
     if _.options.TEST_HEADLESS:
-        from importlib import import_module
+        os.environ['DPX_TEST_HEADLESS'] = 'True'
         import_module("tests.testutils.bokehtesting").HEADLESS = True
-    cmdline.main([
-        "tests/",
-        "-m",
-        ('' if _.options.TEST_INTEGRATION else 'not ')+'integration',
-    ])
+
+    cmd = ["tests/", *_.options.TEST_GROUP]
+    if not _.options.TEST_COV:
+        import_module("pytest").cmdline.main(cmd)
+    else:
+        omits = ["--omit", 'tests/*.py,*waf*.py,*test*.py']
+        cmd   = ["run", *omits, "-m", "pytest"] + cmd
+        import_module("coverage.cmdline").main(cmd)
+        if not Path("Coverage").exists():
+            os.mkdir("Coverage")
+        import_module("coverage.cmdline").main(["html", "-i", *omits, "-d", "Coverage"])
