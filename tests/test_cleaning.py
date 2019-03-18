@@ -374,25 +374,24 @@ def test_message_creation():
 @integrationmark
 def test_cleaningview(bokehaction):
     "test the view"
-    with bokehaction.launch('cleaning.view.CleaningView', 'taskapp.toolbar') as server:
-        server.load('big_legacy')
+    server = bokehaction.start('cleaning.view.CleaningView', 'taskapp.toolbar')
+    server.load('big_legacy')
 
-        assert 'config.tasks' not in server.savedconfig
+    assert 'config.tasks' not in server.savedconfig
 
-        assert server.task(DataCleaningTask).maxhfsigma != 0.002
-        server.change('Cleaning:Filter', 'maxhfsigma', 0.002)
-        server.wait()
-        assert server.widget['Cleaning:Filter'].maxhfsigma == 0.002
-        assert server.task(DataCleaningTask).maxhfsigma == 0.002
+    assert server.task(DataCleaningTask).maxhfsigma != 0.002
+    server.change('Cleaning:Filter', 'maxhfsigma', 0.002)
+    server.wait()
+    assert server.widget['Cleaning:Filter'].maxhfsigma == 0.002
+    assert server.task(DataCleaningTask).maxhfsigma == 0.002
 
-        cnf = server.savedconfig['config.tasks']['picotwist']['datacleaning']
-        assert cnf.maxhfsigma == 0.002
+    cnf = server.savedconfig['config.tasks']['picotwist']['datacleaning']
+    assert cnf.maxhfsigma == 0.002
 
-        server.change('Cleaning:Filter', 'subtracted', "11")
-        server.wait()
+    server.change('Cleaning:Filter', 'subtracted', "11")
+    server.wait()
 
-        server.change('Cleaning:Filter', 'subtracted', "11,30")
-        server.wait()
+    server.change('Cleaning:Filter', 'subtracted', "11,30")
 
 def test_fixedbeadsorting():
     "test fixed bead detection"

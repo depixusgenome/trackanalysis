@@ -163,144 +163,151 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-
         if 'ybounds' in old:
             vals[:2] = [0. if i is None else i for i in model.ybounds]
 
-    with bokehaction.launch('hybridstat.view.peaksplot.PeaksPlotView',
-                            'taskapp.toolbar') as server:
-        server.ctrl.display.observe("hybridstat.peaks", _printrng)
-        server.load('big_legacy')
+    server = bokehaction.start(
+        'hybridstat.view.peaksplot.PeaksPlotView',
+        'taskapp.toolbar'
+    )
+    server.ctrl.display.observe("hybridstat.peaks", _printrng)
+    server.load('big_legacy')
 
-        krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
-        def _press(val):
-            server.press(val, krow)
-            for _ in range(5):
-                if vals != prev:
-                    break
-                server.wait()
-            assert vals != prev
-            prev[:2] = vals
-
-        fig = server.widget['Peaks:fig']()
+    krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
+    def _press(val):
+        server.press(val, krow)
         for _ in range(5):
-            if fig.extra_x_ranges['duration'].end is None:
-                server.wait()
-        _press('Shift- ')
-        _press('Shift-ArrowUp')
-        _press('Alt-ArrowUp')
-        _press('Alt-ArrowDown')
-        _press('Shift-ArrowDown')
+            if vals != prev:
+                break
+            server.wait()
+        assert vals != prev
+        prev[:2] = vals
 
-        _t_e_s_t_peaks(server, bokehaction)
+    fig = server.widget['Peaks:fig']()
+    for _ in range(5):
+        if fig.extra_x_ranges['duration'].end is None:
+            server.wait()
+    _press('Shift- ')
+    _press('Shift-ArrowUp')
+    _press('Alt-ArrowUp')
+    _press('Alt-ArrowDown')
+    _press('Shift-ArrowDown')
+
+    _t_e_s_t_peaks(server, bokehaction)
 
 @integrationmark
 def test_cyclehistplot(bokehaction): # pylint: disable=too-many-statements,too-many-locals
     "test peaksplot"
-    with bokehaction.launch('hybridstat.view.cyclehistplot.CycleHistPlotView',
-                            'taskapp.toolbar') as server:
-        server.load('big_legacy')
-        _t_e_s_t_peaks(server, bokehaction)
+    server = bokehaction.start(
+        'hybridstat.view.cyclehistplot.CycleHistPlotView',
+        'taskapp.toolbar'
+    )
+    server.load('big_legacy')
+    _t_e_s_t_peaks(server, bokehaction)
 
 @integrationmark
 def test_hairpingroup(bokehaction): # pylint: disable=too-many-statements,too-many-locals
     "test peaksplot"
-    with bokehaction.launch('hybridstat.view.hairpingroup.HairpinGroupPlotView',
-                            'taskapp.toolbar') as server:
-        server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
-        server.load('big_legacy')
-        rng  = server.widget.get(FactorRange)
-        tbar = server.widget.get('Main:toolbar')
-        filt = server.widget.get('HairpinGroup:filter')
-        assert rng.factors == ['0']
+    server = bokehaction.start(
+        'hybridstat.view.hairpingroup.HairpinGroupPlotView',
+        'taskapp.toolbar'
+    )
+    server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
+    server.load('big_legacy')
+    rng  = server.widget.get(FactorRange)
+    tbar = server.widget.get('Main:toolbar')
+    filt = server.widget.get('HairpinGroup:filter')
+    assert rng.factors == ['0']
 
-        server.change(tbar, 'bead', tbar.bead+1, rendered = True)
-        assert rng.factors == ['1', '0']
+    server.change(tbar, 'bead', tbar.bead+1, rendered = True)
+    assert rng.factors == ['1', '0']
 
-        server.load('hairpins.fasta', andpress = False, rendered = False)
-        server.change('Cycles:Sequence', 'value', '←')
-        server.change('Cycles:Oligos', 'value', 'ctgt', rendered = True)
-        server.wait()
-        assert rng.factors == ['1']
+    server.load('hairpins.fasta', andpress = False, rendered = False)
+    server.change('Cycles:Sequence', 'value', '←')
+    server.change('Cycles:Oligos', 'value', 'ctgt', rendered = True)
+    server.wait()
+    assert rng.factors == ['1']
 
-        server.change(tbar, 'bead', tbar.bead+1, rendered = True)
-        assert rng.factors == ['2']
+    server.change(tbar, 'bead', tbar.bead+1, rendered = True)
+    assert rng.factors == ['2']
 
-        server.change(tbar, 'bead', 0, rendered = True)
-        assert rng.factors == ['0']
+    server.change(tbar, 'bead', 0, rendered = True)
+    assert rng.factors == ['0']
 
-        server.change(tbar, 'bead', 4, rendered = True)
-        assert rng.factors == ['4', '0']
+    server.change(tbar, 'bead', 4, rendered = True)
+    assert rng.factors == ['4', '0']
 
-        server.change(filt, 'forced', '2', rendered = True)
-        server.change(tbar, 'bead', 2, rendered = True)
-        server.change('Cycles:Sequence', 'value', 'GF1', rendered = True)
-        assert rng.factors == ['2', '1']
+    server.change(filt, 'forced', '2', rendered = True)
+    server.change(tbar, 'bead', 2, rendered = True)
+    server.change('Cycles:Sequence', 'value', 'GF1', rendered = True)
+    assert rng.factors == ['2', '1']
 
-        server.change('Cycles:Sequence', 'value', 'GF4', rendered = True)
-        assert rng.factors == ['2', '0', '4']
+    server.change('Cycles:Sequence', 'value', 'GF4', rendered = True)
+    assert rng.factors == ['2', '0', '4']
 
-        server.change(filt, 'discarded', '0', rendered = True)
-        assert rng.factors == ['2', '4']
+    server.change(filt, 'discarded', '0', rendered = True)
+    assert rng.factors == ['2', '4']
 
-        server.change(tbar, 'bead', 4, rendered = True)
-        assert rng.factors == ['4', '2']
+    server.change(tbar, 'bead', 4, rendered = True)
+    assert rng.factors == ['4', '2']
 
 @integrationmark
 def test_reference(bokehaction):
     "test peaksplot"
-    with bokehaction.launch('hybridstat.view.peaksplot.PeaksPlotView',
-                            'taskapp.toolbar') as server:
+    server = bokehaction.start(
+        'hybridstat.view.peaksplot.PeaksPlotView',
+        'taskapp.toolbar'
+    )
 
-        server.load('100bp_4mer/ref.pk')
-        ref = server.ctrl.display.get("tasks", "roottask")
+    server.load('100bp_4mer/ref.pk')
+    ref = server.ctrl.display.get("tasks", "roottask")
 
-        server.load('100bp_4mer/AACG.pk')
+    server.load('100bp_4mer/AACG.pk')
 
-        store = server.ctrl.display.model("hybridstat.fittoreference")
-        assert server.widget['HS:reference'].value == '-1'
-        assert store.reference is None
+    store = server.ctrl.display.model("hybridstat.fittoreference")
+    assert server.widget['HS:reference'].value == '-1'
+    assert store.reference is None
 
-        server.change("HS:reference", 'value', "0")
-        assert server.widget['HS:reference'].value == '0'
-        assert store.reference is ref
+    server.change("HS:reference", 'value', "0")
+    assert server.widget['HS:reference'].value == '0'
+    assert store.reference is ref
 
-        server.load('hairpins.fasta', andpress = False, rendered = False)
-        server.change('Cycles:Oligos', 'value', 'ctgt', rendered = True)
-        server.wait()
+    server.load('hairpins.fasta', andpress = False, rendered = False)
+    server.change('Cycles:Sequence', 'value', '←')
+    server.change('Cycles:Oligos', 'value', 'ctgt', rendered = True)
 
 @integrationmark
 def test_hybridstat(bokehaction):
     "test hybridstat"
-    with bokehaction.launch(
+    server = bokehaction.start(
         'hybridstat.view.HybridStatView',
         'taskapp.toolbar',
         filters = [
             (RuntimeWarning,     ".*All-NaN slice encountered.*"),
             (DeprecationWarning, ".*elementwise comparison failed;*"),
         ]
-    ) as server:
-        server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
-        tabs = next(iter(server.doc.select({'type': Tabs})))
-        for i in range(len(tabs.tabs)):
-            server.change(tabs, 'active', i)
+    )
+    server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
+    tabs = next(iter(server.doc.select({'type': Tabs})))
+    for i in range(len(tabs.tabs)):
+        server.change(tabs, 'active', i)
+        server.wait()
+
+    mdl         = server.ctrl.theme.model("app.tabs")
+    assert list(mdl.titles.values()) == [i.title for i in tabs.tabs]
+    indcleaning = next(i for i, j in enumerate(mdl.titles) if j == 'cleaning')
+    indcyc      = next(i for i, j in enumerate(mdl.titles) if j == 'cycles')
+    server.change(tabs, 'active', indcleaning)
+    server.load('big_legacy')
+
+    for i in range(len(tabs.tabs)):
+        server.change(tabs, 'active', i, rendered = i != indcleaning)
+        if i == indcleaning:
             server.wait()
 
-        mdl         = server.ctrl.theme.model("app.tabs")
-        assert list(mdl.titles.values()) == [i.title for i in tabs.tabs]
-        indcleaning = next(i for i, j in enumerate(mdl.titles) if j == 'cleaning')
-        indcyc      = next(i for i, j in enumerate(mdl.titles) if j == 'cycles')
-        server.change(tabs, 'active', indcleaning)
-        server.load('big_legacy')
-
-        for i in range(len(tabs.tabs)):
-            server.change(tabs, 'active', i, rendered = i != indcleaning)
-            if i == indcleaning:
-                server.wait()
-
-        server.change(tabs, 'active', indcleaning)
-        server.wait()
-        server.change('Cleaning:Filter', 'subtracted', "38", rendered = True)
-        server.change('Main:toolbar', 'discarded', '38', rendered = True)
-        server.change(tabs, 'active', indcyc)
-        server.wait()
+    server.change(tabs, 'active', indcleaning)
+    server.wait()
+    server.change('Cleaning:Filter', 'subtracted', "38", rendered = True)
+    server.change('Main:toolbar', 'discarded', '38', rendered = True)
+    server.change(tabs, 'active', indcyc)
 
 if __name__ == '__main__':
-    from testutils.bokehtesting import BokehAction
+    from tests.testutils.bokehtesting import BokehAction
     test_hybridstat(BokehAction(None))
