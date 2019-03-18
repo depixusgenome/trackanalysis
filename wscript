@@ -22,13 +22,13 @@ def options(ctx, __old__ = locals().pop('options')):
     "add options"
     __old__(ctx)
     grp = ctx.add_option_group('Test options')
-    for i, j, k in [
-            ('i', 'integration', ('-m', 'integration')),
-            ('u', 'unit',        ('-m', 'not integration')),
-            ('a', 'all',         ())
+    for j, k in [
+            ('integration', ('-m', 'integration')),
+            ('unit',        ('-m', 'not integration')),
+            ('all',         ())
     ]:
         grp.add_option(
-            f'-{i}', f'--{j}tests',
+            f'-{j[0]}', f'--{j}tests',
             help    = f"Run {j} tests",
             default = ("-m", "not integration"),
             dest    = "TEST_GROUP",
