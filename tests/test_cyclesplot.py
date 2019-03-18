@@ -151,5 +151,5 @@ def test_cyclesplot2(bokehaction):
     server.change('Cycles:DriftWidget', 'value', [0], rendered = True)
 
 if __name__ == '__main__':
-    from testutils.bokehtesting import BokehAction
+    from tests.testutils.bokehtesting import BokehAction
     test_cyclesplot(BokehAction(None))
