@@ -14,7 +14,7 @@ buildclang:
     - python waf build --nolinting
 
 unittest:
-  stage: unittest
+  stage: test
   script: 
     - export CXX=g++-8
     - python waf configure
@@ -22,7 +22,7 @@ unittest:
     - python waf test --unittests
 
 integrationtest:
-  stage: integrationtest
+  stage: test
   script: 
     - export CXX=g++-8
     - python waf configure
