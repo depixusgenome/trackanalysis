@@ -25,7 +25,7 @@ unittest:
     - export CXX=g++-8
     - python waf configure
     - python waf build --nolinting
-    - python waf test --unittests
+    - python waf test --unittests --junit "unittests.xml"
 
 integrationtest:
   stage: test
@@ -35,4 +35,4 @@ integrationtest:
     - export CXX=g++-8
     - python waf configure
     - python waf build --nolinting
-    - python waf test --alltests --coverage
+    - python waf test --alltests --junit "alltests.xml" --coverage "Coverage"
