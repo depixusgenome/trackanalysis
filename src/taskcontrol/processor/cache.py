@@ -126,7 +126,7 @@ class Cache(Iterable[Processor]):
             good = [i for i, j in enumerate(self._items) if type(j.proc.task) is tsk]
             if len(good) > 1:
                 raise IndexError("ambiguous: please specify the task instance")
-            elif len(good) == 0:
+            if len(good) == 0:
                 raise IndexError("Missing task")
             return good[0]
 

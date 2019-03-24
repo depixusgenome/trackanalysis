@@ -261,7 +261,7 @@ class BaseTaskController(Controller):
         if task is None and len(tasks) == 0:
             raise NoEmission()
 
-        elif task is None:
+        if task is None:
             task = cast(RootTask, tasks[0])
 
         if not isinstance(task, RootTask):
