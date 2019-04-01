@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Tests carryover detection"
 from   tests.testutils import integrationmark
+import pytest
 import pandas as pd
 
 @integrationmark
