@@ -41,6 +41,7 @@ def test_fewerevents(holoviewingcleaner):
     assert CARRY.rulefewerevents({"eventcount":10},{"eventcount":6})
     assert CARRY.rulefewerevents({"eventcount":10},{"eventcount":1})
 
+@pytest.mark.xfail
 @integrationmark
 def test_find(holoviewingcleaner):
     "check pairs found"
