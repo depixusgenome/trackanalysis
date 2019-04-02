@@ -5,11 +5,13 @@
 from typing                     import cast
 from tempfile                   import mktemp, gettempdir
 from pathlib                    import Path
+import asyncio
 import numpy as np
 
 from bokeh.models               import Tabs, FactorRange
 from tornado.gen                import sleep
 from tornado.ioloop             import IOLoop
+from tornado.platform.asyncio   import AsyncIOMainLoop
 
 from tests.testutils                  import integrationmark
 from tests.testingcore                import path as utfilepath
@@ -26,6 +28,9 @@ from peakcalling.processor.__config__    import FitToHairpinTask
 @integrationmark
 def test_hybridstat_xlsxio():
     "tests xlxs production"
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    AsyncIOMainLoop().make_current()
+
     path  = cast(Path, utfilepath("big_legacy"))
     track = Path(path).parent/"*.trk", utfilepath("CTGT_selection")
     itr   = _hmodels(dict(track     = track, # type: ignore
@@ -59,6 +64,9 @@ def test_hybridstat_xlsxio():
 @integrationmark
 def test_peaks_xlsxio():
     "tests xlxs production"
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    AsyncIOMainLoop().make_current()
+
     path = cast(Path, utfilepath("big_legacy"))
     itr  = _pmodels(dict(track = (Path(path).parent/"*.trk", utfilepath("CTGT_selection"))))
     mdl  = next(itr)
@@ -309,5 +317,6 @@ def test_hybridstat(bokehaction):
     server.change(tabs, 'active', indcyc)
 
 if __name__ == '__main__':
+    # pylint: disable=ungrouped-imports
     from tests.testutils.bokehtesting import BokehAction
     test_hybridstat(BokehAction(None))
