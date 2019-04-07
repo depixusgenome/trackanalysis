@@ -2,7 +2,7 @@
         if @_hvr_cnt != value
             return
 
-        inds.sort((a,b) => a - b)
+        inds.sort((a,b) -> a - b)
         ind = inds[Math.floor(inds.length*0.5)]
         ind = Math.floor(ind/@shape[1]) * @shape[1]
         if ind == @cycle
@@ -118,7 +118,10 @@
             bases = table.data["bases"]
             aval  = bases[0] / @stretch + @bias
             bval  = bases[1] / @stretch + @bias
-            if Math.abs(aval-table.data['z']) < 1e-5 && Math.abs(bval-table.data['z']) < 1e-5
+            if (
+                Math.abs(aval-table.data['z']) < 1e-5 &&
+                Math.abs(bval-table.data['z']) < 1e-5
+            )
                 return
 
             table.data["z"] = [aval, bval]

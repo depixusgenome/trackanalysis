@@ -75,7 +75,8 @@ export class DpxFitParamsView extends WidgetView
         icon     = if @model.locksequence then 'lock' else 'unlocked'
         return "<button type='button' id='dpx-pk-locksequence' #{ttip} "+
               "class='dpx-fp-freeze bk-bs-btn bk-bs-btn-default'#{disabled}>"+
-              "<span class='icon-dpx-#{icon}'#{disabled} id='dpx-pk-ls-icon'>Hairpin</span></button>"
+              "<span class='icon-dpx-#{icon}'#{disabled} "+
+              "id='dpx-pk-ls-icon'>Hairpin</span></button>"
 
 export class DpxFitParams extends Widget
     default_view: DpxFitParamsView

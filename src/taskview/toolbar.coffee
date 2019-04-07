@@ -138,7 +138,8 @@ export class DpxToolbarView extends WidgetView
                @make_btn('selection', '=', ttips[3])+
                "<input id='dpx-tb-discard'"+
                    " class='dpx-freeze bk-widget-form-input'"+
-                   " type='text' value='#{mdl.discarded}' placeholder='#{mdl.helpmessage}'>"+
+                   " type='text' value='#{mdl.discarded}'"+
+                   " placeholder='#{mdl.helpmessage}'>"+
                @make_btn('del', @_icon('bin'), ttips[4])+
                "<div id='dpx-tb-message' class='bk-markup'>"+
                    "#{mdl.message}</div>"+

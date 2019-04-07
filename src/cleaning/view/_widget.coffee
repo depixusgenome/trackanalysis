@@ -67,7 +67,9 @@ export class DpxCleaningView extends WidgetView
         elem = $(@el)
 
         elem.find("#dpx-cl-subtracted").change((e) => @model.subtracted = e.target.value)
-        elem.find("#dpx-cl-add").click(() => @model.subtractcurrent =  @model.subtractcurrent+1)
+        elem.find("#dpx-cl-add").click(
+            () => @model.subtractcurrent =  @model.subtractcurrent+1
+        )
         for evt in @cl_inputs
             el = elem.find("#dpx-cl-#{evt}")
             el.change((e) => @model[e.target.id[7...]] = Number(e.target.value))

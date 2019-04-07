@@ -13,7 +13,7 @@ import  numpy       as     np
 
 from    eventdetection.view      import (AlignmentWidget, # pylint: disable=unused-import
                                          AlignmentModalDescriptor)
-from    modaldialog.view         import tab
+from    taskview.modaldialog     import tab
 from    taskcontrol.beadscontrol import TaskWidgetEnabler
 from    utils                    import initdefaults
 from    utils.gui                import parseints, intlistsummary

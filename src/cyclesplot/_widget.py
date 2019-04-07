@@ -11,7 +11,7 @@ from    bokeh.models        import (ColumnDataSource, Slider, CustomJS, DataTabl
                                     CheckboxButtonGroup, Widget)
 
 from    eventdetection.view      import AlignmentWidget, EventDetectionWidget
-from    modaldialog.view         import tab
+from    taskview.modaldialog     import tab
 from    tasksequences.view       import OligoListWidget, SequencePathWidget
 from    taskcontrol.beadscontrol import TaskWidgetEnabler
 from    taskmodel                import RootTask

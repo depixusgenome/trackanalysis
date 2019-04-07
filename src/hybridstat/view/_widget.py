@@ -14,13 +14,13 @@ from bokeh.models               import (DataTable, TableColumn, CustomJS,
 from cleaning.view              import BeadSubtractionModalDescriptor
 from eventdetection.view        import AlignmentModalDescriptor
 from excelreports.creation      import writecolumns
-from modaldialog.view           import tab
 from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
 from peakfinding.groupby        import FullEm, ByHistogram
 from signalfilter               import rawprecision
 from tasksequences.view         import (SequenceTicker, SequenceHoverMixin,
                                         OligoListWidget, SequencePathWidget)
 from taskcontrol.beadscontrol   import TaskWidgetEnabler
+from taskview.modaldialog       import tab
 from taskview.toolbar           import FileList
 from utils                      import dflt, dataclass
 from utils.gui                  import startfile
