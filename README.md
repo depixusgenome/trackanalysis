@@ -1,3 +1,7 @@
+<a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_IntegrationTest&guest=1">
+<img src="http://jupyter.depixus.org:8111/app/rest/builds/buildType:Trackanalysis_IntegrationTest/statusIcon"/>
+</a>
+
 # Project Goals
 
 * User-friendly, platform agnostic data analysis tools.
