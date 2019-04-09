@@ -6,7 +6,7 @@ Saves stuff from session to session
 from   copy                    import deepcopy
 from   typing                  import Tuple, List, Optional
 
-from   data.__scripting__      import Track
+from   data.__scripting__      import Track, TracksDict
 from   taskmodel.application   import TasksConfig
 from   taskmodel.__scripting__ import Tasks, Task
 from   utils                   import initdefaults
@@ -98,8 +98,19 @@ def save(cls, task: Task):
         cls.tasksmodel(**{mdl.instrument: out})
         scriptapp.writeuserconfig()
 
+@addto(Tasks, classmethod)
+def instrument(cls, instrument = None) -> str: # pylint: disable=redefined-outer-name
+    "return or set the instrument"
+    if isinstance(instrument, TracksDict):
+        instrument = next(iter(instrument.values()))
+    if isinstance(instrument, Track):
+        instrument = instrument.instrument["type"].name
+    if instrument is not None:
+        cls.tasksmodel(instrument = instrument)
+    return cls.tasksmodel().instrument
+
 @addto(Tasks)
-def let(self, *resets, instrument = None, **kwa) -> Task:
+def let(self, *resets, instrument = None, **kwa) -> Task: # pylint: disable=redefined-outer-name
     """
     Same as Tasks.__call__ but saves the configuration as the default
     """
