@@ -8,11 +8,11 @@ from   typing                    import Optional, Union, Any, Dict, cast
 
 import taskstore
 from   taskmodel.__scripting__.track import LocalTasks
-from   ..trackio                 import Handler, _TrackIO # pylint: disable=protected-access
+from   ..trackio                 import Handler, TrackIO
 from   ..trackio                 import PATHTYPES, PATHTYPE, instrumenttype
 from   .track                    import Track
 
-class ScriptAnaIO(_TrackIO):
+class ScriptAnaIO(TrackIO):
     "checks and opens taskstore paths"
     EXT = '.ana'
     @classmethod
