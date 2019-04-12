@@ -206,6 +206,9 @@ class PeaksStatsWidget:
             "all track dependant stats"
             if mdl.track is None:
                 return
+            dim = mdl.track.instrument['dimension']
+            if dim != 'µm':
+                self.titles = [(i.replace('µm', dim), j) for i,j in self.titles]
 
             self.values[0] = mdl.track.ncycles
             self.values[3] = rawprecision(mdl.track, mdl.bead)

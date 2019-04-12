@@ -55,6 +55,7 @@ class MuWellsFilesIO(TrackIO):
         output['picofrate']  = output.pop("framerate", None)
         output['phases']     = output["phases"][kwa.get('clipcycles', 2):, :]
         output['instrument']["type"] = cls.instrumenttype(paths)
+        output['instrument']["dimension"] = "V"
         for i, liapath in enumerate(paths[1:]):
             if Path(liapath).suffix == cls.LIAEXT:
                 output.update(cls.__update(output, i, str(liapath), kwa))

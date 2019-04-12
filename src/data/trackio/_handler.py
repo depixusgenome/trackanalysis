@@ -148,6 +148,7 @@ class Handler:
             assert "type" in res['instrument']
         else:
             res['instrument'] = {"type": self.instrumenttype(), "name": None}
+        res['instrument'].setdefault("dimension", "µm")
 
     @staticmethod
     def __fov(res, kwargs):
