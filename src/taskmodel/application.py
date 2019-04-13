@@ -79,7 +79,14 @@ class TasksConfig(ConfigObject):
     instrument: str            = InstrumentType.picotwist.name
     picotwist:  Configuration  = cast(Configuration, ConfigurationDescriptor())
     sdi:        Configuration  = cast(Configuration, ConfigurationDescriptor())
+    muwells:    Configuration  = cast(Configuration, ConfigurationDescriptor())
     order:      List[str]      = list(TASK_ORDER)
+
+    # make sure all configurations are available
+    locals().update({
+        i: ConfigurationDescriptor()
+        for i in set(InstrumentType.__members__)-set(locals())
+    })
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):

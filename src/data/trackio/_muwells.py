@@ -37,7 +37,7 @@ class MuWellsFilesIO(TrackIO):
     @staticmethod
     def instrumenttype(_) -> str:
         "return the instrument type"
-        return "µwells"
+        return "muwells"
 
     @classmethod
     def open(cls, paths:Tuple[PATHTYPE,PATHTYPE], **kwa) -> dict: # type: ignore
