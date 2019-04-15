@@ -1,15 +1,20 @@
-<p>CLANG build <a href=/viewType.html?buildTypeId=BuildClang&guest=1">
+<table>
+<tr> <td>CLANG <a href=/viewType.html?buildTypeId=BuildClang&guest=1">
 <img src="http://jupyter.depixus.org:8111/app/rest/builds/buildType:BuildClang/statusIcon"/>
-</a></p>
-<p>GCC build <a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_Build&guest=1">
+</a></td>
+
+<td>GCC <a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_Build&guest=1">
 <img src="http://jupyter.depixus.org:8111/app/rest/builds/buildType:Trackanalysis_Build/statusIcon"/>
-</a></p>
-<p>Unit tests <a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_IntegrationTest&guest=1">
+</a></td>
+
+<td>Unit tests <a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_IntegrationTest&guest=1">
 <img src="http://jupyter.depixus.org:8111/app/rest/builds/buildType:Trackanalysis_IntegrationTest/statusIcon"/>
-</a></p>
-<p>Unit tests <a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_Test&guest=1">
+</a></td>
+
+<td>Integration tests <a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_Test&guest=1">
 <img src="http://jupyter.depixus.org:8111/app/rest/builds/buildType:Trackanalysis_Test/statusIcon"/>
-</a></p>
+</a></td>
+</table>
 
 # Project Goals
 
