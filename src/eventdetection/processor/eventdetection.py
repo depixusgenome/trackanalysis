@@ -10,7 +10,7 @@ from utils                 import initdefaults
 from ..data                import Events
 from ..                    import EventDetectionConfig
 
-class EventDetectionTask(EventDetectionConfig, Task):
+class EventDetectionTask(EventDetectionConfig, Task, zattributes = ('events',)):
     """
     # Returned Values
 

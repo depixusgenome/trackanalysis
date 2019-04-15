@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "subtracting fixed beads from other beads"
+from   copy                         import deepcopy
 from   typing                       import (List, Tuple, Optional, Callable,
                                             Union, Dict, cast)
 import warnings
@@ -12,6 +13,7 @@ from   data.views                   import Cycles, Beads, BEADKEY
 from   signalfilter                 import nanhfsigma
 from   utils                        import initdefaults
 from   taskmodel                    import PHASE
+from   taskmodel.base               import Rescaler
 from   .datacleaning                import AberrantValuesRule, HFSigmaRule, ExtentRule
 from   ._core                       import (reducesignals, # pylint: disable=import-error
                                             phasebaseline, dztotalcount)
@@ -150,7 +152,7 @@ def aggtype(name:str) -> AggType:
 
 FixedData = Tuple[float, float, float, BEADKEY]
 FixedList = List[FixedData]
-class MeasureDropsRule():
+class MeasureDropsRule(Rescaler, zattributes = ('mindzdt',)):
     """
     Threshold on the number of cycles with frames in PHASE.measure such that:
 
@@ -161,7 +163,7 @@ class MeasureDropsRule():
     mindzdt  = 1.5e-2
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
-        pass
+        super().__init__()
 
     def measure(self, track, data) -> int:
         "return the number of stairs in PHASE.measure"
@@ -173,7 +175,7 @@ class MeasureDropsRule():
         "tests the number of cycles with too many stairs"
         return self.measure(track, data) > self.maxdrops*track.ncycles//100
 
-class FixedBeadDetection:
+class FixedBeadDetection(Rescaler):
     """
     Finds and sorts fixed beads
     """
@@ -191,6 +193,22 @@ class FixedBeadDetection:
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
+
+    def rescale(self, value:float) -> "FixedBeadDetection":
+        "rescale z-axis attributes"
+        cpy   = deepcopy(self)
+
+        for attr in ('maxabsvalue', 'maxderivate'):
+            setattr(
+                cpy.abberrant.derivative,
+                attr,
+                getattr(cpy.abberrant.derivative, attr)*value
+            )
+
+        cpy.drops.mindzdt *= value
+        for attr in ('maxdiff', 'minhfsigma', 'maxhfsigma', 'maxextent'):
+            setattr(cpy, attr, getattr(cpy, attr)*value)
+        return cpy
 
     def extents(self, cycles: Cycles) -> np.ndarray:
         """

@@ -3,6 +3,7 @@
 "Removing aberrant points and cycles"
 from    typing                  import cast
 import  numpy                   as     np
+from    taskmodel.base          import Rescaler
 # pylint: disable=import-error,unused-import
 from    ._core                  import (constant as _cleaningcst, # pylint: disable=import-error
                                         clip     as _cleaningclip,
@@ -13,12 +14,22 @@ from    ._core                  import (constant as _cleaningcst, # pylint: disa
                                         PopulationRule, HFSigmaRule, ExtentRule,
                                         SaturationRule, Partial)
 
-class DataCleaning(AberrantValuesRule, # pylint: disable=too-many-ancestors
-                   HFSigmaRule,
-                   PopulationRule,
-                   ExtentRule,
-                   PingPongRule,
-                   SaturationRule):
+class DataCleaning(
+        Rescaler, # pylint: disable=too-many-ancestors
+        AberrantValuesRule,
+        HFSigmaRule,
+        PopulationRule,
+        ExtentRule,
+        PingPongRule,
+        SaturationRule,
+        zattributes = (
+            'maxabsvalue', 'maxderivate',   # AberrantValuesRule
+            'minhfsigma',  'maxhfsigma',    # HFSigmaRule
+            'minextent',   'maxextent',     # ExtentRurle
+            'mindifference',                # PingPongRule
+            'maxdisttozero'                 # SaturationRule
+        )
+):
     """
     Remove specific points, cycles or even the whole bead depending on a number
     of criteria implemented in aptly named methods:
@@ -87,14 +98,14 @@ class DataCleaning(AberrantValuesRule, # pylint: disable=too-many-ancestors
 
     def __getstate__(self):
         state = dict(self.__dict__)
-        for base in DataCleaning.__bases__:
+        for base in DataCleaning.__bases__[1:]:
             state.update(base.__getstate__(self))
         return state
 
     def __setstate__(self, vals):
         self.__init__()
         self.__dict__.update({i: j for i, j in vals.items() if i in self.__dict__})
-        for base in DataCleaning.__bases__:
+        for base in DataCleaning.__bases__[1:]:
             base.configure(self, vals)
 
     @staticmethod

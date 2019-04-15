@@ -5,7 +5,7 @@ Classes defining a type of data treatment.
 
 **Warning** Those definitions must remain data-independant.
 """
-from   typing       import Dict, Any
+from   typing       import Dict, Any, Tuple
 from   copy         import deepcopy
 from   pickle       import dumps as _dumps
 
@@ -30,10 +30,44 @@ class TaskIsUniqueError(Exception):
         if any(tcl is other.unique() for other in lst if other.unique()):
             raise cls()
 
-class Task:
+class Rescaler:
+    "Class for rescaling z-axis-dependant attributes"
+    def __init_subclass__(cls, zattributes = (), **kwa):
+        if zattributes:
+            def zscaledattributes() -> Tuple[str,...]:
+                "return the names of attributes scaled to Z"
+                return zattributes
+            cls.zscaledattributes = staticmethod(zscaledattributes)
+        super().__init_subclass__(**kwa)
+
+    def rescale(self, value:float) -> 'Rescaler':
+        "rescale factors (from µm to V for example) for a given bead"
+        cpy = deepcopy(self)
+        def _rescale(old):
+            if old is None or isinstance(old, str):
+                return old
+            if isinstance(old, (list, set, tuple)):
+                return type(old)(*(_rescale(i) for i in old))
+            if isinstance(old, dict):
+                return type(old)((_rescale(i), _rescale(j)) for i, j in old.items())
+            if hasattr(old, 'rescale'):
+                return old.rescale(value)
+            return old*value
+
+        for attr in self.zscaledattributes():
+            setattr(cpy, attr, _rescale(getattr(cpy, attr)))
+        return cpy
+
+    @staticmethod
+    def zscaledattributes() -> Tuple[str,...]:
+        "return the names of attributes scaled to Z"
+        return ()
+
+class Task(Rescaler):
     "Class containing high-level configuration infos for a task"
     disabled = False
     def __init__(self, **kwargs) -> None:
+        super().__init__()
         self.disabled = kwargs.get('disabled', type(self).disabled)
         if 'level' in kwargs:
             self.level = toenum(Level, kwargs['level']) # type: Level

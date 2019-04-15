@@ -432,6 +432,45 @@ def test_clippingtask():
     assert len(nzer) == 5
     assert np.all(np.isnan(arr[nzer]))
 
+def test_rescaling():
+    "test rescaling"
+    attrs = (
+        'maxabsvalue', 'maxderivate',   # AberrantValuesRule
+        'minhfsigma', 'maxhfsigma',     # HFSigmaRule
+        'minextent',  'maxextent',      # ExtentRurle
+        'mindifference',                # PingPongRule
+        'maxdisttozero'                 # SaturationRule
+    )
+    task = DataCleaningTask()
+    new  = task.rescale(5.)
+    resc = new.__getstate__()
+    assert task is not new
+    for i, j in task.__getstate__().items():
+        assert abs(resc[i]-j*5) < 1e-6 if i in attrs else resc[i] == j
+
+    for cls in (ClippingTask, BeadSubtractionTask):
+        task = cls()
+        new  = task.rescale(5.)
+        assert task is not new
+        assert task == new
+
+    obj   = FixedBeadDetection()
+    new   = obj.rescale(5)
+    assert obj is not new
+
+    attrs = ('maxabsvalue', 'maxderivate')
+    for i, j in obj.abberrant.__getstate__().items():
+        assert abs(new.abberrant.__getstate__()[i] - (j*5. if i in attrs else j)) < 1e-5
+
+    attrs = ('mindzdt',)
+    for i, j in obj.drops.__dict__.items():
+        assert getattr(new.drops, i) == (j*5. if i in attrs else j)
+
+    attrs = ('maxdiff', 'minhfsigma', 'maxhfsigma', 'maxextent')
+    for i, j in obj.__dict__.items():
+        if not np.isscalar(j):
+            continue
+        assert abs(getattr(new, i) - (j*5. if i in attrs else j)) < 1e-5
+
 if __name__ == '__main__':
-    test_fixedbeadsorting()
-    test_clippingtask()
+    test_rescaling()

@@ -96,6 +96,11 @@ class ExtremumAlignmentTask(Task):
     def __init__(self, **_):
         super().__init__()
 
+    @staticmethod
+    def zscaledattributes() -> Tuple[str,...]:
+        "return the names of attributes scaled to Z"
+        return ('delta', 'minrelax', 'pull')
+
 class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
     "Aligns cycles to zero"
     class _Utils:

@@ -21,7 +21,7 @@ from peakcalling.tohairpin      import (PeakMatching, GaussianProductFit,
                                         PiecesPeakGridFit)
 from peakcalling.toreference    import HistogramFit, ChiSquareHistogramFit, Pivot
 from peakcalling.processor      import (BeadsByHairpinProcessor, BeadsByHairpinTask,
-                                        DistanceConstraint, FitToReferenceTask)
+                                        DistanceConstraint, FitToReferenceTask, FitToHairpinTask)
 from tests.testingcore          import DummyPool, path as utpath
 
 def test_toref():
@@ -300,6 +300,40 @@ def test_peakiterator():
     vals = list(match.PeakIterator(ref, exp, 0., 10., -10., .5))
     assert_allclose([i for i, _ in vals], [1., 3.], rtol = 1e-3)
     assert_allclose([i for _, i in vals], [0., 1./3.], rtol = 1e-3)
+
+def test_rescale():
+    "test rescale"
+    rng = Range(1, 1, 1)
+    obj = rng.rescale("stretch", 5)
+    assert rng is not obj
+    assert all(abs(5.-i) < 1e-5 for i in obj)
+
+    obj = rng.rescale("bias", .2)
+    assert rng is not obj
+    assert all(abs(5.-i) < 1e-5 for i in obj)
+
+    rng = Range(None, 1, 1)
+    obj = rng.rescale("stretch", 5)
+    assert rng is not obj
+    assert obj[0] is None
+    assert all(abs(5.-i) < 1e-5 for i in obj[1:])
+
+    obj = rng.rescale("bias", .2)
+    assert rng is not obj
+    assert obj[0] is None
+    assert all(abs(5.-i) < 1e-5 for i in obj[1:])
+
+    dist = DistanceConstraint("hp", {"stretch": Range(1, 1, 1), "bias": Range(1, 1, 1)})
+    obj  = dist.rescale(5.)
+
+    assert dist is not obj
+    assert obj[0] == "hp"
+    assert all(abs(5.-i) < 1e-5 for i in obj[1]['stretch'])
+    assert all(abs(.2-i) < 1e-5 for i in obj[1]['bias'])
+
+
+    task = FitToHairpinTask()
+    assert task.rescale(5.) is not task
 
 if __name__ == '__main__':
     test_ref_piecespeaksgrid()

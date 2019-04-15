@@ -3,6 +3,7 @@
 "Signal Analysis: filters for removing noise"
 from typing         import (Union, Iterator, Iterable, Tuple, Sequence, Optional,
                             overload, cast, TYPE_CHECKING)
+from copy           import deepcopy
 from abc            import ABC
 
 import numpy as np
@@ -55,6 +56,37 @@ class PrecisionAlg(ABC):
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
+
+    def __init_subclass__(cls, zattributes = (), **kwa):
+        if zattributes:
+            def zscaledattributes() -> Tuple[str,...]:
+                "return the names of attributes scaled to Z"
+                return zattributes
+            cls.zscaledattributes = staticmethod(zscaledattributes)
+        super().__init_subclass__(**kwa)
+
+    @staticmethod
+    def zscaledattributes() -> Tuple[str,...]:
+        "return the names of attributes scaled to Z"
+        return ('precision',)
+
+    def rescale(self, value:float) -> 'PrecisionAlg':
+        "rescale factors (from µm to V for example) for a given bead"
+        cpy = deepcopy(self)
+        def _rescale(old):
+            if old is None or isinstance(old, str):
+                return old
+            if isinstance(old, (list, set, tuple)):
+                return type(old)(*(_rescale(i) for i in old))
+            if isinstance(old, dict):
+                return type(old)((_rescale(i), _rescale(j)) for i, j in old.items())
+            if hasattr(old, 'rescale'):
+                return old.rescale(value)
+            return old*value
+
+        for attr in self.zscaledattributes():
+            setattr(cpy, attr, _rescale(getattr(cpy, attr)))
+        return cpy
 
     def getprecision(self, # pylint: disable=too-many-branches
                      precision:PRECISION = None,
@@ -128,6 +160,37 @@ class CppPrecisionAlg:
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
+
+    def __init_subclass__(cls, zattributes = (), **kwa):
+        if zattributes:
+            def zscaledattributes() -> Tuple[str,...]:
+                "return the names of attributes scaled to Z"
+                return zattributes
+            cls.zscaledattributes = staticmethod(zscaledattributes)
+        super().__init_subclass__(**kwa)
+
+    @staticmethod
+    def zscaledattributes() -> Tuple[str,...]:
+        "return the names of attributes scaled to Z"
+        return ('precision',)
+
+    def rescale(self, value:float) -> 'CppPrecisionAlg':
+        "rescale factors (from µm to V for example) for a given bead"
+        cpy = deepcopy(self)
+        def _rescale(old):
+            if old is None or isinstance(old, str):
+                return old
+            if isinstance(old, (list, set, tuple)):
+                return type(old)(*(_rescale(i) for i in old))
+            if isinstance(old, dict):
+                return type(old)((_rescale(i), _rescale(j)) for i, j in old.items())
+            if hasattr(old, 'rescale'):
+                return old.rescale(value)
+            return old*value
+
+        for attr in self.zscaledattributes():
+            setattr(cpy, attr, _rescale(getattr(cpy, attr)))
+        return cpy
 
     def getprecision(self, # pylint: disable=too-many-branches
                      precision:PRECISION = None,

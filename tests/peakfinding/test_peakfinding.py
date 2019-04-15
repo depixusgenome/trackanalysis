@@ -383,5 +383,22 @@ def test_gels():
                      dtype= 'f4')
     assert_allclose(found, truth)
 
+def test_rescaling():
+    "test rescaling"
+    for cls in (SingleStrandTask, BaselinePeakTask):
+        task = cls()
+        obj  = task.rescale(5.)
+        assert obj is not task
+        for i, j in task.__dict__.items():
+            if i in ("delta", "maxdisttozero"):
+                assert abs(j*5 - obj.__dict__[i]) < 1e-5
+            else:
+                assert j == obj.__dict__[i]
+
+    task = PeakSelectorTask()
+    obj  = task.rescale(5.)
+    assert obj is not task
+    assert obj == task
+
 if __name__ == '__main__':
     test_baselinepeak()

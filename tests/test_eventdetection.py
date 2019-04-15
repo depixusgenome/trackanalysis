@@ -25,7 +25,8 @@ from eventdetection.intervalextension import (IntervalExtensionAroundMean,
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
                                       PhaseEdgeAlignment)
 from eventdetection.processor import (ExtremumAlignmentProcessor, AlignmentTactic,
-                                      EventDetectionTask)
+                                      EventDetectionTask, ExtremumAlignmentTask,
+                                      BiasRemovalTask)
 from eventdetection.data      import Events
 from eventdetection           import samples
 from taskcontrol.taskcontrol  import create
@@ -479,6 +480,34 @@ def test_dataframe():
     assert 'cycle' in data.index.names
     assert 'event' in data.index.names
     assert 'avg'   in data
+
+def test_rescale():
+    "test rescale"
+    task = EventDetectionTask()
+    obj  = task.rescale(5.)
+    assert obj.events.select.__getstate__() == task.events.select.__getstate__()
+    dumps = pickle.dumps
+    assert dumps(obj.events.split) == dumps(task.events.split)
+    assert dumps(obj.events.merge.pop) == dumps(task.events.merge.pop)
+    assert dumps(obj.events.merge.range) == dumps(task.events.merge.range)
+    assert obj.events.merge.stats.confidence == task.events.merge.stats.confidence
+    assert (obj.events.merge.stats.minprecision - task.events.merge.stats.minprecision*5.) < 1e-6
+
+    task = ExtremumAlignmentTask()
+    obj  = task.rescale(5.)
+    for i, j in task.__dict__.items():
+        if i in ('delta', 'minrelax', 'pull'):
+            assert abs(getattr(obj, i) - j*5) < 1e-6
+        else:
+            assert getattr(obj, i)  == j
+
+    task = BiasRemovalTask()
+    obj  = task.rescale(5.)
+    for i, j in task.__dict__.items():
+        if i in ('zerodelta', 'binsize'):
+            assert abs(getattr(obj, i) - j*5) < 1e-6
+        else:
+            assert getattr(obj, i)  == j
 
 if __name__ == '__main__':
     test_select()

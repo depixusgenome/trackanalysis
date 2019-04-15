@@ -7,6 +7,7 @@ from    typing                      import (Sequence, NamedTuple, Tuple, Union,
                                             Iterator, cast)
 from    abc                         import ABC, abstractmethod
 from    functools                   import partial
+from    copy                        import deepcopy
 from    scipy.interpolate           import interp1d
 from    scipy.optimize              import fmin_cobyla
 import  numpy                       as     np
@@ -69,6 +70,14 @@ class HistogramFit(GriddedOptimization, ReferenceFit):
 
     precision    = property(lambda self: self.histogram.precision,
                             lambda self, val: setattr(self.histogram, 'precision', val))
+
+    def rescale(self, value:float) -> 'HistogramFit':
+        "rescale factors (from µm to V for example) for a given bead"
+        cpy           = deepcopy(self)
+        cpy.histogram = cpy.histogram.rescale(value)
+        cpy.bias      = Range(*(i/value if i else i for i in cpy.bias))
+        return cpy
+
     def getprecision(self, *args, **kwargs):
         "returns the precision"
         return self.histogram.getprecision(*args, **kwargs)

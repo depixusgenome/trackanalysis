@@ -3,8 +3,11 @@
 """
 Basic stuff for dealing with peak calling
 """
-from   typing       import (NamedTuple, Dict, Any, Optional, Union,
-                            Iterator, Tuple, List, cast)
+from   typing       import (
+    NamedTuple, Dict, Any, Optional, Union,
+    Iterator, Tuple, List, cast
+)
+from   copy         import copy
 from   enum         import Enum
 from   itertools    import product
 import numpy        as     np
@@ -31,11 +34,29 @@ class Range(NamedTuple):
     center:  Optional[float]
     size:    float
     step:    float
+    def rescale(self, name: str, value:float) -> 'Range':
+        "rescale factors (from µm to V for example) for a given bead"
+        # pylint: disable=too-many-function-args,not-an-iterable
+        if 'bias' in name.lower():
+            return Range(
+                self.center/value if self.center else self.center,
+                self.size/value,
+                self.step/value
+            )
+        return Range(
+            self.center*value if self.center else self.center,
+            self.size*value,
+            self.step*value
+        )
 
 class Distance(NamedTuple):
     value:   float
     stretch: float
     bias:    float
+    def rescale(self, value:float) -> 'Distance':
+        "rescale factors (from µm to V for example) for a given bead"
+        # pylint: disable=too-many-function-args
+        return type(self)(self.value, self.stretch*value, self.bias/value)
 
 class Pivot(Enum):
     "The position of the pivot in the fit"
@@ -70,6 +91,13 @@ class OptimizationParams:
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
+
+    def rescale(self, value:float) -> 'OptimizationParams':
+        "rescale factors (from µm to V for example) for a given bead"
+        cpy         = copy(self)
+        cpy.stretch = cpy.stretch.rescale('stretch', value)
+        cpy.bias    = cpy.bias   .rescale('bias',     value)
+        return cpy
 
     def _defaultdistance(self) -> Distance:
         "return the default distance"

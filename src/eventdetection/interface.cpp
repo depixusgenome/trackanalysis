@@ -279,6 +279,9 @@ namespace eventdetection { namespace splitting {
         }
     };
 
+    template <typename T>
+    T _rescale(T const & self, float) { return self; }
+
     template <typename T, typename ...Args>
     void _defaults(py::module & mod, char const * name, char const *doc, Args ...args)
     {
@@ -288,6 +291,7 @@ namespace eventdetection { namespace splitting {
            .def("__call__",   &_callall<T>,  "data"_a, "precision"_a, "start"_a, "stop"_a)
            .def("grade",      &_grade<T>,    "data"_a, "precision"_a)
            .def("threshold",  &_threshold<T>::call)
+           .def("rescale",    &_rescale<T>)
            .def_static("run", [args...](ndarray<float> data, float prec, py::kwargs kwa)
                        {
                             auto self = dpx::pyinterface::create<T>(kwa, args...);
@@ -330,6 +334,25 @@ more frames in a row.)_";
 
 namespace eventdetection { namespace merging {
     template <typename T>
+    T _rescale(T const & self, float) { return self; }
+
+    template <>
+    HeteroscedasticEventMerger _rescale(HeteroscedasticEventMerger const & self, float val)
+    { 
+        auto cpy = self;
+        cpy.minprecision *= val;
+        return cpy; 
+    }
+
+    template <>
+    MultiMerger _rescale(MultiMerger const & self, float val)
+    { 
+        auto cpy = self;
+        cpy.stats.minprecision *= val;
+        return cpy; 
+    }
+
+    template <typename T>
     ndarray<int> _call(T              const & self,
                        ndarray<float> const & data,
                        ndarray<int>   const & intervals,
@@ -365,6 +388,7 @@ namespace eventdetection { namespace merging {
         using namespace py::literals;
         py::class_<T> cls(mod, name, doc);
         cls.def("__call__",   &_call<T>, "data"_a, "intervals"_a)
+           .def("rescale",    &_rescale<T>)
            .def_static("run", [args...](ndarray<float>   data,
                                         ndarray<int>     rng,
                                         py::kwargs kwa)

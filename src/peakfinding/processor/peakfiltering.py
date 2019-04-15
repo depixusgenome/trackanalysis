@@ -50,6 +50,11 @@ class SingleStrandTask(Task):
     def __init__(self, **_):
         super().__init__(**_)
 
+    @staticmethod
+    def zscaledattributes() -> Tuple[str,...]:
+        "return the names of attributes scaled to Z"
+        return ('delta',)
+
 _DTYPE = np.dtype([('peaks', 'f4'), ('events', 'O')])
 def _topeakarray(arr):
     return arr if isinstance(arr, np.ndarray) else np.array(list(arr), dtype = _DTYPE)
@@ -192,6 +197,11 @@ class BaselinePeakTask(Task):
     eventend           = 5
     maxdisttozero      = .015
     mineventpercentage = 10
+
+    @staticmethod
+    def zscaledattributes() -> Tuple[str,...]:
+        "return the names of attributes scaled to Z"
+        return ('maxdisttozero',)
 
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):

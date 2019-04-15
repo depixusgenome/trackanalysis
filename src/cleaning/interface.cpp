@@ -432,6 +432,15 @@ returns: *True* if the number of remaining values is too low)_";
             py::class_<CLS> cls(mod, "DerivateSuppressor", doc);
             cls.def_readwrite("maxderivate", &CLS::maxderivate)
                .def_readwrite("maxabsvalue", &CLS::maxabsvalue)
+               .def(
+                       "rescale", 
+                        [](CLS const & self, float val)
+                        {
+                            auto cpy = self;
+                            cpy.maxabsvalue = cpy.maxabsvalue*val;
+                            cpy.maxderivate = cpy.maxderivate*val;
+                        }
+               )
                .def("apply",
                     [](CLS const & self, ndarray<float> & arr, bool clip, float zero)
                     { self.apply(arr.size(), arr.mutable_data(), clip, zero); });
@@ -462,6 +471,14 @@ returns: *True* if the number of remaining values is too low)_";
                .def_readwrite("islandwidth", &CLS::islandwidth)
                .def_readwrite("ratio",       &CLS::ratio)
                .def_readwrite("maxderivate", &CLS::maxderivate)
+               .def(
+                       "rescale", 
+                        [](CLS const & self, float val)
+                        {
+                            auto cpy = self;
+                            cpy.maxderivate = cpy.maxderivate*val;
+                        }
+               )
                .def("apply", [](CLS const & self, ndarray<float> & arr)
                     { self.apply(arr.size(), arr.mutable_data()); });
             _defaults(cls);
@@ -484,6 +501,16 @@ A value at position *n* is aberrant if any:
                .def_readwrite("derivative", &CLS::derivative)
                .def_readwrite("localnans",  &CLS::localnans)
                .def_readwrite("islands",    &CLS::islands)
+               .def(
+                       "rescale", 
+                        [](CLS const & self, float val)
+                        {
+                            auto cpy = self;
+                            cpy.derivative.maxabsvalue = cpy.derivative.maxabsvalue*val;
+                            cpy.derivative.maxderivate = cpy.derivative.maxderivate*val;
+                            cpy.islands.maxderivate    = cpy.islands.maxderivate*val;
+                        }
+               )
                .def("aberrant",
                     [](CLS const & self, ndarray<float> & arr, bool clip)
                     { self.apply(arr.size(), arr.mutable_data(), clip); },
