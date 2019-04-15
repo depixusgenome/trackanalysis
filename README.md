@@ -1,6 +1,15 @@
-<a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_IntegrationTest&guest=1">
+<p>CLANG build <a href=/viewType.html?buildTypeId=BuildClang&guest=1">
+<img src="http://jupyter.depixus.org:8111/app/rest/builds/buildType:BuildClang/statusIcon"/>
+</a></p>
+<p>GCC build <a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_Build&guest=1">
+<img src="http://jupyter.depixus.org:8111/app/rest/builds/buildType:Trackanalysis_Build/statusIcon"/>
+</a></p>
+<p>Unit tests <a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_IntegrationTest&guest=1">
 <img src="http://jupyter.depixus.org:8111/app/rest/builds/buildType:Trackanalysis_IntegrationTest/statusIcon"/>
-</a>
+</a></p>
+<p>Unit tests <a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_Test&guest=1">
+<img src="http://jupyter.depixus.org:8111/app/rest/builds/buildType:Trackanalysis_Test/statusIcon"/>
+</a></p>
 
 # Project Goals
 
@@ -12,10 +21,13 @@ is user-oriented. Comments are for the developpers.
 
 # Installing
 
-The first step is to install boost libraries, either using the linux distribution's package manager or installing them manually.
+The first step will be to install the version control system named git (https://git-scm.com/).
+The second step is to download miniconda (tested) or the the more complete anaconda
+(untested, details in what follows may vary). 
 
 Clone the git repository and it's submodules, then set up the 
-environment and build:
+environment and build. **On windows**, the following commandlines will only work if
+miniconda is in the *PATH*: use the *Anaconda Prompt* powershell.
 
 ```shell
 git clone http:\\GIT-REPO
@@ -40,11 +52,30 @@ The *configure* and *setup* steps are every time new dependencies
 are added. The *build* step is required any time sources are
 changed.
 
+## Installing on windows
+
+Required by windows for compiling the C++ is Visual Studio c++. It's been tested
+to work on MSVC community edtion 2019. The following options were checked
+(a shorter list *might also work as well):
+
+* Python: everything can be unchecked
+* C++:
+
+  * MSVC v142
+  * Windows SDK
+  * C++ profile tools
+  * C++ make tools
+  * C++ ATL
+  * C++ MFC
+  * C++/CLI
+  * C++ modules
+  * MSVC v140
+
 ## Known problems
 
-### As of 2018-01-01
+### As of 2019-04-01
 
-#### pyembed error
+#### pyembed error on LINUX
 
 The default python installed by conda might not be compatible with compiling
 native code (*pybind11*) modules. The solution is to look for and install a
@@ -63,8 +94,8 @@ It spits out a list of values such as:
     python                     3.6.4                hc3d631a_1  defaults 
 
 The *undocumented* tags in the 3rd column are the relevant piece of information.
-Choose a tag from *conda-forge* (4th column). The tag always seems to be an integer.
-Its value doesn't seem to matter.
+Choose a tag from *conda-forge* (4th column). **On ubuntu 18.04 and 18.10, the
+current working python is python=3.7.0=hfd72cd7_0**.
 
 # Architecture
 
