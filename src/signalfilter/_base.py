@@ -3,12 +3,11 @@
 "Signal Analysis: filters for removing noise"
 from typing         import (Union, Iterator, Iterable, Tuple, Sequence, Optional,
                             overload, cast, TYPE_CHECKING)
-from copy           import deepcopy
-from abc            import ABC
 
 import numpy as np
 
 from utils          import initdefaults
+from utils.rescaler import Rescaler, ARescaler
 # pylint: disable=no-name-in-module,import-error
 from ._core.stats   import (hfsigma, mediandeviation, nanhfsigma as _nanhfsigma,
                             nanmediandeviation as _nanmediandeviation)
@@ -48,7 +47,7 @@ DATATYPE  = Union[Sequence[Sequence[np.ndarray]],
                   None]
 PRECISION = Union[float, Tuple[DATATYPE, int], None]
 
-class PrecisionAlg(ABC):
+class PrecisionAlg(ARescaler):
     "Implements precision extraction from data"
     precision: Optional[float] = None
     rawfactor    = 1.
@@ -56,37 +55,6 @@ class PrecisionAlg(ABC):
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
-
-    def __init_subclass__(cls, zattributes = (), **kwa):
-        if zattributes:
-            def zscaledattributes() -> Tuple[str,...]:
-                "return the names of attributes scaled to Z"
-                return zattributes
-            cls.zscaledattributes = staticmethod(zscaledattributes)
-        super().__init_subclass__(**kwa)
-
-    @staticmethod
-    def zscaledattributes() -> Tuple[str,...]:
-        "return the names of attributes scaled to Z"
-        return ('precision',)
-
-    def rescale(self, value:float) -> 'PrecisionAlg':
-        "rescale factors (from µm to V for example) for a given bead"
-        cpy = deepcopy(self)
-        def _rescale(old):
-            if old is None or isinstance(old, str):
-                return old
-            if isinstance(old, (list, set, tuple)):
-                return type(old)(*(_rescale(i) for i in old))
-            if isinstance(old, dict):
-                return type(old)((_rescale(i), _rescale(j)) for i, j in old.items())
-            if hasattr(old, 'rescale'):
-                return old.rescale(value)
-            return old*value
-
-        for attr in self.zscaledattributes():
-            setattr(cpy, attr, _rescale(getattr(cpy, attr)))
-        return cpy
 
     def getprecision(self, # pylint: disable=too-many-branches
                      precision:PRECISION = None,
@@ -152,7 +120,7 @@ class PrecisionAlg(ABC):
         "Obtain the raw precision for a given bead"
         return getattr(track, 'track', track).rawprecision(ibead, first, last)
 
-class CppPrecisionAlg:
+class CppPrecisionAlg(Rescaler):
     "Implements precision extraction from data: use only in case of Metaclass conflict"
     precision    = PrecisionAlg.precision
     rawfactor    = PrecisionAlg.rawfactor
@@ -160,37 +128,6 @@ class CppPrecisionAlg:
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
-
-    def __init_subclass__(cls, zattributes = (), **kwa):
-        if zattributes:
-            def zscaledattributes() -> Tuple[str,...]:
-                "return the names of attributes scaled to Z"
-                return zattributes
-            cls.zscaledattributes = staticmethod(zscaledattributes)
-        super().__init_subclass__(**kwa)
-
-    @staticmethod
-    def zscaledattributes() -> Tuple[str,...]:
-        "return the names of attributes scaled to Z"
-        return ('precision',)
-
-    def rescale(self, value:float) -> 'CppPrecisionAlg':
-        "rescale factors (from µm to V for example) for a given bead"
-        cpy = deepcopy(self)
-        def _rescale(old):
-            if old is None or isinstance(old, str):
-                return old
-            if isinstance(old, (list, set, tuple)):
-                return type(old)(*(_rescale(i) for i in old))
-            if isinstance(old, dict):
-                return type(old)((_rescale(i), _rescale(j)) for i, j in old.items())
-            if hasattr(old, 'rescale'):
-                return old.rescale(value)
-            return old*value
-
-        for attr in self.zscaledattributes():
-            setattr(cpy, attr, _rescale(getattr(cpy, attr)))
-        return cpy
 
     def getprecision(self, # pylint: disable=too-many-branches
                      precision:PRECISION = None,

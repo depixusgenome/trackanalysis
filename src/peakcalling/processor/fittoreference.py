@@ -94,7 +94,7 @@ class _DefaultFitData:
         return out
 
 
-class FitToReferenceTask(Task, zattributes = ('fitalg', "window")):
+class FitToReferenceTask(Task, zattributes = ('fitalg', "~window")):
     "Fits a bead to a reference"
     level                  = Level.peak
     defaultdata            = None

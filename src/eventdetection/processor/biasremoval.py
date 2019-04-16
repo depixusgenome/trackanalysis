@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
-from   typing                 import Tuple
 from   functools              import partial
 
 import numpy                  as     np
 from   taskcontrol.processor  import Processor
 from   taskmodel              import Task, Level, PHASE
+from   utils                  import initdefaults
 
-class BiasRemovalTask(Task):
+class BiasRemovalTask(Task, zattributes = ('zerodelta', 'binsize')):
     "removes the bias from the whole bead"
     level       = Level.bead
     phase       = PHASE.measure
@@ -17,10 +17,9 @@ class BiasRemovalTask(Task):
     zerodelta   = 1e-2
     binsize     = 1e-3
 
-    @staticmethod
-    def zscaledattributes() -> Tuple[str,...]:
-        "return the names of attributes scaled to Z"
-        return ('zerodelta', 'binsize')
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
 
 class BiasRemovalProcessor(Processor[BiasRemovalTask]):
     "removes the bias from the whole bead"

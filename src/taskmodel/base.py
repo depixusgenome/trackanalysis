@@ -5,14 +5,15 @@ Classes defining a type of data treatment.
 
 **Warning** Those definitions must remain data-independant.
 """
-from   typing       import Dict, Any, Tuple
+from   typing       import Dict, Any
 from   copy         import deepcopy
 from   pickle       import dumps as _dumps
 
 import numpy        as     np
 
-from   utils        import toenum, initdefaults
-from   .level       import Level
+from   utils            import toenum, initdefaults
+from   utils.rescaler   import Rescaler
+from   .level           import Level
 
 class TaskIsUniqueError(Exception):
     "verifies that the list contains no unique task of type task"
@@ -29,58 +30,6 @@ class TaskIsUniqueError(Exception):
 
         if any(tcl is other.unique() for other in lst if other.unique()):
             raise cls()
-
-class Rescaler:
-    "Class for rescaling z-axis-dependant attributes"
-    def __init_subclass__(cls, zattributes = (), **kwa):
-        if zattributes:
-            def zscaledattributes() -> Tuple[str,...]:
-                "return the names of attributes scaled to Z"
-                return zattributes
-            cls.zscaledattributes = staticmethod(zscaledattributes)
-        super().__init_subclass__(**kwa)
-
-    def rescale(self, value:float) -> 'Rescaler':
-        "rescale factors (from µm to V for example) for a given bead"
-        cpy = deepcopy(self)
-        if hasattr(self, '__getstate__'):
-            getattr(cpy, '__setstate__')(dict(
-                getattr(cpy, '__getstate__')(),
-                **self.zscaled(value)
-            ))
-        else:
-            for i, j in self.zscaled(value).items():
-                setattr(cpy, i, j)
-        return cpy
-
-    def zscaled(self, value:float) -> Dict[str, Any]:
-        "return the rescaled attributes scaled"
-        def _rescale(old):
-            if old is None or isinstance(old, str):
-                return old
-            if isinstance(old, (list, set, tuple)):
-                return type(old)(*(_rescale(i) for i in old))
-            if isinstance(old, dict):
-                return type(old)((_rescale(i), _rescale(j)) for i, j in old.items())
-            if hasattr(old, 'rescale'):
-                return old.rescale(value)
-            return old*value
-
-        attrs = self.zscaledattributes()
-        args  = (
-            ((i, getattr(self, i)) for i in attrs)      if not hasattr(self, '__getstate__') else
-            (
-                (i, j)
-                for i, j in getattr(self, '__getstate__')().items()
-                if i in attrs
-            )
-        )
-        return {i: _rescale(j) for i, j in args}
-
-    @staticmethod
-    def zscaledattributes() -> Tuple[str,...]:
-        "return the names of attributes scaled to Z"
-        return ()
 
 class Task(Rescaler):
     "Class containing high-level configuration infos for a task"

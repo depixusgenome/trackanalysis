@@ -37,7 +37,7 @@ class Range(NamedTuple):
     def rescale(self, name: str, value:float) -> 'Range':
         "rescale factors (from µm to V for example) for a given bead"
         # pylint: disable=too-many-function-args,not-an-iterable
-        if 'bias' in name.lower():
+        if 'stretch' in name.lower():
             return Range(
                 self.center/value if self.center else self.center,
                 self.size/value,
@@ -94,9 +94,10 @@ class OptimizationParams:
 
     def rescale(self, value:float) -> 'OptimizationParams':
         "rescale factors (from µm to V for example) for a given bead"
-        cpy         = copy(self)
-        cpy.stretch = cpy.stretch.rescale('stretch', value)
-        cpy.bias    = cpy.bias   .rescale('bias',    value)
+        cpy                 = copy(self)
+        cpy.defaultstretch /= value
+        cpy.stretch         = cpy.stretch.rescale('stretch', value)
+        cpy.bias            = cpy.bias   .rescale('bias',    value)
         return cpy
 
     def _defaultdistance(self) -> Distance:

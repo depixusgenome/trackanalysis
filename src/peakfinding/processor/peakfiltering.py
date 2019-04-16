@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from peakfinding.processor.selector import Output
     from peakfinding.peaksarray         import PeakListArray
 
-class SingleStrandTask(Task):
+class SingleStrandTask(Task, zattributes = ('delta',)):
     """
     Find the peak corresponding to a single strand DNA and remove it.
 
@@ -49,11 +49,6 @@ class SingleStrandTask(Task):
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
         super().__init__(**_)
-
-    @staticmethod
-    def zscaledattributes() -> Tuple[str,...]:
-        "return the names of attributes scaled to Z"
-        return ('delta',)
 
 _DTYPE = np.dtype([('peaks', 'f4'), ('events', 'O')])
 def _topeakarray(arr):
@@ -173,7 +168,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         return (i for i in range(len(peaks)-1, -1, -1)
                 if sum(len(j) > 0 for j in peaks[i][1])*ratio > ssevts[i])
 
-class BaselinePeakTask(Task):
+class BaselinePeakTask(Task, zattributes = ('maxdisttozero',)):
     """
     Find the peak corresponding to the baseline and discards it and all peaks below.
 
@@ -197,11 +192,6 @@ class BaselinePeakTask(Task):
     eventend           = 5
     maxdisttozero      = .015
     mineventpercentage = 10
-
-    @staticmethod
-    def zscaledattributes() -> Tuple[str,...]:
-        "return the names of attributes scaled to Z"
-        return ('maxdisttozero',)
 
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
