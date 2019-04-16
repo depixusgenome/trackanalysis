@@ -47,7 +47,7 @@ def _files(directory, files, bead):
             ctrl.display.update("tasks", bead = bead)
         INITIAL_ORDERS.append(_setbead)
 
-@defaultclick("TrackAnalysis", defaultview = "hybridistat.view.HybridStatView")
+@defaultclick("TrackAnalysis", defaultview = "hybridstat.view.HybridStatView")
 @click.option('-b', "--bead",
               type       = int,
               default    = None,
