@@ -114,7 +114,12 @@ class FixedBeadDetectionConfig(FixedBeadDetection):
     Warning: the class name must end with Config in order for the config file to be
     good.
     """
-    name = "fixedbeads"
+    name:      str   = "fixedbeads"
+    rescaling: float = 1.
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
 
 class FixedBeadDetectionStore:
     "For saving in the right place"
@@ -137,13 +142,8 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
         self.cleaning          = DataCleaningAccess(self)
         self.subtracted        = BeadSubtractionAccess(self)
 
-    __ADD_DONE = False # This is a workaround to miss-handled MVC.
     def addto(self, ctrl, noerase = False):
         "add to the controller"
-        if self.__ADD_DONE:
-            return
-        self.__ADD_DONE = True
-
         @ctrl.tasks.observe
         def _onclosetrack(task = None, **_):
             data = self._fixedbeadsstore.data
@@ -164,9 +164,15 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
             if instr not in model.rescaling:
                 return
 
-            coeff = float(model.rescaling[instr]) / float(old['rescaling'][instr])
+            coeff = float(model.rescaling[instr])
+            if abs(coeff - self._fixedbeadsconfig.rescaling) < 1e-5:
+                return
+
+            cur    = coeff
+            coeff /= self._fixedbeadsconfig.rescaling
             ctrl.theme.update(
                 self._fixedbeadsconfig,
+                rescaling = cur,
                 **dict(self._fixedbeadsconfig.zscaled(coeff))
             )
 

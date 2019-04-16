@@ -71,6 +71,7 @@ class PeaksPlotConfig:
     def __init__(self):
         self.name:             str   = "hybridstat.peaks"
         self.estimatedstretch: float = 1./8.8e-4
+        self.rescaling:        float = 1.
 
 class PeaksPlotDisplay(PlotDisplay):
     "PeaksPlotDisplay"
@@ -658,15 +659,9 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         if addto:
             self.addto(ctrl, noerase = False)
 
-    __ADD_DONE = False
     def addto(self, ctrl, noerase = False):
         "add to the controller"
         super().addto(ctrl, noerase = noerase)
-        if self.__ADD_DONE:
-            return
-
-        self.__ADD_DONE = True
-
         @ctrl.theme.observe
         def _ontasks(old = None, model = None, **_):
             if 'rescaling' not in old:
@@ -679,9 +674,15 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
             if instr not in model.rescaling:
                 return
 
-            coeff = float(model.rescaling[instr]) / float(old['rescaling'][instr])
+            coeff = float(model.rescaling[instr])
+            if abs(coeff - self.peaksmodel.config.rescaling) < 1e-5:
+                return
+
+            cur    = coeff
+            coeff /= self.peaksmodel.config.rescaling
             ctrl.theme.update(
                 self.peaksmodel.config,
+                rescaling         = cur,
                 estimatedstretch  = self.peaksmodel.config.estimatedstretch/coeff
             )
 

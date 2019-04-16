@@ -24,6 +24,7 @@ class CyclesModelConfig:
     binwidth         = 0.01
     minframes        = 10
     estimatedstretch = 1./8.8e-4
+    rescaling        = 1.
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -154,14 +155,9 @@ class CyclesModelAccess(SequencePlotModelAccess):
         self.driftpercycle  = CyclesDriftTaskAccess(self)
         self.eventdetection = EventDetectionTaskAccess(self)
 
-    __ADD_DONE = True
     def addto(self, ctrl, noerase = False):
         "add to the controller"
         super().addto(ctrl, noerase = noerase)
-        if self.__ADD_DONE:
-            return
-
-        self.__ADD_DONE = True
 
         @ctrl.theme.observe
         def _ontasks(old = None, model = None, **_):
@@ -175,11 +171,31 @@ class CyclesModelAccess(SequencePlotModelAccess):
             if instr not in model.rescaling:
                 return
 
-            coeff = float(model.rescaling[instr]) / float(old['rescaling'][instr])
+            cnf   = self.cycles.config
+            coeff = float(model.rescaling[instr])
+            if abs(coeff - cnf.rescaling) < 1e-5:
+                return
+
+            cur    = coeff
+            coeff /= cnf.rescaling
+
+            info   = dict(self.cycles.display.info)
+            for i in info.values():
+                i.stretch /= coeff
+
+            ctrl.display.update(
+                self.cycles.display,
+                estimatedstretch = cnf.estimatedstretch/coeff,
+                info             = info,
+            )
+
             ctrl.theme.update(
                 self.cycles.config,
-                estimatedstretch  = self.cycles.config.estimatedstretch/coeff
+                estimatedstretch = cnf.estimatedstretch/coeff,
+                binwidth         = cnf.binwidth*coeff,
+                rescaling        = cur
             )
+
 
     @property
     def stretch(self) -> None:

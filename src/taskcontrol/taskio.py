@@ -219,7 +219,7 @@ class ConfigMuWellsFilesIO(ConfigTrackIO):
 
         coeff = float(model.rescaling[instr]) / float(old['rescaling'][instr])
         for task in list(ctrl.tasks.tasklist(root))[1:]:
-            cpy = task.zscaled(coeff)
+            cpy = dict(task.zscaled(coeff))
             if cpy:
                 ctrl.tasks.updatetask(root, task, **cpy)
 
