@@ -154,6 +154,33 @@ class CyclesModelAccess(SequencePlotModelAccess):
         self.driftpercycle  = CyclesDriftTaskAccess(self)
         self.eventdetection = EventDetectionTaskAccess(self)
 
+    __ADD_DONE = True
+    def addto(self, ctrl, noerase = False):
+        "add to the controller"
+        super().addto(ctrl, noerase = noerase)
+        if self.__ADD_DONE:
+            return
+
+        self.__ADD_DONE = True
+
+        @ctrl.theme.observe
+        def _ontasks(old = None, model = None, **_):
+            if 'rescaling' not in old:
+                return
+
+            root  = ctrl.display.get("tasks", "roottask")
+            if root is None:
+                return
+            instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
+            if instr not in model.rescaling:
+                return
+
+            coeff = float(model.rescaling[instr]) / float(old['rescaling'][instr])
+            ctrl.theme.update(
+                self.cycles.config,
+                estimatedstretch  = self.cycles.config.estimatedstretch/coeff
+            )
+
     @property
     def stretch(self) -> None:
         "return the stretch for the current bead"

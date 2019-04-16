@@ -167,7 +167,7 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
             coeff = float(model.rescaling[instr]) / float(old['rescaling'][instr])
             ctrl.theme.update(
                 self._fixedbeadsconfig,
-                **self._fixedbeadsconfig.zscaled(coeff)
+                **dict(self._fixedbeadsconfig.zscaled(coeff))
             )
 
         @ctrl.theme.observe(self._fixedbeadsconfig)

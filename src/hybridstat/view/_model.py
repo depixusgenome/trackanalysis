@@ -658,6 +658,33 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         if addto:
             self.addto(ctrl, noerase = False)
 
+    __ADD_DONE = False
+    def addto(self, ctrl, noerase = False):
+        "add to the controller"
+        super().addto(ctrl, noerase = noerase)
+        if self.__ADD_DONE:
+            return
+
+        self.__ADD_DONE = True
+
+        @ctrl.theme.observe
+        def _ontasks(old = None, model = None, **_):
+            if 'rescaling' not in old:
+                return
+
+            root  = ctrl.display.get("tasks", "roottask")
+            if root is None:
+                return
+            instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
+            if instr not in model.rescaling:
+                return
+
+            coeff = float(model.rescaling[instr]) / float(old['rescaling'][instr])
+            ctrl.theme.update(
+                self.peaksmodel.config,
+                estimatedstretch  = self.peaksmodel.config.estimatedstretch/coeff
+            )
+
     def getfitparameters(self, key = NoArgs, bead = NoArgs) -> Tuple[float, float]:
         "return the stretch  & bias for the current bead"
         if bead is not NoArgs:
