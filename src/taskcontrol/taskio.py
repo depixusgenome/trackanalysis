@@ -4,10 +4,11 @@
 from typing                import Union, Iterable, Tuple, Dict, cast
 from pathlib               import Path
 from itertools             import chain
+from functools             import partial
 from copy                  import deepcopy
 
 from control.decentralized import Indirection
-from data.trackio          import instrumenttype
+from data.trackio          import instrumenttype, MuWellsFilesIO
 from data.tracksdict       import TracksDict
 from taskmodel             import TrackReaderTask
 from taskmodel.application import TasksConfig, TasksDisplay, TaskIOTheme
@@ -159,10 +160,68 @@ class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
             ret.append(tuple(i for i in mdl if not isinstance(i, task)))
         return ret
 
-class ConfigLIAFilesIO(ConfigTrackIO):
+class ConfigMuWellsFilesIO(ConfigTrackIO):
     "Adds an alignment to the tracks per default"
-    EXT      = ('txt',)
-    _display = Indirection()
+    EXT = ('txt',)
+    def __init__(self, ctrl, *_):
+        super().__init__(ctrl, *_)
+        ctrl.theme.add(MuWellsFilesIO.DEFAULT)
+        ctrl.display.observe("tasks", partial(self._onchangedisplay, ctrl))
+        ctrl.theme.observe("tasks", partial(self._onrescale, ctrl))
+
+    @staticmethod
+    def _onchangedisplay(ctrl, **_):
+        root  = ctrl.display.get('tasks', 'roottask')
+        if not MuWellsFilesIO.check(root.path):
+            return
+
+        bead  = ctrl.display.get('tasks', 'bead')
+        track = ctrl.tasks.track(root)
+        if bead not in getattr(track, 'experimentallength', ()):
+            return
+
+        instr  = getattr(track.instrument['type'], 'value', None)
+        if instr is None:
+            return
+
+        cnv    = ctrl.theme.get('tasks', 'rescaling')
+        explen = getattr(track, 'experimentallength')[bead]
+        seqlen = getattr(track, 'sequencelength')[bead]
+        if seqlen is None:
+            seqlen = cnv[instr].sequence
+
+        old   = float(cnv[instr])
+        cnv   = dict(cnv, **{instr: cnv[instr].rescale(explen, seqlen)})
+        coeff = float(cnv[instr])/old
+        if abs(coeff - 1.) < 1e-5:
+            return
+
+        ctrl.theme.update(
+            "tasks",
+            **{
+                'rescaling': cnv,
+                instr: {
+                    i: j.rescale(coeff)
+                    for i, j in ctrl.theme.get('tasks', instr).items()
+                }
+            }
+        )
+
+    @staticmethod
+    def _onrescale(ctrl, old = None, model = None, **_):
+        if 'rescaling' not in old:
+            return
+
+        root  = ctrl.display.get("tasks", "roottask")
+        instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
+        if instr not in model.rescaling:
+            return
+
+        coeff = float(model.rescaling[instr]) / float(old['rescaling'][instr])
+        for task in list(ctrl.tasks.tasklist(root))[1:]:
+            cpy = task.zscaled(coeff)
+            if cpy:
+                ctrl.tasks.updatetask(root, task, **cpy)
 
     def open(self, path:OpenType, _:tuple):
         "open a LIA file"
@@ -173,10 +232,11 @@ class ConfigLIAFilesIO(ConfigTrackIO):
             return None
 
         if len(trks) == 0:
-            track = self._display.roottask
+            track = self._ctrl.display.get("tasks", "roottask")
             if track is None:
                 raise IOError("IOError: start by opening a track file!", "warning")
             trks = topath(getattr(track, 'path'))
+
         return super().open(trks+lias, _)
 
 def openmodels(openers, task, tasks):

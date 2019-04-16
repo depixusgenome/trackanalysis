@@ -137,8 +137,13 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
         self.cleaning          = DataCleaningAccess(self)
         self.subtracted        = BeadSubtractionAccess(self)
 
+    __ADD_DONE = False # This is a workaround to miss-handled MVC.
     def addto(self, ctrl, noerase = False):
         "add to the controller"
+        if self.__ADD_DONE:
+            return
+        self.__ADD_DONE = True
+
         @ctrl.tasks.observe
         def _onclosetrack(task = None, **_):
             data = self._fixedbeadsstore.data
@@ -146,6 +151,24 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
                 info = dict(data)
                 info.pop(task, None)
                 self._fixedbeadsstore = {'data': info}
+
+        @ctrl.theme.observe("tasks")
+        def _onrescale(old = None, model = None, **_):
+            if 'rescaling' not in old:
+                return
+
+            root  = ctrl.display.get("tasks", "roottask")
+            if root is None:
+                return
+            instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
+            if instr not in model.rescaling:
+                return
+
+            coeff = float(model.rescaling[instr]) / float(old['rescaling'][instr])
+            ctrl.theme.update(
+                self._fixedbeadsconfig,
+                **self._fixedbeadsconfig.zscaled(coeff)
+            )
 
         @ctrl.theme.observe(self._fixedbeadsconfig)
         def _onchangeconfig(**_):
