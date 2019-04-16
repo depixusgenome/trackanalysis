@@ -9,5 +9,7 @@ from .                     import (BeadSubtractionTask, DataCleaningTask,
 setupdefaulttask(BeadSubtractionTask)
 setupdefaulttask(DataCleaningTask)
 setupdefaulttask(ClippingTask,
-                 picotwist = {'lowfactor': 6, 'highfactor': 1},
-                 sdi       = {'lowfactor': 4, 'highfactor': 0})
+                 picotwist = {'lowfactor': 6,  'highfactor': 1},
+                 muwells   = {'lowfactor': 15, 'highfactor': 5},
+                 sdi       = {'lowfactor': 4,  'highfactor': 0},
+                )

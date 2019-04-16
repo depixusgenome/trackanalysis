@@ -16,4 +16,5 @@ setupdefaulttask(BaselinePeakTask)
 setupdefaulttask(BaselinePeakFilterTask)
 setupdefaulttask(PeakSelectorTask,
                  picotwist = {'rawfactor': 2.0},
+                 muwells   = {'rawfactor': 4.0},
                  sdi       = {'rawfactor': 1.0})
