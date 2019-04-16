@@ -164,6 +164,11 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             rng  = self._fig.extra_y_ranges['bases'] # pylint: disable=unsubscriptable-object
             cache[rng] = self.newbounds(None, inds)
 
+            if self._model.track:
+                dim = self._model.track.instrument['dimension']
+                lbl = self._theme.ylabel.split('(')[0]
+                cache[self._fig.yaxis[0]].update(axis_label = f"{lbl} ({dim})")
+
             _color('peakscount',    'default',  'below')
             _color('peaksduration', 'duration', 'above')
 

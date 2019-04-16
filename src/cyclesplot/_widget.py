@@ -126,6 +126,7 @@ class ConversionSlidersWidget:
     def __init__(self, ctrl, display) -> None:
         self.__display = display
         self.__theme   = ctrl.theme.add(ConversionSliderTheme())
+        self.__ctrl    = ctrl
 
     def addinfo(self, histsource):
         "adds info to the widget"
@@ -157,6 +158,12 @@ class ConversionSlidersWidget:
 
         resets[self.__bias].update(value = self.__display.bias, start = start, end = end)
         resets[self.__stretch].update(value = self.__display.stretch)
+
+        track  = self.__ctrl.tasks.track(self.__ctrl.display.get('tasks', "roottask"))
+        if track:
+            dim = track.instrument["dimension"]
+            resets[self.__bias].update(title = self.__theme.bias['title'].replace('µm', dim))
+            resets[self.__stretch].update(title = self.__theme.stretch['title'].replace('µm', dim))
 
     def callbacks(self, hover):
         "adding callbacks"

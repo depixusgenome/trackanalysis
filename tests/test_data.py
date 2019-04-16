@@ -6,7 +6,7 @@ from tests.testingcore import path as utpath
 
 def test_muwells(tmp_path):
     "test muwells data"
-    assert MuWellsFilesIO.instrumenttype({}) == "µwells"
+    assert MuWellsFilesIO.instrumenttype({}) == "muwells"
     paths = MuWellsFilesIO.check((
         utpath("W6N46_HPB20190107_OR134689_cycle_1.9-2.10_TC10m.txt"),
         utpath("W6N46_HPB20190107_W2_OR134689_cycle_1.9-2.10_TC10m.trk"),
@@ -15,6 +15,8 @@ def test_muwells(tmp_path):
 
     output = MuWellsFilesIO.open(paths)
     assert output['phases'].shape == (32, 8)
+    assert output['sequencelength'] == {0: None}
+    assert abs(output['experimentallength'][0] - 31.720950927734293) < 1e-5
 
     with open(utpath("W6N46_HPB20190107_OR134689_cycle_1.9-2.10_TC10m.txt")) as istr:
         with open(tmp_path/"lio.txt", "w") as ostr:
