@@ -43,6 +43,18 @@ class Rescaler:
     def rescale(self, value:float) -> 'Rescaler':
         "rescale factors (from µm to V for example) for a given bead"
         cpy = deepcopy(self)
+        if hasattr(self, '__getstate__'):
+            getattr(cpy, '__setstate__')(dict(
+                getattr(cpy, '__getstate__')(),
+                **self.zscaled(value)
+            ))
+        else:
+            for i, j in self.zscaled(value).items():
+                setattr(cpy, i, j)
+        return cpy
+
+    def zscaled(self, value:float) -> Dict[str, Any]:
+        "return the rescaled attributes scaled"
         def _rescale(old):
             if old is None or isinstance(old, str):
                 return old
@@ -54,9 +66,16 @@ class Rescaler:
                 return old.rescale(value)
             return old*value
 
-        for attr in self.zscaledattributes():
-            setattr(cpy, attr, _rescale(getattr(cpy, attr)))
-        return cpy
+        attrs = self.zscaledattributes()
+        args  = (
+            ((i, getattr(self, i)) for i in attrs)      if not hasattr(self, '__getstate__') else
+            (
+                (i, j)
+                for i, j in getattr(self, '__getstate__')().items()
+                if i in attrs
+            )
+        )
+        return {i: _rescale(j) for i, j in args}
 
     @staticmethod
     def zscaledattributes() -> Tuple[str,...]:

@@ -96,7 +96,7 @@ class OptimizationParams:
         "rescale factors (from µm to V for example) for a given bead"
         cpy         = copy(self)
         cpy.stretch = cpy.stretch.rescale('stretch', value)
-        cpy.bias    = cpy.bias   .rescale('bias',     value)
+        cpy.bias    = cpy.bias   .rescale('bias',    value)
         return cpy
 
     def _defaultdistance(self) -> Distance:

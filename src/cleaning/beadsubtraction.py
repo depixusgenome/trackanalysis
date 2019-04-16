@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "subtracting fixed beads from other beads"
-from   copy                         import deepcopy
 from   typing                       import (List, Tuple, Optional, Callable,
                                             Union, Dict, cast)
 import warnings
@@ -175,7 +174,10 @@ class MeasureDropsRule(Rescaler, zattributes = ('mindzdt',)):
         "tests the number of cycles with too many stairs"
         return self.measure(track, data) > self.maxdrops*track.ncycles//100
 
-class FixedBeadDetection(Rescaler):
+class FixedBeadDetection(
+        Rescaler,
+        zattributes = ("abberrant", "drops", 'maxdiff', 'minhfsigma', 'maxhfsigma', 'maxextent')
+):
     """
     Finds and sorts fixed beads
     """
@@ -193,22 +195,6 @@ class FixedBeadDetection(Rescaler):
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
-
-    def rescale(self, value:float) -> "FixedBeadDetection":
-        "rescale z-axis attributes"
-        cpy   = deepcopy(self)
-
-        for attr in ('maxabsvalue', 'maxderivate'):
-            setattr(
-                cpy.abberrant.derivative,
-                attr,
-                getattr(cpy.abberrant.derivative, attr)*value
-            )
-
-        cpy.drops.mindzdt *= value
-        for attr in ('maxdiff', 'minhfsigma', 'maxhfsigma', 'maxextent'):
-            setattr(cpy, attr, getattr(cpy, attr)*value)
-        return cpy
 
     def extents(self, cycles: Cycles) -> np.ndarray:
         """

@@ -403,6 +403,19 @@ namespace cleaning { namespace datacleaning {
             py::class_<CLS> cls(mod, "ConstantValuesSuppressor", doc);
             cls.def_readwrite("mindeltarange", &CLS::mindeltarange)
                .def_readwrite("mindeltavalue", &CLS::mindeltavalue)
+               .def_static(
+                       "zscaledattributes", 
+                        []() { return py::make_tuple("mindeltavalue"); }
+               )
+               .def(
+                       "rescale", 
+                        [](CLS const & self, float val)
+                        {
+                            auto cpy           = self;
+                            cpy.mindeltavalue *= val;
+                            return cpy;
+                        }
+               )
                .def("apply",
                     [](CLS const & self, ndarray<float> & arr)
                     { self.apply(arr.size(), arr.mutable_data()); });
@@ -432,13 +445,18 @@ returns: *True* if the number of remaining values is too low)_";
             py::class_<CLS> cls(mod, "DerivateSuppressor", doc);
             cls.def_readwrite("maxderivate", &CLS::maxderivate)
                .def_readwrite("maxabsvalue", &CLS::maxabsvalue)
+               .def_static(
+                       "zscaledattributes", 
+                        []() { return py::make_tuple("maxabsvalue", "maxderivate"); }
+               )
                .def(
                        "rescale", 
                         [](CLS const & self, float val)
                         {
                             auto cpy = self;
-                            cpy.maxabsvalue = cpy.maxabsvalue*val;
-                            cpy.maxderivate = cpy.maxderivate*val;
+                            cpy.maxabsvalue *= val;
+                            cpy.maxderivate *= val;
+                            return cpy;
                         }
                )
                .def("apply",
@@ -471,12 +489,17 @@ returns: *True* if the number of remaining values is too low)_";
                .def_readwrite("islandwidth", &CLS::islandwidth)
                .def_readwrite("ratio",       &CLS::ratio)
                .def_readwrite("maxderivate", &CLS::maxderivate)
+               .def_static(
+                       "zscaledattributes", 
+                        []() { return py::make_tuple("maxderivate"); }
+               )
                .def(
                        "rescale", 
                         [](CLS const & self, float val)
                         {
-                            auto cpy = self;
-                            cpy.maxderivate = cpy.maxderivate*val;
+                            auto cpy         = self;
+                            cpy.maxderivate *= val;
+                            return cpy;
                         }
                )
                .def("apply", [](CLS const & self, ndarray<float> & arr)
@@ -501,14 +524,24 @@ A value at position *n* is aberrant if any:
                .def_readwrite("derivative", &CLS::derivative)
                .def_readwrite("localnans",  &CLS::localnans)
                .def_readwrite("islands",    &CLS::islands)
+               .def_static(
+                       "zscaledattributes", 
+                        []() {
+                            return py::make_tuple(
+                                "mindeltavalue", "maxabsvalue", "maxderivate", "cstmaxderivate"
+                            ); 
+                        }
+               )
                .def(
                        "rescale", 
                         [](CLS const & self, float val)
                         {
                             auto cpy = self;
-                            cpy.derivative.maxabsvalue = cpy.derivative.maxabsvalue*val;
-                            cpy.derivative.maxderivate = cpy.derivative.maxderivate*val;
-                            cpy.islands.maxderivate    = cpy.islands.maxderivate*val;
+                            cpy.constants.mindeltavalue *= val;
+                            cpy.derivative.maxabsvalue  *= val;
+                            cpy.derivative.maxderivate  *= val;
+                            cpy.islands.maxderivate     *= val;
+                            return cpy;
                         }
                )
                .def("aberrant",
@@ -545,6 +578,20 @@ horisontal plane and thus a prefered vertical axis.
             py::class_<CLS> cls(mod, "HFSigmaRule", doc);
             cls.def_readwrite("minhfsigma",  &CLS::minv)
                .def_readwrite("maxhfsigma",  &CLS::maxv)
+               .def_static(
+                       "zscaledattributes", 
+                        []() { return py::make_tuple("minhfsigma", "maxhfsigma"); }
+               )
+               .def(
+                       "rescale", 
+                        [](CLS const & self, float val)
+                        {
+                            auto cpy = self;
+                            cpy.minv *= val;
+                            cpy.maxv *= val;
+                            return cpy;
+                        }
+               )
                .def("hfsigma",
                     [partial](CLS const & self,
                               ndarray<float> bead,
@@ -566,6 +613,18 @@ a finite value.)_";
             using CLS = PopulationRule;
             py::class_<CLS> cls(mod, "PopulationRule", doc);
             cls.def_readwrite("minpopulation",  &CLS::minv)
+               .def_static(
+                       "zscaledattributes",
+                       [] () { return py::make_tuple(); }
+               )
+               .def(
+                       "rescale",
+                       [](CLS const & self, float)
+                       {
+                            auto cpy = self;
+                            return cpy;
+                       }
+               )
                .def("population",
                     [partial](CLS const & self,
                               ndarray<float> bead,
@@ -589,6 +648,20 @@ is estimated from phases `PHASE.initial` to `PHASE.measure`.)_";
             _pairproperty(cls, "percentiles", &CLS::minpercentile, &CLS::maxpercentile);
             cls.def_readwrite("minextent",  &CLS::minv)
                .def_readwrite("maxextent",  &CLS::maxv)
+               .def_static(
+                       "zscaledattributes", 
+                        []() { return py::make_tuple("minextent", "maxextent"); }
+               )
+               .def(
+                       "rescale", 
+                        [](CLS const & self, float val)
+                        {
+                            auto cpy = self;
+                            cpy.minv *= val;
+                            cpy.maxv *= val;
+                            return cpy;
+                        }
+               )
                .def("extent",
                     [partial](CLS const & self,
                               ndarray<float> bead,
@@ -614,6 +687,19 @@ below a givent threshold: those that can be considered due to normal levels of n
             _pairproperty(cls, "percentiles",   &CLS::minpercentile, &CLS::maxpercentile);
             cls.def_readwrite("maxpingpong",    &CLS::maxv)
                .def_readwrite("mindifference",  &CLS::mindifference)
+               .def_static(
+                       "zscaledattributes",
+                        [] () { return py::make_tuple("mindifference"); }
+               )
+               .def(
+                       "rescale",
+                       [](CLS const & self, float val)
+                       {
+                            auto cpy = self;
+                            cpy.mindifference *= val;
+                            return cpy;
+                       }
+               )
                .def("pingpong",
                     [partial](CLS const & self,
                               ndarray<float> bead,
@@ -641,6 +727,19 @@ detectable in ramp files.
             cls.def_readwrite("maxsaturation",  &CLS::maxv)
                .def_readwrite("maxdisttozero",  &CLS::maxdisttozero)
                .def_readwrite("satwindow",      &CLS::satwindow)
+               .def_static(
+                       "zscaledattributes",
+                       [] () { return py::make_tuple("maxdisttozero"); }
+               )
+               .def(
+                       "rescale",
+                       [](CLS const & self, float val)
+                       {
+                            auto cpy = self;
+                            cpy.maxdisttozero *= val;
+                            return cpy;
+                       }
+               )
                .def("saturation",
                     [partial](CLS const & self,
                               ndarray<float> bead,

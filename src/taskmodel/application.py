@@ -71,16 +71,39 @@ class InstrumentDescriptor:
         inst.__dict__['instrument'] = InstrumentType(val).name
         return inst.__dict__['instrument']
 
+class RescalingParameters:
+    "Parameters used for rescaling"
+    experimental : float = 1.073      # HP005 sequence length * µm ↔ bases at phase 3 (18 pN)
+    mumtobase    : float = 1.e-3      # µm ↔ bases at phase 3 (18 pN)
+    sequence     : float = 1073       # HP005 sequence length
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def __float__(self) -> float:
+        "return the factor to apply to tasks"
+        return self.experimental/(self.mumtobase*self.sequence)
+
+    def rescale(self, explen, seqlen = None) -> 'RescalingParameters':
+        "rescales the current setup"
+        return type(self)(
+            experimental = explen,
+            mumtobase    = self.mumtobase,
+            sequence     = self.sequence if seqlen is None else seqlen,
+        )
+
 class TasksConfig(ConfigObject):
     """
     permanent globals on tasks
     """
-    name                       = "tasks"
-    instrument: str            = InstrumentType.picotwist.name
-    picotwist:  Configuration  = cast(Configuration, ConfigurationDescriptor())
-    sdi:        Configuration  = cast(Configuration, ConfigurationDescriptor())
-    muwells:    Configuration  = cast(Configuration, ConfigurationDescriptor())
-    order:      List[str]      = list(TASK_ORDER)
+    name                         = "tasks"
+    instrument: str              = InstrumentType.picotwist.name
+    picotwist:  Configuration    = cast(Configuration, ConfigurationDescriptor())
+    sdi:        Configuration    = cast(Configuration, ConfigurationDescriptor())
+    muwells:    Configuration    = cast(Configuration, ConfigurationDescriptor())
+    order:      List[str]        = list(TASK_ORDER)
+    rescaling:  Dict[str, float] = {InstrumentType.muwells.value: RescalingParameters()}
 
     # make sure all configurations are available
     locals().update({
@@ -98,7 +121,7 @@ class TasksConfig(ConfigObject):
     @staticmethod
     def __config__(cmap):
         "simplify a config map"
-        for i in {'picotwist', 'sdi'} & set(cmap.maps[0]):
+        for i in {'picotwist', 'sdi', 'muwells'} & set(cmap.maps[0]):
             left            = cmap.maps[1][i]
             cmap.maps[0][i] = {j: k for j, k in cmap.maps[0][i].items() if left[j] != k}
 
@@ -166,7 +189,7 @@ class TaskIOTheme(ConfigObject):
     tasks:      List[str] = []
     inputs:     List[str] = ['taskstore.control.ConfigAnaIO',
                              'taskcontrol.taskio.ConfigGrFilesIO',
-                             'taskcontrol.taskio.ConfigLIAFilesIO',
+                             'taskcontrol.taskio.ConfigMuWellsFilesIO',
                              'taskcontrol.taskio.ConfigTrackIO']
     outputs:    List[str] = ['taskstore.control.ConfigAnaIO']
     processors: List[str] = []

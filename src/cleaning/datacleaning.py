@@ -14,6 +14,7 @@ from    ._core                  import (constant as _cleaningcst, # pylint: disa
                                         PopulationRule, HFSigmaRule, ExtentRule,
                                         SaturationRule, Partial)
 
+RULES = AberrantValuesRule, HFSigmaRule, PopulationRule, ExtentRule, PingPongRule, SaturationRule
 class DataCleaning(
         Rescaler, # pylint: disable=too-many-ancestors
         AberrantValuesRule,
@@ -22,13 +23,7 @@ class DataCleaning(
         ExtentRule,
         PingPongRule,
         SaturationRule,
-        zattributes = (
-            'maxabsvalue', 'maxderivate',   # AberrantValuesRule
-            'minhfsigma',  'maxhfsigma',    # HFSigmaRule
-            'minextent',   'maxextent',     # ExtentRurle
-            'mindifference',                # PingPongRule
-            'maxdisttozero'                 # SaturationRule
-        )
+        zattributes = sum((i.zscaledattributes() for i in RULES), ())
 ):
     """
     Remove specific points, cycles or even the whole bead depending on a number
@@ -84,28 +79,55 @@ class DataCleaning(
     """
     CYCLES  = 'population', 'hfsigma', 'extent', 'pingpong'
     def __init__(self, **_):
-        for base in DataCleaning.__bases__:
+        DataCleaning.__bases__[0].__init__(self)
+        for base in RULES:
             base.__init__(self, **_) # type: ignore
 
-    maxabsvalue = cast(float,
-                       property(lambda self: self.derivative.maxabsvalue,
-                                lambda self, val: setattr(self.derivative, 'maxabsvalue', val)))
-    maxderivate = cast(float,
-                       property(lambda self: self.derivative.maxderivate,
-                                lambda self, val: setattr(self.derivative, 'maxderivate', val)))
+    maxabsvalue = cast(
+        float,
+        property(
+            lambda self: self.derivative.maxabsvalue,
+            lambda self, val: setattr(self.derivative, 'maxabsvalue', val)
+        )
+    )
+
+    maxderivate = cast(
+        float,
+        property(
+            lambda self: self.derivative.maxderivate,
+            lambda self, val: setattr(self.derivative, 'maxderivate', val)
+        )
+    )
+
+    mindeltavalue = cast(
+        float,
+        property(
+            lambda self: self.constants.mindeltavalue,
+            lambda self, val: setattr(self.constants, 'mindeltavalue', val)
+        )
+    )
+
+    cstmaxderivate = cast(
+        float,
+        property(
+            lambda self: self.islands.maxderivate,
+            lambda self, val: setattr(self.islands, 'maxderivate', val)
+        )
+    )
+
     def __eq__(self, other):
-        return all(base.__eq__(self, other) for base in DataCleaning.__bases__)
+        return all(base.__eq__(self, other) for base in RULES)
 
     def __getstate__(self):
         state = dict(self.__dict__)
-        for base in DataCleaning.__bases__[1:]:
+        for base in RULES:
             state.update(base.__getstate__(self))
         return state
 
     def __setstate__(self, vals):
         self.__init__()
         self.__dict__.update({i: j for i, j in vals.items() if i in self.__dict__})
-        for base in DataCleaning.__bases__[1:]:
+        for base in RULES:
             base.configure(self, vals)
 
     @staticmethod
@@ -128,4 +150,4 @@ class DataCleaning(
 AberrantValuesRule.__base__.__setstate__ = lambda self, vals: self.configure(vals)
 
 if DataCleaning.__doc__:
-    DataCleaning.__doc__ = DataCleaning.__doc__.format(*(i.__doc__ for i in DataCleaning.__bases__))
+    DataCleaning.__doc__ = DataCleaning.__doc__.format(*(i.__doc__ for i in RULES))

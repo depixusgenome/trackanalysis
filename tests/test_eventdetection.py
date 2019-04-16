@@ -496,7 +496,7 @@ def test_rescale():
     task = ExtremumAlignmentTask()
     obj  = task.rescale(5.)
     for i, j in task.__dict__.items():
-        if i in ('delta', 'minrelax', 'pull'):
+        if i in ('delta', 'minrelax', 'pull', 'opening'):
             assert abs(getattr(obj, i) - j*5) < 1e-6
         else:
             assert getattr(obj, i)  == j
