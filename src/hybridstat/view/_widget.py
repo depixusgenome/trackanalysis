@@ -206,9 +206,8 @@ class PeaksStatsWidget:
             "all track dependant stats"
             if mdl.track is None:
                 return
-            dim = mdl.track.instrument['dimension']
-            if dim != 'µm':
-                self.titles = [(i.replace('µm', dim), j) for i,j in self.titles]
+            dim         = mdl.track.instrument['dimension']
+            self.titles = [(i.replace('µm', dim), j) for i,j in self.titles]
 
             self.values[0] = mdl.track.ncycles
             self.values[3] = rawprecision(mdl.track, mdl.bead)
@@ -312,15 +311,20 @@ class PeakListWidget:
     __widget: DataTable
     theme:  PeakListTheme
     def __init__(self, ctrl, model:PeaksPlotModelAccess, theme = None) -> None:
+        self.__ctrl  = ctrl
         self.__model = model
         self.theme   = ctrl.theme.add(PeakListTheme() if theme is None else theme,
                                       noerase = False)
 
-    def __cols(self):
+    def __cols(self, ctrl):
+        dim   = (
+            ctrl.tasks.track(ctrl.display.get("tasks", "roottask"))
+            .instrument['dimension']
+        )
         fmt   = lambda i: (StringFormatter(text_align = 'center') if i == '' else
                            DpxNumberFormatter(format = i, text_align = 'right'))
         cols  = list(TableColumn(field      = i[0],
-                                 title      = i[1],
+                                 title      = i[1].replace("µm", dim),
                                  formatter  = fmt(i[2]))
                      for i in self.theme.columns)
 
@@ -334,7 +338,7 @@ class PeakListWidget:
 
     def addtodoc(self, _1, _2, src) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
         "creates the widget"
-        cols  = self.__cols()
+        cols  = self.__cols(self.__ctrl)
         self.__widget = DataTable(source         = src,
                                   columns        = cols,
                                   editable       = False,
@@ -346,7 +350,7 @@ class PeakListWidget:
 
     def reset(self, resets):
         "resets the wiget when a new file is opened"
-        resets[self.__widget].update(columns = self.__cols())
+        resets[self.__widget].update(columns = self.__cols(self.__ctrl))
 
 @dataclass
 class PeakIDPathTheme:
@@ -430,11 +434,16 @@ class PeakIDPathWidget:
                 if not path.endswith(".xlsx"):
                     raise IOError(*self.__theme.tableerror)
 
+
+                dim = (
+                    ctrl.tasks.track(ctrl.display.get("tasks", "roottask"))
+                    .instrument['dimension']
+                )
                 writecolumns(path, "Summary",
-                             [('Bead', [self.__peaks.bead]),
-                              ('Reference', [self.__peaks.sequencekey]),
-                              ('Stretch (base/µm)', [self.__peaks.stretch]),
-                              ('Bias (µm)', [self.__peaks.bias])])
+                             [('Bead',                  [self.__peaks.bead]),
+                              ('Reference',             [self.__peaks.sequencekey]),
+                              (f'Stretch (base/{dim})', [self.__peaks.stretch]),
+                              (f'Bias ({dim})',         [self.__peaks.bias])])
                 startfile(path)
 
             ctrl.display.update(self.__peaks.peaksmodel.display,
