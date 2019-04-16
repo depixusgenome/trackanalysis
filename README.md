@@ -38,7 +38,7 @@ miniconda is in the *PATH*: use the *Anaconda Prompt* powershell.
 git clone http:\\GIT-REPO
 git submodule update --init --recursive
 
-python3 waf setup [-n myenv]
+python3 waf setup [-e myenv]
 [conda activate myenv]
 
 python3 waf configure [--boost-includes=BOOST_INCLUDEPATH --boost-libs=BOOST_LIBSPATH]
@@ -48,8 +48,8 @@ python3 waf build
 
 Items in between [] are optional or specific to windows:
 
-* [-n myenv] is optional. [conda activate myenv] is mandatory if and
-  only if the [-n myenv] option was used.
+* [-e myenv] is optional. [conda activate myenv] is mandatory if and
+  only if the [-e myenv] option was used.
 
 * [--boost ... ] are mandatory only if BOOST was installed manually.
 
