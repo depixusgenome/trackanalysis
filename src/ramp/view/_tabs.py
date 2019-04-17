@@ -32,10 +32,6 @@ class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess, # type: ignore
 
 class FoVPlotView(PlotView[FoVPlotCreator]):
     "FoV plot view"
-    TASKS = ()
-    def ismain(self, ctrl):
-        "Cleaning is set up by default"
-        self._ismain(ctrl, tasks = self.TASKS)
 
 PANELS = {FoVPlotView: 'fov', RampPlotView: 'ramp'}
 
