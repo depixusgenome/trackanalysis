@@ -5,9 +5,11 @@
 from typing                     import cast
 from tempfile                   import mktemp, gettempdir
 from pathlib                    import Path
+import warnings
 import asyncio
 import numpy as np
 
+from bokeh.plotting             import Figure
 from bokeh.models               import Tabs, FactorRange
 from tornado.gen                import sleep
 from tornado.ioloop             import IOLoop
@@ -20,7 +22,14 @@ from view.plots                 import DpxKeyedRow
 
 from peakfinding.reporting.batch         import createmodels as _pmodels
 
-from hybridstat.reporting.identification import writeparams
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        'ignore',
+        category = DeprecationWarning,
+        message  = ".*html argument of XMLParser.*"
+    )
+    from hybridstat.reporting.identification import writeparams
+
 from hybridstat.reporting.batch          import createmodels as _hmodels
 from hybridstat.view._io                 import ConfigXlsxIO
 from peakcalling.processor.__config__    import FitToHairpinTask
@@ -316,7 +325,61 @@ def test_hybridstat(bokehaction):
     server.change('Main:toolbar', 'discarded', '38', rendered = True)
     server.change(tabs, 'active', indcyc)
 
+@integrationmark
+def test_muwells(bokehaction):
+    "test hybridstat"
+    import selenium.common.exceptions
+    server = bokehaction.start(
+        'hybridstat.view.HybridStatView',
+        'taskapp.toolbar',
+        filters = [
+            (RuntimeWarning,     ".*All-NaN slice encountered.*"),
+            (DeprecationWarning, ".*elementwise comparison failed;*"),
+        ],
+        runtime = 'selenium'
+    )
+    server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
+
+    tabs    = next(iter(server.doc.select({'type': Tabs})))
+    muwells = dict(server.ctrl.theme.get("tasks", "muwells"))
+    muwells['datacleaning'].maxsaturation = 90
+    server.ctrl.theme.update("tasks", muwells = muwells)
+    def _test(dim):
+        active   = tabs.active
+        for i in range(len(tabs.tabs)-2):
+            server.change(tabs, 'active', i, rendered = i != active)
+            if i == active:
+                server.wait()
+
+            if i == 0:
+                continue
+
+            for elem in server.selenium["//b", ...]:
+                try:
+                    text = elem.text
+                    assert dim not in text
+                except selenium.common.exceptions.StaleElementReferenceException:
+                    pass
+
+            for elem in server.selenium[".slick-column-name", ...]:
+                try:
+                    text = elem.text
+                    assert dim not in text
+                except selenium.common.exceptions.StaleElementReferenceException:
+                    pass
+
+            assert not any(
+                dim in axis.axis_label
+                for fig in server.doc.select(dict(type = Figure))
+                for axis in fig.yaxis
+            )
+
+    server.load('muwells/W6N46_HPB20190107_W2_OR134689_cycle_1.9-2.10_TC10m.trk')
+    _test('V)')
+    server.load('muwells/W6N46_HPB20190107_OR134689_cycle_1.9-2.10_TC10m.txt')
+    _test('m)')
+
 if __name__ == '__main__':
     # pylint: disable=ungrouped-imports
     from tests.testutils.bokehtesting import BokehAction
-    test_hybridstat(BokehAction(None))
+    test_muwells(BokehAction(None))
