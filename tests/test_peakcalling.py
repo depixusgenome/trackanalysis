@@ -304,21 +304,21 @@ def test_peakiterator():
 def test_rescale():
     "test rescale"
     rng = Range(1, 1, 1)
-    obj = rng.rescale("stretch", 5)
+    obj = rng.rescale("bias", 5)
     assert rng is not obj
     assert all(abs(5.-i) < 1e-5 for i in obj)
 
-    obj = rng.rescale("bias", .2)
+    obj = rng.rescale("stretch", .2)
     assert rng is not obj
     assert all(abs(5.-i) < 1e-5 for i in obj)
 
     rng = Range(None, 1, 1)
-    obj = rng.rescale("stretch", 5)
+    obj = rng.rescale("bias", 5)
     assert rng is not obj
     assert obj[0] is None
     assert all(abs(5.-i) < 1e-5 for i in obj[1:])
 
-    obj = rng.rescale("bias", .2)
+    obj = rng.rescale("stretch", .2)
     assert rng is not obj
     assert obj[0] is None
     assert all(abs(5.-i) < 1e-5 for i in obj[1:])
@@ -328,8 +328,8 @@ def test_rescale():
 
     assert dist is not obj
     assert obj[0] == "hp"
-    assert all(abs(5.-i) < 1e-5 for i in obj[1]['stretch'])
-    assert all(abs(.2-i) < 1e-5 for i in obj[1]['bias'])
+    assert all(abs(5.-i) < 1e-5 for i in obj[1]['bias'])
+    assert all(abs(.2-i) < 1e-5 for i in obj[1]['stretch'])
 
 
     task = FitToHairpinTask()
