@@ -83,7 +83,7 @@ class RescalingParameters:
 
     def __float__(self) -> float:
         "return the factor to apply to tasks"
-        return self.experimental/(self.mumtobase*self.sequence)
+        return float(self.experimental/(self.mumtobase*self.sequence))
 
     def rescale(self, explen, seqlen = None) -> 'RescalingParameters':
         "rescales the current setup"
