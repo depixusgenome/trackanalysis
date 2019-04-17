@@ -8,8 +8,8 @@ def test_muwells(tmp_path):
     "test muwells data"
     assert MuWellsFilesIO.instrumenttype({}) == "muwells"
     paths = MuWellsFilesIO.check((
-        utpath("W6N46_HPB20190107_OR134689_cycle_1.9-2.10_TC10m.txt"),
-        utpath("W6N46_HPB20190107_W2_OR134689_cycle_1.9-2.10_TC10m.trk"),
+        utpath("muwells/W6N46_HPB20190107_OR134689_cycle_1.9-2.10_TC10m.txt"),
+        utpath("muwells/W6N46_HPB20190107_W2_OR134689_cycle_1.9-2.10_TC10m.trk"),
     ))
     assert paths
 
@@ -17,10 +17,14 @@ def test_muwells(tmp_path):
     assert output['phases'].shape == (32, 8)
     assert output['sequencelength'] == {0: None}
     assert abs(output['experimentallength'][0] - 31.720950927734293) < 1e-5
+    assert output['framerate'] > 100.
+    assert len(output['zmag']) == len(output[0])
+    assert output['Tsample'][0].max() >  len(output[0]) * .75 # greater than the 30Hz framerate
+    assert output['vcap'][0].max() >  len(output[0]) * .75 # greater than the 30Hz framerate
 
-    with open(utpath("W6N46_HPB20190107_OR134689_cycle_1.9-2.10_TC10m.txt")) as istr:
+    with open(utpath("muwells/W6N46_HPB20190107_OR134689_cycle_1.9-2.10_TC10m.txt")) as istr:
         with open(tmp_path/"lio.txt", "w") as ostr:
-            for _ in range(4):
+            for _ in range(5):
                 print(istr.readline().strip(), file = ostr)
             for _ in range(output['phases'][4,5]):
                 istr.readline()
@@ -29,7 +33,7 @@ def test_muwells(tmp_path):
 
 
     paths = MuWellsFilesIO.check((
-        utpath("W6N46_HPB20190107_W2_OR134689_cycle_1.9-2.10_TC10m.trk"),
+        utpath("muwells/W6N46_HPB20190107_W2_OR134689_cycle_1.9-2.10_TC10m.trk"),
         tmp_path/"lio.txt",
     ))
     output2 = MuWellsFilesIO.open(paths)
