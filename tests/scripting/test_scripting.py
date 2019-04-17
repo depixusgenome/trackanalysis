@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-builtin,wildcard-import,unused-wildcard-import
-# pylint: disable=wrong-import-position,ungrouped-imports,no-member
+# pylint: disable=wrong-import-position,ungrouped-imports,no-member,unused-argument
+# pylint: disable=unused-argument,unused-import,no-name-in-module
 "Tests interval detection"
 from   typing              import cast
 import pickle
@@ -10,7 +11,7 @@ from   tests.testutils     import integrationmark
 @integrationmark
 def test_track(scriptingcleaner):
     "test scripting enhanced track"
-    from scripting             import Track, Tasks, localcontext #pylint: disable=no-name-in-module
+    from scripting             import Track, Tasks, localcontext
     from data                  import Cycles
     from eventdetection.data   import Events
     from peakfinding.processor import PeaksDict
@@ -57,7 +58,7 @@ def test_track(scriptingcleaner):
 @integrationmark
 def test_confusion(scriptingcleaner):
     "test the confusion matrix"
-    from scripting             import Track #pylint: disable=no-name-in-module
+    from scripting             import Track
     from scripting.confusion   import ConfusionMatrix, LNAHairpin
     from tests.testingcore     import path as utpath
     peaks = pickle.load(open(cast(str, utpath("hp6jan2018.peaks")), "rb"))
@@ -68,5 +69,20 @@ def test_confusion(scriptingcleaner):
     conf  = cnf.confusion(det)
     return det, conf
 
+@integrationmark
+def test_muwells(scriptingcleaner):
+    "test µwells"
+    from scripting          import Track
+    from tests.testingcore  import path as utpath
+    trackfile = utpath("muwells/W6N46_HPB20190107_W2_OR134689_cycle_1.9-2.10_TC10m.trk")
+    liafile   = utpath("muwells/W6N46_HPB20190107_OR134689_cycle_1.9-2.10_TC10m.txt")
+    track     = Track(path= (trackfile, liafile))
+    assert set(track.tasks.tasks.keys()) == set()
+    other     = track.op.rescaletobead(0)
+    assert track is not other
+    assert set(other.tasks.tasks.keys()) == {
+        'cleaning', 'alignment', 'eventdetection', 'peakselector'
+    }
+
 if __name__ == '__main__':
-    test_track()
+    test_muwells(None)
