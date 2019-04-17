@@ -54,26 +54,15 @@ class PeaksTableWidget:
         self.__theme   = ctrl.theme.add(PeaksTableTheme())
         self.__display = ctrl.display.add(PeaksTableDisplay())
         self.__tasks   = tasks
+        self.__ctrl    = ctrl
 
     def addtodoc(self, mainview, ctrl) -> List[Widget]:
         "creates the widget"
-        width  = self.__theme.width
-        fmt    = DpxNumberFormatter(format = self.__theme.zformat, text_align = 'right')
-        cols   = [TableColumn(field     = 'bases',
-                              title     = self.__theme.columns[0],
-                              editor    = IntEditor(),
-                              width     = width//2),
-                  TableColumn(field     = 'z',
-                              title     = self.__theme.columns[1],
-                              editor    = NumberEditor(step = self.__theme.zstep),
-                              formatter = fmt,
-                              width     = width//2)]
-
         self.__widget = DataTable(source         = ColumnDataSource(self.__data()),
-                                  columns        = cols,
+                                  columns        = self.__columns(),
                                   editable       = True,
                                   index_position = None,
-                                  width          = width,
+                                  width          = self.__theme.width,
                                   height         = self.__theme.height,
                                   name           = "Cycles:Peaks")
 
@@ -86,9 +75,38 @@ class PeaksTableWidget:
 
         return [self.__widget]
 
+    def __columns(self):
+        width  = self.__theme.width
+        fmt    = DpxNumberFormatter(format = self.__theme.zformat, text_align = 'right')
+        track  = self.__ctrl.tasks.track(self.__ctrl.display.get('tasks', "roottask"))
+        dim    = track.instrument["dimension"] if track else 'µm'
+
+        def _rep(ind):
+            title = self.__theme.columns[ind]
+            if 'm)' in title:
+                title = title.split('(')[0] + f' ({dim})'
+            return title
+
+        return [
+            TableColumn(
+                field     = 'bases',
+                title     = _rep(0),
+                editor    = IntEditor(),
+                width     = width//2
+            ),
+            TableColumn(
+                field     = 'z',
+                title     = _rep(1),
+                editor    = NumberEditor(step = self.__theme.zstep),
+                formatter = fmt,
+                width     = width//2
+            )
+        ]
+
     def reset(self, resets:CACHE_TYPE):
         "updates the widget"
-        resets[self.__widget.source]['data'] = self.__data()
+        resets[self.__widget.source].update(data = self.__data())
+        resets[self.__widget].update(columns = self.__columns())
 
     def callbacks(self, hover):
         "adding callbacks"
