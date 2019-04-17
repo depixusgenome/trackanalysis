@@ -34,14 +34,19 @@ Differences with the optical systems
 ====================================
 
 The main difference is the hardware low-pass filter applied to the data and the
-frame rate. Both together affect the effective value used for measuring the
-noise |NOISE|. There are no automated way of changing this.
+frame rate. This low-pass filter has a cutoff value which can be set within a
+range from 1ms to 100ms or more. It's effect is always to remove noise at
+high-frequencies. Anything above 1/30Hz will affect the current high-frequency
+noise estimator |NOISE|. As the latter is used throughout the processing
+pipeline as a calibration factor. This can have a profound effect on the data
+processing output. For now, there are no automated way of measuring the effect
+and correcting for it.
 
-In the cleaning tab, one might be required to change the parameters used, in
-particular, the |pingpong| test can under-estimate the high-frequency noise,
-resulting in an over-estimation of the low-frequency noise it tries to detect.
-One can increase the |pingpong| setting from the advanced menu.
+As a result, in the cleaning tab, one might be required to change the
+parameters used, in particular, the |pingpong| test can under-estimate the
+high-frequency noise, resulting in an over-estimation of the low-frequency
+noise it tries to detect. One might need to increase the |pingpong| settings
+available on the advanced menu.
 
 In the peaks tabs, the same effect might result in too low a smearing the peak
-data in the histograms.  On may wish to raise that setting in the advanced
-menu.
+data in the histograms. On may wish to raise the setting in the advanced menu.
