@@ -317,10 +317,8 @@ class PeakListWidget:
                                       noerase = False)
 
     def __cols(self, ctrl):
-        dim   = (
-            ctrl.tasks.track(ctrl.display.get("tasks", "roottask"))
-            .instrument['dimension']
-        )
+        track = ctrl.tasks.track(ctrl.display.get("tasks", "roottask"))
+        dim   = track.instrument['dimension'] if track else 'µm'
         fmt   = lambda i: (StringFormatter(text_align = 'center') if i == '' else
                            DpxNumberFormatter(format = i, text_align = 'right'))
         cols  = list(TableColumn(field      = i[0],
@@ -435,10 +433,8 @@ class PeakIDPathWidget:
                     raise IOError(*self.__theme.tableerror)
 
 
-                dim = (
-                    ctrl.tasks.track(ctrl.display.get("tasks", "roottask"))
-                    .instrument['dimension']
-                )
+                track = ctrl.tasks.track(ctrl.display.get("tasks", "roottask"))
+                dim   = track.instrument['dimension'] if track else 'µm'
                 writecolumns(path, "Summary",
                              [('Bead',                  [self.__peaks.bead]),
                               ('Reference',             [self.__peaks.sequencekey]),
