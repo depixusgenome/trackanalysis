@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 "Deals with global information"
 from enum               import Enum
-from typing             import (Dict, Optional, List, Iterator, Type, Iterable,
-                                Callable, Any, ClassVar, TYPE_CHECKING, cast)
+from typing             import (Dict, Optional, List, Iterator, Type,
+                                Callable, Any, ClassVar, Iterable,
+                                TYPE_CHECKING, cast)
 from copy               import deepcopy
 from utils              import initdefaults
 from utils.configobject import ConfigObject
@@ -93,17 +94,18 @@ class RescalingParameters:
             sequence     = self.sequence if seqlen is None else seqlen,
         )
 
+Rescalings = Dict[str, RescalingParameters]
 class TasksConfig(ConfigObject):
     """
     permanent globals on tasks
     """
-    name                         = "tasks"
-    instrument: str              = InstrumentType.picotwist.name
-    picotwist:  Configuration    = cast(Configuration, ConfigurationDescriptor())
-    sdi:        Configuration    = cast(Configuration, ConfigurationDescriptor())
-    muwells:    Configuration    = cast(Configuration, ConfigurationDescriptor())
-    order:      List[str]        = list(TASK_ORDER)
-    rescaling:  Dict[str, float] = {InstrumentType.muwells.value: RescalingParameters()}
+    name                      = "tasks"
+    instrument: str           = InstrumentType.picotwist.name
+    picotwist:  Configuration = cast(Configuration, ConfigurationDescriptor())
+    sdi:        Configuration = cast(Configuration, ConfigurationDescriptor())
+    muwells:    Configuration = cast(Configuration, ConfigurationDescriptor())
+    order:      List[str]     = list(TASK_ORDER)
+    rescaling:  Rescalings    = {InstrumentType.muwells.value: RescalingParameters()}
 
     # make sure all configurations are available
     locals().update({
@@ -152,6 +154,36 @@ class TasksConfig(ConfigObject):
             if not isinstance(tsk, previous):
                 return i+1
         return len(curr)
+
+    def rescale(self, instr, explen, seqlen = None) -> Dict[str, Any]:
+        "rescale an instrument according to provided values"
+        if None in (instr, explen):
+            return {}
+
+        if hasattr(instr, 'experimentallength'):
+            # pylint: disable=no-member
+            seqlen = getattr(instr, 'sequencelength')[int(explen)]
+            explen = getattr(instr, 'experimentallength')[int(explen)]
+            instr  = instr.instrument['type']
+
+        assert isinstance(explen, float)
+        assert seqlen is None or isinstance(seqlen, float)
+        instr = InstrumentType(instr).value
+
+        cnv   = self.rescaling
+        if seqlen is None:
+            seqlen = cnv[instr].sequence
+
+        old   = float(cnv[instr])
+        cnv   = dict(cnv, **{instr: cnv[instr].rescale(explen, seqlen)})
+        coeff = float(cnv[instr])/old
+        if abs(coeff - 1.) < 1e-5:
+            return {}
+
+        return {
+            'rescaling': cnv,
+            instr: { i: j.rescale(coeff) for i, j in getattr(self, instr).items()}
+        }
 
 class TasksDisplay(ConfigObject):
     """

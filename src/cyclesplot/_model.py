@@ -181,7 +181,7 @@ class CyclesModelAccess(SequencePlotModelAccess):
 
             ctrl.display.update(
                 self.cycles.display,
-                estimatedstretch = cnf.estimatedstretch/coeff,
+                estimatedstretch = self.cycles.display.estimatedstretch/coeff,
             )
 
             ctrl.theme.update(

@@ -172,40 +172,12 @@ class ConfigMuWellsFilesIO(ConfigTrackIO):
     @staticmethod
     def _onchangedisplay(ctrl, **_):
         root  = ctrl.display.get('tasks', 'roottask')
-        if not MuWellsFilesIO.check(root.path):
-            return
-
-        bead  = ctrl.display.get('tasks', 'bead')
-        track = ctrl.tasks.track(root)
-        if bead not in getattr(track, 'experimentallength', ()):
-            return
-
-        instr  = getattr(track.instrument['type'], 'value', None)
-        if instr is None:
-            return
-
-        cnv    = ctrl.theme.get('tasks', 'rescaling')
-        explen = getattr(track, 'experimentallength')[bead]
-        seqlen = getattr(track, 'sequencelength')[bead]
-        if seqlen is None:
-            seqlen = cnv[instr].sequence
-
-        old   = float(cnv[instr])
-        cnv   = dict(cnv, **{instr: cnv[instr].rescale(explen, seqlen)})
-        coeff = float(cnv[instr])/old
-        if abs(coeff - 1.) < 1e-5:
-            return
-
-        ctrl.theme.update(
-            "tasks",
-            **{
-                'rescaling': cnv,
-                instr: {
-                    i: j.rescale(coeff)
-                    for i, j in ctrl.theme.get('tasks', instr).items()
-                }
-            }
-        )
+        if MuWellsFilesIO.check(root.path):
+            bead  = ctrl.display.get('tasks', 'bead')
+            track = ctrl.tasks.track(root)
+            if bead in getattr(track, 'experimentallength', ()):
+                model = ctrl.theme.model('tasks')
+                ctrl.theme.update(model, **model.rescale(track, bead))
 
     @staticmethod
     def _onrescale(ctrl, old = None, model = None, **_):
