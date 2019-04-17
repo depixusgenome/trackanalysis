@@ -24,6 +24,7 @@ further studies.
    :caption: Contents:
 
    gettingstarted
+   muwells
    fov
    qc
    cleaning

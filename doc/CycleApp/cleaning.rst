@@ -142,8 +142,7 @@ Most other filters allow discarding badly behaving cycles:
 * |NOISE|: allows discarding noisy cycles or those for which
   measures were not recorded (z is constant).
 * `% good`: allows discarding cycles that have too many missing values.
-* |pingpong| allows discarding cycles with values which jump
-  up and down. This filter's parameters cannot be set by the user.
+* |pingpong| allows discarding cycles with values which jump up and down.
 
 Finally one filter is performed over all cycles:
 
@@ -239,6 +238,7 @@ The first 8 elements are repeats of inputs available in the main window. The
 advantage of having them here is simply to have their default value indicated
 again. The following are additionnal:
 
+* |pingpong|  discarding cycles with values which jump up and down.
 * `Cycles are closed if |z(φ1)-z(φ5)| <`: the maximum distance from phase 1
   that the last values in phase 5 may sit for the cycle to be considered as
   *closed*.
