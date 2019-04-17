@@ -435,12 +435,13 @@ def test_clippingtask():
 def test_rescaling():
     "test rescaling"
     attrs = (
-        'maxabsvalue', 'maxderivate',   # AberrantValuesRule
-        'minhfsigma', 'maxhfsigma',     # HFSigmaRule
-        'minextent',  'maxextent',      # ExtentRurle
-        'mindifference',                # PingPongRule
-        'maxdisttozero'                 # SaturationRule
+        'mindeltavalue', 'cstmaxderivate',
+        'maxabsvalue', 'maxderivate',
+        'minhfsigma', 'maxhfsigma',
+        'minextent', 'maxextent',
+        'mindifference', 'maxdisttozero'
     )
+
     task = DataCleaningTask()
     new  = task.rescale(5.)
     resc = new.__getstate__()
@@ -458,7 +459,7 @@ def test_rescaling():
     new   = obj.rescale(5)
     assert obj is not new
 
-    attrs = ('maxabsvalue', 'maxderivate')
+    attrs = ('maxabsvalue', 'maxderivate', 'mindeltavalue', 'cstmaxderivate')
     for i, j in obj.abberrant.__getstate__().items():
         assert abs(new.abberrant.__getstate__()[i] - (j*5. if i in attrs else j)) < 1e-5
 
