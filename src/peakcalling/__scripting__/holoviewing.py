@@ -130,6 +130,10 @@ class _AutoHP(OligoMappingDisplay):
             if self._fit is True:
                 cnf.pop('fit')
             self.__fits = self._items.new(FitToHairpinDict, config = cnf)
+            if 'rescaling' in getattr(getattr(self._items, 'track', None), 'instrument', ()):
+                self.__fits.config = self.__fits.config.rescale(
+                    float(self._items.track.instrument['rescaling'])
+                )
 
         cache = self.__cache
         if bead not in cache:
