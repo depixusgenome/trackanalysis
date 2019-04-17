@@ -6,6 +6,7 @@ from    typing                   import Tuple, Optional, Dict, Any, List, cast
 from    pathlib                  import Path
 import  numpy                    as     np
 from    numpy.lib.stride_tricks  import as_strided
+from    scipy.interpolate        import interp1d
 import  pandas                   as     pd
 from    legacy                   import readtrack # pylint: disable=no-name-in-module
 from    utils                    import initdefaults
@@ -109,7 +110,37 @@ class MuWellsFilesIO(TrackIO):
             if Path(liapath).suffix == cls.LIAEXT:
                 cls.__update(output, i, str(liapath), cnf)
 
+        if not any(isinstance(i, int) for i in output):
+            raise IOError("Could not add µwells data to the current track")
+
+        cls.__correctsecondaries(output)
         return output
+
+    @staticmethod
+    def __correctsecondaries(output: dict):
+        if output['picofrate'] == output['framerate']:
+            return
+
+        ratio   = output['framerate']/output['picofrate']
+        nframes = next(len(j) for i, j in output.items() if isinstance(i, int))
+        for key in output:
+            if not isinstance(key, str):
+                continue
+
+            if key.startswith("T") or key == 'vcap':
+                output[key] = (
+                    np.round(output[key][0]*ratio).astype('i4'),
+                    *output[key][1:]
+                )
+
+            elif key == 'zmag':
+                output[key] = interp1d(
+                    np.arange(len(output[key]))*ratio,
+                    output[key],
+                    assume_sorted = True,
+                    fill_value    = np.NaN,
+                    bounds_error  = False
+                )(np.arange(nframes))
 
     @staticmethod
     def __seqlen(path):
