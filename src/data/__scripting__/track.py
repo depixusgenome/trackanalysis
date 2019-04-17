@@ -152,12 +152,17 @@ class TrackOperations:
         self._trk.load()
         trk   = shallowcopy(self._trk)
         items = Tasks.tasksmodel().rescale(trk, bead)
-        names = {j: i for i, j in getattr(Tasks, '_cnv')(None).items()}
-        for i, j in items.get(trk.instrument['type'].value, {}).items():
-            if j.zscaledattributes() == ():
-                continue
-            if hasattr(trk.tasks, names.get(i, i)):
-                setattr(trk.tasks, names.get(i, i), j)
+        instr = trk.instrument['type'].value
+        if instr in items:
+            names = {j: i for i, j in getattr(Tasks, '_cnv')(None).items()}
+            for i, j in items[instr].items():
+                if j.zscaledattributes() == ():
+                    continue
+                if hasattr(trk.tasks, names.get(i, i)):
+                    setattr(trk.tasks, names.get(i, i), j)
+            trk.instrument['rescaling'] = items['rescaling'][instr]
+        else:
+            trk.instrument.pop('rescaling', None)
         return trk
 
 @extend(Track)
