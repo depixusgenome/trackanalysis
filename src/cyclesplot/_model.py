@@ -179,14 +179,9 @@ class CyclesModelAccess(SequencePlotModelAccess):
             cur    = coeff
             coeff /= cnf.rescaling
 
-            info   = dict(self.cycles.display.info)
-            for i in info.values():
-                i.stretch /= coeff
-
             ctrl.display.update(
                 self.cycles.display,
                 estimatedstretch = cnf.estimatedstretch/coeff,
-                info             = info,
             )
 
             ctrl.theme.update(
