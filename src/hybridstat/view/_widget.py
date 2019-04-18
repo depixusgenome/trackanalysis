@@ -378,7 +378,10 @@ class PeakIDPathWidget:
             task = mdl.default(self.__peaks)
         except Exception as exc: # pylint: disable=broad-except
             LOGS.exception(exc)
-            ctrl.display.update("message", message = IOError("Failed to read id file"))
+            ctrl.display.update(
+                "message",
+                message = IOError("Failed to read id file", "warning")
+            )
             return
 
         missing = (
