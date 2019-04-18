@@ -12,6 +12,8 @@ IdType  = Tuple[int,str,Optional[float],Optional[float]]
 IdsType = List[IdType]
 
 def _id(row, ibead):
+    if len(row) <= ibead:
+        return None
     val = row[ibead].value
     if val is None:
         return None
@@ -28,6 +30,8 @@ def _id(row, ibead):
         return None
 
 def _tofloat(row, ibead):
+    if len(row) <= ibead:
+        return None
     val = row[ibead].value
     if val is not None:
         try:
@@ -37,6 +41,8 @@ def _tofloat(row, ibead):
     return None
 
 def _add(info, row, ibead, ref):
+    if len(row) <= ibead:
+        return None
     val = row[ibead].value
     if val is None:
         return None
@@ -70,7 +76,12 @@ def _read_summary(rows) -> IdsType:
 
     info: IdsType = list()
     if ids.count(None) == 0:
-        cnv: Sequence[Callable] = (_id, lambda r, i: str(r[i].value), _tofloat, _tofloat)
+        cnv: Sequence[Callable] = (
+            _id,
+            lambda r, i: (None if len(r) <= i else str(r[i].value)),
+            _tofloat,
+            _tofloat
+        )
         for row in rows:
             vals = tuple(fcn(row, idx) for fcn, idx in zip(cnv, ids))
             if None not in vals[:2]:
