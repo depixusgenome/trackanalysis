@@ -24,6 +24,7 @@ from taskview.modaldialog       import tab
 from taskview.toolbar           import FileList
 from utils                      import dflt, dataclass
 from utils.gui                  import startfile
+from utils.logconfig            import getLogger
 from view.plots                 import DpxNumberFormatter, CACHE_TYPE
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
@@ -31,6 +32,7 @@ from view.static                import ROUTE, route
 from ._model                    import (PeaksPlotModelAccess, FitToReferenceStore,
                                         PeaksPlotTheme, PeaksPlotDisplay)
 from ._model                    import SingleStrandConfig
+LOGS = getLogger(__name__)
 
 @dataclass
 class ReferenceWidgetTheme:
@@ -370,13 +372,30 @@ class PeakIDPathWidget:
         self.__peaks        = model
         self.__theme        = ctrl.theme.add(PeakIDPathTheme(), noerase = False)
 
+    def _doresetmodel(self, ctrl):
+        mdl  = self.__peaks.identification
+        try:
+            task = mdl.default(self.__peaks)
+        except Exception as exc: # pylint: disable=broad-except
+            LOGS.exception(exc)
+            ctrl.display.update("message", message = IOError("Failed to read id file"))
+            return
+
+        missing = (
+            {i[0] for i in task.constraints.values()} - set(task.fit)
+            if task else
+            set()
+        )
+        if len(missing):
+            msg = f"IDs missing from fasta: {missing}"
+            ctrl.display.update("message", message = KeyError(msg, "warning"))
+        else:
+            with ctrl.action:
+                mdl.resetmodel(self.__peaks)
+
     def callbacks(self, ctrl, doc):
         "sets-up a periodic callback which checks whether the id file has changed"
         finfo = [None, None]
-
-        @ctrl.action
-        def _do_resetmodel():
-            self.__peaks.identification.resetmodel(self.__peaks)
 
         def _callback():
             if not self.keeplistening:
@@ -399,7 +418,7 @@ class PeakIDPathWidget:
             if not diff:
                 return
 
-            _do_resetmodel()
+            self._doresetmodel(ctrl)
 
         doc.add_periodic_callback(_callback, self.__theme.filechecks)
 
@@ -442,8 +461,11 @@ class PeakIDPathWidget:
                               (f'Bias ({dim})',         [self.__peaks.bias])])
                 startfile(path)
 
-            ctrl.display.update(self.__peaks.peaksmodel.display,
-                                constraintspath = str(Path(path).resolve()))
+            ctrl.display.update(
+                self.__peaks.peaksmodel.display,
+                constraintspath = str(Path(path).resolve())
+            )
+            self._doresetmodel(ctrl)
 
         self.__widget.on_change('click', _onclick_cb)
         self.__widget.on_change('value', _onchangetext_cb)
