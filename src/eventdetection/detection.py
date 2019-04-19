@@ -44,7 +44,7 @@ class PyEventDetector(PrecisionAlg):
         "instantiates and calls class"
         return cls(**kwa)(*args)
 
-class EventDetector(CppPrecisionAlg, _EventDetector):
+class EventDetector(CppPrecisionAlg, _EventDetector, zattributes = ('precision', 'merge')):
     """
     Detect, merge and select flat intervals in `PHASE.measure`
 
@@ -59,6 +59,8 @@ class EventDetector(CppPrecisionAlg, _EventDetector):
 
     * `select`: possibly clips events and discards those too small.
     """
+    split: SplitDetector
+    merge: EventMerger
     def __init__(self, **kwa):
         CppPrecisionAlg.__init__(self, **kwa)
         _EventDetector.__init__(self, **kwa)

@@ -29,4 +29,4 @@ PATHS = dict(small_pickle   = "small_pickle.pk",
              big_selected   = big_selected,
              big_all        = big_all)
 
-path = ResourcePath("../data/", PATHS) # pylint: disable=invalid-name
+path = ResourcePath(None, PATHS) # pylint: disable=invalid-name

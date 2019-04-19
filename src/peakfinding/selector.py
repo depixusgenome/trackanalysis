@@ -128,7 +128,7 @@ class PeakSelectorDetails: # pylint: disable=too-many-instance-attributes
         vals = [_measure(i) for i in evts if i is not None and len(i) > 0]
         return zmeas(np.concatenate(vals))
 
-class PeakSelector(PrecisionAlg):
+class PeakSelector(PrecisionAlg, zattributes = ('precision', 'histogram')):
     """
     Find binding positions and selects relevant events.
 

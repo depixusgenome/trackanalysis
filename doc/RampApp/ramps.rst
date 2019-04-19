@@ -13,6 +13,8 @@ The |RampApp| application has two goals:
 This is not for *offline* analysis. This is for to be used with ramp data prior
 to testing oligos or antibodies.
 
+Nonetheless, it's possible to export the ramp data in xlsx or csv.
+
 The Field of View
 =================
 

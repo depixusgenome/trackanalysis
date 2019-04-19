@@ -48,7 +48,6 @@ class FoVPlotTheme(PlotTheme):
     thumbnail   = 128
     calibimg    = PlotAttrs('Greys256', 'image', x = 0, y = 0)
     calibsize   = 6./16
-    calibtools  = 'pan,box_zoom,save'
     tooltips    = '<table>@ttips{safe}</table>'
     tooltiptype = dict(DataCleaningErrorMessage.NAMES)
     tooltiprow  = ('<tr>'
@@ -59,7 +58,7 @@ class FoVPlotTheme(PlotTheme):
                    '<tr><td><td><td>Δz    =</td><td>{:.2f}</td></tr>'
                   )
     toolbar     = dict(PlotTheme.toolbar)
-    toolbar['items'] = 'pan,box_zoom,tap,save,hover'
+    toolbar['items'] = 'pan,box_zoom,reset,tap,save,hover'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
@@ -129,6 +128,9 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
                 return
 
             # pylint: disable=unsubscriptable-object
+            if len(self._beadssource.data['text']) <= new[0]:
+                return
+
             bead = int(self._beadssource.data['text'][new[0]])
             if bead == self._model.bead:
                 return

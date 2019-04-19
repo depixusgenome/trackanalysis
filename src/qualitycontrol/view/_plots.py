@@ -187,6 +187,13 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
                     (None, None))
         return None, None
 
+    def _reset(self, cache:CACHE_TYPE):
+        super()._reset(cache)
+        if self._model.track:
+            dim = self._model.track.instrument['dimension']
+            lbl = self._theme.ylabel.split('(')[0]
+            cache[self._fig.yaxis[0]].update(axis_label = f"{lbl} ({dim})")
+
 class QualityControlPlots:
     "All plots together"
     def __init__(self, ctrl, mdl):

@@ -14,7 +14,9 @@ from peakcalling.processor.fittoreference import (FitToReferenceTask, FitToRefer
                                                   TaskViewProcessor, BEADKEY)
 from taskcontrol.processor.utils          import ExceptionCatchingTask
 from taskcontrol.taskcontrol              import create as _createdata
-from taskcontrol.taskio                   import ConfigTrackIO, ConfigGrFilesIO, TaskIO
+from taskcontrol.taskio                   import (
+    ConfigTrackIO, ConfigGrFilesIO, ConfigMuWellsFilesIO, TaskIO
+)
 from utils.logconfig                      import getLogger
 from utils.gui                            import startfile
 from view.base                            import spawn, threadmethod
@@ -42,6 +44,9 @@ class _PeaksIOMixin:
         return items
 
 class PeaksConfigTrackIO(_PeaksIOMixin, ConfigTrackIO): # type: ignore
+    "selects the default tasks"
+
+class PeaksConfigMuWellsFilesIO(_PeaksIOMixin, ConfigMuWellsFilesIO): # type: ignore
     "selects the default tasks"
 
 class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO): # type: ignore
@@ -218,5 +223,6 @@ def setupio(cls):
     name = lambda i: __name__ + '.'+i
     return dict(ioopen = (slice(None, -2),
                           name('PeaksConfigGRFilesIO'),
+                          name('PeaksConfigMuWellsFilesIO'),
                           name('PeaksConfigTrackIO')),
                 iosave = (..., name('ConfigXlsxIO')))

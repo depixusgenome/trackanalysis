@@ -257,6 +257,7 @@ class ConsensusConfig:
         args           = {"align": None, "peakalign": None}
         self.picotwist = PeakSelectorTask(rawfactor = 2., **args)
         self.sdi       = PeakSelectorTask(rawfactor = 1., **args)
+        self.muwells   = PeakSelectorTask(rawfactor = 4., **args)
 
     def __getitem__(self, name) -> PeakSelectorTask:
         return getattr(self, InstrumentType(name).name)

@@ -45,21 +45,21 @@ export class DpxCleaningView extends WidgetView
                             "#{@mk_btn("add", "╋", ttips[1])}</div></td></tr>"+
                "</table>"+
                "<table><tr><td #{ttips[2]}>|z| ≤</td>"+
-                     "<td>#{@mk_inp("maxabsvalue", 10.0, 0.1)}</td>"+
+                     "<td>#{@mk_inp("maxabsvalue")}</td>"+
                      "<td #{ttips[4]}>|dz/dt| ≤</td>"+
-                     "<td>#{@mk_inp("maxderivate", 10.0, 0.1)}</td></tr>"+
+                     "<td>#{@mk_inp("maxderivate")}</td></tr>"+
                  "<tr><td></td>"+
-                     "<td>#{@mk_inp("minextent", 10.0, 0.05)}</td>"+
+                     "<td>#{@mk_inp("minextent")}</td>"+
                      "<td #{ttips[3]}>≤ Δz ≤</td>"+
-                     "<td>#{@mk_inp("maxextent", 10.0, 0.05)}</td></tr>"+
+                     "<td>#{@mk_inp("maxextent")}</td></tr>"+
                  "<tr><td></td>"+
-                     "<td>#{@mk_inp("minhfsigma", 0.05, 0.0001)}</td>"+
+                     "<td>#{@mk_inp("minhfsigma")}</td>"+
                      "<td #{ttips[6]}>≤ σ[HF] ≤</td>"+
-                     "<td>#{@mk_inp("maxhfsigma", 0.05,  0.001)}</td></tr>"+
+                     "<td>#{@mk_inp("maxhfsigma")}</td></tr>"+
                  "<tr><td #{ttips[5]}>% good  ≥</td>"+
-                     "<td>#{@mk_inp("minpopulation", 100, 0.1)}</td>"+
+                     "<td>#{@mk_inp_with_extrema("minpopulation", 100, 0.1)}</td>"+
                      "<td #{ttips[7]}>Non-closing cycles (%)</td>"+
-                     "<td>#{@mk_inp("maxsaturation", 100.0, 1.0)}</td></tr>"+
+                     "<td>#{@mk_inp_with_extrema("maxsaturation", 100.0, 1.0)}</td></tr>"+
                  "</table>"
 
 
@@ -78,7 +78,13 @@ export class DpxCleaningView extends WidgetView
     cl_inputs: ['maxabsvalue', 'maxderivate', 'minpopulation', 'minhfsigma',
                 'maxhfsigma', 'minextent', 'maxextent', 'maxsaturation']
 
-    mk_inp: (name, maxv = 100, dv = 0.1) ->
+    mk_inp: (name) ->
+        val  = @model[name]
+        dv   = Math.pow(10, Math.log10(val)-1)
+        maxv = Math.pow(10, Math.log10(val)+2)
+        return @mk_inp_with_extrema(name, maxv, dv)
+
+    mk_inp_with_extrema: (name, maxv, dv) ->
         disabled = if @model.frozen then ' disabled=true' else ''
         return  "<input id='dpx-cl-#{name}'"+
                     " class='dpx-cl-freeze bk-widget-form-input'"+

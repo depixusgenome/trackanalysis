@@ -285,9 +285,12 @@ class WidgetMixin(ABC):
             σ[HF] >                               %(cleaning.minhfsigma).3F
             σ[HF] <                               %(cleaning.maxhfsigma).3F
             % good frames >                       %(cleaning.minpopulation)D
+            ∑|dz| <                               %(cleaning.maxpingpong).3F
+
             <b> Non-closing cycles</b>
-            Cycles are closed if |z(φ₁)-z(φ₅)| <  %(cleaning.maxdisttozero)D
+            Cycles are closed if |z(φ₁)-z(φ₅)| <  %(cleaning.maxdisttozero).3F
             % non-closing cycles <                %(cleaning.maxsaturation)D
+
             <b></b>
             %(AlignmentModalDescriptor:)
             Discard z(∈ φ₅) < z(φ₁)-σ[HF]⋅α, α =  %(clipping.lowfactor).1oF

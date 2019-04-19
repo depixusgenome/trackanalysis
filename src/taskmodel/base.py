@@ -11,8 +11,9 @@ from   pickle       import dumps as _dumps
 
 import numpy        as     np
 
-from   utils        import toenum, initdefaults
-from   .level       import Level
+from   utils            import toenum, initdefaults
+from   utils.rescaler   import Rescaler
+from   .level           import Level
 
 class TaskIsUniqueError(Exception):
     "verifies that the list contains no unique task of type task"
@@ -30,10 +31,11 @@ class TaskIsUniqueError(Exception):
         if any(tcl is other.unique() for other in lst if other.unique()):
             raise cls()
 
-class Task:
+class Task(Rescaler):
     "Class containing high-level configuration infos for a task"
     disabled = False
     def __init__(self, **kwargs) -> None:
+        super().__init__()
         self.disabled = kwargs.get('disabled', type(self).disabled)
         if 'level' in kwargs:
             self.level = toenum(Level, kwargs['level']) # type: Level

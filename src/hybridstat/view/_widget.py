@@ -24,6 +24,7 @@ from taskview.modaldialog       import tab
 from taskview.toolbar           import FileList
 from utils                      import dflt, dataclass
 from utils.gui                  import startfile
+from utils.logconfig            import getLogger
 from view.plots                 import DpxNumberFormatter, CACHE_TYPE
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
@@ -31,6 +32,7 @@ from view.static                import ROUTE, route
 from ._model                    import (PeaksPlotModelAccess, FitToReferenceStore,
                                         PeaksPlotTheme, PeaksPlotDisplay)
 from ._model                    import SingleStrandConfig
+LOGS = getLogger(__name__)
 
 @dataclass
 class ReferenceWidgetTheme:
@@ -206,6 +208,8 @@ class PeaksStatsWidget:
             "all track dependant stats"
             if mdl.track is None:
                 return
+            dim         = mdl.track.instrument['dimension']
+            self.titles = [(i.replace('µm', dim), j) for i,j in self.titles]
 
             self.values[0] = mdl.track.ncycles
             self.values[3] = rawprecision(mdl.track, mdl.bead)
@@ -309,15 +313,18 @@ class PeakListWidget:
     __widget: DataTable
     theme:  PeakListTheme
     def __init__(self, ctrl, model:PeaksPlotModelAccess, theme = None) -> None:
+        self.__ctrl  = ctrl
         self.__model = model
         self.theme   = ctrl.theme.add(PeakListTheme() if theme is None else theme,
                                       noerase = False)
 
-    def __cols(self):
+    def __cols(self, ctrl):
+        track = ctrl.tasks.track(ctrl.display.get("tasks", "roottask"))
+        dim   = track.instrument['dimension'] if track else 'µm'
         fmt   = lambda i: (StringFormatter(text_align = 'center') if i == '' else
                            DpxNumberFormatter(format = i, text_align = 'right'))
         cols  = list(TableColumn(field      = i[0],
-                                 title      = i[1],
+                                 title      = i[1].replace("µm", dim),
                                  formatter  = fmt(i[2]))
                      for i in self.theme.columns)
 
@@ -331,7 +338,7 @@ class PeakListWidget:
 
     def addtodoc(self, _1, _2, src) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
         "creates the widget"
-        cols  = self.__cols()
+        cols  = self.__cols(self.__ctrl)
         self.__widget = DataTable(source         = src,
                                   columns        = cols,
                                   editable       = False,
@@ -343,7 +350,7 @@ class PeakListWidget:
 
     def reset(self, resets):
         "resets the wiget when a new file is opened"
-        resets[self.__widget].update(columns = self.__cols())
+        resets[self.__widget].update(columns = self.__cols(self.__ctrl))
 
 @dataclass
 class PeakIDPathTheme:
@@ -365,13 +372,33 @@ class PeakIDPathWidget:
         self.__peaks        = model
         self.__theme        = ctrl.theme.add(PeakIDPathTheme(), noerase = False)
 
+    def _doresetmodel(self, ctrl):
+        mdl  = self.__peaks.identification
+        try:
+            task = mdl.default(self.__peaks)
+        except Exception as exc: # pylint: disable=broad-except
+            LOGS.exception(exc)
+            ctrl.display.update(
+                "message",
+                message = IOError("Failed to read id file", "warning")
+            )
+            return
+
+        missing = (
+            {i[0] for i in task.constraints.values()} - set(task.fit)
+            if task else
+            set()
+        )
+        if len(missing):
+            msg = f"IDs missing from fasta: {missing}"
+            ctrl.display.update("message", message = KeyError(msg, "warning"))
+        else:
+            with ctrl.action:
+                mdl.resetmodel(self.__peaks)
+
     def callbacks(self, ctrl, doc):
         "sets-up a periodic callback which checks whether the id file has changed"
         finfo = [None, None]
-
-        @ctrl.action
-        def _do_resetmodel():
-            self.__peaks.identification.resetmodel(self.__peaks)
 
         def _callback():
             if not self.keeplistening:
@@ -394,7 +421,7 @@ class PeakIDPathWidget:
             if not diff:
                 return
 
-            _do_resetmodel()
+            self._doresetmodel(ctrl)
 
         doc.add_periodic_callback(_callback, self.__theme.filechecks)
 
@@ -427,15 +454,21 @@ class PeakIDPathWidget:
                 if not path.endswith(".xlsx"):
                     raise IOError(*self.__theme.tableerror)
 
+
+                track = ctrl.tasks.track(ctrl.display.get("tasks", "roottask"))
+                dim   = track.instrument['dimension'] if track else 'µm'
                 writecolumns(path, "Summary",
-                             [('Bead', [self.__peaks.bead]),
-                              ('Reference', [self.__peaks.sequencekey]),
-                              ('Stretch (base/µm)', [self.__peaks.stretch]),
-                              ('Bias (µm)', [self.__peaks.bias])])
+                             [('Bead',                  [self.__peaks.bead]),
+                              ('Reference',             [self.__peaks.sequencekey]),
+                              (f'Stretch (base/{dim})', [self.__peaks.stretch]),
+                              (f'Bias ({dim})',         [self.__peaks.bias])])
                 startfile(path)
 
-            ctrl.display.update(self.__peaks.peaksmodel.display,
-                                constraintspath = str(Path(path).resolve()))
+            ctrl.display.update(
+                self.__peaks.peaksmodel.display,
+                constraintspath = str(Path(path).resolve())
+            )
+            self._doresetmodel(ctrl)
 
         self.__widget.on_change('click', _onclick_cb)
         self.__widget.on_change('value', _onchangetext_cb)

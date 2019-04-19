@@ -21,7 +21,7 @@ class ClippingTask(Task):
     replacement   = np.NaN
     minpopulation = 80.
 
-    @initdefaults(frozenset(locals()))
+    @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         super().__init__(**kwa)
         Task.__init__(self, **kwa)

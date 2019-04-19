@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Task IO module"
+"Task IO module"
 from typing                import Union, Iterable, Tuple, Dict, cast
 from pathlib               import Path
 from itertools             import chain
+from functools             import partial
 from copy                  import deepcopy
 
 from control.decentralized import Indirection
-from data.trackio          import instrumenttype
+from data.trackio          import instrumenttype, MuWellsFilesIO
 from data.tracksdict       import TracksDict
 from taskmodel             import TrackReaderTask
 from taskmodel.application import TasksConfig, TasksDisplay, TaskIOTheme
@@ -16,17 +17,17 @@ LOGS     = getLogger(__name__)
 PathType = Union[str, Path]
 OpenType = Union[PathType, Iterable[PathType], Dict[str, str]]
 class TaskIO:
-    u"base class for opening files"
+    "base class for opening files"
     def __init__(self, *_):
         pass
 
     # pylint: disable=no-self-use,unused-argument
     def open(self, path:OpenType, model:tuple):
-        u"opens a file"
+        "opens a file"
         return None
 
     def save(self, path:str, models):
-        u"saves a file"
+        "saves a file"
         return None
 
     @classmethod
@@ -69,8 +70,8 @@ class ConfigTrackIO(TrackIO):
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
         self._ctrl   = ctrl
-        self._config = TasksConfig()
-        self._io     = TaskIOTheme()
+        self._config = ctrl.theme.add(TasksConfig(), False)
+        self._io     = ctrl.theme.add(TaskIOTheme(), False)
 
     def open(self, path:OpenType, model:tuple):
         "opens a track file and adds a alignment"
@@ -119,7 +120,7 @@ class _GrFilesIOMixin:
         if len(trks) == 0:
             track = self._display.roottask
             if track is None:
-                raise IOError(u"IOError: start by opening a track file!", "warning")
+                raise IOError("IOError: start by opening a track file!", "warning")
             trks = topath(getattr(track, 'path'))
         return trks+grs
 
@@ -158,6 +159,57 @@ class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
         for mdl in mdls:
             ret.append(tuple(i for i in mdl if not isinstance(i, task)))
         return ret
+
+class ConfigMuWellsFilesIO(ConfigTrackIO):
+    "Adds an alignment to the tracks per default"
+    EXT = ('txt',)
+    def __init__(self, ctrl, *_):
+        super().__init__(ctrl, *_)
+        ctrl.theme.add(MuWellsFilesIO.DEFAULT)
+        ctrl.display.observe("tasks", partial(self._onchangedisplay, ctrl))
+        ctrl.theme.observe("tasks", partial(self._onrescale, ctrl))
+
+    @staticmethod
+    def _onchangedisplay(ctrl, **_):
+        root  = ctrl.display.get('tasks', 'roottask')
+        if MuWellsFilesIO.check(root.path):
+            bead  = ctrl.display.get('tasks', 'bead')
+            track = ctrl.tasks.track(root)
+            if bead in getattr(track, 'experimentallength', ()):
+                model = ctrl.theme.model('tasks')
+                ctrl.theme.update(model, **model.rescale(track, bead))
+
+    @staticmethod
+    def _onrescale(ctrl, old = None, model = None, **_):
+        if 'rescaling' not in old:
+            return
+
+        root  = ctrl.display.get("tasks", "roottask")
+        instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
+        if instr not in model.rescaling:
+            return
+
+        coeff = float(model.rescaling[instr]) / float(old['rescaling'][instr])
+        for task in list(ctrl.tasks.tasklist(root))[1:]:
+            cpy = dict(task.zscaled(coeff))
+            if cpy:
+                ctrl.tasks.updatetask(root, task, **cpy)
+
+    def open(self, path:OpenType, _:tuple):
+        "open a LIA file"
+        trail = topath(path)
+        trks  = tuple(i for i in trail if i.suffix[1:] in TrackIO.EXT)
+        lias  = tuple(i for i in trail if i.suffix[1:] == self.EXT[-1])
+        if len(trks) + len(lias) < len(trail) or len(trks) > 1 or len(lias) < 1:
+            return None
+
+        if len(trks) == 0:
+            track = self._ctrl.display.get("tasks", "roottask")
+            if track is None:
+                raise IOError("IOError: start by opening a track file!", "warning")
+            trks = topath(getattr(track, 'path'))
+
+        return super().open(trks+lias, _)
 
 def openmodels(openers, task, tasks):
     "opens all models"

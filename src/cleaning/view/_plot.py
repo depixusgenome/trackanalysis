@@ -139,6 +139,12 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
             data        = self.__data(items, nans)
             self.setbounds(cache, self.__fig, data['t'], data['z'])
             cache[self.__source]['data'] = data
+
+            if self._model.track:
+                dim = self._model.track.instrument['dimension']
+                lbl = self._theme.ylabel.split('(')[0]
+                cache[self.__fig.yaxis[0]].update(axis_label = f"{lbl} ({dim})")
+
             self._resetwidget(cache, disable)
 
     def __data(self, items, nans) -> Dict[str, np.ndarray]:

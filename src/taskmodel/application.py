@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 "Deals with global information"
 from enum               import Enum
-from typing             import (Dict, Optional, List, Iterator, Type, Iterable,
-                                Callable, Any, ClassVar, TYPE_CHECKING, cast)
+from typing             import (Dict, Optional, List, Iterator, Type,
+                                Callable, Any, ClassVar, Iterable,
+                                TYPE_CHECKING, cast)
 from copy               import deepcopy
 from utils              import initdefaults
 from utils.configobject import ConfigObject
@@ -71,15 +72,46 @@ class InstrumentDescriptor:
         inst.__dict__['instrument'] = InstrumentType(val).name
         return inst.__dict__['instrument']
 
+class RescalingParameters:
+    "Parameters used for rescaling"
+    experimental : float = 1.073      # HP005 sequence length * µm ↔ bases at phase 3 (18 pN)
+    mumtobase    : float = 1.e-3      # µm ↔ bases at phase 3 (18 pN)
+    sequence     : float = 1073       # HP005 sequence length
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def __float__(self) -> float:
+        "return the factor to apply to tasks"
+        return float(self.experimental/(self.mumtobase*self.sequence))
+
+    def rescale(self, explen, seqlen = None) -> 'RescalingParameters':
+        "rescales the current setup"
+        return type(self)(
+            experimental = explen,
+            mumtobase    = self.mumtobase,
+            sequence     = self.sequence if seqlen is None else seqlen,
+        )
+
+Rescalings = Dict[str, RescalingParameters]
 class TasksConfig(ConfigObject):
     """
     permanent globals on tasks
     """
-    name                       = "tasks"
-    instrument: str            = InstrumentType.picotwist.name
-    picotwist:  Configuration  = cast(Configuration, ConfigurationDescriptor())
-    sdi:        Configuration  = cast(Configuration, ConfigurationDescriptor())
-    order:      List[str]      = list(TASK_ORDER)
+    name                      = "tasks"
+    instrument: str           = InstrumentType.picotwist.name
+    picotwist:  Configuration = cast(Configuration, ConfigurationDescriptor())
+    sdi:        Configuration = cast(Configuration, ConfigurationDescriptor())
+    muwells:    Configuration = cast(Configuration, ConfigurationDescriptor())
+    order:      List[str]     = list(TASK_ORDER)
+    rescaling:  Rescalings    = {InstrumentType.muwells.value: RescalingParameters()}
+
+    # make sure all configurations are available
+    locals().update({
+        i: ConfigurationDescriptor()
+        for i in set(InstrumentType.__members__)-set(locals())
+    })
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -91,7 +123,7 @@ class TasksConfig(ConfigObject):
     @staticmethod
     def __config__(cmap):
         "simplify a config map"
-        for i in {'picotwist', 'sdi'} & set(cmap.maps[0]):
+        for i in {'picotwist', 'sdi', 'muwells'} & set(cmap.maps[0]):
             left            = cmap.maps[1][i]
             cmap.maps[0][i] = {j: k for j, k in cmap.maps[0][i].items() if left[j] != k}
 
@@ -122,6 +154,36 @@ class TasksConfig(ConfigObject):
             if not isinstance(tsk, previous):
                 return i+1
         return len(curr)
+
+    def rescale(self, instr, explen, seqlen = None) -> Dict[str, Any]:
+        "rescale an instrument according to provided values"
+        if None in (instr, explen):
+            return {}
+
+        if hasattr(instr, 'experimentallength'):
+            # pylint: disable=no-member
+            seqlen = getattr(instr, 'sequencelength')[int(explen)]
+            explen = getattr(instr, 'experimentallength')[int(explen)]
+            instr  = instr.instrument['type']
+
+        assert isinstance(explen, float)
+        assert seqlen is None or isinstance(seqlen, float)
+        instr = InstrumentType(instr).value
+
+        cnv   = self.rescaling
+        if seqlen is None:
+            seqlen = cnv[instr].sequence
+
+        old   = float(cnv[instr])
+        cnv   = dict(cnv, **{instr: cnv[instr].rescale(explen, seqlen)})
+        coeff = float(cnv[instr])/old
+        if abs(coeff - 1.) < 1e-5:
+            return {}
+
+        return {
+            'rescaling': cnv,
+            instr: { i: j.rescale(coeff) for i, j in getattr(self, instr).items()}
+        }
 
 class TasksDisplay(ConfigObject):
     """
@@ -159,6 +221,7 @@ class TaskIOTheme(ConfigObject):
     tasks:      List[str] = []
     inputs:     List[str] = ['taskstore.control.ConfigAnaIO',
                              'taskcontrol.taskio.ConfigGrFilesIO',
+                             'taskcontrol.taskio.ConfigMuWellsFilesIO',
                              'taskcontrol.taskio.ConfigTrackIO']
     outputs:    List[str] = ['taskstore.control.ConfigAnaIO']
     processors: List[str] = []

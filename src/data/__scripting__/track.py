@@ -147,6 +147,24 @@ class TrackOperations:
             return renamebeads(self._trk, *zip(key, val))
         return renamebeads(self._trk, (key, val))
 
+    def rescaletobead(self, bead) -> Track:
+        "rescales elements to the current bead"
+        self._trk.load()
+        trk   = shallowcopy(self._trk)
+        items = Tasks.tasksmodel().rescale(trk, bead)
+        instr = trk.instrument['type'].value
+        if instr in items:
+            names = {j: i for i, j in getattr(Tasks, '_cnv')(None).items()}
+            for i, j in items[instr].items():
+                if j.zscaledattributes() == ():
+                    continue
+                if hasattr(trk.tasks, names.get(i, i)):
+                    setattr(trk.tasks, names.get(i, i), j)
+            trk.instrument['rescaling'] = items['rescaling'][instr]
+        else:
+            trk.instrument.pop('rescaling', None)
+        return trk
+
 @extend(Track)
 class _TrackMixin:
     "Additional track methods"

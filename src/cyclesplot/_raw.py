@@ -118,4 +118,9 @@ class RawMixin(ABC):
             self._hover.resetraw(self._raw, data, shape, cache)
             bnds                     = self.newbounds('x', data['t'])
             cache[self._raw.x_range] = {'bounds': (bnds['reset_start'], bnds['reset_end'])}
+
+            if self._model.track:
+                dim = self._model.track.instrument['dimension']
+                lbl = self._theme.ylabel.split('(')[0]
+                cache[self._raw.yaxis[0]].update(axis_label = f"{lbl} ({dim})")
         return shape

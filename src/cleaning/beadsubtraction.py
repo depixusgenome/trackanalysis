@@ -12,6 +12,7 @@ from   data.views                   import Cycles, Beads, BEADKEY
 from   signalfilter                 import nanhfsigma
 from   utils                        import initdefaults
 from   taskmodel                    import PHASE
+from   taskmodel.base               import Rescaler
 from   .datacleaning                import AberrantValuesRule, HFSigmaRule, ExtentRule
 from   ._core                       import (reducesignals, # pylint: disable=import-error
                                             phasebaseline, dztotalcount)
@@ -150,7 +151,7 @@ def aggtype(name:str) -> AggType:
 
 FixedData = Tuple[float, float, float, BEADKEY]
 FixedList = List[FixedData]
-class MeasureDropsRule():
+class MeasureDropsRule(Rescaler, zattributes = ('mindzdt',)):
     """
     Threshold on the number of cycles with frames in PHASE.measure such that:
 
@@ -161,7 +162,7 @@ class MeasureDropsRule():
     mindzdt  = 1.5e-2
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
-        pass
+        super().__init__()
 
     def measure(self, track, data) -> int:
         "return the number of stairs in PHASE.measure"
@@ -173,7 +174,10 @@ class MeasureDropsRule():
         "tests the number of cycles with too many stairs"
         return self.measure(track, data) > self.maxdrops*track.ncycles//100
 
-class FixedBeadDetection:
+class FixedBeadDetection(
+        Rescaler,
+        zattributes = ("abberrant", "drops", 'maxdiff', 'minhfsigma', 'maxhfsigma', 'maxextent')
+):
     """
     Finds and sorts fixed beads
     """

@@ -47,7 +47,9 @@ def _files(directory, files, bead):
             ctrl.display.update("tasks", bead = bead)
         INITIAL_ORDERS.append(_setbead)
 
-@defaultclick("TrackAnalysis", defaultview = "hybridistat.view.HybridStatView")
+DEFAULT_VIEW = "hybridstat.view.HybridStatView"
+
+@defaultclick("TrackAnalysis", defaultview = DEFAULT_VIEW)
 @click.option('-b', "--bead",
               type       = int,
               default    = None,
@@ -60,6 +62,10 @@ def _files(directory, files, bead):
 def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
          gui, config, wall, port, raiseerr, nothreading):
     "Launches an view"
+    if any(view.endswith(i) for i in (".trk", ".ana", ".xlsx", ".pk")) or "/" in view:
+        files = (view,)+files
+        view  = DEFAULT_VIEW
+
     defaultinit(config, wall, raiseerr, nothreading)
     _files(tracks, files, bead)
     return defaultmain(_filtr, view, gui, port, "taskapp.toolbar")

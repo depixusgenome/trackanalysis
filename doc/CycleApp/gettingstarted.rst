@@ -35,6 +35,11 @@ contents of such a file. Formats are:
   instruments. This is the basic type of file that can be opened by the
   software.
 
+* ``.txt``: For micro-wells only! Such files are created by the lock-in
+  amplifier.  It expects a specific csv format, including 5 header lines and
+  exactly 2 columns, time and voltage respectively. The data is automatically
+  synchronized the last loaded track file. See the micro-wells sections.
+
 * ``.gr``: These are data files created using :program:`pias`. They should
   contain a cleaned version of the data for a given bead. To open such
   files, one must first open the ``.trk`` used to created them. This is

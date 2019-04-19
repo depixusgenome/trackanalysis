@@ -33,7 +33,7 @@ class AlignmentTactic(Enum):
     initial     = 'initial'
     pull        = 'pull'
 
-class ExtremumAlignmentTask(Task):
+class ExtremumAlignmentTask(Task, zattributes = ('delta', 'minrelax', 'pull', 'opening')):
     """
     Task for aligning on a given phase.
 

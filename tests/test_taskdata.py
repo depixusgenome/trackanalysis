@@ -12,10 +12,12 @@ from   legacy           import readtrack   # pylint: disable=import-error,no-nam
 import data
 from   data.views       import ITrackView
 from   data.trackio     import LegacyGRFilesIO, savetrack, PickleIO, LegacyTrackIO
+from   data.trackio     import MuWellsFilesIO
 from   data.track       import FoV, Track
 from   data.trackops    import concatenatetracks, selectcycles, dropbeads, clone
 from   data.tracksdict  import TracksDict
 from   tests.testingcore      import path as utpath
+
 
 # pylint: disable=missing-docstring,protected-access
 class _MyItem(ITrackView):
@@ -256,13 +258,53 @@ def test_scancgr():
     directory        = Path(cast(str, utpath(None)))
     pairs, grs, trks = LegacyGRFilesIO.scan(directory, directory)
     assert (pairs, grs) == ((), ())
-    assert sorted(trks) == sorted(Path(directory).glob("*.trk"))
+
+    truth = sorted(
+        list(Path(directory).glob("*.trk"))+
+        list(Path(directory).glob("*/*.trk"))
+    )
+    assert sorted(trks) == truth
 
     pairs, grs, trks = LegacyGRFilesIO.scan(directory, directory, cgrdir = 'CTGT_selection')
     assert len(grs) == 0
     assert pairs    == ((directory/'test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.trk',
                          directory/'CTGT_selection'),)
-    assert len(trks) == len(tuple(Path(directory).glob("*.trk"))) - len(pairs)
+    assert len(trks) == len(truth) - len(pairs)
+
+def test_muwells(tmp_path):
+    "test muwells data"
+    assert MuWellsFilesIO.instrumenttype({}) == "muwells"
+    paths = MuWellsFilesIO.check((
+        utpath("muwells/W6N46_HPB20190107_OR134689_cycle_1.9-2.10_TC10m.txt"),
+        utpath("muwells/W6N46_HPB20190107_W2_OR134689_cycle_1.9-2.10_TC10m.trk"),
+    ))
+    assert paths
+
+    output = MuWellsFilesIO.open(paths)
+    assert output['phases'].shape == (32, 8)
+    assert output['sequencelength'] == {0: None}
+    assert abs(output['experimentallength'][0] - 31.720950927734293) < 1e-5
+    assert output['framerate'] > 100.
+    assert len(output['zmag']) == len(output[0])
+    assert output['Tsample'][0].max() >  len(output[0]) * .75 # greater than the 30Hz framerate
+    assert output['vcap'][0].max() >  len(output[0]) * .75 # greater than the 30Hz framerate
+
+    with open(utpath("muwells/W6N46_HPB20190107_OR134689_cycle_1.9-2.10_TC10m.txt")) as istr:
+        with open(tmp_path/"lio.txt", "w") as ostr:
+            for _ in range(5):
+                print(istr.readline().strip(), file = ostr)
+            for _ in range(output['phases'][4,5]):
+                istr.readline()
+            for _ in range(output['phases'][4,5], output['phases'][-5,2]):
+                print(istr.readline().strip(), file = ostr)
+
+
+    paths = MuWellsFilesIO.check((
+        utpath("muwells/W6N46_HPB20190107_W2_OR134689_cycle_1.9-2.10_TC10m.trk"),
+        tmp_path/"lio.txt",
+    ))
+    output2 = MuWellsFilesIO.open(paths)
+    assert output2['phases'].shape == (22, 8)
 
 def test_allleaves():
     'tests pairing of track files and gr-files in the absence of cgr'
@@ -415,5 +457,4 @@ def test_beadextension():
     assert abs(trk1.beadextension(0) - 0.951788546331226) < 1e-5
 
 if __name__ == '__main__':
-    test_concatenate()
-    test_beadextension()
+    test_scancgr()

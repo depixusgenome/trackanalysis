@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "cleaning the raw data after bead subraction"
-from    typing            import Optional, Dict, Any, List, Tuple, Type, cast
-from    itertools         import repeat
-from    functools         import partial
+from    itertools import repeat
+from    functools import partial
+from    typing    import Optional, Dict, Any, List, Tuple, Type, cast
 
 import  numpy             as     np
 

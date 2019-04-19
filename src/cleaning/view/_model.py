@@ -114,7 +114,12 @@ class FixedBeadDetectionConfig(FixedBeadDetection):
     Warning: the class name must end with Config in order for the config file to be
     good.
     """
-    name = "fixedbeads"
+    name:      str   = "fixedbeads"
+    rescaling: float = 1.
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
 
 class FixedBeadDetectionStore:
     "For saving in the right place"
@@ -146,6 +151,30 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
                 info = dict(data)
                 info.pop(task, None)
                 self._fixedbeadsstore = {'data': info}
+
+        @ctrl.theme.observe("tasks")
+        def _onrescale(old = None, model = None, **_):
+            if 'rescaling' not in old:
+                return
+
+            root  = ctrl.display.get("tasks", "roottask")
+            if root is None:
+                return
+            instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
+            if instr not in model.rescaling:
+                return
+
+            coeff = float(model.rescaling[instr])
+            if abs(coeff - self._fixedbeadsconfig.rescaling) < 1e-5:
+                return
+
+            cur    = coeff
+            coeff /= self._fixedbeadsconfig.rescaling
+            ctrl.theme.update(
+                self._fixedbeadsconfig,
+                rescaling = cur,
+                **dict(self._fixedbeadsconfig.zscaled(coeff))
+            )
 
         @ctrl.theme.observe(self._fixedbeadsconfig)
         def _onchangeconfig(**_):

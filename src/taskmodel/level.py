@@ -10,6 +10,7 @@ class InstrumentType(Enum):
     "The type of instrument"
     picotwist = "picotwist"
     sdi       = "sdi"
+    muwells   = 'muwells'
 
 @unique
 class Level(Enum):

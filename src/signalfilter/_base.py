@@ -3,11 +3,11 @@
 "Signal Analysis: filters for removing noise"
 from typing         import (Union, Iterator, Iterable, Tuple, Sequence, Optional,
                             overload, cast, TYPE_CHECKING)
-from abc            import ABC
 
 import numpy as np
 
 from utils          import initdefaults
+from utils.rescaler import Rescaler, ARescaler
 # pylint: disable=no-name-in-module,import-error
 from ._core.stats   import (hfsigma, mediandeviation, nanhfsigma as _nanhfsigma,
                             nanmediandeviation as _nanmediandeviation)
@@ -47,7 +47,7 @@ DATATYPE  = Union[Sequence[Sequence[np.ndarray]],
                   None]
 PRECISION = Union[float, Tuple[DATATYPE, int], None]
 
-class PrecisionAlg(ABC):
+class PrecisionAlg(ARescaler):
     "Implements precision extraction from data"
     precision: Optional[float] = None
     rawfactor    = 1.
@@ -120,7 +120,7 @@ class PrecisionAlg(ABC):
         "Obtain the raw precision for a given bead"
         return getattr(track, 'track', track).rawprecision(ibead, first, last)
 
-class CppPrecisionAlg:
+class CppPrecisionAlg(Rescaler):
     "Implements precision extraction from data: use only in case of Metaclass conflict"
     precision    = PrecisionAlg.precision
     rawfactor    = PrecisionAlg.rawfactor

@@ -1,4 +1,15 @@
 # CycleApp
+## cycles_v6.7
+
+* 2019-04-17 15:41:46 +0100  (tag: cycles_v6.7)
+
+### Micro-well data
+
+One can now load micro-well lock-in amplifier data into the application. Simply
+open the track file, then open the text file. The information from both files
+is synchronized to the best of the available information. See the documentation
+for more details.
+
 ## cycles_v6.6
 
 * 2019-02-25 15:41:46 +0100  (tag: cycles_v6.6.5)
@@ -854,6 +865,15 @@ New application for viewing cycles
     * then open the *.gr* files. You can select all of them in one go.
 
 # RampApp
+
+## ramp__v2.1
+
+* 2019-04-17 15:41:46 +0100  (tag: ramp_v2.1)
+
+## Exporting to excel or csv
+
+One can now export the data for all beads and cycles. Simply save a file either
+with a '.xlsx' or a '.csv' extension.
 
 ## ramp_v2.0
 

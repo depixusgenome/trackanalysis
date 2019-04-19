@@ -1,21 +1,143 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot view for cleaning data"
-from    typing         import Dict, Tuple, cast
+from    typing         import Dict, Tuple, List, Optional, cast
+from    pathlib        import Path
+import time
 
 from    bokeh.models   import ColumnDataSource, Range1d
 from    bokeh.plotting import Figure
 from    bokeh          import layouts
 
-import  numpy                   as     np
+import  numpy          as     np
+import  pandas         as     pd
 
-from    data.views              import Beads
-from    taskview.plots          import PlotView, CACHE_TYPE, TaskPlotCreator
+from    data.views             import Beads
+from    taskview.plots         import PlotView, CACHE_TYPE, TaskPlotCreator
+from    taskcontrol.taskio     import TaskIO
+from    view.base              import spawn, ThreadPoolExecutor, threadmethod
+from    utils.logconfig        import getLogger
+from    utils.gui              import startfile
 
-from    ._model                 import (RampPlotModel, RampPlotTheme,
-                                        RampPlotDisplay, RampTaskPlotModelAccess,
-                                        observetracks)
-from    ._widget                import RampWidgets
+from    ._model                import (RampPlotModel, RampPlotTheme,
+                                       RampPlotDisplay, RampTaskPlotModelAccess,
+                                       observetracks)
+from    ._widget               import RampWidgets
+
+LOGS = getLogger(__name__)
+
+class ConfigXlsxIOTheme:
+    "ConfigXlsxIOTheme"
+    name   = 'ramp.configxlsxio'
+    maxiter= 10
+    sleep  = .5
+    start  = ('Report in progress ...', 'normal')
+    end    = ('The report has been created', 'normal')
+    errors = {'running': ("Can only create one report at a time", "warning")}
+
+class ConfigXlsxIO(TaskIO):
+    "Ana IO saving only the current project"
+    EXT      = 'xlsx', 'csv'
+    RUNNING  = False
+    def __init__(self, ctrl):
+        super().__init__(ctrl)
+        self.__ctrl  = ctrl
+        self.__theme = ctrl.theme.add(ConfigXlsxIOTheme(), True)
+
+    def save(self, path:str, models):
+        "creates a Hybridstat report"
+        if not len(models):
+            raise IOError("Nothing to save", "warning")
+
+        def _end(exc):
+            if exc is None and not Path(path).exists():
+                exc = IOError("Report file created but not not found!")
+
+            if isinstance(exc, IOError) and len(exc.args) == 1:
+                if len(exc.args) == 1:
+                    msg = self.__theme.errors.get(exc.args[0], None)
+                    if msg is not None:
+                        self.__msg(msg)
+                        LOGS.debug('Failed report creation with %s', msg[0])
+                        return
+            if exc is not None:
+                LOGS.exception(exc)
+                self.__msg(exc)
+            else:
+                exc = self.__theme.end
+                self.__msg(exc)
+                startfile(path)
+
+        try:
+            LOGS.info('%s saving %s', type(self).__name__, path)
+            ret = self._run(self.__theme, self.__ctrl.display.model("ramp"), path, models, _end)
+        except IOError as exc:
+            if len(exc.args) == 1:
+                msg = self.__theme.errors.get(exc.args[0], None)
+                if msg is not None:
+                    raise IOError(*msg) from exc
+            raise
+
+        if ret:
+            self.__msg(self.__theme.start)
+        return ret
+
+    def __msg(self, msg):
+        self.__ctrl.display.update("message", message = msg)
+
+    @classmethod
+    def _run(   # pylint: disable=too-many-arguments
+            cls, cnf, display, path, models, end = None
+    ):
+        "creates a Hybridstat report"
+        if cls.RUNNING:
+            raise IOError("running")
+        cls.RUNNING = True
+
+        def _pathname(root):
+            path = root.path
+            if isinstance(path, (tuple, list)):
+                path = path[0]
+            return Path(path).stem
+
+        error: List[Optional[Exception]] = [None]
+        def _process():
+            try:
+                for _ in range(cnf.maxiter):
+                    if any(
+                            mdl[0] not in display.dataframe
+                            for mdl in models
+                    ):
+                        time.sleep(cnf.sleep)
+
+                lst   = [
+                    data[1].assign(filename = _pathname(data[0]))
+                    for data in display.dataframe.items()
+                    if any(data[0] is mdl[0] for mdl in models)
+                ]
+                if len(lst) == 0:
+                    raise IOError("Failed to save data")
+                frame = pd.concat(lst)
+                if path.endswith(".xlsx"):
+                    frame.to_excel(path)
+                elif path.endswith(".pkz"):
+                    frame.to_pickle(path)
+                else:
+                    frame.to_csv(path)
+            except Exception as exc:
+                error[0] = exc
+                raise
+            finally:
+                cls.RUNNING = False
+                if end is not None:
+                    end(error[0])
+
+        async def _thread():
+            with ThreadPoolExecutor(1) as thread:
+                await threadmethod(_process, pool = thread)
+
+        spawn(_thread)
+        return True
 
 _DataType = Tuple[Dict[str, np.ndarray], ...]
 class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
@@ -126,4 +248,8 @@ class RampPlotView(PlotView[RampPlotCreator]):
     TASKS = ('extremumalignment',)
     def ismain(self, ctrl):
         "Cleaning and alignment, ... are set-up by default"
-        self._ismain(ctrl, tasks = self.TASKS)
+        self._ismain(
+            ctrl,
+            tasks  = self.TASKS,
+            iosave = (..., __name__+".ConfigXlsxIO")
+        )

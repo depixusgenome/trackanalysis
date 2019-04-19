@@ -130,6 +130,10 @@ class _AutoHP(OligoMappingDisplay):
             if self._fit is True:
                 cnf.pop('fit')
             self.__fits = self._items.new(FitToHairpinDict, config = cnf)
+            if 'rescaling' in getattr(getattr(self._items, 'track', None), 'instrument', ()):
+                self.__fits.config = self.__fits.config.rescale(
+                    float(self._items.track.instrument['rescaling'])
+                )
 
         cache = self.__cache
         if bead not in cache:
@@ -199,6 +203,12 @@ class _ManualHP(OligoMappingDisplay):
         params = tuple((i, getattr(self, '_'+i)) for i in ('stretch', 'bias')
                        if getattr(self, '_'+i) != getattr(self.__class__, '_'+i))
         rngs   = Tasks.scriptingmodel("fittohairpinrange") # type: ignore
+        if 'rescaling' in getattr(getattr(self._items, 'track', None), 'instrument', ()):
+            coeff = float(self._items.track.instrument['rescaling'])
+            rngs = {
+                'stretch': tuple(i/coeff for i in rngs['stretch']),
+                'bias':    tuple(i*coeff for i in rngs['bias'])
+            }
 
         pins   = sequences.peaks(self._sequence, self._oligos)
         if isinstance(pins, np.ndarray):

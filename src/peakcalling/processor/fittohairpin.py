@@ -25,12 +25,18 @@ from   .._base                     import Range
 class DistanceConstraint(NamedTuple):
     hairpin     : Optional[str]
     constraints : Dict[str, Range]
+    def rescale(self, value:float) -> 'DistanceConstraint':
+        "rescale factors (from µm to V for example) for a given bead"
+        return type(self)(
+            self.hairpin,
+            {i: j.rescale(i, value) for i, j in self.constraints.items()}
+        )
 
 Fitters     = Dict[str,     HairpinFitter]
 Constraints = Dict[BEADKEY, DistanceConstraint]
 Matchers    = Dict[str,     PeakMatching]
 
-class FitToHairpinTask(Task):
+class FitToHairpinTask(Task, zattributes = ('fit', 'constraints', 'singlestrand', 'baseline')):
     """
     Fits a bead to all provided hairpins.
 

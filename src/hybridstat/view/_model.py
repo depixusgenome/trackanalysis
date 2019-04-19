@@ -71,6 +71,7 @@ class PeaksPlotConfig:
     def __init__(self):
         self.name:             str   = "hybridstat.peaks"
         self.estimatedstretch: float = 1./8.8e-4
+        self.rescaling:        float = 1.
 
 class PeaksPlotDisplay(PlotDisplay):
     "PeaksPlotDisplay"
@@ -657,6 +658,33 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         self._observers     = ObserversDisplay()
         if addto:
             self.addto(ctrl, noerase = False)
+
+    def addto(self, ctrl, noerase = False):
+        "add to the controller"
+        super().addto(ctrl, noerase = noerase)
+        @ctrl.theme.observe
+        def _ontasks(old = None, model = None, **_):
+            if 'rescaling' not in old:
+                return
+
+            root  = ctrl.display.get("tasks", "roottask")
+            if root is None:
+                return
+            instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
+            if instr not in model.rescaling:
+                return
+
+            coeff = float(model.rescaling[instr])
+            if abs(coeff - self.peaksmodel.config.rescaling) < 1e-5:
+                return
+
+            cur    = coeff
+            coeff /= self.peaksmodel.config.rescaling
+            ctrl.theme.update(
+                self.peaksmodel.config,
+                rescaling         = cur,
+                estimatedstretch  = self.peaksmodel.config.estimatedstretch/coeff
+            )
 
     def getfitparameters(self, key = NoArgs, bead = NoArgs) -> Tuple[float, float]:
         "return the stretch  & bias for the current bead"

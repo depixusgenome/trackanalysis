@@ -6,8 +6,9 @@ from   functools              import partial
 import numpy                  as     np
 from   taskcontrol.processor  import Processor
 from   taskmodel              import Task, Level, PHASE
+from   utils                  import initdefaults
 
-class BiasRemovalTask(Task):
+class BiasRemovalTask(Task, zattributes = ('zerodelta', 'binsize')):
     "removes the bias from the whole bead"
     level       = Level.bead
     phase       = PHASE.measure
@@ -15,6 +16,10 @@ class BiasRemovalTask(Task):
     zeropos     = 5.
     zerodelta   = 1e-2
     binsize     = 1e-3
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
 
 class BiasRemovalProcessor(Processor[BiasRemovalTask]):
     "removes the bias from the whole bead"

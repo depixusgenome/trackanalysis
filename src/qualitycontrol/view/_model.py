@@ -103,7 +103,7 @@ class QualityControlModelAccess(DataCleaningModelAccess):
                         if tsk is None:
                             continue
 
-                        mem = ctx.taskcache(tsk).pop('messages', None)
+                        mem = ctx.taskcache(tsk).pop('messages', ())
                         # pylint: disable=unsupported-membership-test
                         mem = [i for i in mem if i[0] not in default['bead']]
                         if not mem:
