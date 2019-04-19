@@ -1,7 +1,7 @@
 # CycleApp
 ## cycles_v6.7
 
-* 2019-04-17 15:41:46 +0100  (tag: cycles_v6.7)
+* 2019-04-19 11:41:46 +0100  (tag: cycles_v6.7)
 
 ### Micro-well data
 
@@ -868,7 +868,7 @@ New application for viewing cycles
 
 ## ramp__v2.1
 
-* 2019-04-17 15:41:46 +0100  (tag: ramp_v2.1)
+* 2019-04-19 11:41:46 +0100  (tag: ramp_v2.1)
 
 ## Exporting to excel or csv
 
