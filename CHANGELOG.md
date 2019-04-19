@@ -3,7 +3,7 @@
 
 * 2019-04-17 15:41:46 +0100  (tag: cycles_v6.7)
 
-## Micro-well data
+### Micro-well data
 
 One can now load micro-well lock-in amplifier data into the application. Simply
 open the track file, then open the text file. The information from both files
