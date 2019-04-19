@@ -148,7 +148,7 @@ namespace peakfinding { namespace projection {
                 ptr[0]     = (int) arr[icyc][ipks].first;
                 (++ptr)[0] = (int) arr[icyc][ipks].second;
             }
-        return out;
+        return std::move(out);
     }
 
     py::object _eventsextract(EventExtractor  const & self,
@@ -183,7 +183,7 @@ namespace peakfinding { namespace projection {
                 cur.append(py::make_tuple(rng.first, intv));
             }
         }
-        return lst;
+        return std::move(lst);
     }
 
     void pymodule(py::module & mod)

@@ -30,7 +30,7 @@
 #     pragma GCC diagnostic ignored "-Wparentheses"
 #   endif
 # else
-#   if (__clang_major__ == 6)
+#   if (__clang_major__ <= 8)
 #     pragma GCC diagnostic push
 #     pragma GCC diagnostic ignored "-Wmissing-noreturn"
 #     pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -57,7 +57,7 @@
 #     pragma GCC diagnostic pop
 #   endif
 # else
-#   if (__clang_major__ == 6)
+#   if (__clang_major__ <= 8)
 #     pragma GCC diagnostic pop
 #   endif
 # endif

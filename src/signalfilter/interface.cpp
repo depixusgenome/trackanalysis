@@ -37,7 +37,7 @@ namespace
         pybind11::tuple tup(est.estimators.size());
         for(size_t i = 0, e = est.estimators.size(); i < e; ++i)
             tup[i] = int(est.estimators[i]);
-        return tup;
+        return std::move(tup);
     }
 
     template <typename T>

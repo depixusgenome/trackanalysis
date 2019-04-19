@@ -13,7 +13,7 @@ namespace legacy
         {
             auto out = pybind11::array_t<T>(shape, {long(shape[1]*sizeof(T)), long(sizeof(T))});
             std::copy(ptr, ptr+shape[1]*shape[0], out.mutable_data());
-            return out;
+            return std::move(out);
         }
 
         template <typename T>
@@ -21,7 +21,7 @@ namespace legacy
         {
             auto out = pybind11::array_t<T>(sz);
             std::copy(ptr, ptr+sz, out.mutable_data());
-            return out;
+            return std::move(out);
         }
 
         template <typename T>
@@ -190,7 +190,7 @@ namespace legacy
         std::vector<size_t> shape   = {rec.ncycles()-(notall ? 4: 0), rec.nphases()};
         res["phases"] = _toimage<typename decltype(cycles)::value_type>
                             (shape, cycles.data()+(notall ? 3*rec.nphases() : 0));
-        return res;
+        return std::move(res);
     }
 
     pybind11::object _readtrackrotation(std::string name)
@@ -221,7 +221,7 @@ namespace legacy
         for(size_t i = 0; i < gr.size(); ++i)
             res[pybind11::bytes(gr.title(i))] = pybind11::make_tuple(get(true, i),
                                                                     get(false, i));
-        return res;
+        return std::move(res);
     }
 
     pybind11::object _readim(std::string name, bool all)
@@ -253,7 +253,7 @@ namespace legacy
         }
         if(!all)
             return pybind11::none();
-        return res;
+        return std::move(res);
     }
 
     void pymodule(pybind11::module & mod)
