@@ -172,6 +172,8 @@ class ConfigMuWellsFilesIO(ConfigTrackIO):
     @staticmethod
     def _onchangedisplay(ctrl, **_):
         root  = ctrl.display.get('tasks', 'roottask')
+        if root is None:
+            return
         if MuWellsFilesIO.check(root.path):
             bead  = ctrl.display.get('tasks', 'bead')
             track = ctrl.tasks.track(root)
