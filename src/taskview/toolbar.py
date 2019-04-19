@@ -67,6 +67,7 @@ class TrackFileDialog(FileDialog):
     async def run(self, ctrl, doc):
         "runs the dialog"
         paths = await threadmethod(self.open)
+        ctrl.display.handle('toolbardialog', args = {'path': paths})
         if paths is not None:
             def _toolbaropen():
                 with ctrl.action:
@@ -116,6 +117,7 @@ class SaveFileDialog(FileDialog):
     async def run(self, ctrl, doc):
         "runs the dialog"
         paths = await threadmethod(self.save)
+        ctrl.display.handle('toolbardialog', args = {'path': paths})
         if paths is not None:
             def _toolbarsave():
                 with ctrl.action:
@@ -260,7 +262,10 @@ class MessagesView:
                                          .replace('<', '&lt')
                                          .replace('>', '&gt'))
         if args[1] == 'error':
-            LOGS.error(enc)
+            if isinstance(text, Exception):
+                LOGS.exception(text)
+            else:
+                LOGS.error(enc)
         elif args[1] == 'warning':
             LOGS.warning(enc)
 
@@ -527,11 +532,15 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         def _onbtn_cb(attr, old, new):
             if attr == 'open':
                 async def _run():
+                    LOGS.debug("Running dialog open: %s", new)
                     await self.__diagopen.run(ctrl, doc)
+                    LOGS.debug("Done running dialog open: %s", new)
                 spawn(_run)
             elif attr == 'save':
                 async def _run():
+                    LOGS.debug("Running dialog save: %s", new)
                     await self.__diagsave.run(ctrl, doc)
+                    LOGS.debug("Done running dialog save: %s", new)
                 spawn(_run)
             elif attr == 'quit':
                 ctrl.close()
