@@ -5,9 +5,8 @@
 import numpy as np
 from   numpy.testing            import assert_equal, assert_allclose
 
-from   tests.testutils                import integrationmark
-from   tests.testingcore              import path as utpath
-from   tests.testingcore.bokehtesting import bokehaction  # pylint: disable=unused-import
+from   tests.testutils          import integrationmark
+from   tests.testingcore        import path as utpath
 
 from   cleaning.processor       import (DataCleaningTask, DataCleaningException,
                                         DataCleaningProcessor, BeadSubtractionTask,

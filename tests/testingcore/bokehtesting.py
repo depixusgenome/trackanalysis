@@ -3,8 +3,8 @@
 # pylint: disable=protected-access
 # pylint: disable=unused-import
 """ access to files """
-from ..testutils.bokehtesting import bokehaction, _ManagedServerLoop, LOGS
-from .                        import path as _utpath
+from ..testutils.bokehtesting import _ManagedServerLoop, LOGS, BokehAction
+from .                        import path as utpath
 
 def savedconfig(self):
     "return the saved config"
@@ -18,5 +18,5 @@ _ManagedServerLoop.savedconfig = property(savedconfig)
 def _path(path):
     "returns the path to testing data"
     LOGS.debug("Test is opening: %s", path)
-    return _utpath(path)
+    return utpath(path)
 _ManagedServerLoop.path = staticmethod(_path)
