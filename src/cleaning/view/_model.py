@@ -152,19 +152,19 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
                 info.pop(task, None)
                 self._fixedbeadsstore = {'data': info}
 
-        @ctrl.theme.observe("tasks")
-        def _onrescale(old = None, model = None, **_):
-            if 'rescaling' not in old:
+        @ctrl.theme.observe
+        @ctrl.display.observe
+        def _ontasks(old = None, **_):
+            if 'rescaling' not in old and "roottask" not in old:
                 return
 
             root  = ctrl.display.get("tasks", "roottask")
             if root is None:
                 return
-            instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
-            if instr not in model.rescaling:
-                return
 
-            coeff = float(model.rescaling[instr])
+            model = ctrl.theme.model("tasks")
+            instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
+            coeff = float(model.rescaling[instr]) if instr in model.rescaling else 1.
             if abs(coeff - self._fixedbeadsconfig.rescaling) < 1e-5:
                 return
 
