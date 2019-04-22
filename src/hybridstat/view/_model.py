@@ -695,6 +695,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         if key is not None:
             if bead is NoArgs:
                 dist = self.peaksmodel.display.distances
+                print("dist 1" , dist.keys(), dist.get("PCR23-26.b", "?"))
             else:
                 dist = getattr(cache[0], "distances", {})
 
@@ -773,7 +774,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
             estimatedbias = getattr(dtl, 'peaks', [0.])[0]
         )
 
-        # pkinfo.createpeaks requreset sthe distances to be already set!
+        # pkinfo.createpeaks requires the distances to be already set!
         self._ctrl.display.update(
             self.peaksmodel.display,
             peaks = pkinfo.createpeaks(tuple(pksel.details2output(dtl))),
