@@ -770,8 +770,13 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         self._ctrl.display.update(
             self.peaksmodel.display,
             distances     = getattr(tmp, 'distances', {}),
-            peaks         = pkinfo.createpeaks(tuple(pksel.details2output(dtl))),
             estimatedbias = getattr(dtl, 'peaks', [0.])[0]
+        )
+
+        # pkinfo.createpeaks requreset sthe distances to be already set!
+        self._ctrl.display.update(
+            self.peaksmodel.display,
+            peaks = pkinfo.createpeaks(tuple(pksel.details2output(dtl))),
         )
 
         if dtl is not None:
@@ -824,8 +829,8 @@ def createpeaks(mdl, themecolors, vals) -> Dict[str, np.ndarray]:
     if vals is not None and mdl.identification.task is not None and len(mdl.distances):
         for key in mdl.sequences(...):
             peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors[:2])
-            if key == mdl.sequencekey:
-                peaks['color'] = peaks[mdl.sequencekey+'color']
+        if mdl.sequencekey+'color' in peaks:
+            peaks['color'] = peaks[mdl.sequencekey+'color']
     elif mdl.fittoreference.referencepeaks is not None:
         peaks['color'] = np.where(np.isfinite(peaks['id']), colors[2], colors[0])
     return peaks
