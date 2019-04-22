@@ -38,6 +38,8 @@ export class NAME extends HoverTool
         yrng        = fig.y_range
         bases.start = (yrng.start - @bias) * @stretch
         bases.end   = (yrng.end   - @bias) * @stretch
+        bases.reset_start = (yrng.reset_start - @bias) * @stretch
+        bases.reset_end   = (yrng.reset_end   - @bias) * @stretch
 
         window.setTimeout(((b, c) => @setsource(b, c)),
                           800, ttip, @_callcount)
