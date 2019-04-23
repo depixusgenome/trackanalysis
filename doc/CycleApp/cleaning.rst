@@ -161,11 +161,11 @@ Plot Colors
 The plot's |z| values are color-coded as follows:
 
 * Values without problems are blue
-* |NOISE|: noisy cycles are  gold
+* |NOISE|: noisy cycles are yellow
 * |DZ|: cycles with an incorrect extent are orange
 * Cycles with too few correct values are pink
 * |pingpong| cycles with too few correct values are pink
-* Non-closing cycles are chocolate.
+* Non-closing cycles are dark orange.
 * |absz| and |dzdt|: outliers are red.
 
 Cycle Alignment
