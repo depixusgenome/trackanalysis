@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
-from tests.testutils                import integrationmark
-from tests.testingcore              import path as _utpath
-from tests.testingcore.bokehtesting import bokehaction  # pylint: disable=unused-import
+from tests.testutils          import integrationmark
+from tests.testingcore        import path as _utpath
 from taskcontrol.beadscontrol import DataSelectionBeadController
 
 @integrationmark
@@ -29,14 +28,14 @@ def test_toolbar(bokehaction):
         assert ctrl.theme.get("filedialog", "storage")["open"] == str(track.path[0])
 
     _checknone()
-    server.load('small_legacy', rendered = False)
+    server.load('small_legacy', rendered = "toolbardialog")
     _checkopen()
     server.press('Control-z')
     _checknone()
     server.press('Control-y')
     _checkopen()
 
-    server.load('big_legacy', rendered = False)
+    server.load('big_legacy', rendered = "toolbardialog")
     assert len(curr().path) == 1
     _checkpath('big_legacy')
 
@@ -47,24 +46,30 @@ def test_toolbar(bokehaction):
         assert len(curr().path) == 1
         _checkpath('big_legacy')
 
-    server.load('CTGT_selection', rendered = False)
+    server.load('CTGT_selection', rendered = "toolbardialog")
     assert len(curr().path) == 2
     assert str(curr().path[1]) == _utpath('CTGT_selection')
     _checkpath('big_legacy')
 
     _reset()
 
-    server.load('CTGT_selection/test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.cgr',
-                rendered = False)
+    server.load(
+        'CTGT_selection/test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.cgr',
+        rendered = "toolbardialog"
+    )
     assert len(curr().path) == 2
     assert str(curr().path[1]) == _utpath('CTGT_selection')
     _checkpath('big_legacy')
 
     _reset()
 
-    server.load(('CTGT_selection/test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.cgr',
-                 'CTGT_selection/Z(t)bd0track10.gr'),
-                rendered = False)
+    server.load(
+        (
+            'CTGT_selection/test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.cgr',
+            'CTGT_selection/Z(t)bd0track10.gr'
+        ),
+        rendered = "toolbardialog"
+    )
     assert len(curr().path) == 2
     assert str(curr().path[1]) == _utpath('CTGT_selection/Z(t)bd0track10.gr')
     _checkpath('big_legacy')
@@ -75,7 +80,7 @@ def test_beadtoolbar(bokehaction):
     server = bokehaction.start('taskview.toolbar.BeadToolbar', 'taskapp.default')
     beads  = DataSelectionBeadController(server.ctrl)
 
-    server.load('big_legacy', rendered = False)
+    server.load('big_legacy', rendered = "toolbardialog")
     assert frozenset(beads.availablebeads) == frozenset(range(39))
 
     server.change('Main:toolbar', 'discarded', '0,1,3')
@@ -92,14 +97,16 @@ def test_beadtoolbar(bokehaction):
     server.press('Shift-Delete')
     assert frozenset(beads.availablebeads) == frozenset(range(39))-{bead1, bead2}
 
-    server.load('CTGT_selection/Z(t)bd1track10.gr', rendered = False)
+    server.load('CTGT_selection/Z(t)bd1track10.gr', rendered = "toolbardialog")
     assert frozenset(beads.availablebeads) == frozenset((1,))
 
-    server.load('CTGT_selection/Z(t)bd0track10.gr', rendered = False)
+    server.load('CTGT_selection/Z(t)bd0track10.gr', rendered = "toolbardialog")
     assert frozenset(beads.availablebeads) == frozenset((0, 1))
 
     server.change('Main:toolbar', 'discarded', '0')
     assert frozenset(beads.availablebeads) == frozenset((1,))
 
 if __name__ == '__main__':
-    test_toolbar(bokehaction(None))
+    # pylint: disable=ungrouped-imports
+    from tests.testingcore.bokehtesting import BokehAction
+    test_toolbar(BokehAction(None))

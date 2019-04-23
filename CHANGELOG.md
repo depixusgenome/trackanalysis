@@ -1,7 +1,23 @@
 # CycleApp
+## cycles_v6.8
+
+* 2019-04-23 10:20:10 +0200  (tag: cycles_v6.8)
+
+### Peaks
+
+To improve fit quality, false positives, i.e unidentified peaks are now taken
+into account when computing the score. This changes the order of best hairpins.
+It may have an effect on the stretch and bias values although rarely. One can
+return to the previous behaviour using the advanced menu.
+
+A number of display bugs were corrected which were added at version 6.4. These
+resulted in incorrect axes and peak labeling being displayed on-screen. The
+excel files were not affected.
+
+
 ## cycles_v6.7
 
-* 2019-04-19 11:41:46 +0100  (tag: cycles_v6.7)
+* 2019-04-19 10:20:10 +0200  (tag: cycles_v6.7)
 
 ### Micro-well data
 
@@ -868,7 +884,7 @@ New application for viewing cycles
 
 ## ramp__v2.1
 
-* 2019-04-19 11:41:46 +0100  (tag: ramp_v2.1)
+* 2019-04-19 10:20:10 +0200  (tag: ramp_v2.1)
 
 ## Exporting to excel or csv
 

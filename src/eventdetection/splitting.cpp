@@ -15,7 +15,7 @@
 #   endif
 # endif
 # ifdef __clang__
-#   if(__clang_major__ == 6)
+#   if(__clang_major__ <= 8)
 #     pragma GCC diagnostic push
 #     pragma clang diagnostic ignored "-Wunused-parameter"
 #   endif
@@ -33,7 +33,7 @@
 #   endif
 # endif
 # ifdef __clang__
-#   if(__clang_major__ == 6)
+#   if(__clang_major__ <= 8)
 #     pragma GCC diagnostic pop
 #   endif
 # endif
@@ -150,7 +150,7 @@ namespace
 
         auto const wlen = self.extensionwindow;
         if(wlen == 0 || intervals.size() == 0)
-            return intervals;
+            return std::move(intervals);
         auto const data = std::get<0>(info);
         auto const sz   = std::get<1>(info);
 

@@ -60,9 +60,9 @@
             if emit
                 peaks.source.change.emit()
 
-            if menu.value in @stretches
+            if menu.value in Object.keys(@stretches)
                 @updating = 'seq'
                 @stretch  = @stretches[menu.value]
-                @bias     = @biases   [menu.value]
+                @bias     = @biases[menu.value]
                 @updating = '*'
                 @updating = ''

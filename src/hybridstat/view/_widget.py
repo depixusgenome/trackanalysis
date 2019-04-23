@@ -14,7 +14,7 @@ from bokeh.models               import (DataTable, TableColumn, CustomJS,
 from cleaning.view              import BeadSubtractionModalDescriptor
 from eventdetection.view        import AlignmentModalDescriptor
 from excelreports.creation      import writecolumns
-from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
+from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit, Symmetry
 from peakfinding.groupby        import FullEm, ByHistogram
 from signalfilter               import rawprecision
 from tasksequences.view         import (SequenceTicker, SequenceHoverMixin,
@@ -551,10 +551,15 @@ class _IdAccessor:
         self._name = 'match' if attr == 'window' else 'fit'
         if attr == 'alg':
             self._fget = lambda i: isinstance(i, PeakGridFit)
-            self._fset = lambda i: ((ChiSquareFit, PeakGridFit)[i](),)
+            self._fset = lambda _, i: ((ChiSquareFit, PeakGridFit)[i](),)
+        elif attr == 'fpos':
+            self._fget = lambda i: i.symmetry == Symmetry.both
+            self._fset = lambda j, i: {
+                'symmetry': Symmetry.both if i else type(j).symmetry
+            }
         else:
             self._fget = lambda i: getattr(i, attr)
-            self._fset = lambda i: {attr: i}
+            self._fset = lambda _, i: {attr: i}
 
     def getdefault(self, inst, usr = False):
         "returns the default value"
@@ -571,8 +576,9 @@ class _IdAccessor:
         if value == self.__get__(inst, inst.__class__):
             return
 
-        mdl = getattr(inst, '_model')
-        val = self._fset(value)
+        mdl   = getattr(inst, '_model')
+        ident = getattr(inst, '_model').identification
+        val   = self._fset(ident.defaultattribute(self._name, True), value)
         if isinstance(val, dict):
             mdl.identification.updatedefault(self._name, **val)
         else:
@@ -627,12 +633,13 @@ def advanced(**kwa):
         {msg}
 
         {kwa.pop("peakstext", "")}
-        Min frame count per hybridisation  %(eventdetection.events.select.minlength)D
-        Min hybridisations per peak        %(peakselection.finder.grouper.mincount)D
-        Re-align cycles using peaks        %(peakselection.align)b
-        Peak kernel size (blank ⇒ auto)    %(peakselection.precision).4oF
-        Exhaustive fit algorithm           %(_IdAccessor:alg)b
-        Max Δ to theoretical peak          %(_IdAccessor:window)d
+        Min frame count per hybridisation       %(eventdetection.events.select.minlength)D
+        Min hybridisations per peak             %(peakselection.finder.grouper.mincount)D
+        Re-align cycles using peaks             %(peakselection.align)b
+        Peak kernel size (blank ⇒ auto)         %(peakselection.precision).4oF
+        Exhaustive fit algorithm                %(_IdAccessor:alg)b
+        Score is affected by false positives    %(_IdAccessor:fpos)b
+        Max Δ to theoretical peak               %(_IdAccessor:window)d
         """,
         accessors = {i.__name__: i for i in acc},
         figure    = kwa if kwa else (PeaksPlotTheme, PeaksPlotDisplay),

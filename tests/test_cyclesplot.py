@@ -5,7 +5,6 @@
 import warnings
 from pytest                   import approx       # pylint: disable=no-name-in-module
 from tests.testutils          import integrationmark
-from tests.testingcore.bokehtesting import bokehaction  # pylint: disable=unused-import
 from view.plots               import DpxKeyedRow
 
 def _check(server, name, value):

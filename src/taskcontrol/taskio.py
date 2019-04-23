@@ -172,6 +172,8 @@ class ConfigMuWellsFilesIO(ConfigTrackIO):
     @staticmethod
     def _onchangedisplay(ctrl, **_):
         root  = ctrl.display.get('tasks', 'roottask')
+        if root is None:
+            return
         if MuWellsFilesIO.check(root.path):
             bead  = ctrl.display.get('tasks', 'bead')
             track = ctrl.tasks.track(root)
@@ -190,7 +192,7 @@ class ConfigMuWellsFilesIO(ConfigTrackIO):
             return
 
         coeff = float(model.rescaling[instr]) / float(old['rescaling'][instr])
-        for task in list(ctrl.tasks.tasklist(root))[1:]:
+        for task in list(ctrl.tasks.tasklist(root))[1::-1]:
             cpy = dict(task.zscaled(coeff))
             if cpy:
                 ctrl.tasks.updatetask(root, task, **cpy)

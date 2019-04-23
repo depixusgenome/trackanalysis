@@ -59,7 +59,7 @@ class MuWellsFilesIO(TrackIO):
             return None
 
         if any(i.is_dir() for i in allpaths):
-            raise IOError("µwell data file paths should not include directories")
+            return None
 
         cnf = LIAFilesIOConfiguration(**dict(cls.DEFAULT.config(), **kwa))
         trk = next(i for i in allpaths if i.suffix == cls.TRKEXT)

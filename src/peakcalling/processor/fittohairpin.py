@@ -162,7 +162,7 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
 
     @staticmethod
     def __topeaks(aevts:PeakEvents) -> PeakListArray:
-        "Regroups the beads from a frame by hairpin"
+        "converts PeakEvents to PeakListArray"
         if not isinstance(aevts, Iterator):
             evts = cast(Sequence[PeakFindingOutput], aevts)
             if getattr(evts, 'dtype', 'O') == 'f4':
@@ -182,7 +182,15 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
     def _transform_ids(cls, sel):
         return cls._transform_to_bead_ids(sel)
 
-    def __distances(self, key: BEADKEY, inp:PeakListArray)->Dict[Optional[str], Distance]:
+    def distances(
+            self,
+            key: BEADKEY,
+            inp: Optional[PeakListArray] = None
+    )->Dict[Optional[str], Distance]:
+        "compute distances from peak data"
+        if inp is None:
+            inp = self.__topeaks(cast(PeakEvents, cast(dict, self.data)[key]))
+
         fits = dict(self.config.fit)
         cstr = self.config.constraints.get(key, None)
         hpin = None if cstr is None else fits.get(cast(str, cstr[0]), None)
@@ -243,7 +251,7 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
 
 
         events = self.__topeaks(inp)
-        dist   = self.__distances(bead, events)
+        dist   = self.distances(bead, events)
         return self.__beadoutput(bead, events, dist)
 
 class FitToHairpinProcessor(TaskViewProcessor[FitToHairpinTask, FitToHairpinDict, BEADKEY]):

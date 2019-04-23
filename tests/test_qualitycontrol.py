@@ -3,7 +3,6 @@
 # pylint: disable=redefined-outer-name
 """ Tests views """
 from tests.testutils                  import integrationmark
-from tests.testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 
 @integrationmark
 def test_view_messages(bokehaction):

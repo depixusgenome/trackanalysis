@@ -160,19 +160,20 @@ class CyclesModelAccess(SequencePlotModelAccess):
         super().addto(ctrl, noerase = noerase)
 
         @ctrl.theme.observe
-        def _ontasks(old = None, model = None, **_):
-            if 'rescaling' not in old:
+        @ctrl.display.observe
+        def _ontasks(old = None, **_):
+            if 'rescaling' not in old and "roottask" not in old:
                 return
 
             root  = ctrl.display.get("tasks", "roottask")
             if root is None:
                 return
+
+            model = ctrl.theme.model("tasks")
             instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
-            if instr not in model.rescaling:
-                return
+            coeff = float(model.rescaling[instr]) if instr in model.rescaling else 1.
 
             cnf   = self.cycles.config
-            coeff = float(model.rescaling[instr])
             if abs(coeff - cnf.rescaling) < 1e-5:
                 return
 

@@ -15,9 +15,8 @@ from tornado.gen                import sleep
 from tornado.ioloop             import IOLoop
 from tornado.platform.asyncio   import AsyncIOMainLoop
 
-from tests.testutils                  import integrationmark
-from tests.testingcore                import path as utfilepath
-from tests.testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
+from tests.testutils            import integrationmark
+from tests.testingcore          import path as utfilepath
 from view.plots                 import DpxKeyedRow
 
 from peakfinding.reporting.batch         import createmodels as _pmodels
@@ -60,49 +59,55 @@ def test_hybridstat_xlsxio():
     cnt = 0
     async def _run():
         nonlocal cnt
-        for i in range(100):
+        for i in range(50):
             if ConfigXlsxIO.RUNNING is False:
                 break
             cnt = i
-            await sleep(.1)
+            await sleep(.5)
 
-    IOLoop.current().run_sync(_run)
-    assert Path(out).exists()
-    assert cnt > 0
+    try:
+        IOLoop.current().run_sync(_run)
+        assert Path(out).exists()
+        assert cnt > 0
+    finally:
+        ConfigXlsxIO.RUNNING = False
 
 @integrationmark
 def test_peaks_xlsxio():
     "tests xlxs production"
-    asyncio.set_event_loop(asyncio.new_event_loop())
-    AsyncIOMainLoop().make_current()
+    try:
+        asyncio.set_event_loop(asyncio.new_event_loop())
+        AsyncIOMainLoop().make_current()
 
-    path = cast(Path, utfilepath("big_legacy"))
-    itr  = _pmodels(dict(track = (Path(path).parent/"*.trk", utfilepath("CTGT_selection"))))
-    mdl  = next(itr)
+        path = cast(Path, utfilepath("big_legacy"))
+        itr  = _pmodels(dict(track = (Path(path).parent/"*.trk", utfilepath("CTGT_selection"))))
+        mdl  = next(itr)
 
-    for path in Path(gettempdir()).glob("*_hybridstattest*.*"):
-        path.unlink()
+        for path in Path(gettempdir()).glob("*_hybridstattest*.*"):
+            path.unlink()
 
-    out   = mktemp()+"_hybridstattest5.xlsx"
-    assert not Path(out).exists()
-    # pylint: disable=protected-access
-    ConfigXlsxIO._run(dict(path      = out,
-                           oligos    = [],
-                           sequences = utfilepath('hairpins.fasta')),
-                      mdl)
+        out   = mktemp()+"_hybridstattest5.xlsx"
+        assert not Path(out).exists()
+        # pylint: disable=protected-access
+        ConfigXlsxIO._run(dict(path      = out,
+                               oligos    = [],
+                               sequences = utfilepath('hairpins.fasta')),
+                          mdl)
 
-    cnt = 0
-    async def _run():
-        nonlocal cnt
-        for i in range(100):
-            if ConfigXlsxIO.RUNNING is False:
-                break
-            cnt = i
-            await sleep(.1)
+        cnt = 0
+        async def _run():
+            nonlocal cnt
+            for i in range(50):
+                if ConfigXlsxIO.RUNNING is False:
+                    break
+                cnt = i
+                await sleep(.5)
 
-    IOLoop.current().run_sync(_run)
-    assert Path(out).exists()
-    assert cnt > 0
+        IOLoop.current().run_sync(_run)
+        assert Path(out).exists()
+        assert cnt > 0
+    finally:
+        ConfigXlsxIO.RUNNING = False
 
 def _t_e_s_t_peaks(server, bkact): # pylint: disable=too-many-statements
     import hybridstat.view._widget as widgetmod
@@ -132,7 +137,7 @@ def _t_e_s_t_peaks(server, bkact): # pylint: disable=too-many-statements
 
     menu = server.widget['Cycles:Sequence'].menu
     lst  = tuple(i if i is None else i[0] for i in list(menu))
-    assert lst == ('₁ GF4', '₂ GF1', '₃ GF2', '₄ GF3', '✗ 015',
+    assert lst == ('₁ GF4', '₂ GF3', '₃ GF1', '₄ GF2', '✗ 015',
                    None, 'Select a hairpin path')
 
     def _hascstr(yes):

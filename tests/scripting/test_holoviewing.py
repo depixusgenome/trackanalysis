@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-builtin,wildcard-import,unused-wildcard-import
 # pylint: disable=wrong-import-position,ungrouped-imports,no-member,invalid-name
+# pylint: disable=unused-argument,unused-import,no-name-in-module
 "Tests interval detection"
-import sys
 import warnings
+from   concurrent.futures import ThreadPoolExecutor
 from   tests.testutils import integrationmark
 
 
@@ -37,8 +38,10 @@ def _callbacks():
 
 def _data():
     from scripting import TracksDict
-    tracks = TracksDict("../data/100bp_4mer/*.pk", # type: ignore
-                       match = r".*/(.*)\.pk")
+    tracks = TracksDict( # type: ignore
+        "../data/100bp_4mer/*.pk",
+        match = r".*/(.*)\.pk"
+    )
     tracks.cleaned = True
     return tracks
 
@@ -224,16 +227,17 @@ def _holoviewing_ref_2d():
 def _run_holoviewing(fcn):
     with warnings.catch_warnings():
         for i in [
-            ".*Using or importing the ABCs from 'collections'.*",
-            ".*In future, it will be an error for 'np.bool_.*",
-            ".*he truth value of an.*"
+                ".*Using or importing the ABCs from 'collections'.*",
+                ".*In future, it will be an error for 'np.bool_.*",
+                ".*he truth value of an.*"
         ]:
             warnings.filterwarnings(
                 'ignore',
                 category = DeprecationWarning,
                 message  = i
-        )
-        fcn()
+            )
+        with ThreadPoolExecutor(1) as pool:
+            pool.submit(fcn).result(timeout = 300)
 
 @integrationmark
 def test_holoviewing_callbacks(holoviewingcleaner):

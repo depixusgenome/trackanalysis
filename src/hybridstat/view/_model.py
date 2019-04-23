@@ -5,7 +5,10 @@ from   asyncio                  import sleep as _sleep
 from   copy                     import deepcopy
 from   functools                import partial
 from   multiprocessing          import Process, Pipe
-from   typing                   import Set, Optional, Dict, Tuple, Any, Sequence, cast
+from   typing                   import (
+    Set, Optional, Dict, Tuple, Any, Sequence,
+    Iterator, cast
+)
 
 import numpy                    as     np
 
@@ -277,6 +280,13 @@ class FitToHairpinConfig:
         self.stretch     : Tuple[float, int] = (5.,   1)
         self.bias        : Tuple[float, int] = (5e-3, 1)
 
+    def zscaled(self, value) -> Iterator[Tuple[str, Any]]:
+        "rescale the config"
+        yield ('fit',         self.fit.rescale(value))
+        yield ('constraints', {i: j.rescale(i, value) for i, j in self.constraints.items()})
+        yield ('stretch',     (self.stretch[0]/value, self.stretch[1]))
+        yield ('bias',        (self.bias[0]   *value, self.bias[1]))
+
 ConstraintsDict = Dict[RootTask, Constraints]
 class FitToHairpinDisplay:
     """
@@ -474,6 +484,11 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         task.constraints.update(self.__display.constraints.get(self.roottask, {}))
         return task
 
+    def rescale(self, ctrl, mdl, value):
+        "rescale the model"
+        ctrl.theme.update(self.__defaults, **dict(self.__defaults.zscaled(value)))
+        self.resetmodel(mdl)
+
     def resetmodel(self, mdl):
         "resets the model"
         task = self.default(mdl)
@@ -663,18 +678,18 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         "add to the controller"
         super().addto(ctrl, noerase = noerase)
         @ctrl.theme.observe
-        def _ontasks(old = None, model = None, **_):
-            if 'rescaling' not in old:
+        @ctrl.display.observe
+        def _ontasks(old = None, **_):
+            if 'rescaling' not in old and "roottask" not in old:
                 return
 
             root  = ctrl.display.get("tasks", "roottask")
             if root is None:
                 return
-            instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
-            if instr not in model.rescaling:
-                return
 
-            coeff = float(model.rescaling[instr])
+            model = ctrl.theme.model("tasks")
+            instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
+            coeff = float(model.rescaling[instr]) if instr in model.rescaling else 1.
             if abs(coeff - self.peaksmodel.config.rescaling) < 1e-5:
                 return
 
@@ -685,6 +700,8 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
                 rescaling         = cur,
                 estimatedstretch  = self.peaksmodel.config.estimatedstretch/coeff
             )
+
+            self.identification.rescale(ctrl, self, coeff)
 
     def getfitparameters(self, key = NoArgs, bead = NoArgs) -> Tuple[float, float]:
         "return the stretch  & bias for the current bead"
@@ -770,8 +787,13 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         self._ctrl.display.update(
             self.peaksmodel.display,
             distances     = getattr(tmp, 'distances', {}),
-            peaks         = pkinfo.createpeaks(tuple(pksel.details2output(dtl))),
             estimatedbias = getattr(dtl, 'peaks', [0.])[0]
+        )
+
+        # pkinfo.createpeaks requires the distances to be already set!
+        self._ctrl.display.update(
+            self.peaksmodel.display,
+            peaks = pkinfo.createpeaks(tuple(pksel.details2output(dtl))),
         )
 
         if dtl is not None:
@@ -824,8 +846,8 @@ def createpeaks(mdl, themecolors, vals) -> Dict[str, np.ndarray]:
     if vals is not None and mdl.identification.task is not None and len(mdl.distances):
         for key in mdl.sequences(...):
             peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors[:2])
-            if key == mdl.sequencekey:
-                peaks['color'] = peaks[mdl.sequencekey+'color']
+        if mdl.sequencekey+'color' in peaks:
+            peaks['color'] = peaks[mdl.sequencekey+'color']
     elif mdl.fittoreference.referencepeaks is not None:
         peaks['color'] = np.where(np.isfinite(peaks['id']), colors[2], colors[0])
     return peaks
