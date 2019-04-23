@@ -5,7 +5,10 @@ from   asyncio                  import sleep as _sleep
 from   copy                     import deepcopy
 from   functools                import partial
 from   multiprocessing          import Process, Pipe
-from   typing                   import Set, Optional, Dict, Tuple, Any, Sequence, cast
+from   typing                   import (
+    Set, Optional, Dict, Tuple, Any, Sequence,
+    Iterator, cast
+)
 
 import numpy                    as     np
 
@@ -277,6 +280,13 @@ class FitToHairpinConfig:
         self.stretch     : Tuple[float, int] = (5.,   1)
         self.bias        : Tuple[float, int] = (5e-3, 1)
 
+    def zscaled(self, value) -> Iterator[Tuple[str, Any]]:
+        "rescale the config"
+        yield ('fit',         self.fit.rescale(value))
+        yield ('constraints', {i: j.rescale(i, value) for i, j in self.constraints.items()})
+        yield ('stretch',     (self.stretch[0]/value, self.stretch[1]))
+        yield ('bias',        (self.bias[0]   *value, self.bias[1]))
+
 ConstraintsDict = Dict[RootTask, Constraints]
 class FitToHairpinDisplay:
     """
@@ -473,6 +483,11 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
             return None
         task.constraints.update(self.__display.constraints.get(self.roottask, {}))
         return task
+
+    def rescale(self, ctrl, mdl, value):
+        "rescale the model"
+        ctrl.theme.update(self.__defaults, **dict(self.__defaults.zscaled(value)))
+        self.resetmodel(mdl)
 
     def resetmodel(self, mdl):
         "resets the model"
@@ -686,6 +701,8 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
                 estimatedstretch  = self.peaksmodel.config.estimatedstretch/coeff
             )
 
+            self.identification.rescale(ctrl, self, coeff)
+
     def getfitparameters(self, key = NoArgs, bead = NoArgs) -> Tuple[float, float]:
         "return the stretch  & bias for the current bead"
         if bead is not NoArgs:
@@ -695,7 +712,6 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         if key is not None:
             if bead is NoArgs:
                 dist = self.peaksmodel.display.distances
-                print("dist 1" , dist.keys(), dist.get("PCR23-26.b", "?"))
             else:
                 dist = getattr(cache[0], "distances", {})
 
