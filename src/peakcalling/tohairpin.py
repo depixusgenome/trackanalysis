@@ -207,7 +207,7 @@ class ChiSquareFit(GaussianProductFit):
     We use the GaussianProductFit results to match peaks then estimate
     the best Χ² fit between matched peaks, adding their count as well.
     """
-    symmetry = Symmetry.right
+    symmetry = Symmetry.both
     window   = 10.
     def _chisquare(self, hpin, peaks, stretch, bias):
         sym = Symmetry.both if self.symmetry is Symmetry.both else Symmetry.left
@@ -253,7 +253,7 @@ class PeakGridFit(HairpinFitter):
     The stretch & bias with the least χ² value is returned.
     """
     window    = 10.
-    symmetry  = Symmetry.left
+    symmetry  = Symmetry.both
     bounds    = 10.
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
