@@ -97,11 +97,11 @@ def test_peaks_xlsxio():
         cnt = 0
         async def _run():
             nonlocal cnt
-            for i in range(100):
+            for i in range(50):
                 if ConfigXlsxIO.RUNNING is False:
                     break
                 cnt = i
-                await sleep(.1)
+                await sleep(.5)
 
         IOLoop.current().run_sync(_run)
         assert Path(out).exists()
