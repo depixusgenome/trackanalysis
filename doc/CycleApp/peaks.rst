@@ -246,5 +246,8 @@ Peaks
   histogram. This should be higher than |NOISE|. It' currently at 1 |NOISE| for
   the |SDI| and 2 |NOISE| for the |PICO|.
 * `Exhaustive fit algorithm` allows selecting one or the other fit algorithm.
+* `Score is affected by false positives` means that the best fit should also
+  account for a low number of unidentified peaks. That was *not* the case prior
+  to version 6.8
 * `Max Δ to theoretical peak` sets a threshold on how far an experimental peak
   can be from to theoretical position for identification.
