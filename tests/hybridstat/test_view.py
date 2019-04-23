@@ -137,7 +137,7 @@ def _t_e_s_t_peaks(server, bkact): # pylint: disable=too-many-statements
 
     menu = server.widget['Cycles:Sequence'].menu
     lst  = tuple(i if i is None else i[0] for i in list(menu))
-    assert lst == ('₁ GF4', '₂ GF1', '₃ GF2', '₄ GF3', '✗ 015',
+    assert lst == ('₁ GF4', '₂ GF3', '₃ GF1', '₄ GF2', '✗ 015',
                    None, 'Select a hairpin path')
 
     def _hascstr(yes):
