@@ -882,11 +882,11 @@ New application for viewing cycles
 
 # RampApp
 
-## ramp__v2.1
+## ramp_v2.1
 
 * 2019-04-19 10:20:10 +0200  (tag: ramp_v2.1)
 
-## Exporting to excel or csv
+### Exporting to excel or csv
 
 One can now export the data for all beads and cycles. Simply save a file either
 with a '.xlsx' or a '.csv' extension.
