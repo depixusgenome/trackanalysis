@@ -357,6 +357,7 @@ class PeakIDPathTheme:
     "PeakIDPathTheme"
     name       : str           = "hybridstat.peaks.idpath"
     title      : Optional[str] = None
+    dialogtitle: str           = 'Select an id file path'
     placeholder: str           = 'Id file path'
     filechecks : int           = 500
     width      : int           = 225
@@ -427,7 +428,12 @@ class PeakIDPathWidget:
 
     def observe(self, ctrl):
         "sets up observers"
-        self.__dlg = FileDialog(ctrl, storage = 'constraints.path', filetypes = '*|xlsx')
+        self.__dlg = FileDialog(
+            ctrl,
+            storage   = 'constraints.path',
+            filetypes = '*|xlsx',
+            title     = self.__theme.dialogtitle
+        )
 
     def addtodoc(self, mainview, ctrl, # type: ignore # pylint: disable=arguments-differ
                  *_) -> List[Widget]:
@@ -472,8 +478,6 @@ class PeakIDPathWidget:
 
         self.__widget.on_change('click', _onclick_cb)
         self.__widget.on_change('value', _onchangetext_cb)
-
-        self.__dlg.title = self.__theme.title
         return [self.__widget]
 
     def reset(self, resets):
