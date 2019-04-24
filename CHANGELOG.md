@@ -884,7 +884,8 @@ New application for viewing cycles
 
 ## ramp_v2.1
 
-* 2019-04-19 10:20:10 +0200  (tag: ramp_v2.1)
+* 2019-04-24 09:02:39 +0200  (tag: ramp_v2.1.1)
+* 2019-04-19 10:20:39 +0200  (tag: ramp_v2.1)
 
 ### Exporting to excel or csv
 
