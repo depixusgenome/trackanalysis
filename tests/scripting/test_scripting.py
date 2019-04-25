@@ -11,8 +11,8 @@ from   tests.testutils     import integrationmark
 @integrationmark
 def test_track(scriptingcleaner):
     "test scripting enhanced track"
-    from scripting             import Track, Tasks, localcontext
-    from data                  import Cycles
+    from scripting             import Track, Tasks, localcontext, Task
+    from data                  import Cycles, Beads
     from eventdetection.data   import Events
     from peakfinding.processor import PeaksDict
     from tests.testingcore     import path as utpath
@@ -21,10 +21,15 @@ def test_track(scriptingcleaner):
     assert track.path == utpath("big_legacy")
 
     assert set(track.data.keys()) == set(list(range(0,39)))
-    assert isinstance(track.cleancycles,    Cycles)
-    assert isinstance(track.measures,       Cycles)
-    assert isinstance(track.events,         Events)
-    assert isinstance(track.peaks,          PeaksDict)
+    for i, j in [
+            ('cleanbeads',  Beads),
+            ('cleancycles', Cycles),
+            ('events',      Events),
+            ('peaks',       PeaksDict)
+    ]:
+        itm = getattr(track, i)
+        assert isinstance(itm, j)
+        assert all(isinstance(k, Task) for k in itm.tasklist)
     assert track.cleaned is False
 
     assert ([Tasks(i) for i in Tasks.defaulttasklist(None, Tasks.clipping, False)]
@@ -54,6 +59,24 @@ def test_track(scriptingcleaner):
 
     assert track.op[:,:5].ncycles == 5
     assert set(track.op[[1,2]].beads.keys()) == {1,2}
+
+@integrationmark
+def test_trackconfig(scriptingcleaner):
+    "test scripting enhanced track"
+    from scripting             import Track, Tasks, localcontext
+    from data                  import Cycles
+    from eventdetection.data   import Events
+    from peakfinding.processor import PeaksDict
+    from tests.testingcore     import path as utpath
+
+    track = Track(path = utpath("big_legacy"))
+    assert track.path == utpath("big_legacy")
+
+    assert set(track.data.keys()) == set(list(range(0,39)))
+    assert isinstance(track.cleancycles,    Cycles)
+    assert isinstance(track.measures,       Cycles)
+    assert isinstance(track.events,         Events)
+    assert isinstance(track.peaks,          PeaksDict)
 
 @integrationmark
 def test_confusion(scriptingcleaner):

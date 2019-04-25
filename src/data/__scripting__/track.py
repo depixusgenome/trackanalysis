@@ -8,7 +8,7 @@ We add some methods and change the default behaviour:
 * *__init__* takes *path* as it's first positional argument
 * an *events* property is added
 """
-from   copy                 import copy  as shallowcopy
+from   copy                 import copy  as shallowcopy, deepcopy
 from   datetime             import datetime
 from   functools            import partial
 from   pathlib              import Path
@@ -198,7 +198,11 @@ class _TrackMixin:
         If no Ellipsis is introduced, the list of tasks is completed using the reduced
         list in `Tasks.defaulttaskorder`. This list does not include any cleaning task.
         """
-        return next(iter(self.processors(*args).run(copy = copy)))
+        args = deepcopy(args)
+        itr  = next(iter(self.processors(*args).run(copy = copy)))
+        assert not hasattr(itr, 'tasklist')
+        setattr(itr, 'tasklist', args)
+        return itr
 
     @property
     def cleanbeads(self) -> Beads:
@@ -208,7 +212,11 @@ class _TrackMixin:
     @property
     def cleancycles(self) -> Cycles:
         "Return cleaned cycles"
-        return cast(Cycles, self.cleanbeads[...,...])
+        beads = self.cleanbeads
+        out   = cast(Cycles, beads[...,...])
+        assert not hasattr(out, 'tasklist')
+        setattr(out, 'tasklist', getattr(beads, 'tasklist'))
+        return out
 
     @property
     def measures(self):
@@ -247,7 +255,6 @@ class _TrackMixin:
                 return dropbeads(self, *(i for i in value if i != '~'))
 
         return selectbeads(self, value)
-
 
 addattributes(Track, protected = dict(cleaned = False))
 Track.cycles    .args['copy'] = True
