@@ -22,7 +22,7 @@ class DpxRamp(Widget):
     "Interface to filters needed for cleaning"
     __css__            = route("ramp.css")
     __javascript__     = route()
-    __implementation__ = "_widget.coffee"
+    __implementation__ = "_widget.ts"
     frozen             = props.Bool(True)
     minhfsigma         = props.Float(RampStatsTask.hfsigma[0])
     maxhfsigma         = props.Float(RampStatsTask.hfsigma[1])
