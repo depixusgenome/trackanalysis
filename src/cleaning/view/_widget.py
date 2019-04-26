@@ -168,7 +168,7 @@ class DpxCleaning(Widget):
     "Interface to filters needed for cleaning"
     __css__            = route("cleaning.css")
     __javascript__     = route()
-    __implementation__ = "_widget.coffee"
+    __implementation__ = "_widget.ts"
     frozen             = props.Bool(True)
     framerate          = props.Float(30.)
     figure             = props.Instance(Figure)

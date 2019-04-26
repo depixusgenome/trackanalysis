@@ -217,6 +217,11 @@ export namespace DpxToolbar {
 export interface DpxToolbar extends DpxToolbar.Attrs {}
 
 export class DpxToolbar extends Widget {
+    properties: DpxToolbar.Props
+    constructor(attrs?: Partial<DpxToolbar.Attrs>) {
+        super(attrs);
+    }
+
     static initClass(): void {
         this.prototype.type = 'DpxToolbar'
         this.prototype.default_view = DpxToolbarView
