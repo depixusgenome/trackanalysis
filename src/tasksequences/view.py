@@ -52,7 +52,7 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
     __fig:       Figure
     __axis:      'SequenceTicker'
 
-    __implementation__ = "sequenceticker.coffee"
+    __implementation__ = "sequenceticker.ts"
 
     def __init__( # pylint: disable=too-many-arguments
             self,
@@ -160,7 +160,7 @@ class SequenceHoverMixin:
             fields: Dict[str, Tuple[str,...]],
             extra:  Union[None, str, Path] = None
     ) -> TypeScript:
-        "returns the coffeescript implementation"
+        "returns the typescript implementation"
         path = Path(__file__).with_suffix('.ts')
         if not path.exists():
             return ""
