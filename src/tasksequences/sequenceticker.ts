@@ -11,7 +11,7 @@ export namespace SequenceTicker {
     }
 }
 
-export interface SequenceTicker extends BasicTicker.Attrs {}
+export interface SequenceTicker extends SequenceTicker.Attrs {}
 
 export class SequenceTicker extends BasicTicker {
     properties: SequenceTicker.Props
