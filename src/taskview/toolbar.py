@@ -128,7 +128,7 @@ class SaveFileDialog(FileDialog):
 class DpxToolbar(Widget):
     "Toolbar model"
     __css__            = route("view.css", "icons.css", "toolbar.css")
-    __implementation__ = 'toolbar.coffee'
+    __implementation__ = 'toolbar.ts'
     __javascript__     = route()
     frozen      = props.Bool(True)
     open        = props.Int(0)
