@@ -15,7 +15,7 @@ try:
 
 except ImportError as exc:
     raise ImportError("Don't forget to clone wafbuilder!!") from exc
-_default('python', 'coffee')
+_default('python', 'nodejs')
 
 _utils.INCORRECT.append(str(Path(__file__).parent))
 _utils.ROOT      = str(Path(__file__).parent.parent)

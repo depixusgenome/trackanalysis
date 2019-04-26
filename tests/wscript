@@ -11,12 +11,15 @@ require(
     rtime       = False
 )
 
+require(nodejs = '10.13.0',                  rtime = False)
+require(nodejs = dict(typescript = '3.4.4'), rtime = False)
+
 def build(bld):
     pysrc = bld.path.ant_glob('**/*.py')
-    cfe   = bld.path.ant_glob('**/*.coffee')
+    cfe   = bld.path.ant_glob('**/*.ts')
 
     builder.checkpy  (bld, 'tests', pysrc, 'pylint')
     builder.copyfiles(bld, builder.appname(), pysrc)
     builder.copyfiles(bld, builder.appname(), cfe)
 
-make()
+make(locals())

@@ -1,3 +1,4 @@
-require(python = dict(nodejs = '6.10.0', bokeh = '1.0'), rtime = True)
-require(coffee = '1.10.0', rtime = False)
+require(python = dict(bokeh = '=1.0.4'), rtime = True)
+require(nodejs = '10.13.0',                  rtime = False)
+require(nodejs = dict(typescript = '3.4.4'), rtime = False)
 guimake('view.RampView', locals(), scriptname = 'RampApp')
