@@ -254,8 +254,10 @@ class CleaningFilterWidget:
     def setfigure(self, fig):
         "sets the figure"
         self.__widget.figure = fig
-        fig.x_range.callback = CustomJS.from_coffeescript('mdl.onchangebounds()',
-                                                          dict(mdl = self.__widget))
+        fig.x_range.callback = CustomJS(
+            code = 'mdl.onchangebounds()',
+            args = dict(mdl = self.__widget)
+        )
 
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"

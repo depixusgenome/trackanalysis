@@ -18,7 +18,7 @@ export class PeaksStatsDiv extends Div {
     static initClass() : void {
         this.prototype.type= "PeaksStatsDiv"
         this.prototype.default_view= DivView
-        @define({ data: [ p.Any,  {}] })
+        this.define({ data: [ p.Any,  {}] })
     }
 }
 PeaksStatsDiv.initClass()

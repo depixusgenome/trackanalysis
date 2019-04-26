@@ -14,10 +14,6 @@ export class DpxFitParamsView extends WidgetView {
             elem.addClass("icon-dpx-unlocked")
     }
 
-    on_change_frozen(): void {
-        jQuery(this.el).find('.dpx-fp-freeze').prop('disabled', this.model.frozen)
-    }
-
     on_lock(evt): void {
         this.model.locksequence = !this.model.locksequence
         this._set_lock()
@@ -69,14 +65,14 @@ export class DpxFitParamsView extends WidgetView {
         elem.find("#dpx-pk-locksequence").click(() => this.on_lock())
     }
 
-    mk_inp(name, label, ttip): void {
+    mk_inp(name, label, ttip): string {
         const disabled = this.model.frozen ? ' disabled=true' : ''
         return  `<input id='dpx-pk-${name}' ${ttip}`+
             ` class='dpx-fp-freeze bk-widget-form-input' type='text' `+
             ` placeholder='${label}' value='${this.model[name]}'${disabled}>`
     }
 
-    mk_check(ttip): void {
+    mk_check(ttip): string {
         const disabled = this.model.frozen ? ' disabled=true' : ''
         const icon     = this.model.locksequence ? 'lock' : 'unlocked'
         return `<button type='button' id='dpx-pk-locksequence' ${ttip} `+
@@ -86,8 +82,8 @@ export class DpxFitParamsView extends WidgetView {
     }
 
     static initClass() : void {
-        this.prototype.tagName= "div"
-        this.prototype.cl_inputs= ["stretch", "bias", "locksequence"]
+        this.prototype.tagName   = "div"
+        this.prototype.cl_inputs = ["stretch", "bias", "locksequence"]
     }
 }
 DpxFitParamsView.initClass()

@@ -144,7 +144,7 @@ class PeaksSequencePathWidget(SequencePathWidget):
 class PeaksStatsDiv(Div): # pylint: disable = too-many-ancestors
     "div for displaying stats"
     data               = props.Dict(props.String, props.String)
-    __implementation__ = "peakstats.coffee"
+    __implementation__ = "peakstats.ts"
 
 _LINE = """
     <div>

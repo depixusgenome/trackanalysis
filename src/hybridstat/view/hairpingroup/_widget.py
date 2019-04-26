@@ -19,7 +19,7 @@ from ._model                import (HairpinGroupScatterModel, ConsensusHistPlotM
 class DpxDiscardedBeads(Widget):
     "Toolbar model"
     __css__            = route("groupedbeads.css", "icons.css")
-    __implementation__ = '_widget.coffee'
+    __implementation__ = '_widget.ts'
     __javascript__     = route()
     frozen        = props.Bool(True)
     hassequence   = props.Bool(False)
