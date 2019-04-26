@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Create a grid displaying a sequence"
-from    typing              import List, Optional, Tuple, Any
+from    pathlib             import Path
+from    typing              import List, Optional, Tuple, Any, Dict, Union
 import  numpy               as np
 import  bokeh.core.properties as props
 from    bokeh.plotting      import Figure
 from    bokeh.models        import (LinearAxis, ColumnDataSource, Range1d, Widget,
                                     BasicTicker, Dropdown, CustomJS,
                                     AutocompleteInput)
+from    bokeh.util.compiler import TypeScript
 
 from   utils                import dataclass, dflt
-from   utils.gui            import implementation
 from   view.plots           import checksizes, themed
 from   view.dialog          import FileDialog
 from   .                    import marksequence
@@ -154,11 +155,33 @@ class SequenceHoverMixin:
         ctrl.theme.add(SequenceHoverTheme(), False)
 
     @staticmethod
-    def impl(name, fields, extra = None):
+    def impl(
+            name:   str,
+            fields: Dict[str, Tuple[str,...]],
+            extra:  Union[None, str, Path] = None
+    ) -> TypeScript:
         "returns the coffeescript implementation"
-        args = ('@define {', '@define {\n        '+fields)
-        code = implementation(__file__, args, NAME  = name, extra = extra)
-        return code
+        path = Path(__file__).with_suffix('.ts')
+        if not path.exists():
+            return ""
+
+        code = ''.join(open(path)).replace('NAME', name)
+        line = '\n'+'    '*3
+        for title, fcn in [
+                ('.Props & {',    lambda i, j: f'{i}: p.Property<{j[1]}>'),
+                ('this.define({', lambda i, j: f'{i}: {j[0]},')
+        ]:
+            repl = line+line.join(fcn(i, j) for i, j in fields.items())
+            code = code.replace(title, title+repl)
+        if extra:
+            ind  = code.rfind('}')
+            code = (
+                code[:ind]
+                +'\n'
+                +''.join(open(Path(extra).with_suffix('.ts')))
+                +code[ind:]
+            )
+        return TypeScript(code)
 
     @property
     def source(self):

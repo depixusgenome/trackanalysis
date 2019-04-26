@@ -20,11 +20,15 @@ class DpxHoverModel(HoverTool,  # pylint: disable=too-many-instance-attributes,t
     updating  = props.String('')
     rawrend   = props.Instance(Renderer)
     impl      = SequenceHoverMixin.impl
-    __implementation__ = impl('DpxHoverModel',
-                              ('shape: [p.Array, [2,1]],'
-                               'cycle: [p.Int, -1],'
-                               'rawrend: [p.Instance, null],'),
-                              __file__)
+    __implementation__ = impl(
+        'DpxHoverModel',
+        {
+            'shape':    ('[p.Array, [2,1]]',    'number[]'),
+            'cycle':    ('[p.Int, -1]',         'number'),
+            'rawrend':  ('[p.Instance, null]',  'any')
+        },
+        __file__
+    )
 
     @staticmethod
     def _createrawdata(data, shape):

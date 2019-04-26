@@ -36,10 +36,14 @@ class PeaksSequenceHover(# pylint: disable=too-many-instance-attributes,too-many
     updating  = props.String('')
     biases    = props.Dict(props.String, props.Float)
     stretches = props.Dict(props.String, props.Float)
-    __implementation__ = SequenceHoverMixin.impl('PeaksSequenceHover',
-                                                 ('stretches: [p.Any, {}], '
-                                                  'biases:    [p.Any, {}],'),
-                                                 __file__)
+    __implementation__ = SequenceHoverMixin.impl(
+        'PeaksSequenceHover',
+        {
+            'stretches': ('[p.Any, {}]', 'any'),
+            'biases':    ('[p.Any, {}]', 'any')
+        },
+        __file__
+    )
 
 
     @classmethod
