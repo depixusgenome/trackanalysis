@@ -492,7 +492,7 @@ class DpxFitParams(Widget):
     "Interface to filters needed for cleaning"
     __css__            = route("peaksplot.css")
     __javascript__     = [ROUTE+"/jquery.min.js", ROUTE+"/jquery-ui.min.js"]
-    __implementation__ = "_widget.coffee"
+    __implementation__ = "_widget.ts"
     frozen             = props.Bool(True)
     stretch            = props.String("")
     bias               = props.String("")
