@@ -4,7 +4,9 @@ import {WidgetView, Widget} from "models/widgets/widget"
 declare function jQuery(...args: any[]): any
 
 export class DpxDiscardedBeadsView extends WidgetView {
-    on_change_input(evt): void {
+    model: DpxDiscardedBeads
+    _inputs: string[]
+    on_change_input(evt:string): void {
         jQuery(this.el).find(`#dpx-gb-${evt}`).val(`${this.model[evt]}`)
     }
 
@@ -13,7 +15,7 @@ export class DpxDiscardedBeadsView extends WidgetView {
         for(let evt of this._inputs)
             this.connect(
                 this.model.properties[evt].change,
-                ((e) => (() => this.on_change_input(e)))(evt)
+                ((e:string) => (() => this.on_change_input(e)))(evt)
             )
         this.connect(this.model.properties.frozen.change, () => this.render())
     }
@@ -37,17 +39,16 @@ export class DpxDiscardedBeadsView extends WidgetView {
         for(let evt of this._inputs)
         {
             const el = elem.find(`#dpx-gb-${evt}`)
-            el.change((e) => this.model[e.target.id.slice(7)] = e.target.value)
+            el.change((e:Event) => {
+                let t = e.target as any as {id: string, value: string}
+                this.model[t.id.slice(7)] = t.value
+            })
         }
     }
 
-    get_width_height(): [int, int] {
-        return [super.get_width_height()[0], 30]
-    }
+    get_height(): number { return 30 }
 
-    get_height(): int { return 30 }
-
-    _mkinp(name): string {
+    _mkinp(name: string): string {
         let disabled: string = ' disabled=true'
         if((name != 'forced') || this.model.hassequence)
             disabled = this.model.frozen ? ' disabled=true' : ''
@@ -76,6 +77,7 @@ export namespace DpxDiscardedBeads {
         discardedhelp: p.Property<string>
         forced:        p.Property<string>
         forcedhelp:    p.Property<string>
+        [key:string]:  p.Property<any>
     }
 }
 
@@ -92,13 +94,13 @@ export class DpxDiscardedBeads extends Widget {
             css_classes : ["dpx-row", "dpx-widget", "dpx-gb-widget", "dpx-span"]
         })
 
-        this.define({
-            frozen:        [p.Bool,   true],
-            hassequence:   [p.Bool,   false],
-            discarded:     [p.String, ''],
-            discardedhelp: [p.String, ''],
-            forced:        [p.String, ''],
-            forcedhelp:    [p.String, '']
+        this.define<DpxDiscardedBeads.Props>({
+            frozen:        [p.Boolean, true],
+            hassequence:   [p.Boolean, false],
+            discarded:     [p.String,  ''],
+            discardedhelp: [p.String,  ''],
+            forced:        [p.String,  ''],
+            forcedhelp:    [p.String,  '']
         })
     }
 }

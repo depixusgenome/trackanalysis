@@ -1,15 +1,11 @@
-import {build_views}    from "core/build_views"
-import *        as p    from "core/properties"
+import *        as p        from "core/properties"
 import {WidgetView, Widget} from "models/widgets/widget"
 
 declare function jQuery(...args: any[]): any
 
 export class DpxRampView extends WidgetView {
     model: DpxRamp
-    static initClass() : void {
-        this.prototype.tagName = "div"
-    }
-
+    cl_inputs: string[]
     on_change_frozen() {
         jQuery(this.el).find('.dpx-rp-freeze').prop('disabled', this.model.frozen)
     }
@@ -27,7 +23,7 @@ export class DpxRampView extends WidgetView {
         for(let evt of this.cl_inputs)
             this.connect(
                 this.model.properties[evt].change,
-                ((e) => { return (): void => { this.on_change_input(e) } })(evt)
+                ((e:string) => { return (): void => { this.on_change_input(e) } })(evt)
             )
         this.connect(this.model.properties.displaytype.change,  (): void => this.render())
         this.connect(this.model.properties.frozen.change, (): void => this.on_change_frozen())
@@ -76,21 +72,24 @@ export class DpxRampView extends WidgetView {
         let elem = jQuery(this.el)
         for(let j of this.cl_inputs) {
             let el = elem.find("#dpx-rp-"+j)
-            el.change((e) => this.model[e.target.id.slice(7)] = Number(e.target.value))
+            el.change((e:Event) => {
+                let t = e.target as any as {id: string, value: string}
+                this.model[t.id.slice(7)] = Number(t.value)
+            })
         }
 
         for(let j = 0; j < 3; ++ j)
-            elem.find("#dpx-rp-displaytype-"+j).change((e) => this.on_click_display(e))
+            elem.find("#dpx-rp-displaytype-"+j).change((e:Event) => this.on_click_display(e))
 
     }
 
-    on_click_display(evt: MouseEvent) : void {
+    on_click_display(evt: Event) : void {
         evt.preventDefault()
         evt.stopPropagation()
 
-        let tmp = evt.target.id.split('-')
+        let t   = evt.target as any as {id: string}
+        let tmp = t.id.split('-')
         let id  = tmp[tmp.length-1]
-        console.log("disp", evt.target.id, id, this.model.displaytype)
         if(id == `${this.model.displaytype}`)
             return
 
@@ -102,11 +101,12 @@ export class DpxRampView extends WidgetView {
     mk_inp(name: string, maxv:number = 100, dv: number = 0.1): string {
         return `<input id='dpx-rp-${name}'
              class='dpx-rp-freeze bk-widget-form-input'"
-             type='number' min=0 max="+maxv+" step=${dv}
+             type='number' min=0 max=${maxv} step=${dv}
              value=${this.model[name]}${this.model.frozen ? ' disabled=true' : ''}>`
     }
 
     static initClass() : void {
+        this.prototype.tagName = "div"
         this.prototype.cl_inputs = ['minhfsigma', 'maxhfsigma', 'minextension', 'maxextension']
     }
 }
@@ -122,6 +122,7 @@ export namespace DpxRamp {
         fixedextension: p.Property<number>
         maxextension:   p.Property<number>
         displaytype:    p.Property<number>
+        [key:string]:   p.Property<any>
     }
 }
 
@@ -135,14 +136,14 @@ export class DpxRamp extends Widget {
         this.prototype.default_view = DpxRampView
         this.prototype.type         = "DpxRamp"
 
-        this.define({
-            frozen:         [p.Bool  , true],
-            minhfsigma:     [p.Number, 1e-4],
-            maxhfsigma:     [p.Number, 5e-3],
-            minextension:   [p.Number, .05],
-            fixedextension: [p.Number, .4],
-            maxextension:   [p.Number, 1.5],
-            displaytype:    [p.Number, 0]
+        this.define<DpxRamp.Props>({
+            frozen:         [p.Boolean, true],
+            minhfsigma:     [p.Number,  1e-4],
+            maxhfsigma:     [p.Number,  5e-3],
+            minextension:   [p.Number,  .05],
+            fixedextension: [p.Number,  .4],
+            maxextension:   [p.Number,  1.5],
+            displaytype:    [p.Number,  0]
         })
         this.override({css_classes: ["dpx-ramp", "dpx-widget"]})
     }

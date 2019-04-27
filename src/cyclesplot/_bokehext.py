@@ -23,6 +23,7 @@ class DpxHoverModel(HoverTool,  # pylint: disable=too-many-instance-attributes,t
     __implementation__ = impl(
         'DpxHoverModel',
         {
+            '_hvr_cnt': ('[p.Number, -1]', 'number'),
             'shape':    ('[p.Array, [2,1]]',    'number[]'),
             'cycle':    ('[p.Int, -1]',         'number'),
             'rawrend':  ('[p.Instance, null]',  'any')

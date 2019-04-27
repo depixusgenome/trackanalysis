@@ -1,4 +1,3 @@
-import {build_views}    from "core/build_views"
 import *        as p    from "core/properties"
 import {WidgetView, Widget} from "models/widgets/widget"
 
@@ -7,6 +6,36 @@ declare function jQuery(...args: any[]): any
 export class DpxCleaningView extends WidgetView {
     model: DpxCleaning
     cl_inputs: string[]
+
+    mk_inp(name: string): string {
+        const val  = this.model[name]
+        const dv   = Math.pow(10, Math.log10(val)-1)
+        const maxv = Math.pow(10, Math.log10(val)+2)
+        return this.mk_inp_with_extrema(name, maxv, dv)
+    }
+
+    mk_inp_with_extrema(name:string, maxv:number, dv:number): string {
+        const disabled = this.model.frozen ? ' disabled=true' : ''
+        return  `<input id='dpx-cl-${name}'`+
+            ` class='dpx-cl-freeze bk-widget-form-input'`+
+            ` type='number' min=0 max=${maxv} step=${dv} `+
+            ` value=${this.model[name]}${disabled}>`
+    }
+
+    mk_txt(name:string, placeholder:string = '') : string {
+        const disabled = this.model.frozen ? ' disabled=true' : ''
+        return  `<input id='dpx-cl-${name}'`+
+            ` type='text' class='dpx-cl-freeze bk-widget-form-input'`+
+            ` value='${this.model[name]}'${disabled}`+
+            ` placeholder='${placeholder}'>`
+    }
+
+    mk_btn(name:string, label:string, ttip: string): string {
+        const disabled = this.model.frozen ? ' disabled=true' : ''
+        return `<button type='button' id='dpx-cl-${name}' ${ttip} `+
+            `class='dpx-cl-freeze bk-bs-btn bk-bs-btn-default'${disabled}>`+
+            label+"</button>"
+    }
 
     on_change_frozen(): void {
         jQuery(this.el).find('.dpx-cl-freeze').prop('disabled', this.model.frozen)
@@ -28,7 +57,7 @@ export class DpxCleaningView extends WidgetView {
         for(let evt of this.cl_inputs)
             this.connect(
                 this.model.properties[evt].change,
-                ((e) => (() => this.on_change_input(e)))(evt)
+                ((e:string) => (() => this.on_change_input(e)))(evt)
             )
         this.connect(this.model.properties.frozen.change, () => this.on_change_frozen())
         this.connect(this.model.properties.fixedbeads.change, () => this.render())
@@ -78,44 +107,19 @@ export class DpxCleaningView extends WidgetView {
              "</table>"
 
         const elem = jQuery(this.el)
-        elem.find("#dpx-cl-subtracted").change((e) => this.model.subtracted = e.target.value)
+        elem.find("#dpx-cl-subtracted").change((e:Event) => {
+            this.model.subtracted = (e.target as any).value
+        })
         elem.find("#dpx-cl-add").click(
             () => this.model.subtractcurrent =  this.model.subtractcurrent+1
         )
         for(let evt of this.cl_inputs) {
             let el = elem.find(`#dpx-cl-${evt}`)
-            el.change((e) => this.model[e.target.id.slice(7)] = Number(e.target.value))
+            el.change((e:Event) => {
+                let t = e.target as any as {value: string, id: string}
+                this.model[t.id.slice(7)] = Number(t.value)
+            })
         }
-    }
-
-    mk_inp(name: string): string {
-        const val  = this.model[name]
-        const dv   = Math.pow(10, Math.log10(val)-1)
-        const maxv = Math.pow(10, Math.log10(val)+2)
-        return this.mk_inp_with_extrema(name, maxv, dv)
-    }
-
-    mk_inp_with_extrema(name:string, maxv:number, dv:number): string {
-        const disabled = this.model.frozen ? ' disabled=true' : ''
-        return  `<input id='dpx-cl-${name}'`+
-            ` class='dpx-cl-freeze bk-widget-form-input'`+
-            ` type='number' min=0 max=${maxv} step=${dv} `+
-            ` value=${this.model[name]}${disabled}>`
-    }
-
-    mk_txt(name:string, placeholder:string = '') : string {
-        const disabled = this.model.frozen ? ' disabled=true' : ''
-        return  `<input id='dpx-cl-${name}'`+
-            ` type='text' class='dpx-cl-freeze bk-widget-form-input'`+
-            ` value='${this.model[name]}'${disabled}`+
-            ` placeholder='${placeholder}'>`
-    }
-
-    mk_btn(name:string, label:string, ttip: string): string {
-        const disabled = this.model.frozen ? ' disabled=true' : ''
-        return `<button type='button' id='dpx-cl-${name}' ${ttip} `+
-            `class='dpx-cl-freeze bk-bs-btn bk-bs-btn-default'${disabled}>`+
-            label+"</button>"
     }
 
     static initClass(): void {
@@ -145,10 +149,14 @@ export namespace DpxCleaning {
         minextent:       p.Property<number>
         maxextent:       p.Property<number>
         maxsaturation:   p.Property<number>
+        [key: string]:   p.Property<any>
     }
 }
 
-export interface DpxCleaning extends DpxCleaning.Attrs {}
+export interface DpxCleaning extends DpxCleaning.Attrs 
+{
+    [key: string] : any
+}
 
 export class DpxCleaning extends Widget {
     properties: DpxCleaning.Props
@@ -172,8 +180,8 @@ export class DpxCleaning extends Widget {
         this.override({
             css_classes : ["dpx-cleaning", "dpx-widget"]
         })
-        this.define({
-            frozen:          [p.Bool, true],
+        this.define<DpxCleaning.Props>({
+            frozen:          [p.Boolean, true],
             framerate:       [p.Number, 30],
             figure:          [p.Instance],
             fixedbeads:      [p.String, ""],

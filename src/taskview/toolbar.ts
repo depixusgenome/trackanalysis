@@ -1,6 +1,4 @@
-import {build_views}    from "core/build_views"
-import {logger}         from "core/logging"
-import * as p           from "core/properties"
+import * as p   from "core/properties"
 
 import {WidgetView, Widget} from "models/widgets/widget"
 declare function jQuery(...args: any[]): any
@@ -81,13 +79,14 @@ export class DpxToolbarView extends WidgetView {
                     '<span class="bk-bs-caret"/>'+
                 '</button>'+
                 '<div id="dpx-tb-flist-menu"><table>'
-        if(this.model.filelist.length > 0)
-            for(let j = 0; j < this.model.filelist.length; ++j) {
+        let lst = this.model.filelist as any as string[]
+        if(lst.length > 0)
+            for(let j = 0; j < lst.length; ++j) {
                 itm += '<tr><td><label class="bk-bs-radio"><input'
                 if(j == this.model.currentfile)
                     itm += ' checked=true'
                 itm += ` type='radio' id='dpx-tb-flist-${j}' class='dpx-tb-flist-itm'/>`+
-                       this.model.filelist[j]+"</label></td>"+
+                       lst[j]+"</label></td>"+
                        "<td><button type='button' class='bk-bs-btn bk-bs-btn-danger' "+
                        `id='dpx-tb-flist-btn-${j}' class='dpx-tb-flist-itm'>`+
                        this._icon('bin')+"</button></td>"+
@@ -98,20 +97,20 @@ export class DpxToolbarView extends WidgetView {
         return itm
     }
 
-    on_click_del_file(evt: MouseEvent): void {
+    on_click_del_file(evt: Event): void {
         evt.preventDefault()
         evt.stopPropagation()
 
-        const tmp          = evt.target.id.split('-')
+        const tmp          = (evt.target as any as {id: string}).id.split('-')
         this.model.delfile = Number(tmp[tmp.length-1])
     }
 
-    on_click_file(evt: MouseEvent): void {
+    on_click_file(evt: Event): void {
         evt.preventDefault()
         evt.stopPropagation()
 
-        tmp = evt.target.id.split('-')
-        id  = Number(tmp[tmp.length-1])
+        let tmp = (evt.target as any as {id: string}).id.split('-')
+        let id  = Number(tmp[tmp.length-1])
         if(id == this.model.currentfile)
             return
 
@@ -168,19 +167,15 @@ export class DpxToolbarView extends WidgetView {
         elem.find('#dpx-tb-bead').change(() => this.on_bead())
         elem.find('#dpx-tb-discard').change(() => this.on_discard())
         elem.find('#dpx-tb-selection').click(() => this.on_selection())
-        if(this.model.filelist.length > 0)
-            for(let i = 0; i < this.model.filelist.length; ++i){
-                elem.find(`#dpx-tb-flist-${i}`).change((e) => this.on_click_file(e))
-                elem.find(`#dpx-tb-flist-btn-${i}`).click((e) => this.on_click_del_file(e))
+        let lst = this.model.filelist as any as string[]
+        if(lst.length > 0)
+            for(let i = 0; i < lst.length; ++i){
+                elem.find(`#dpx-tb-flist-${i}`).change((e:Event) => this.on_click_file(e))
+                elem.find(`#dpx-tb-flist-btn-${i}`).click((e:Event) => this.on_click_del_file(e))
             }
 
         this.on_change_frozen()
     }
-    get_width_height(): [number, number] {
-        const width = super.get_width_height()[0]
-        return [width, 30]
-    }
-
     get_height() : number { return 30 }
 
     static initClass(): void {
@@ -193,7 +188,7 @@ DpxToolbarView.initClass()
 export namespace DpxToolbar {
     export type Attrs = p.AttrsOf<Props>
 
-    export type Props = WidgetView.Props & {
+    export type Props = Widget.Props & {
         frozen:      p.Property<boolean>
         open:        p.Property<number>
         currentfile: p.Property<number>
@@ -228,8 +223,8 @@ export class DpxToolbar extends Widget {
         this.override({
             css_classes: ["dpx-row", "dpx-widget", "dpx-tb", "dpx-span"]
         })
-        this.define({
-            frozen:      [p.Bool,    true],
+        this.define<DpxToolbar.Props>({
+            frozen:      [p.Boolean, true],
             open:        [p.Number,  0],
             currentfile: [p.Number,  -1],
             delfile:     [p.Number,  -1],
@@ -240,12 +235,12 @@ export class DpxToolbar extends Widget {
             bead:        [p.Number,  -1],
             discarded:   [p.String,  ''],
             accepted:    [p.String,  ''],
-            currentbead: [p.Bool,    true],
-            seltype:     [p.Bool,    true],
+            currentbead: [p.Boolean, true],
+            seltype:     [p.Boolean, true],
             message:     [p.String,  ''],
-            helpmessage: [p.String, ''],
-            hasquit:     [p.Bool,    false],
-            hasdoc:     [p.Bool,    false]
+            helpmessage: [p.String,  ''],
+            hasquit:     [p.Boolean, false],
+            hasdoc:      [p.Boolean, false]
         })
     }
 }

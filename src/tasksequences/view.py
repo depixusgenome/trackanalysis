@@ -165,20 +165,32 @@ class SequenceHoverMixin:
         if not path.exists():
             return ""
 
-        code = ''.join(open(path)).replace('NAME', name)
-        line = '\n'+'    '*3
-        for title, fcn in [
-                ('.Props & {',    lambda i, j: f'{i}: p.Property<{j[1]}>'),
-                ('this.define({', lambda i, j: f'{i}: {j[0]},')
+        code     = ''.join(open(path))
+        line     = '\n'+'    '*3
+        internal = {i: j for i, j in fields.items() if i[0] == '_'}
+        cumpy    = {i: j for i, j in fields.items() if i[0] != '_'}
+        for title, fcn, itms in [
+                ('.Props & {',    lambda i, j: f'{i}: p.Property<{j[1]}>', fields),
+                ('this.internal({', lambda i, j: f'{i}: {j[0]},', internal)
         ]:
-            repl = line+line.join(fcn(i, j) for i, j in fields.items())
+            repl = line+line.join(fcn(i, j) for i, j in itms.items())
             code = code.replace(title, title+repl)
+
+        if internal:
+            repl = '{'+line+line.join(fcn(i, j) for i, j in internal.items())[:-1]+'}'
+            code = code.replace('this.define', f'this.internal({repl})\n        this.define')
+
+        code = code.replace('NAME', name)
         if extra:
-            ind  = code.rfind('}')
+            lines = open(Path(extra).with_suffix('.ts'), encoding = 'utf-8').readlines()
+            ind   = max((i for i, j in enumerate(lines) if j.startswith('import ')), default = 0)
+            imps  = lines[:ind+1]
+            ind   = code.rfind('}')
             code = (
-                code[:ind]
+                ''.join(imps)
+                +code[:ind]
                 +'\n'
-                +''.join(open(Path(extra).with_suffix('.ts')))
+                +''.join(lines[len(imps):])
                 +code[ind:]
             )
         return TypeScript(code)

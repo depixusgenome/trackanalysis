@@ -19,7 +19,7 @@ export class SequenceTicker extends BasicTicker {
     static initClass() : void {
         this.prototype.type = 'SequenceTicker'
 
-        this.define({
+        this.define<SequenceTicker.Props>({
             major:      [ p.Any, {} ],
             minor:      [ p.Any, {} ],
             key:        [ p.String, '']
