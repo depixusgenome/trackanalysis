@@ -1,5 +1,5 @@
 import {Range1d}       from "models/ranges/range1d"
-import {PeaksStatsDiv} from "./peakstats.ts"
+import {PeaksStatsDiv} from "./peakstats"
 
 on_change_bounds(fig: Plot, src: ColumnDataSource): void {
     this.on_change_bases(fig)
@@ -27,8 +27,8 @@ on_change_bounds(fig: Plot, src: ColumnDataSource): void {
         dur.end = 0
         cnt.end = 0
     } else {
-        dur.end = Math.max.apply(Math, src.data["duration"].slice(ix1, ix2))*1.05
-        cnt.end = Math.max.apply(Math, src.data["count"].slice(ix1, ix2))*1.05
+        dur.end = Math.max.apply(Math, (src.data["duration"] as number []).slice(ix1, ix2))*1.05
+        cnt.end = Math.max.apply(Math, (src.data["count"] as number[]).slice(ix1, ix2))*1.05
     }
 }
 
@@ -47,11 +47,11 @@ on_change_sequence(
     stats: PeaksStatsDiv,
     tick1: {key: string},
     tick2: {key: string},
-    menu:  {value: string, menu: any, label: string}
+    menu:  {value: string, menu: [string, string][], label: string}
 ): void {
     if (Object.keys(src.data).indexOf(menu.value) > -1) {
         let good: boolean = false
-        for(let i:[string, string] of menu.menu)
+        for(let i of menu.menu)
             if ((i != null) && (i[1] == menu.value))
             {
                 menu.label = i[0]
@@ -70,7 +70,7 @@ on_change_sequence(
             stats.text = stats.data[menu.value]
 
         let emit: boolean = false
-        for(let key: string of ['id', 'bases', 'distance', 'orient', 'color']) {
+        for(let key of ['id', 'bases', 'distance', 'orient', 'color']) {
             const col = peaks.source.data[menu.value+key]
             if (col != null)
             {

@@ -154,8 +154,9 @@ class SequenceHoverMixin:
         "initialize"
         ctrl.theme.add(SequenceHoverTheme(), False)
 
-    @staticmethod
+    @classmethod
     def impl(
+            cls,
             name:   str,
             fields: Dict[str, Tuple[str,...]],
             extra:  Union[None, str, Path] = None
@@ -171,7 +172,7 @@ class SequenceHoverMixin:
         cumpy    = {i: j for i, j in fields.items() if i[0] != '_'}
         for title, fcn, itms in [
                 ('.Props & {',    lambda i, j: f'{i}: p.Property<{j[1]}>', fields),
-                ('this.internal({', lambda i, j: f'{i}: {j[0]},', internal)
+                ('this.define<NAME.Props>({', lambda i, j: f'{i}: {j[0]},', cumpy)
         ]:
             repl = line+line.join(fcn(i, j) for i, j in itms.items())
             code = code.replace(title, title+repl)
@@ -182,17 +183,7 @@ class SequenceHoverMixin:
 
         code = code.replace('NAME', name)
         if extra:
-            lines = open(Path(extra).with_suffix('.ts'), encoding = 'utf-8').readlines()
-            ind   = max((i for i, j in enumerate(lines) if j.startswith('import ')), default = 0)
-            imps  = lines[:ind+1]
-            ind   = code.rfind('}')
-            code = (
-                ''.join(imps)
-                +code[:ind]
-                +'\n'
-                +''.join(lines[len(imps):])
-                +code[ind:]
-            )
+            code = cls.__impl_extra(code, extra)
         return TypeScript(code)
 
     @property
@@ -275,6 +266,20 @@ class SequenceHoverMixin:
         data['text'] = data.get(key, data[next(iter(dseq))])
         data['z']    = data['values']/mdl.stretch+(0. if mdl.bias is None else mdl.bias)
         return data
+
+    @staticmethod
+    def __impl_extra(code:str, extra:Union[str, Path]) -> str:
+        lines = open(Path(extra).with_suffix('.ts'), encoding = 'utf-8').readlines()
+        ind   = max((i for i, j in enumerate(lines) if j.startswith('import ')), default = 0)
+        imps  = lines[:ind+1]
+        ind   = code.rfind('}')
+        return (
+            ''.join(imps)
+            +code[:ind]
+            +'\n'
+            +''.join(lines[len(imps):])
+            +code[ind:]
+        )
 
 @dataclass
 class SequencePathTheme:
