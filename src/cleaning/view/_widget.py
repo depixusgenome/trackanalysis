@@ -56,11 +56,7 @@ class BeadSubtractionModalDescriptor:
         return getattr(getattr(inst, '_model').subtracted.task, 'beads', [])
 
     def __set__(self,inst,value):
-        subtracted = getattr(inst, '_model').subtracted
-        if not value:
-            subtracted.remove()
-        else:
-            subtracted.update(beads = list(value))
+        getattr(inst, '_model').subtracted.beads = value
 
 class CyclesListTheme:
     "Cycles List Model"
