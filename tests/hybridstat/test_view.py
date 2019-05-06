@@ -29,9 +29,17 @@ with warnings.catch_warnings():
     )
     from hybridstat.reporting.identification import writeparams
 
+from cleaning.processor                  import BeadSubtractionTask
 from hybridstat.reporting.batch          import createmodels as _hmodels
 from hybridstat.view._io                 import ConfigXlsxIO
 from peakcalling.processor.__config__    import FitToHairpinTask
+from peakcalling.tohairpin               import PeakGridFit, ChiSquareFit, Symmetry
+
+FILTERS = [
+    (FutureWarning,      ".*elementwise comparison failed;.*"),
+    (RuntimeWarning,     ".*All-NaN slice encountered.*"),
+    (DeprecationWarning, ".*elementwise comparison failed;*"),
+]
 
 @integrationmark
 def test_hybridstat_xlsxio():
@@ -187,7 +195,8 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-
 
     server = bokehaction.start(
         'hybridstat.view.peaksplot.PeaksPlotView',
-        'taskapp.toolbar'
+        'taskapp.toolbar',
+        filters = FILTERS
     )
     server.ctrl.display.observe("hybridstat.peaks", _printrng)
     server.load('big_legacy')
@@ -219,7 +228,8 @@ def test_cyclehistplot(bokehaction): # pylint: disable=too-many-statements,too-m
     "test peaksplot"
     server = bokehaction.start(
         'hybridstat.view.cyclehistplot.CycleHistPlotView',
-        'taskapp.toolbar'
+        'taskapp.toolbar',
+        filters = FILTERS
     )
     server.load('big_legacy')
     _t_e_s_t_peaks(server, bokehaction)
@@ -229,7 +239,8 @@ def test_hairpingroup(bokehaction): # pylint: disable=too-many-statements,too-ma
     "test peaksplot"
     server = bokehaction.start(
         'hybridstat.view.hairpingroup.HairpinGroupPlotView',
-        'taskapp.toolbar'
+        'taskapp.toolbar',
+        filters = FILTERS
     )
     server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
     server.load('big_legacy')
@@ -275,7 +286,8 @@ def test_reference(bokehaction):
     "test peaksplot"
     server = bokehaction.start(
         'hybridstat.view.peaksplot.PeaksPlotView',
-        'taskapp.toolbar'
+        'taskapp.toolbar',
+        filters = FILTERS
     )
 
     server.load('100bp_4mer/ref.pk')
@@ -301,10 +313,7 @@ def test_hybridstat(bokehaction):
     server = bokehaction.start(
         'hybridstat.view.HybridStatView',
         'taskapp.toolbar',
-        filters = [
-            (RuntimeWarning,     ".*All-NaN slice encountered.*"),
-            (DeprecationWarning, ".*elementwise comparison failed;*"),
-        ]
+        filters = FILTERS
     )
     server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
     tabs = next(iter(server.doc.select({'type': Tabs})))
@@ -337,10 +346,7 @@ def test_muwells(bokehaction):
     server = bokehaction.start(
         'hybridstat.view.HybridStatView',
         'taskapp.toolbar',
-        filters = [
-            (RuntimeWarning,     ".*All-NaN slice encountered.*"),
-            (DeprecationWarning, ".*elementwise comparison failed;*"),
-        ],
+        filters = FILTERS,
         runtime = 'selenium'
     )
     server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
@@ -384,7 +390,50 @@ def test_muwells(bokehaction):
     server.load('muwells/W6N46_HPB20190107_OR134689_cycle_1.9-2.10_TC10m.txt')
     _test('m)')
 
+@integrationmark
+def test_advancedmenu(bokehaction):
+    "test advanced menu"
+    server = bokehaction.start(
+        'hybridstat.view.peaksplot.PeaksPlotView',
+        'taskapp.toolbar',
+        filters = FILTERS,
+        runtime = "selenium"
+    )
+
+    server.load('big_legacy')
+    server.load('hairpins.fasta', rendered = False, andpress= False)
+    server.change('Cycles:Sequence', 'value', '←')
+    server.change('Cycles:Oligos', 'value', 'CTGT')
+
+    tlist  = lambda: server.ctrl.tasks.tasklist(server.roottask)
+    subcnt = lambda: sum(isinstance(i, BeadSubtractionTask) for i in tlist())
+    modal  = server.selenium.modal("//span[@class='icon-dpx-cog']", True)
+
+    assert subcnt() == 0
+    with modal:
+        modal.input('Subtracted beads', '11, 31')
+    assert subcnt() == 1
+    with modal:
+        modal.input('Subtracted beads', '')
+    assert subcnt() == 0
+
+    fit = lambda: next(i for i in tlist() if isinstance(i, FitToHairpinTask))
+    def _test(tpe, symm):
+        assert all(isinstance(i, tpe) for i in fit().fit.values())
+        assert all(i.symmetry == Symmetry(symm) for i in fit().fit.values())
+    _test(PeakGridFit, 'both')
+    with modal:
+        modal.tab('Peaks').toggle('Exhaustive fit algorithm')
+    _test(ChiSquareFit, 'both')
+    with modal:
+        modal.tab('Peaks').toggle('Score is affected by false positives')
+    _test(ChiSquareFit, 'right')
+    with modal:
+        modal.tab('Peaks').toggle('Exhaustive fit algorithm')
+    _test(PeakGridFit, 'left')
+
 if __name__ == '__main__':
     # pylint: disable=ungrouped-imports
-    from tests.testutils.bokehtesting import BokehAction
-    test_muwells(BokehAction(None))
+    from tests.testingcore.bokehtesting import BokehAction
+    with BokehAction(None) as bka:
+        test_advancedmenu(bka)
