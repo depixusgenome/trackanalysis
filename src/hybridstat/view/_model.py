@@ -791,9 +791,10 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         )
 
         # pkinfo.createpeaks requires the distances to be already set!
+        data = tuple(() if pksel is None else pksel.details2output(dtl))
         self._ctrl.display.update(
             self.peaksmodel.display,
-            peaks = pkinfo.createpeaks(tuple(pksel.details2output(dtl))),
+            peaks = pkinfo.createpeaks(data),
         )
 
         if dtl is not None:
