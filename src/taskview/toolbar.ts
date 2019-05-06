@@ -62,10 +62,10 @@ export class DpxToolbarView extends WidgetView {
         let str = ""
         if(ttip == '')
             str = `<button type='button' id='dpx-tb-${name}' `+
-                  `class='${freeze} bk-bs-btn bk-bs-btn-default'>${label}</button>`
+                  `class='${freeze} bk bk-bs-btn bk-bs-btn-default'>${label}</button>`
         else
             str = `<button type='button' id='dpx-tb-${name}' `+
-                  `class='${freeze} bk-bs-btn bk-bs-btn-default' `+
+                  `class='${freeze} bk bk-bs-btn bk-bs-btn-default' `+
                   `data-balloon='${ttip}' `+
                     'data-balloon-length="medium" data-balloon-pos="right">'+
                   label+'</button>'
@@ -74,7 +74,7 @@ export class DpxToolbarView extends WidgetView {
 
     make_filelist(): string {
         let itm = '<div id="dpx-tb-flist">'+
-                '<button type="button" class="bk-bs-btn bk-bs-btn-default"'+
+                '<button type="button" class="bk bk-bs-btn bk-bs-btn-default"'+
                 ' id="dpx-tb-flist-btn">'+
                     '<span class="bk-bs-caret"/>'+
                 '</button>'+
@@ -87,7 +87,7 @@ export class DpxToolbarView extends WidgetView {
                     itm += ' checked=true'
                 itm += ` type='radio' id='dpx-tb-flist-${j}' class='dpx-tb-flist-itm'/>`+
                        lst[j]+"</label></td>"+
-                       "<td><button type='button' class='bk-bs-btn bk-bs-btn-danger' "+
+                       "<td><button type='button' class='bk bk-bs-btn bk-bs-btn-danger' "+
                        `id='dpx-tb-flist-btn-${j}' class='dpx-tb-flist-itm'>`+
                        this._icon('bin')+"</button></td>"+
                        "</tr>"
@@ -126,11 +126,12 @@ export class DpxToolbarView extends WidgetView {
         const mdl:  DpxToolbar = this.model
         let   quit: string     = ''
         let   docu: string     = ""
-        if(this.model.hasquit)
-            quit = `<div class='dpx-col-12'>${this.make_btn('quit', 'Quit', '', '')}</div>`
         if(this.model.hasdoc)
-            docu = "<button type='button' id='dpx-tb-doc"+
-                   "class='bk-bs-btn bk-bs-btn-default'>?</button>"
+            docu = "<button type='button' id='dpx-tb-doc' "+
+                   "class='bk bk-bs-btn bk-bs-btn-default'>?</button>"
+        if(this.model.hasquit)
+            quit = this.make_btn('quit', 'Quit', '', '')
+        let last:string = `<span class='dpx-col-12'>${docu}${quit}</span>`
 
         const ttips: string[] = [
             'Open an analysis, i.e. ".ana" extension, or a track file and then its ".gr" files',
@@ -154,8 +155,9 @@ export class DpxToolbarView extends WidgetView {
                    ` type='text' value='${mdl.discarded}'`+
                    ` placeholder='${mdl.helpmessage}'>`+
                this.make_btn('del', this._icon('bin'), ttips[4])+
+               "<span id='dpx-tb-message-span' style='display:inline-block'>"+
                "<div id='dpx-tb-message' class='bk-markup'>"+
-                   `${mdl.message}</div>`+ docu + quit
+                `${mdl.message}</div></span>`+ last
 
         const elem = jQuery(this.el)
         elem.html(html)
@@ -176,7 +178,6 @@ export class DpxToolbarView extends WidgetView {
 
         this.on_change_frozen()
     }
-    get_height() : number { return 30 }
 
     static initClass(): void {
         this.prototype.tagName = "div"
