@@ -43,7 +43,7 @@ class BeadSubtractionModalDescriptor:
 
     def line(self) -> Tuple[Union[str, Tuple[str,str]], str]:
         "return the modal dialog line"
-        return (('width: 40%', 'Subtracted beads'), f"%({self._name})220csvi")
+        return (('width: 40%', 'Subtracted beads'), f"%({self._name})o220csvi")
 
     @classmethod
     def text(cls):
@@ -57,7 +57,7 @@ class BeadSubtractionModalDescriptor:
 
     def __set__(self,inst,value):
         subtracted = getattr(inst, '_model').subtracted
-        if len(value) == 0:
+        if not value:
             subtracted.remove()
         else:
             subtracted.update(beads = list(value))
