@@ -4,6 +4,7 @@
 
 .dpx-tb { float: left; height:30px; }
 .dpx-tb  button { float: left; width: 30px; min-width: unset!important; }
+.dpx-tb  div { float: left; min-width: unset!important; display: inline-block!important; }
 #dpx-tb-bead    { width: 50px; height: 28px; }
 #dpx-tb-discard { width: 120px; height: 28px; min-width: unset; }
 #dpx-tb-selection { width: 30px; }
@@ -18,19 +19,14 @@
 #dpx-tb-doc  { float: right; }
 #dpx-tb-quit { width: 60px; float: right; }
 
-#dpx-tb-flist {
-    overflow: hidden;
-    height:50px;
-    z-index:500;
-}
-
 #dpx-tb-flist:hover #dpx-tb-flist-menu {
-    display: block;
+    display: block!important;
 }
 
 #dpx-tb-flist-menu {
-    display: none;
+    display: none!important;
     position: absolute;
+    overflow: hidden;
     background-color: white;
     min-width: 400px;
     box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
@@ -38,7 +34,7 @@
 }
 
 #dpx-tb-flist-menu label {
-    float:none;
+    float:left;
     padding: 6px 16px;
     text-align: left;
 }
@@ -48,6 +44,7 @@
 }
 
 #dpx-tb-flist-menu input{
+  float:left;
   position: relative;
   bottom: 7px;
 }
