@@ -131,7 +131,6 @@ export class DpxToolbarView extends WidgetView {
                    "class='bk bk-bs-btn bk-bs-btn-default'>?</button>"
         if(this.model.hasquit)
             quit = this.make_btn('quit', 'Quit', '', '')
-        let last:string = `<span class='dpx-col-12'>${docu}${quit}</span>`
 
         const ttips: string[] = [
             'Open an analysis, i.e. ".ana" extension, or a track file and then its ".gr" files',
@@ -155,9 +154,8 @@ export class DpxToolbarView extends WidgetView {
                    ` type='text' value='${mdl.discarded}'`+
                    ` placeholder='${mdl.helpmessage}'>`+
                this.make_btn('del', this._icon('bin'), ttips[4])+
-               "<span id='dpx-tb-message-span' style='display:inline-block'>"+
                "<div id='dpx-tb-message' class='bk-markup'>"+
-                `${mdl.message}</div></span>`+ last
+                `${mdl.message}</div>`+ docu + quit
 
         const elem = jQuery(this.el)
         elem.html(html)

@@ -260,9 +260,13 @@ class MessagesView:
 
         txt = str(args[0])
         enc = txt.encode("utf-8") if sys.platform != 'linux' else txt
-        val = templ[str(args[1])].format(txt
-                                         .replace('<', '&lt')
-                                         .replace('>', '&gt'))
+        val = templ[str(args[1])].format(
+            txt
+            .replace('<', '&lt')
+            .replace('>', '&gt')
+            .strip()
+            .replace('\n', '<br>')
+        )
         if args[1] == 'error':
             if isinstance(text, Exception):
                 LOGS.exception(text)

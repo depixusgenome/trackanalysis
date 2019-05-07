@@ -3,7 +3,7 @@
 .bk-root {margin-left: -10px!important; }
 
 .dpx-tb { float: left; height:30px; }
-.dpx-tb  button { width: 30px; min-width: unset !important; }
+.dpx-tb  button { float: left; width: 30px; min-width: unset!important; }
 #dpx-tb-bead    { width: 50px; height: 28px; }
 #dpx-tb-discard { width: 120px; height: 28px; min-width: unset; }
 #dpx-tb-selection { width: 30px; }
@@ -15,7 +15,8 @@
     min-width:100%; 
     height:28px;
 }
-#dpx-tb-quit { width: 60px; }
+#dpx-tb-doc  { float: right; }
+#dpx-tb-quit { width: 60px; float: right; }
 
 #dpx-tb-flist {
     overflow: hidden;
