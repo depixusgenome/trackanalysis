@@ -68,9 +68,9 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
                 for i in mdl.track.cycles.withdata({0:nans}).values())
 
     @classmethod
-    def runbead(cls, mdl):
+    def runbead(cls, mdl, **kwa):
         "updates the cache in the gui and returns the nans"
-        ctx   = mdl.runcontext(cls, GuiClippingProcessor)
+        ctx   = mdl.runcontext(cls, GuiClippingProcessor, **kwa)
         items = nans = exc = None
         with ctx as cycles:
             if cycles is not None:
