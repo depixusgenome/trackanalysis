@@ -234,11 +234,12 @@ def _processrun(fcn, *args):
     for _ in modulecleanup(pairs = [('ACCEPT_SCRIPTING', 'jupyter')]):
         fcn(*args)
 
+_HEADLESS = (
+    os.environ.get("DPX_TEST_HEADLESS", '').lower().strip() in ('true', '1', 'yes')
+    or 'DISPLAY' not in os.environ
+)
+
 def _run_holoviewing(fcn, *args):
-    headless         = (
-        os.environ.get("DPX_TEST_HEADLESS", '').lower().strip() in ('true', '1', 'yes')
-        or 'DISPLAY' not in os.environ
-    )
     with warnings.catch_warnings():
         for i in [
                 ".*Using or importing the ABCs from 'collections'.*",
@@ -251,7 +252,7 @@ def _run_holoviewing(fcn, *args):
                 message  = i
             )
 
-        if headless:
+        if _HEADLESS:
             with ProcessPoolExecutor(1) as pool:
                 pool.submit(_processrun, fcn, *args).result(timeout = 120)
         else:
@@ -272,13 +273,15 @@ def test_holoviewing_hpin():
     "test hpin graphs"
     _run_holoviewing(_holoviewing_hpin)
 
+@pytest.mark.skipif(_HEADLESS, reason = "the test can hang when run without displays")
 @integrationmark
 def test_holoviewing_ref2d():
     "test hpin graphs"
     _run_holoviewing(_holoviewing_ref_2d)
 
+@pytest.mark.skipif(_HEADLESS, reason = "the test can hang when run without displays")
 @integrationmark
-@pytest.mark.parametrize("tpe", [1])#, 2, 3])
+@pytest.mark.parametrize("tpe", [1,2,3])
 def test_holoviewing_ref1d(tpe):
     "test hpin graphs"
     _run_holoviewing(_holoviewing_ref_1d, tpe)
