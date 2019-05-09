@@ -65,6 +65,11 @@ class CyclesListTheme:
                'pingpong', 'saturation', 'good')
     width   = 65
     height  = 300
+    colors  = CleaningPlotModel.theme.name
+    dot     = """
+        <div style="border-style:solid;border-color:{};border-radius:5px;float:left;"></div>
+        <div>{}</div>
+    """.strip()
     columns = [['cycle',      u'Cycle',       '0'],
                ['population', u'% good',      '0.'],
                ['hfsigma',    u'σ[HF]',       '0.0000'],
@@ -72,6 +77,9 @@ class CyclesListTheme:
                ['pingpong',   u'∑|dz|',       '0.0'],
                ['saturation', u'Non-closing', ''],
                ['discarded',  u'Discarded',   '']]
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
 
 class CyclesListWidget:
     "Table containing stats per peaks"
@@ -81,13 +89,18 @@ class CyclesListWidget:
         self.__task  = task
         self.__model = ctrl.theme.add(CyclesListTheme())
 
-    def addtodoc(self, *_) -> List[Widget]:
+    def addtodoc(self, _, ctrl) -> List[Widget]:
         "creates the widget"
+        clrs   = (
+            self.__model.colors  if isinstance(self.__model.colors, dict) else
+            ctrl.theme.get(self.__model.colors, "colors")
+        )
+        dot   = lambda i, j: self.__model.dot.format(clrs[i], j) if i in clrs else j
         fmt   = lambda i: (StringFormatter(text_align = 'center',
                                            font_style = 'bold') if i == '' else
                            DpxNumberFormatter(format = i, text_align = 'right'))
         cols  = list(TableColumn(field      = i[0],
-                                 title      = i[1],
+                                 title      = dot(i[0], i[1]),
                                  formatter  = fmt(i[2]))
                      for i in self.__model.columns)
 

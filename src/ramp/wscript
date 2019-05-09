@@ -1,3 +1,2 @@
 require(python = dict(bokeh = '=1.0.4'), rtime = True)
-require(nodejs = '10.13.0',                  rtime = False)
 guimake('view.RampView', locals(), scriptname = 'RampApp')
