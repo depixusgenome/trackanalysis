@@ -253,7 +253,7 @@ def _run_holoviewing(fcn, *args):
 
         if headless:
             with ProcessPoolExecutor(1) as pool:
-                pool.submit(_processrun, fcn, *args).result(timeout = 30)
+                pool.submit(_processrun, fcn, *args).result(timeout = 120)
         else:
             _processrun(fcn, *args)
 
