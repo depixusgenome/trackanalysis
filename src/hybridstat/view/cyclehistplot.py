@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "View for seeing both cycles and peaks"
 from copy                   import deepcopy
-from typing                 import Dict, TypeVar, Optional, cast
+from typing                 import Dict, List, Tuple, TypeVar, Optional, cast
 
 import numpy as np
 
@@ -10,6 +10,7 @@ from bokeh                     import layouts
 from bokeh.plotting            import Figure
 from bokeh.models              import (ColumnDataSource, Range1d, LinearAxis,
                                        NumeralTickFormatter, HoverTool)
+from cleaning.view             import GuiDataCleaningProcessor
 from model.plots               import (PlotTheme, PlotDisplay, PlotModel, PlotAttrs,
                                        PlotState)
 from peakfinding.histogram     import interpolator
@@ -110,7 +111,7 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
         return self._fig
 
     def _reset(self, cache: CACHE_TYPE):
-        def _data():
+        def _data() -> Optional[Tuple[List[np.ndarray], Optional[Exception]]]:
             procs = self._model.processors()
             if procs is None:
                 return None
@@ -119,12 +120,14 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
             if evts is not None:
                 procs = procs.keepupto(evts, False)
 
-            run = next(iter(procs.run(copy = True)))[self._model.bead, ...]
-            return list(run.values())
+            itms, _, exc = GuiDataCleaningProcessor.runbead(self._model, ctrl = procs, copy = True)
+            return [i for _, i in itms], exc
 
-        def _display(items):
-            data = self._data(items)
-            if items is not None and self._model.fiterror():
+        def _display(items: Optional[Tuple[List[np.ndarray], Optional[Exception]]]):
+            data = self._data(items[0] if items else None)
+            if items and items[1]:
+                self._errors.reset(cache, items[1])
+            elif items is not None and self._model.fiterror():
                 self._errors.reset(cache, self._theme.fiterror, False)
 
             self.__setbounds(cache, data)
@@ -243,7 +246,7 @@ class BaseHistPlotCreator(TaskPlotCreator[TModelAccess, PlotModelType]):
             cache[self._ref] = resetrefaxis(self._model, self._theme.reflabel)
             task = self._model.identification.task
             fit  = getattr(task, 'fit', {}).get(self._model.sequencekey, None)
-            if fit is None or len(fit.peaks) <= 0:
+            if itms is None or fit is None or len(fit.peaks) <= 0:
                 cache[self._ref].update(visible = False)
             else:
                 label = self._model.sequencekey

@@ -153,9 +153,14 @@ class TaskPlotModelAccess(PlotModelAccess):
         ctrl  = self.processors()
         return None if ctrl is None else  next(iter(ctrl.run(copy = True)))
 
-    def runcontext(self, *processors: Processor, copy = True) -> ReplaceProcessors:
+    def runcontext(
+            self,
+            *processors: Processor,
+            ctrl: Optional[ProcessorController] = None,
+            copy: bool                          = True
+    ) -> ReplaceProcessors:
         "returns a ReplaceProcessors context from which a trackview can be obtains"
-        return ReplaceProcessors(self.processors(), *processors, copy = copy)
+        return ReplaceProcessors(ctrl if ctrl else self.processors(), *processors, copy = copy)
 
     def addtodoc(self, _):
         "adds items to the doc"

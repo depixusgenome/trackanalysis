@@ -140,20 +140,24 @@ class ConfigXlsxIO(TaskIO):
         if ind is not None:
             model.insert(ind+1, ExceptionCatchingTask(exceptions = [DataCleaningException]))
 
-        if not isinstance(model[-1], pksmdl.identification.tasktype):
+        if not any(isinstance(i, pksmdl.identification.tasktype) for i in model):
+            # If this methods gets called prior to the user using the peaks tab, some
+            # tasks - irrelevant to the visited tabs - may have never been appended.
+            # We add them now
             missing: tuple = (
                 pksmdl.eventdetection,
                 pksmdl.peakselection,
                 *(getattr(pksmdl, i) for i in self.__TASKS if getattr(pksmdl, i).task)
             )
-            while len(missing):
-                if not isinstance(model[-1], tuple(i.tasktype for i in missing)):
-                    return model + [deepcopy(i.configtask) for i in missing]
+            while len(missing) and isinstance(model[-1], tuple(i.tasktype for i in missing)):
                 missing = missing[1:]
+            model = model + [deepcopy(i.configtask) for i in missing]
 
         ref = pksmdl.fittoreference.reference
-        ind = next((i for i, j in enumerate(model) if isinstance(j, FitToReferenceTask)),
-                   None)
+        ind = next(
+            (i for i, j in enumerate(model) if isinstance(j, FitToReferenceTask)),
+            None
+        )
         if ref is not None and ind is not None:
             procs                  = self.__ctrl.tasks.processors(ref, PeakSelectorTask)
             model[ind]             = _SafeTask(**model[ind].config())

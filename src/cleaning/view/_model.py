@@ -75,7 +75,8 @@ class BeadSubtractionAccess(TaskAccess, tasktype = BeadSubtractionTask):
     @beads.setter
     def beads(self, vals):
         "returns beads to subtract"
-        self.update(beads = sorted(vals), disabled = len(vals) == 0)
+        lst               = list(vals) if vals else []
+        self.update(beads = sorted(lst), disabled = len(lst) == 0)
 
     def referencebeads(self) -> Optional[List[int]]:
         "return beads from the reference if they exist"

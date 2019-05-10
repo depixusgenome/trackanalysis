@@ -4,8 +4,10 @@
 # pylint: disable=wrong-import-position,ungrouped-imports,no-member,invalid-name
 # pylint: disable=unused-argument,unused-import,no-name-in-module
 "Tests interval detection"
+import os
 import warnings
-from   concurrent.futures import ThreadPoolExecutor
+from   concurrent.futures import ProcessPoolExecutor
+import pytest
 from   tests.testutils import integrationmark
 
 
@@ -143,61 +145,64 @@ def _holoviewing_hpin():
           """,
           ref.display(sequence=hpin, oligos=refs, fit = True).display()[25])
 
-def _holoviewing_ref_1d():
+def _holoviewing_ref_1d(tpe):
     from scripting import Tasks
     tracks = _data()
-    dmap = tracks.peaks[['AACG', 'CCTC'], [12, 25]](format = None, reference = 'ref').display()
-    _comp("""
-          :Overlay
-             .Area.Ref    :Area   [z]   (events)
-             .Curve.Ref   :Curve   [z]   (events)
-             .Scatter.Ref :Scatter   [z]   (events)
-             .Scatter.I   :Scatter   [z]   (events)
-             .Curve.I     :Curve   [z]   (events)
-             .Curve.Key   :Curve   [z]   (events)
-             .Scatter.Key :Scatter   [z]   (events)
-             .Scatter.II  :Scatter   [z]   (events)
-             .Curve.II    :Curve   [z]   (events)
-             .Text.I      :Text   [z,events]
-          """, dmap['AACG',12], dmap['CCTC',25])
+    if tpe == 1:
+        dmap = tracks.peaks[['AACG', 'CCTC'], [12, 25]](format = None, reference = 'ref').display()
+        _comp("""
+              :Overlay
+                 .Area.Ref    :Area   [z]   (events)
+                 .Curve.Ref   :Curve   [z]   (events)
+                 .Scatter.Ref :Scatter   [z]   (events)
+                 .Scatter.I   :Scatter   [z]   (events)
+                 .Curve.I     :Curve   [z]   (events)
+                 .Curve.Key   :Curve   [z]   (events)
+                 .Scatter.Key :Scatter   [z]   (events)
+                 .Scatter.II  :Scatter   [z]   (events)
+                 .Curve.II    :Curve   [z]   (events)
+                 .Text.I      :Text   [z,events]
+              """, dmap['AACG',12], dmap['CCTC',25])
 
-    dmap = tracks.peaks[['AACG', 'CCCC'], [12, 25]](format = '1d', reference = 'ref').display()
-    _comp("""
-          :Overlay
-             .Area.Ref     :Area   [z]   (events)
-             .Curve.Ref    :Curve   [z]   (events)
-             .Scatter.Ref  :Scatter   [z]   (events)
-             .Scatter.I    :Scatter   [z]   (events)
-             .Curve.I      :Curve   [z]   (events)
-             .Curve.AACG   :Curve   [z]   (events)
-             .Scatter.AACG :Scatter   [z]   (events)
-             .Scatter.II   :Scatter   [z]   (events)
-             .Curve.II     :Curve   [z]   (events)
-             .Curve.CCCC   :Curve   [z]   (events)
-             .Scatter.CCCC :Scatter   [z]   (events)
-             .Scatter.III  :Scatter   [z]   (events)
-             .Curve.III    :Curve   [z]   (events)
-             .Text.I       :Text   [z,events]
-          """, dmap[12], dmap[25])
+    elif tpe == 2:
+        dmap = tracks.peaks[['AACG', 'CCCC'], [12, 25]](format = '1d', reference = 'ref').display()
+        _comp("""
+              :Overlay
+                 .Area.Ref     :Area   [z]   (events)
+                 .Curve.Ref    :Curve   [z]   (events)
+                 .Scatter.Ref  :Scatter   [z]   (events)
+                 .Scatter.I    :Scatter   [z]   (events)
+                 .Curve.I      :Curve   [z]   (events)
+                 .Curve.AACG   :Curve   [z]   (events)
+                 .Scatter.AACG :Scatter   [z]   (events)
+                 .Scatter.II   :Scatter   [z]   (events)
+                 .Curve.II     :Curve   [z]   (events)
+                 .Curve.CCCC   :Curve   [z]   (events)
+                 .Scatter.CCCC :Scatter   [z]   (events)
+                 .Scatter.III  :Scatter   [z]   (events)
+                 .Curve.III    :Curve   [z]   (events)
+                 .Text.I       :Text   [z,events]
+              """, dmap[12], dmap[25])
 
-    dmap = tracks.peaks[['AACG', 'CCTC'], [12, 25]](format = '1d', reference = 'ref').display()
-    _comp("""
-          :Overlay
-             .Area.Ref     :Area   [z]   (events)
-             .Curve.Ref    :Curve   [z]   (events)
-             .Scatter.Ref  :Scatter   [z]   (events)
-             .Scatter.I    :Scatter   [z]   (events)
-             .Curve.I      :Curve   [z]   (events)
-             .Curve.AACG   :Curve   [z]   (events)
-             .Scatter.AACG :Scatter   [z]   (events)
-             .Scatter.II   :Scatter   [z]   (events)
-             .Curve.II     :Curve   [z]   (events)
-             .Curve.CCTC   :Curve   [z]   (events)
-             .Scatter.CCTC :Scatter   [z]   (events)
-             .Scatter.III  :Scatter   [z]   (events)
-             .Curve.III    :Curve   [z]   (events)
-             .Text.I       :Text   [z,events]
-          """, dmap[12], dmap[25])
+    else:
+        dmap = tracks.peaks[['AACG', 'CCTC'], [12, 25]](format = '1d', reference = 'ref').display()
+        _comp("""
+              :Overlay
+                 .Area.Ref     :Area   [z]   (events)
+                 .Curve.Ref    :Curve   [z]   (events)
+                 .Scatter.Ref  :Scatter   [z]   (events)
+                 .Scatter.I    :Scatter   [z]   (events)
+                 .Curve.I      :Curve   [z]   (events)
+                 .Curve.AACG   :Curve   [z]   (events)
+                 .Scatter.AACG :Scatter   [z]   (events)
+                 .Scatter.II   :Scatter   [z]   (events)
+                 .Curve.II     :Curve   [z]   (events)
+                 .Curve.CCTC   :Curve   [z]   (events)
+                 .Scatter.CCTC :Scatter   [z]   (events)
+                 .Scatter.III  :Scatter   [z]   (events)
+                 .Curve.III    :Curve   [z]   (events)
+                 .Text.I       :Text   [z,events]
+              """, dmap[12], dmap[25])
 
 def _holoviewing_ref_2d():
     from scripting import Tasks
@@ -224,7 +229,17 @@ def _holoviewing_ref_2d():
              .Text.III    :Text   [z,key]
           """, dmap[12], dmap[25])
 
-def _run_holoviewing(fcn):
+def _processrun(fcn, *args):
+    from tests.testutils.modulecleanup import modulecleanup
+    for _ in modulecleanup(pairs = [('ACCEPT_SCRIPTING', 'jupyter')]):
+        fcn(*args)
+
+_HEADLESS = (
+    os.environ.get("DPX_TEST_HEADLESS", '').lower().strip() in ('true', '1', 'yes')
+    or 'DISPLAY' not in os.environ
+)
+
+def _run_holoviewing(fcn, *args):
     with warnings.catch_warnings():
         for i in [
                 ".*Using or importing the ABCs from 'collections'.*",
@@ -236,35 +251,40 @@ def _run_holoviewing(fcn):
                 category = DeprecationWarning,
                 message  = i
             )
-        with ThreadPoolExecutor(1) as pool:
-            pool.submit(fcn).result(timeout = 300)
+
+        if _HEADLESS:
+            with ProcessPoolExecutor(1) as pool:
+                pool.submit(_processrun, fcn, *args).result(timeout = 120)
+        else:
+            _processrun(fcn, *args)
 
 @integrationmark
-def test_holoviewing_callbacks(holoviewingcleaner):
+def test_holoviewing_callbacks():
     "test jupyter callbacks"
     _run_holoviewing(_callbacks)
 
 @integrationmark
-def test_holoviewing_simple(holoviewingcleaner):
+def test_holoviewing_simple():
     "test simple graphs"
     _run_holoviewing(_holoviewing)
 
 @integrationmark
-def test_holoviewing_hpin(holoviewingcleaner):
+def test_holoviewing_hpin():
     "test hpin graphs"
     _run_holoviewing(_holoviewing_hpin)
 
+@pytest.mark.skipif(_HEADLESS, reason = "the test can hang when run without displays")
 @integrationmark
-def test_holoviewing_ref1d(holoviewingcleaner):
-    "test hpin graphs"
-    _run_holoviewing(_holoviewing_ref_1d)
-
-@integrationmark
-def test_holoviewing_ref2d(holoviewingcleaner):
+def test_holoviewing_ref2d():
     "test hpin graphs"
     _run_holoviewing(_holoviewing_ref_2d)
 
+@pytest.mark.skipif(_HEADLESS, reason = "the test can hang when run without displays")
+@integrationmark
+@pytest.mark.parametrize("tpe", [1,2,3])
+def test_holoviewing_ref1d(tpe):
+    "test hpin graphs"
+    _run_holoviewing(_holoviewing_ref_1d, tpe)
+
 if __name__ == '__main__':
-    from tests.testutils.modulecleanup import modulecleanup
-    for x in modulecleanup(pairs = [('ACCEPT_SCRIPTING', 'jupyter')]):
-        test_holoviewing_simple(x)
+    test_holoviewing_simple()

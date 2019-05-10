@@ -551,11 +551,21 @@ class _IdAccessor:
         self._name = 'match' if attr == 'window' else 'fit'
         if attr == 'alg':
             self._fget = lambda i: isinstance(i, PeakGridFit)
-            self._fset = lambda _, i: ((ChiSquareFit, PeakGridFit)[i](),)
+            self._fset = lambda j, i: (
+                (ChiSquareFit, PeakGridFit)[i](symmetry = (
+                    Symmetry.both if j.symmetry == Symmetry.both else
+                    Symmetry.left if i else
+                    Symmetry.right
+                )),
+            )
         elif attr == 'fpos':
             self._fget = lambda i: i.symmetry == Symmetry.both
             self._fset = lambda j, i: {
-                'symmetry': Symmetry.both if i else type(j).symmetry
+                'symmetry': (
+                    Symmetry.both if i else
+                    Symmetry.left if isinstance(j, PeakGridFit) else
+                    Symmetry.right
+                )
             }
         else:
             self._fget = lambda i: getattr(i, attr)
