@@ -13,6 +13,7 @@
 #include <limits>
 #include <type_traits>
 #ifdef __GNUC__
+# define MAC_OS_X_VERSION_MIN_REQUIRED 0
 # ifndef __cpp_noexcept_function_type
 #   define __cpp_noexcept_function_type 0
 # endif
@@ -21,6 +22,8 @@
 #   define __NVCC__ 0
 # endif
 # ifndef __clang__
+#   define __clang_major__ 0
+#   define __clang_major___WORKAROUND_GUARD 0
 #   if (__GNUC__ == 7 || (__GNUC__ == 8 && __GNUC_MINOR__ <= 3))
 #     pragma GCC diagnostic push
 #     pragma GCC diagnostic ignored "-Wdeprecated-declarations"
