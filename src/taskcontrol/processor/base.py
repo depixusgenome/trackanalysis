@@ -117,7 +117,7 @@ class Processor(Generic[TaskType]):
             if (hasattr(cls, '__call__')
                     and cls.__name__[0] != '_'
                     and not issubclass(cls, _tasks.Task)):
-                return cls(**self.task.config())
+                return cast(Callable, cls)(**self.task.config())
 
             bases.extend(cls.__bases__)
 
