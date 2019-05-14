@@ -1,46 +1,9 @@
 #pragma once
-#ifndef __cpp_noexcept_function_type
-# define __cpp_noexcept_function_type 0
-#endif
-#ifndef __NVCC___WORKAROUND_GUARD
-# define __NVCC___WORKAROUND_GUARD 0
-#endif
-#ifndef __NVCC__
-# define __NVCC__ 0
-#endif
 #include <valarray>
 #include <list>
 #include <limits>
 #include <type_traits>
-#ifdef __GNUC__
-# define MAC_OS_X_VERSION_MIN_REQUIRED 0
-# ifndef __cpp_noexcept_function_type
-#   define __cpp_noexcept_function_type 0
-# endif
-# ifndef __NVCC___WORKAROUND_GUARD
-#   define __NVCC___WORKAROUND_GUARD 0
-#   define __NVCC__ 0
-# endif
-# ifndef __clang__
-#   define __clang_major__ 0
-#   define __clang_major___WORKAROUND_GUARD 0
-#   if (__GNUC__ == 7 || (__GNUC__ == 8 && __GNUC_MINOR__ <= 3))
-#     pragma GCC diagnostic push
-#     pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#     pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
-#     pragma GCC diagnostic ignored "-Wmisleading-indentation"
-#     pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-#     pragma GCC diagnostic ignored "-Wparentheses"
-#   endif
-# else
-#   if (__clang_major__ <= 8)
-#     pragma GCC diagnostic push
-#     pragma GCC diagnostic ignored "-Wmissing-noreturn"
-#     pragma GCC diagnostic ignored "-Wunused-parameter"
-#     pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#   endif
-# endif
-#endif
+#include "utils/boostwarnings.h"
 #include <boost/accumulators/statistics/rolling_mean.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/min.hpp>
@@ -54,17 +17,7 @@
 #include <boost/accumulators/statistics/extended_p_square_quantile.hpp>
 #include <boost/accumulators/framework/accumulator_base.hpp>
 #include <boost/accumulators/framework/parameters/sample.hpp>
-#ifdef __GNUC__
-# ifndef __clang__
-#   if (__GNUC__ == 7 || (__GNUC__ == 8 && __GNUC_MINOR__ <= 3))
-#     pragma GCC diagnostic pop
-#   endif
-# else
-#   if (__clang_major__ <= 8)
-#     pragma GCC diagnostic pop
-#   endif
-# endif
-#endif
+#include "utils/boostwarnings.h"
 
 #include "signalfilter/accumulators.h"
 namespace signalfilter { namespace stats

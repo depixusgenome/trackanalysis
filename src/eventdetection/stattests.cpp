@@ -1,27 +1,9 @@
 #ifdef __GNUC__
-# ifndef __cpp_noexcept_function_type
-#   define __cpp_noexcept_function_type 0
-# endif 
-# define MAC_OS_X_VERSION_MIN_REQUIRED 0
-# ifndef __clang__
-#   define __clang_major__ 0
-#   define __clang_major___WORKAROUND_GUARD 0
-#   if(__GNUC__ == 7) || (__GNUC__ == 8 && __GNUC_MINOR__ <= 3)
-#     pragma GCC diagnostic push
-#     pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
-#     pragma GCC diagnostic ignored "-Wparentheses"
-#   endif
-# endif
-#endif
+#include "utils/boostwarnings.h"
 #include <boost/math/distributions/students_t.hpp>
 #include <boost/math/distributions/normal.hpp>
 #include "eventdetection/stattests.h"
-#ifdef __GNUC__
-# ifndef __clang__
-#   if(__GNUC__ == 7) || (__GNUC__ == 8 && __GNUC_MINOR__ <= 3)
-#     pragma GCC diagnostic pop
-#   endif
-# endif
+#include "utils/boostwarnings.h"
 #endif
 
 namespace bm = boost::math;
