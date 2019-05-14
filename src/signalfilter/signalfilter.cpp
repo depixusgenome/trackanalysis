@@ -9,7 +9,7 @@ namespace signalfilter
         using namespace signalfilter::stats;
         struct _BaseQuality
         {
-            _BaseQuality()                     = default;
+            _BaseQuality()                     = delete;
             _BaseQuality(_BaseQuality const &) = default;
             template <typename T>
             _BaseQuality(T const & cf, size_t w, bool norm)
