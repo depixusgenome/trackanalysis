@@ -1,23 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Calls on waf directly: this is a link which both windows and git can understand"
-import  sys
-import  subprocess
-from    pathlib     import Path
-
-fname = Path.cwd()/"wafbuilder"/"bin"/"waf"
-if not fname.exists():
-    msg  = "Missing wafbuilder: do\n"
-    msg += "    git submodules update --init --recursive\n"
-    raise IOError(msg)
-
-args = tuple(sys.argv)
-if args[0].startswith('python'):
-    args = args[2:]
-else:
-    args = args[1:]
-
-if sys.platform.startswith('win'):
-    subprocess.run([str(fname.with_suffix(".bat"))] + list(args))
-else:
-    subprocess.run([str(fname)] + list(args))
+import sys
+from importlib import import_module
+sys.path.insert(0, "./wafbuilder/bin")
+import_module("call_waf")
