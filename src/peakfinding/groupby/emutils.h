@@ -4,12 +4,7 @@
 #include<iostream>
 #include<float.h>
 #include<math.h>
-#include "utils/boostwarnings.h"
-#include<boost/numeric/ublas/matrix.hpp>
-#include<boost/numeric/ublas/matrix_proxy.hpp>
-#include<boost/numeric/ublas/vector_proxy.hpp>
-#include<boost/numeric/ublas/io.hpp>
-#include "utils/boostwarnings.h"
+#include "peakfinding/groupby/emutils_boost.h"
 
 namespace peakfinding{
     namespace emutils{

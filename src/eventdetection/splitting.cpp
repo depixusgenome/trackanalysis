@@ -1,12 +1,6 @@
 #include <limits>
-#include "utils/boostwarnings.h"
-#include <boost/accumulators/statistics/rolling_variance.hpp>
-#include <boost/accumulators/statistics/mean.hpp>
-#include <boost/accumulators/statistics/min.hpp>
-#include <boost/accumulators/statistics/max.hpp>
-#include <boost/math/distributions/chi_squared.hpp>
-#include "utils/boostwarnings.h"
 #include "signalfilter/accumulators.hpp"
+#include "eventdetection/splitting_boost.h"
 #include "eventdetection/splitting.h"
 
 namespace eventdetection {  namespace splitting {

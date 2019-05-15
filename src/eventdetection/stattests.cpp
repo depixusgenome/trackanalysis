@@ -1,11 +1,5 @@
-#ifdef __GNUC__
-#include "utils/boostwarnings.h"
-#include <boost/math/distributions/students_t.hpp>
-#include <boost/math/distributions/normal.hpp>
+#include "eventdetection/stattests_boost.h"
 #include "eventdetection/stattests.h"
-#include "utils/boostwarnings.h"
-#endif
-
 namespace bm = boost::math;
 
 namespace samples
