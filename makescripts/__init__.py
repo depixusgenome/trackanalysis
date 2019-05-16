@@ -22,7 +22,6 @@ _utils.ROOT      = str(Path(__file__).parent.parent)
 _utils.DEFAULT   = str(Path(__file__).parent.parent/"wscript")
 
 
-BaseContext = basecontext('../build')
 MODULES     = Modules(src = ['core', 'src'])
 EXCLUDED    = "tests", "testutils", 'scripting', 'daq'
 
@@ -64,7 +63,7 @@ def guimake(viewname, locs, scriptname = None):
     )
 
 locals().update(package(
-    BaseContext, MODULES, build,
+    MODULES,
     excluded      = EXCLUDED,
     libname       = "trackanalysis",
     resourcepaths = ["makescripts/"+i for i in ("index.gif", "application.desktop")],
