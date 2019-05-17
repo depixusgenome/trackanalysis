@@ -1,7 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Calls on waf directly: this is a link which both windows and git can understand"
+"Calls on waf directly: this is a link which both windows and git can understand"
 import sys
-from importlib import import_module
+from   importlib import import_module
+
 sys.path.insert(0, "./wafbuilder/bin")
-import_module("call_waf")
+try:
+    import_module("call_waf")
+except ModuleNotFoundError:
+    import subprocess
+    try:
+        subprocess.check_call(["git", "submodule", "update", "--init", "--recursive"])
+    except subprocess.CalledProcessError:
+        raise IOError(
+            "Missing wafbuilder: do\n"
+            +"    git submodules update --init --recursive\n"
+        )
+    import_module("call_waf")
