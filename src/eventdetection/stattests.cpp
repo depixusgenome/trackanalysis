@@ -1,4 +1,5 @@
-#include "eventdetection/stattests_boost.h"
+#include <boost/math/distributions/students_t.hpp>
+#include <boost/math/distributions/normal.hpp>
 #include "eventdetection/stattests.h"
 namespace bm = boost::math;
 
