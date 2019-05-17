@@ -26,11 +26,12 @@ if TYPE_CHECKING:
     class _Ellipsis:
         pass
 
-_none      = type('_none', (), {})
-_Proc      = Type[Processor]
-_Procs     = Union[Iterable[_Proc], _Proc]
-PATHTYPE   = Union[str, Path]
-PATHTYPES  = Union[PATHTYPE,Tuple[PATHTYPE,...]]
+_none     = type('_none', (), {})
+_Proc     = Type[Processor]
+_Procs    = Union[Iterable[_Proc], _Proc]
+_ProcDict = Union[Dict[Type[Task], Processor],_Procs,None]
+PATHTYPE  = Union[str, Path]
+PATHTYPES = Union[PATHTYPE,Tuple[PATHTYPE,...]]
 
 class ProcessorController:
     "data and model for tasks"
@@ -111,9 +112,18 @@ class ProcessorController:
         return other
 
     @classmethod
-    def create(cls, *models : Task, processors: Union[Dict,_Procs,None] = Processor
-              ) -> 'ProcessorController':
-        "creates a task pair for this model"
+    def create(cls, *models: Task, processors: _ProcDict = Processor) -> 'ProcessorController':
+        """
+        Creates a ProcessorController containing a list of task-processor pairs.
+
+        Parameters:
+        -----------
+        models: Tuple[Task]
+            a sequence of tasks
+        processors: Dict[Type[Task], Processor], Iterable[Type[Processor]] or None
+            this argument allows defining which processors to use for implementing
+            the provided tasks
+        """
         tasks = [] # type: List[Task]
         for i in models:
             if isinstance(i, Task):
@@ -149,6 +159,31 @@ class ProcessorController:
         return register(processor, force, cache, True)
 
 create   = ProcessorController.create # pylint: disable=invalid-name
+def process(
+        *models: Task,
+        processors: _ProcDict = Processor,
+        output: str = 'items'
+) -> Iterator:
+    """
+    Creates a ProcessorController, runs it and returns a chained iterator
+    of all its outputs.
+
+    # Parameters:
+
+    * model: Tuple[Task]
+        a sequence of tasks
+    * processors: Iterable[Type[Processor]] or Dict[Type[task], Processor]
+        this argument allows defining which processors to use for implementing
+        the provided tasks
+    * output: "items", "values" or "keys"
+        whether to return key-value pairs, values only or keys only, respectively.
+    """
+    assert output in {'items', 'values', 'keys'}
+    return (
+        j
+        for i in create(*models, processors = processors).run()
+        for j in (i if output == 'items' else getattr(i, output)())
+    )
 
 class BaseTaskController(Controller):
     "Data controller class"

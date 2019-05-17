@@ -73,12 +73,16 @@ class DataFrameFactory(Generic[Frame]):
                 res['bead'] = np.full(cnt, key)
         return res
 
-    def dataframe(self, frame, info) -> pd.DataFrame:
+    def dictionary(self, frame, info) -> Dict[str, np.ndarray]:
+        "creates a dataframe"
+        return self._run(frame, *info)
+
+    def dataframe(self, frame, info) -> Tuple[Any, pd.DataFrame]:
         "creates a dataframe"
         data = pd.DataFrame(self._run(frame, *info))
         inds = self.indexcolumns(len(data), info[0], frame)
         if len(inds):
-            data = pd.concat([pd.DataFrame(inds), data], 1)
+            data = pd.concat([pd.DataFrame(inds), data], 1, sort = False)
 
         cols = [i for i in self.task.indexes if i in data]
         if len(cols):
@@ -123,7 +127,7 @@ class SafeDataFrameProcessor(Processor[DataFrameTask]):
                 lst.append(frame[i])
             except ProcessorException:
                 continue
-        return pd.concat(lst) if lst else None
+        return pd.concat(lst, sort = False) if lst else None
 
     @staticmethod
     def __iter_subclasses() -> Iterator[type]:
@@ -158,4 +162,4 @@ class DataFrameProcessor(SafeDataFrameProcessor):
     """
     @classmethod
     def _merge(cls, task, frame):
-        return pd.concat([i for _, i in cls._apply(task, frame)])
+        return pd.concat([i for _, i in cls._apply(task, frame)], sort = False)

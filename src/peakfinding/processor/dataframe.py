@@ -5,11 +5,8 @@ from   typing                      import Dict, List, Tuple, Callable, cast
 from   functools                   import partial
 import numpy                       as     np
 
-from   data.views                      import selectparent
-from   eventdetection.data             import Events, EventDetectionConfig
 from   taskcontrol.processor.dataframe import DataFrameFactory
-from   taskmodel                       import PHASE
-from   ..probabilities                 import Probability
+from   .probabilities                  import Probability, peakprobability
 from   .selector                       import PeaksDict
 
 @DataFrameFactory.adddoc
@@ -68,13 +65,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
     def __init__(self, task, frame, **kwa):
         super().__init__(task, frame)
 
-        tmp   = selectparent(frame, Events)
-        mdur  = (EventDetectionConfig() if tmp is None else tmp).events.select.minduration
-        frate = frame.track.framerate
-
-        self.__prob   = Probability(minduration = mdur, framerate = frate)
-        self.__ends   = frame.track.phase.duration(..., PHASE.measure)
-
+        self.__prob   = peakprobability(frame)
         meas          = dict(task.measures)
         meas.update(kwa)
         self.__events = meas.pop('events', None)
@@ -109,6 +100,14 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
         if any(j is not None for j in meas.values()):
             raise ValueError(f'Unrecognized measures {meas}')
 
+    def discardcolumns(self, *args) -> 'PeaksDataFrameFactory':
+        "discard some columns"
+        self.__attrs  = [i for i in self.__attrs if i[0] not in args]
+        self.__np     = [i for i in self.__np    if i[0] not in args]
+        self.__aggs   = [i for i in self.__aggs  if i[0] not in args]
+        self.__calls  = [i for i in self.__calls if i[0] not in args]
+        return self
+
     # pylint: disable=arguments-differ
     def _run(self, _1, _2, apeaks) -> Dict[str, np.ndarray]:
         peaks  = cast(Tuple[Tuple[float, np.ndarray], ...], tuple(apeaks))
@@ -133,8 +132,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
         meas.update({i: self.__peakmeasure(peaks, counts, j)  for i, j in self.__calls})
 
     def __probmeasure(self, meas, peaks, counts):
-        prob  = self.__prob
-        probs = [prob(i, self.__ends) for _, i in peaks]
+        probs = [self.__prob(i) for _, i in peaks]
         get   = lambda attr, obj: getattr(obj, attr)
         meas.update({i: self.__peakmeasure(probs, counts, partial(get, j))
                      for i, j in self.__attrs})

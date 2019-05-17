@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Tasks related to peakfinding"
-from typing                         import Optional, Iterable
+from typing                         import Optional, Iterable, Callable
 from functools                      import partial
 
 from data.views                     import selectparent
-from eventdetection.data            import Events, EventDetectionConfig
+from eventdetection.data            import Events, EventsArray, EventDetectionConfig
 from taskcontrol.processor          import Processor
 from taskmodel                      import Task, Level, PHASE
 from utils                          import initdefaults
@@ -19,6 +19,28 @@ class PeakProbabilityTask(Task):
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         super().__init__(**kwa)
+
+def peakprobability(
+        view,
+        framerate:   Optional[float] = None,
+        minduration: Optional[int]   = None
+) -> Callable[[EventsArray], Probability]:
+    "returns a function that can compute probability"
+    rate        = view.track.framerate if framerate is None else framerate
+    ends        = view.track.phase.duration(..., PHASE.measure)
+
+    minduration = None
+    while view is not None:
+        if isinstance(view, EventDetectionConfig):
+            minduration = view.events.select.minduration
+        elif hasattr(getattr(view, 'config', None), 'project'):
+            minduration = getattr(view, 'config', None).countthreshold
+        view = getattr(view, 'data', None)
+    if minduration is None:
+        raise RuntimeError("Missing min duration")
+
+    prob = Probability(minduration = minduration, framerate = rate)
+    return lambda evts: prob(evts, ends)
 
 class PeakProbabilityProcessor(Processor[PeakProbabilityTask]):
     "Computes probabilities for each peak"

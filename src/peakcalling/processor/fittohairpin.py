@@ -1,25 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Matching experimental peaks to hairpins: tasks and processors"
-from   typing                      import (Dict, List, Sequence, NamedTuple,
-                                           Type, Iterator, Tuple, Union, Optional,
-                                           Iterable, Any, cast)
+from   typing                      import (
+    Dict, Sequence, NamedTuple, List, Type, Iterator, Tuple, Union, Optional,
+    Iterable, Any, Callable, cast
+)
 
 import numpy                       as     np
 
 from   data.views                  import BEADKEY, TaskView, TrackView
-from   peakfinding.peaksarray      import (Output as PeakFindingOutput,
-                                           PeakListArray, PeaksArray)
-from   peakfinding.processor       import (PeaksDict, SingleStrandTask,
-                                           BaselinePeakTask, SingleStrandProcessor,
-                                           BaselinePeakProcessor)
+from   peakfinding.peaksarray      import (
+    Output as PeakFindingOutput, PeakListArray, PeaksArray
+)
+from   peakfinding.processor       import (
+    PeaksDict, SingleStrandTask, BaselinePeakTask, SingleStrandProcessor,
+    BaselinePeakProcessor
+)
+from   peakfinding.processor.dataframe import PeaksDataFrameFactory
 from   taskmodel                       import Task, Level
 from   taskcontrol.processor.taskview  import TaskViewProcessor
-from   taskcontrol.processor.dataframe import DataFrameFactory
-from   utils                       import (StreamUnion, initdefaults, updatecopy,
-                                           asobjarray, DefaultValue, isint)
-from   ..tohairpin                 import (HairpinFitter, PeakGridFit, Distance,
-                                           PeakMatching, Pivot, PEAKS_TYPE)
+from   taskcontrol.processor.dataframe import DataFrameFactory, DataFrameTask
+from   utils                       import (
+    StreamUnion, initdefaults, updatecopy, asobjarray, DefaultValue, isint
+)
+from   ..tohairpin                 import (
+    HairpinFitter, PeakGridFit, Distance, PeakMatching, Pivot, PEAKS_TYPE
+)
 from   .._base                     import Range
 
 class DistanceConstraint(NamedTuple):
@@ -190,6 +196,17 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
         "compute distances from peak data"
         if inp is None:
             inp = self.__topeaks(cast(PeakEvents, cast(dict, self.data)[key]))
+        bead = inp['peaks']
+        return {name: calc.optimize(bead) for name, calc in self.fits(key, inp).items()}
+
+    def fits(
+            self,
+            key: BEADKEY,
+            inp: Optional[PeakListArray] = None
+    ) -> Dict[Optional[str], HairpinFitter]:
+        "compute distances from peak data"
+        if inp is None:
+            inp = self.__topeaks(cast(PeakEvents, cast(dict, self.data)[key]))
 
         fits = dict(self.config.fit)
         cstr = self.config.constraints.get(key, None)
@@ -223,8 +240,7 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
             fits.update((i, updatecopy(j, pivot = Pivot.absolute))
                         for i, j in fits.items() if not j.hassinglestrand)
 
-        bead = inp['peaks']
-        return {name: calc.optimize(bead) for name, calc in fits.items()}
+        return fits
 
     def __beadoutput(self,
                      key     : BEADKEY,
@@ -272,26 +288,224 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
     """
     Transform a `FitToHairpinDict` to one or more `pandas.DataFrame`.
 
-    The dataframe contains one row per event selected in a peak.
+    The dataframe contains one row per bead and valid hairpin.
 
     # Default Columns
 
-    * *peak*: the peak position in nm to which the event belongs
-    * the peak position in base number for each hairpin provided. The name of
-    the column is that of the hairpin.
+    * hpin:           the hairpin name.
+    * cost:           the cost value for fitting to that hairpin.
+    * stretch:        the stretch value from fitting to that hairpin.
+    * bias:           the bias value from fitting to that hairpin.
+    * nbindings:      the number of expected bindings on the hairpin.
+    * nblockages:     the number of blockage positions detected on the bead.
+    * hfsigma:        the high frequency noise for that bead.
+    * considering blockage positions versus expected bindings:
+        * beadfalsepos:   the number of formers not assigned to any of the latters.
+        * beadfalseneg:   the number of latters without assignees.
+        * beadtruepos:    the number of assigned formers.
+        * beadresiduals:  the mean distance from a former to its assigned latter.
+        * beadduplicates: the number of assigned formers less the number of assigned latters.
+    * considering expected bindings versus blockage positions:
+        * hpinfalsepos:   the number of formers not assigned to any of the latters.
+        * hpinfalseneg:   the number of latters without assignees.
+        * hpintruepos:    the number of assigned formers.
+        * hpinresiduals:  the mean distance from a former to its assigned latter.
+        * hpinduplicates: the number of assigned formers less the number of assigned latters.
+    * For identified blockage positions:
+        * tpaverageduration:   the average event duration
+        * tphybridisationrate: the average event rate
+        * tpeventcount:        the average event count
+    * For non-identified blockage positions:
+        * fpaverageduration:   the average event duration
+        * fphybridisationrate: the average event rate
+        * fpeventcount:        the average event count
+
+    # Configuration
+
+    The following can be provided to the `measures` dictionnary of the task
+
+    * aggregator: Union[str, Callable[[Sequence[float]], float]
+        the aggregator to use, `np.nanmedian` by default.
+    * distances: Dict[str, float]
+        A dictionnary containing:
+        ```
+        {
+            'bead': max distance from blockage positions to an expected binding,
+            'hpin': max distance from expected bindings to a blockage position.
+        }
+        ```
+    * peaks: Dict[str, Any]
+        A dictionnary passed to a PeaksDataFrameFactory. The latter will
+        measure statistics on true positives and false positives, then report
+        the results aggregated by bead and hairpin.
+    * optionals: Dict[str, Callable[[FitToHairpinDict, int, FitBead], np.ndarray]]
+        A dictionnary for creating additional columns. The functions take 3 arguments,
+        the view, the bead id, and the results for that bead.
     """
     # pylint: disable=arguments-differ
+    def __init__(
+            self,
+            task,
+            frame:     FitToHairpinDict,
+            **kwa:     Callable[[FitToHairpinDict, int, FitBead], np.ndarray]
+    ):
+        super().__init__(task, frame)
+        meas                               = dict(task.measures, **kwa)
+        distances                          = meas.pop('distances', None)
+        self.__distances: Dict[str, float] = (
+            {
+                i: float(cast(int, distances))
+                for i in ('bead', 'hpin')
+            } if np.isscalar(distances) else
+
+            {
+            } if distances is None      else
+
+            {
+                str(i): float(j)
+                for i, j in dict(cast(dict, distances)).items()
+            }
+        )
+
+        peaks = DataFrameTask(measures = meas.pop('peaks', {}))
+        self.__peaks: PeaksDataFrameFactory = (
+            PeaksDataFrameFactory(peaks, frame)
+            .discardcolumns('track', 'bead', 'cycle', 'avg', 'peakposition')
+        )
+        self.__aggregator: Callable[[Sequence[float]], float] = cast(
+            Callable[[Sequence[float]], float],
+            self.getfunction(meas.pop('aggregator', 'median'))
+        )
+        self.__optionals:                                                      \
+            Dict[str, Callable[[FitToHairpinDict, int, FitBead], np.ndarray]]  \
+            = meas
+
+    def _run(
+            self,
+            frame: FitToHairpinDict,
+            bead:  int,
+            res:   FitBead
+    ) -> Dict[str, np.ndarray]: # type: ignore
+        frame = self.__config(frame)
+        fits  = frame.fits(bead, res.events)
+        out   = self.__basic(frame, bead, res, fits)
+        out.update(self.__complex(frame, res, fits))
+        out.update({i: j(frame, bead, res) for i, j in self.__optionals.items()})
+        return out
+
     @staticmethod
-    def _run(_1, _2, res:FitBead) -> Dict[str, np.ndarray]: # type: ignore
-        out: Dict[str, List[np.ndarray]] = {i: [] for i in ('cycle', 'peak', 'avg', 'start')}
-        for (peak, evts) in res.events:
-            for i, evt in enumerate(cast(Iterator[np.ndarray], evts)):
-                if len(evt):
-                    out['cycle'].append(np.full(len(evt), i,    dtype = 'i4'))
-                    out['peak'] .append(np.full(len(evt), peak, dtype = 'f4'))
-                    out['avg']  .append([np.nanmean(j) for j in evt['data']])
-                    out['start'].append(evt['start'])
-        out2 = {i: np.concatenate(j) for i, j in out.items()}
-        out2.update({cast(str, i): (out2['avg']-j.bias)*j.stretch
-                     for i, j in res.distances.items()})
-        return out2
+    def __config(frame: FitToHairpinDict) -> FitToHairpinDict:
+        cur   = frame
+        first = None
+        while hasattr(cur, 'data'):
+            if isinstance(getattr(cur, 'config', None), FitToHairpinTask):
+                first = cur
+            cur = cur.data
+
+        if not first:
+            raise AttributeError(
+                "Dataframe can only be created if"
+                +" a FitToHairpinTask is in the tasklist"
+            )
+        return cast(FitToHairpinDict, first)
+
+    @staticmethod
+    def __basic(
+            frame: FitToHairpinDict,
+            bead:  int,
+            res:   FitBead,
+            fits:  Dict[Optional[str], HairpinFitter]
+    ) -> Dict[str, np.ndarray]:
+        size = len(res.distances)
+        return {
+            'hpin'      : np.array(list(res.distances),                    dtype = '<U20'),
+            'cost'      : np.array([i[0] for i in res.distances.values()], dtype = 'f4'),
+            'stretch'   : np.array([i[1] for i in res.distances.values()], dtype = 'f4'),
+            'bias'      : np.array([i[2] for i in res.distances.values()], dtype = 'f4'),
+            'nbindings' : np.array([i.peaks.size for i in fits.values()],  dtype = 'i4'),
+            'nblockages': np.full (size, len(res.events),                  dtype = 'i4'),
+            'hfsigma'   : np.full (size, frame.track.rawprecision(bead),   dtype = 'f4')
+        }
+
+    def __complex(
+            self,
+            frame: FitToHairpinTask,
+            res:   FitBead,
+            fits:  Dict[Optional[str], HairpinFitter],
+    ) -> Dict[str, np.ndarray]:
+        out: Dict[str, List[float]] = {}
+        dist                        = res.distances
+        for tpe in ('bead', 'hpin'):
+            for hpin, alg in fits.items():
+                good = self.__bead_hpin_complex(
+                    tpe,
+                    out,
+                    self.__pks_complex(res, dist, hpin, alg),
+                    self.__dist_complex(tpe, hpin, frame.config)
+                )
+                if tpe != 'hpin':
+                    self.__tp_fp_complex(out, frame, res, good)
+        return out
+    @staticmethod
+    def __pks_complex(res, dist, hpin, alg) -> Tuple[np.ndarray, np.ndarray]:
+        return (
+            (res.events['peaks']-dist[hpin][2])*dist[hpin][1],
+            alg.peaks
+        )
+
+    def __dist_complex(self, tpe: str, hpin: Optional[str], config: FitToHairpinTask) -> float:
+        return (
+            self.__distances[tpe]       if tpe in self.__distances else
+            config.match[hpin].window   if hpin in config.match    else
+            config.DEFAULT_MATCH.window
+        )
+
+    def __bead_hpin_complex(
+            self,
+            tpe:  str,
+            out:  Dict[str, List[float]],
+            arrs: Tuple[np.ndarray, np.ndarray],
+            dist: float
+    ) -> np.ndarray:
+        left  = np.concatenate([[-1e30], arrs[tpe == "bead"], [1e30]])
+        right = arrs[tpe != "bead"]
+        inds  = np.searchsorted(left, right)
+        inds[left[inds]-right > right-left[inds-1]] -= 1
+
+        good  = np.abs(left[inds]-right) < dist
+        ids   = inds[good]-1
+
+        out.setdefault(tpe+'truepos',    []).append(good.sum())
+        out.setdefault(tpe+'falsepos',   []).append(good.size - good.sum())
+        out.setdefault(tpe+'duplicates', []).append(good.size - np.unique(ids).size)
+        out.setdefault(tpe+'residuals',  []).append(
+            self.__aggregator(
+                np.abs(arrs[tpe == 'bead'][ids]-arrs[tpe != 'bead'][good])
+                **2
+            )
+        )
+        return good
+
+    def __tp_fp_complex(
+            self,
+            out: Dict[str, List[float]],
+            frame:  FitToHairpinDict,
+            res:    FitBead,
+            good:   np.ndarray
+    ):
+        if frame.config.baseline:
+            ind = (
+                BaselinePeakProcessor(task = frame.config.baseline)
+                .index(frame, res.key, res.events)
+            )
+        else:
+            ind = None
+
+        for fmt in ('tp', 'fp'):
+            if ind is not None:
+                # remove the baseline
+                good[ind] = False
+            data = self.__peaks.dictionary(frame, (res.key, res.events))
+            for i, j in data.items():
+                out.setdefault(fmt+i, []).append(self.__aggregator(j))
+            good = np.logical_not(good)

@@ -11,6 +11,7 @@ from pytest                     import approx
 
 from taskcontrol.taskcontrol    import create
 from taskmodel.dataframe        import DataFrameTask
+from taskmodel.track            import TrackReaderTask
 from simulator.processor        import ByPeaksEventSimulatorTask
 from eventdetection.processor   import EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
@@ -335,5 +336,41 @@ def test_rescale():
     task = FitToHairpinTask()
     assert task.rescale(5.) is not task
 
+def test_hp_task_creation():
+    "test fit to hp dataframe"
+    task = FitToHairpinTask(
+        sequence = utpath("hairpins.fasta"),
+        oligos   = "ctgc",
+        fit      = ChiSquareFit(),
+    )
+    assert set(task.fit) == {'015', *(f"GF{i}" for i in range(1, 5))}
+    assert all(isinstance(i, ChiSquareFit) for i in task.fit.values())
+    assert_equal(task.fit['GF4'].peaks, [153, 205, 407, 496, 715, 845])
+    assert all(isinstance(i, ChiSquareFit) for i in task.fit.values())
+
+    task = FitToHairpinTask(
+        sequence = utpath("hairpins.fasta"),
+        oligos   = "ctgc",
+        fit      = PeakGridFit(),
+    )
+    assert set(task.fit) == {'015', *(f"GF{i}" for i in range(1, 5))}
+    assert all(isinstance(i, PeakGridFit) for i in task.fit.values())
+
+def test_hp_dataframe():
+    "test fit to hp dataframe"
+    pair = next(iter(create(
+        TrackReaderTask(path = utpath("big_legacy")),
+        EventDetectionTask(),
+        PeakSelectorTask(),
+        FitToHairpinTask(
+            sequence = utpath("hairpins.fasta"),
+            oligos   = "ctgc",
+            fit      = ChiSquareFit()
+        ),
+        DataFrameTask(merge = True),
+    ).run()))
+    assert pair.shape == (102, 20)
+    assert pair.index.names == ['hpin', 'track', 'bead']
+
 if __name__ == '__main__':
-    test_ref_piecespeaksgrid()
+    test_hp_dataframe()
