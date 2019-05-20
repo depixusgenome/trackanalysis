@@ -25,7 +25,7 @@ _utils.DEFAULT   = str(Path(__file__).parent.parent/"wscript")
 MODULES     = Modules(src = ['core', 'src'])
 EXCLUDED    = "tests", "testutils", 'scripting', 'daq'
 
-locals().update(MODULES.simple('../build/').items())
+locals().update(MODULES.simple().items())
 
 def configure(cnf):
     "configure wafbuilder"
