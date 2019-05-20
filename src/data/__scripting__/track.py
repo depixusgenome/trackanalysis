@@ -178,7 +178,7 @@ class _TrackMixin:
 
     def processors(self, *args, copy = True):
         "returns an iterator over the result of provided tasks"
-        procs = Tasks.processors(self.path, *args)
+        procs = Tasks.processors(self, *args)
         procs.data.setcachedefault(0, self)
         procs.copy = copy
         return procs

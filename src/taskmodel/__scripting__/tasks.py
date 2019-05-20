@@ -23,6 +23,7 @@ from utils.decoration            import addto
 from utils.attrdefaults          import toenum
 from taskmodel                   import Task, Level
 from taskmodel.application       import TasksConfig
+from taskmodel.track             import InMemoryTrackTask
 
 def _update(self, *args, **kwa):
     info = dict(*args, **kwa)
@@ -477,6 +478,11 @@ class Tasks(Enum):
         if isinstance(arg, cls):
             return arg(**kwa)
 
+        if isinstance(arg, Track):
+            if arg.path is None:
+                return InMemoryTrackTask(track = arg)
+            arg = arg.path
+
         if isinstance(arg, Task):
             return update(deepcopy(arg), **kwa)
 
@@ -492,9 +498,13 @@ class Tasks(Enum):
         if callable(arg):
             return cls.action(arg)
 
-        if (isinstance(arg, (Path, str))
-                or (isinstance(arg, (tuple, list))
-                    and isinstance(i, (Path, str)) for i in arg)):
+        if (
+                isinstance(arg, (Path, str))
+                or (
+                    isinstance(arg, (tuple, list))
+                    and all(isinstance(i, (Path, str)) for i in arg)
+                )
+        ):
             info = dict(kwa)
             info.setdefault('path', arg)
             return cls('trackreader').tasktype()(**info)
@@ -502,7 +512,7 @@ class Tasks(Enum):
         if isinstance(arg, (tuple, list)) and len(arg) == 2:
             return cls(arg[0])(**arg[1], **kwa)
 
-        raise RuntimeError('arguments are unexpected')
+        raise RuntimeError(f'Arguments are unexpected: *({arg}), **({kwa})')
 
 @addto(Task)
 def nondefaults(self) -> Dict[str, Any]:
