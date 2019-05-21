@@ -37,7 +37,7 @@ def peakprobability(
             minduration = getattr(view, 'config', None).countthreshold
         view = getattr(view, 'data', None)
     if minduration is None:
-        raise RuntimeError("Missing min duration")
+        minduration = EventDetectionConfig().events.select.minduration
 
     prob = Probability(minduration = minduration, framerate = rate)
     return lambda evts: prob(evts, ends)
