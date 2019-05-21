@@ -175,7 +175,7 @@ def defaulttasklist(obj, upto, cleaned:bool = None, __old__ = Tasks.defaulttaskl
 @addto(Tasks)
 def default(self, __old__ = Tasks.default) -> Task:
     "returns default tasks"
-    return Tasks.defaults(self, self.tasksmodel())
+    return __old__(self, self.tasksmodel())
 
 @addto(Track)
 def grfiles(self):
