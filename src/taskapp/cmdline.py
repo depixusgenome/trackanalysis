@@ -1,18 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Runs an app"
-from   pathlib import Path
-import sys
-import glob
-
-def _add_sys_paths():
-    paths = (str(Path(__file__).parent.parent.resolve()),)+tuple(glob.glob("*.pyz"))
-    for path in paths:
-        if path not in sys.path:
-            sys.path.append(path)
-_add_sys_paths()
-# pylint: disable=wrong-import-position
-from app.cmdline     import defaultclick, defaultmain, defaultinit, click, INITIAL_ORDERS
+from app.cmdline import defaultclick, defaultmain, defaultinit, click, INITIAL_ORDERS
 
 def _filtr(app, viewcls):
     if 'app.' not in app:
