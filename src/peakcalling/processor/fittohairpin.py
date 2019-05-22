@@ -288,12 +288,26 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
     """
     Transform a `FitToHairpinDict` to one or more `pandas.DataFrame`.
 
-    The dataframe contains one row per bead and valid hairpin.
+    The dataframe contains one row per bead and valid hairpin. By valid one means
+    a hairpin, for a given bead, which was fitted against the latter. Some hairpins
+    are considered incorrect, for example if their size is inconsistent with that
+    of the bead.
+    
+    As an example, if there are 2 possible hairpins and 3 beads, there should be
+    from 0 to 6 rows in the dataframe. Zero would imply that none of the beads
+    had a size consistent with any of the hairpins.
+    
+    # Default Indexes
+    
+    * track: the track from which is issued a given bead
+    * bead: the bead id in the track
 
     # Default Columns
 
     * hpin:           the hairpin name.
-    * cost:           the cost value for fitting to that hairpin.
+    * cost:           the cost value for fitting the bead to that hairpin. This
+    value may vary depending on which cost function was selected and its
+    configuration.
     * stretch:        the stretch value from fitting to that hairpin.
     * bias:           the bias value from fitting to that hairpin.
     * nbindings:      the number of expected bindings on the hairpin.
