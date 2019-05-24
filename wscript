@@ -18,9 +18,9 @@ require(python = {'python': PYVERS, 'numpy': '1.14.2', 'pandas': '0.21.0'},
         rtime  = True)
 
 require(python = {'pybind11'    : '2.2.1',
-                  'pylint'      : '=2.1.1',
-                  'astroid'     : '=2.0.3',
-                  'mypy'        : '=0.670'},
+                  'pylint'      : '=2.2.1',
+                  'astroid'     : '=2.1.0',
+                  'mypy'        : '=0.701'},
         rtime  = False)
 
 MODULES.addbuild(locals())
