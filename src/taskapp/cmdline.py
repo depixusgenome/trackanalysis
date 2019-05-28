@@ -3,6 +3,7 @@
 "Runs an app"
 import sys
 sys.path.insert(0, ".")
+# pylint: disable=wrong-import-position
 from app.cmdline import defaultclick, defaultmain, defaultinit, click, INITIAL_ORDERS
 
 def _filtr(app, viewcls):
