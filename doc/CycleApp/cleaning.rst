@@ -154,6 +154,7 @@ Finally one filter is performed over all cycles:
 
 The bottom-left table displays filter values for all cycles. In particular, the
 cycles which have been discarded are marked as such in the right-most column.
+The colored spot on the column titles follows the same code as on the plot. 
 
 Plot Colors
 -----------
