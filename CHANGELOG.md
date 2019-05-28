@@ -1,4 +1,13 @@
 # CycleApp
+## cycles_v6.9
+
+* 2019-xx-xx 10:20:10 +0200  (tag: cycles_v6.9)
+
+### Cleaning
+
+Colored spots have been added to the table of cycle statistics to facilitate
+reading the plots.
+
 ## cycles_v6.8
 
 * 2019-04-23 10:20:10 +0200  (tag: cycles_v6.8)
