@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """ access to files """
+from pathlib     import Path
+from typing      import cast
 from ..testutils import (
-        ResourcePath, getmonkey, DummyPool, Path, cast
+        ResourcePath, getmonkey, DummyPool
 )
 
 def _trackreadertask(fpath):
