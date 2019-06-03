@@ -188,6 +188,14 @@ def grfiles(self):
     old = self.path
     self.__init__(path = ((old,) if isinstance(old, str) else old)+paths)
 
+@addto(Tasks, staticmethod)
+def rescale(track, *args):
+    "rescale tasks according to the provided track"
+    mdl = scriptapp.tasksmodel()
+    if not args:
+        args = (next(iter(track.beads.keys())),)
+    scriptapp.control.theme.update(mdl, **mdl.rescale(track, *args))
+
 # pylint: disable=no-member,invalid-name
 scriptapp = _default.application(ScriptingView).open(None).topview.views[0] # type: ignore
 def localcontext(**kwa):
