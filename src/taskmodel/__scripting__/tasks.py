@@ -21,7 +21,7 @@ from taskcontrol.processor.utils import ActionTask
 from utils                       import update
 from utils.decoration            import addto
 from utils.attrdefaults          import toenum
-from taskmodel                   import Task, Level
+from taskmodel                   import Task, Level, InstrumentType
 from taskmodel.application       import TasksConfig
 from taskmodel.track             import InMemoryTrackTask
 
@@ -211,10 +211,6 @@ class Tasks(Enum):
         return (TasksConfig.picotwist if mdl is None else
                 getattr(TasksConfig, mdl.instrument))[self._cnv(self.name)]
 
-    @staticmethod
-    def _cnv(key: Optional[str]):
-        return _CNV if key is None else _CNV.get(key, key)
-
     def tasktype(self) -> Type[Task]:
         "returns the task type"
         return self.classes()[self.name]
@@ -251,8 +247,18 @@ class Tasks(Enum):
         """
         tasks = list(cls.__tasklist__()) # type: ignore
         paths = getattr(obj, 'path', obj)
-        if (getattr(obj, 'cleaned', cleaned)
-                or (isinstance(paths, (tuple, list)) and len(paths) > 1)):
+        if (
+                getattr(obj, 'cleaned', cleaned)
+                or (
+                    isinstance(paths, (tuple, list))
+                    and len(paths) > 1
+                    and (
+                        getattr(obj, 'instrument', {})
+                        .get('type', InstrumentType.picotwist)
+                        == InstrumentType.picotwist
+                    )
+                )
+        ):
             tasks = [i for i in tasks if i not in cls.__cleaning__()] # type: ignore
 
         upto  = cls(upto) if upto is not None and upto is not Ellipsis else Ellipsis
@@ -308,7 +314,6 @@ class Tasks(Enum):
         procs.copy = copy
         return procs
 
-
     def dumps(self, **kwa):
         "returns the json configuration"
         kwa.setdefault('saveall', False)
@@ -360,6 +365,10 @@ class Tasks(Enum):
             with pool:
                 out = tuple(out)
         return out
+
+    @staticmethod
+    def _cnv(key: Optional[str]):
+        return _CNV if key is None else _CNV.get(key, key)
 
     @staticmethod
     def _default_action(*args, **kwa):

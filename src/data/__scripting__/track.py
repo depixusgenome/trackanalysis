@@ -198,10 +198,11 @@ class _TrackMixin:
         If no Ellipsis is introduced, the list of tasks is completed using the reduced
         list in `Tasks.defaulttaskorder`. This list does not include any cleaning task.
         """
-        args = deepcopy(args)
-        itr  = next(iter(self.processors(*args).run(copy = copy)))
+        args  = deepcopy(args)
+        procs = self.processors(*args)
+        itr   = next(iter(procs.run(copy = copy)))
         assert not hasattr(itr, 'tasklist')
-        setattr(itr, 'tasklist', args)
+        setattr(itr, 'tasklist', procs.model)
         return itr
 
     @property
