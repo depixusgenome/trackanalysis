@@ -13,7 +13,7 @@
     margin-left:5px;
     text-align:center;
     width:auto; 
-    min-width:100%; 
+    min-width:100%!important; 
     height:28px;
 }
 #dpx-tb-doc  { float: right; }

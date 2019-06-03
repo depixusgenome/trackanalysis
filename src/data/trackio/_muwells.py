@@ -21,6 +21,7 @@ class LIAFilesIOConfiguration:
     engine:          str ="python"
     indexbias:       int = -7
     colnames:        str = '% Time (s), Amplitude (V)'
+    indexpower:      float     = .8
     indexthreshold:  float     = .8
     softthreshold:   float     = .1
     framerateapprox: float     = .1
@@ -205,24 +206,36 @@ class MuWellsFilesIO(TrackIO):
         msg = f"Framerate ({framerate}) differs from previous by {delta}"
         raise IOError(msg)
 
-    @staticmethod
-    def __extractdiffpeaks(trk, frames, cnf):
-        phases = trk['phases']
-        diff   = frames[tuple(frames)[1]].diff().values
-        ncols  = phases.shape[0]
-        cols   = diff[1:1+ncols*((len(diff)-1)//ncols)].reshape(ncols, -1)
-        thr    = np.nanmedian(np.nanmax(cols, axis = 1))
-        dist   = cnf.softthreshold * np.nanmedian(
-            np.nanmax(cols, axis = 1) - np.nanmin(cols, axis = 1)
-        )
-        pks    = (diff[2:-1] > diff[1:-2]) & (diff[2:-1] > diff[3:])
-        for i in range(5):
-            inds    = 2+np.nonzero(pks & (diff[2:-1] > thr-dist*pow(.8, i)))[0]
-            idiff   = np.diff(inds)
-            meddist = int(np.median(idiff)*cnf.indexthreshold)
-            if not np.any(idiff < meddist):
-                return inds
-        raise IOError("Could not extract peak threshold")
+    @classmethod
+    def __extractdiffpeaks(cls, trk, frames, cnf):
+        def _extract():
+            diff   = frames[tuple(frames)[1]].diff().values
+            ncols  = trk['phases'].shape[0]
+            cols   = diff[1:1+ncols*((len(diff)-1)//ncols)].reshape(ncols, -1)
+            thr    = np.nanmedian(np.nanmax(cols, axis = 1))
+            dist   = cnf.softthreshold * np.nanmedian(
+                np.nanmax(cols, axis = 1) - np.nanmin(cols, axis = 1)
+            )
+            pks    = (diff[2:-1] > diff[1:-2]) & (diff[2:-1] > diff[3:])
+            for i in range(5):
+                inds    = 2+np.nonzero(
+                    pks
+                    & (diff[2:-1] > thr-dist*pow(cnf.indexpower, i))
+                )[0]
+                idiff   = np.diff(inds)
+                meddist = int(np.median(idiff)*cnf.indexthreshold)
+                if not np.any(idiff < meddist):
+                    return inds
+            return None
+
+        inds  = _extract()
+        if inds is None:
+            name         = tuple(frames)[1]
+            frames[name] = -frames[name]
+            inds         = _extract()
+            if inds is None:
+                raise IOError("Could not extract peak threshold")
+        return inds
 
     @staticmethod
     def __bestfit(left, right):
