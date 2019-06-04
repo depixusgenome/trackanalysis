@@ -266,7 +266,7 @@ class MuWellsFilesIO(TrackIO):
         delttrk = np.append(delttrk, np.nanmedian(delttrk))
         deltamp = np.append(deltamp, np.nanmedian(deltamp))
         bias    = cnf.indexbias*framerate/trk['picofrate']
-        return bias + np.vstack([
+        phases  = bias + np.vstack([
             np.round((phases[i,:]-phases[i,2])* (k/j)+.5).astype('i4') + l
             for i, j, k, l in zip(
                 range(max(0, good), phases.shape[0]),
@@ -275,3 +275,8 @@ class MuWellsFilesIO(TrackIO):
                 indamp[max(0, -good):]
             )
         ])
+
+        for ind in range(phases.shape[0]):
+            if phases[ind, 0] >= 0:
+                return phases[ind:,]
+        return phases[:0,:]
