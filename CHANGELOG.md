@@ -17,6 +17,14 @@ This might be refered to as the *clipping* stage.
 * *discarded*: the percentage of frames discarded wether through data cleaning,
 alignment or clipping.
 
+### Micro Well Data
+
+Added automated detection of LIA data: the files must have a '.txt' extension
+and the directory must be either the same or vary only by replacing 'trk' by
+'txt' in the path.
+
+Can now deal with any polarity in µV as well as non-opening cycles.
+
 ## cycles_v6.8
 
 * 2019-04-23 10:20:10 +0200  (tag: cycles_v6.8)

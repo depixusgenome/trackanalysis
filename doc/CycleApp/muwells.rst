@@ -14,6 +14,9 @@ Currently, the micro-wells data comes in two files:
   3. lines containing the time, a semi-colon and the voltage
 
 Both files are unsynchronized. This is corrected upon loading the text file.
+The latter is detected automatically provided the track file and the text file
+vary by their extension and and the directory is either the same or varies only
+by replacing 'trk' by 'txt' in the path.
 
 Synchronization
 ===============
@@ -29,6 +32,8 @@ The synchronization is done by:
 5. correcting z-axis dependant parameters in the workflow according to this µV
    scale and the expected hairpin size. This size is 1073 bases per default
    (Hairpin HP5).
+
+The algorithm deal with inverted polarity in µV as well as non-opening cycles.
 
 Differences with the optical systems
 ====================================

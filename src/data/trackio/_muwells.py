@@ -46,14 +46,15 @@ class LIAFilesIOConfiguration:
 
 class MuWellsFilesIO(TrackIO):
     "checks and opens legacy GR files"
+    LEGACY  = -500
     DEFAULT = LIAFilesIOConfiguration()
     TRKEXT  = '.trk'
     LIAEXT  = '.txt'
     @classmethod
     def check(cls, path:PATHTYPES, **kwa) -> Optional[PATHTYPES]:
         "checks the existence of paths"
-        if not isinstance(path, (list, tuple, set, frozenset)) or len(path) < 2:
-            return None
+        if not isinstance(path, (list, tuple, set, frozenset)):
+            path = (path,)
 
         allpaths = tuple(Path(i) for i in cast(Tuple[PATHTYPE,...], path))
         if sum(1 for i in allpaths if i.suffix == cls.TRKEXT) != 1:
@@ -61,6 +62,16 @@ class MuWellsFilesIO(TrackIO):
 
         if any(i.is_dir() for i in allpaths):
             return None
+
+        if len(allpaths) == 1:
+            text = allpaths[0].with_suffix(cls.LIAEXT)
+            if not text.exists():
+                text = Path(*(
+                    cls.LIAEXT[1:] if i == cls.TRKEXT[1:] else i for i in text.parts
+                ))
+                if not text.exists():
+                    return None
+            allpaths += (text,)
 
         cnf = LIAFilesIOConfiguration(**dict(cls.DEFAULT.config(), **kwa))
         trk = next(i for i in allpaths if i.suffix == cls.TRKEXT)
@@ -178,11 +189,15 @@ class MuWellsFilesIO(TrackIO):
         phases = cls.__extractphases(trk, frames, frate, cnf)
         last   = int(phases[-1,-1]+np.median(phases[1:,0]-phases[:-1,-1])+.5)
         phases = np.round(phases + .5).astype('i4')
+        if np.any(np.diff(phases.ravel()) <= 0):
+            raise IOError("Could not synchronize the files: incorrect phases", "warning")
+
         arr    = frames[tuple(frames)[1]].values.astype('f4')
         if '(V)' in frames.columns[1]:
             arr *= 1e6
         else:
             raise NotImplementedError(f"Tension should be in (V) : {frames.columns[1]}")
+
 
         trk.update({
             index:                arr[phases[0,0]:last],
@@ -224,8 +239,17 @@ class MuWellsFilesIO(TrackIO):
                 )[0]
                 idiff   = np.diff(inds)
                 meddist = int(np.median(idiff)*cnf.indexthreshold)
-                if not np.any(idiff < meddist):
-                    return inds
+                if np.any(idiff < meddist):
+                    continue
+
+                meddist = int(np.median(idiff))
+                return np.concatenate(
+                    [
+                        [k for k in range(inds[i],inds[i+1]-meddist//2, meddist)]
+                        for i in range(len(inds)-1)
+                    ]
+                    +[inds[-1:]]
+                )
             return None
 
         inds  = _extract()
