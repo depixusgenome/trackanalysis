@@ -3,6 +3,7 @@
 "all cleaning related tasks"
 from   functools                import partial
 from   typing                   import Optional
+import warnings
 import numpy                    as     np
 from   data                     import Track
 from   taskmodel                import Level, PHASE, Task
@@ -76,18 +77,24 @@ class ClippingTask(Task):
         pha    = track.phase.select(..., [self.correction, self.correction+1]).ravel()
         itms   = np.split(data, pha)[1::2]
 
-        maxarr = (
-            np.array([(i>maxv).sum() for i in itms], dtype = 'i4')  if maxv is not None else
-            np.zeros(len(itms), dtype = 'i4')
-        )
-        minarr = (
-            np.array([(i<minv).sum() for i in itms], dtype = 'i4')  if maxv is not None else
-            np.zeros(len(itms), dtype = 'i4')
-        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                'ignore',
+                category = RuntimeWarning,
+                message  = ".*invalid value encountered.*"
+            )
+            maxarr = (
+                np.array([(i>maxv).sum() for i in itms], dtype = 'i4')  if maxv is not None else
+                np.zeros(len(itms), dtype = 'i4')
+            )
+            minarr = (
+                np.array([(i<minv).sum() for i in itms], dtype = 'i4')  if maxv is not None else
+                np.zeros(len(itms), dtype = 'i4')
+            )
         return Partial(
             "clipping",
-            np.nonzero(minarr > 0)[0],
-            np.nonzero(maxarr > 0)[0],
+            np.empty(0, dtype = 'i4'),
+            np.empty(0, dtype = 'i4'),
             (minarr + maxarr) / np.median(np.diff(pha))
         )
 
