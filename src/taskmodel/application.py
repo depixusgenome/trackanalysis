@@ -3,7 +3,7 @@
 "Deals with global information"
 from enum               import Enum
 from typing             import (Dict, Optional, List, Iterator, Type,
-                                Callable, Any, ClassVar, Iterable,
+                                Callable, Any, ClassVar, Iterable, Tuple,
                                 TYPE_CHECKING, cast)
 from copy               import deepcopy
 from utils              import initdefaults
@@ -284,6 +284,20 @@ class TasksModel:
         """
         self.config  = ctrl.theme  .add(self.config,  noerase)
         self.display = ctrl.display.add(self.display, noerase)
+
+def rescalingevent(ctrl, params, previous) -> Tuple[bool, Optional[float], Optional[float]]:
+    "return the rescaling parameter"
+    if 'rescaling' not in params and "roottask" not in params:
+        return True, None, None
+
+    root  = ctrl.display.get("tasks", "roottask")
+    if root is None:
+        return True, None, None
+
+    model = ctrl.theme.model("tasks")
+    instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
+    coeff = float(model.rescaling[instr]) if instr in model.rescaling else 1.
+    return (abs(coeff - previous) < 1e-5, coeff, coeff/previous)
 
 def setupdefaulttask(tasktype: Type[Task], name :str = '', **kwa) -> str:
     "add task to the instruments"

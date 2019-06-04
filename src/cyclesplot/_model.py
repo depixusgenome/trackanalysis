@@ -6,7 +6,7 @@ from typing                    import Optional, Dict, cast
 from model.plots               import PlotTheme, PlotModel, PlotAttrs, PlotDisplay
 from taskcontrol.modelaccess   import TaskAccess
 from taskmodel                 import RootTask
-from taskmodel.application     import TasksDisplay
+from taskmodel.application     import TasksDisplay, rescalingevent
 from tasksequences.modelaccess import SequencePlotModelAccess
 from utils                     import NoArgs, initdefaults
 
@@ -162,36 +162,21 @@ class CyclesModelAccess(SequencePlotModelAccess):
         @ctrl.theme.observe
         @ctrl.display.observe
         def _ontasks(old = None, **_):
-            if 'rescaling' not in old and "roottask" not in old:
-                return
+            cnf              = self.cycles.config
+            done, cur, coeff = rescalingevent(ctrl, old, cnf.rescaling)
+            if coeff:
+                ctrl.display.update(
+                    self.cycles.display,
+                    estimatedstretch = cnf.estimatedstretch/coeff,
+                )
 
-            root  = ctrl.display.get("tasks", "roottask")
-            if root is None:
-                return
-
-            model = ctrl.theme.model("tasks")
-            instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
-            coeff = float(model.rescaling[instr]) if instr in model.rescaling else 1.
-
-            cnf   = self.cycles.config
-            if abs(coeff - cnf.rescaling) < 1e-5:
-                return
-
-            cur    = coeff
-            coeff /= cnf.rescaling
-
-            ctrl.display.update(
-                self.cycles.display,
-                estimatedstretch = self.cycles.display.estimatedstretch/coeff,
-            )
-
-            ctrl.theme.update(
-                self.cycles.config,
-                estimatedstretch = cnf.estimatedstretch/coeff,
-                binwidth         = cnf.binwidth*coeff,
-                rescaling        = cur
-            )
-
+            if not done:
+                ctrl.theme.update(
+                    cnf,
+                    estimatedstretch = cnf.estimatedstretch/coeff,
+                    binwidth         = cnf.binwidth*coeff,
+                    rescaling        = cur
+                )
 
     @property
     def stretch(self) -> None:

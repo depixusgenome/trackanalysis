@@ -129,8 +129,8 @@ class PeaksTableWidget:
 class ConversionSliderTheme:
     "Conversion slider table theme"
     name    = "cycles.conversionslider"
-    stretch = dict(start = 900,  step  = 5, end = 1400, title = 'Stretch (base/µm)')
-    bias    = dict(step  = 1e-4, ratio = .25, offset = .05, title = 'Bias (µm)')
+    stretch = dict(title = 'Stretch (base/µm)', step = 200, ratio = .25)
+    bias    = dict(title = 'Bias (µm)',         step = 200, ratio = .25, offset = .05)
     width   = 280
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -152,30 +152,46 @@ class ConversionSlidersWidget:
 
     def addtodoc(self, *_) -> List[Widget]:
         "creates the widget"
-        widget = lambda x, s, e, n: Slider(value = getattr(self.__display, x),
-                                           title = getattr(self.__theme,  x)['title'],
-                                           step  = getattr(self.__theme,  x)['step'],
-                                           width = self.__theme.width,
-                                           start = s, end = e, name = n)
+        args           = dict(step = .1, start = 0, end = 10, value = 5)
+        self.__stretch = Slider(
+            name  = 'Cycles:Stretch',
+            title = self.__theme.stretch['title'],
+            width = self.__theme.width,
+            **args
+        )
 
-        vals = tuple(self.__theme.stretch[i] for i in ('start', 'end'))
-        self.__stretch = widget('stretch', vals[0], vals[1], 'Cycles:Stretch')
-        self.__bias    = widget('bias', -1., 1., 'Cycles:Bias')
+        self.__bias = Slider(
+            name  = 'Cycles:Bias',
+            title = self.__theme.bias['title'],
+            width = self.__theme.width,
+            **args
+        )
         return [self.__stretch, self.__bias]
 
     def reset(self, resets:CACHE_TYPE):
         "updates the widgets"
-        ratio  = self.__theme.bias['ratio']
-        if resets and self.__figdata in resets and 'data' in resets[self.__figdata]:
-            data = resets[self.__figdata]['data']
-        else:
-            data = self.__figdata.data
+        data = (
+            resets[self.__figdata]['data']
+            if resets and 'data' in resets.get(self.__figdata, ()) else
+            self.__figdata.data
+        )
         start  = data['bottom'][0]
-        end    = start + (data['top'][-1] - start)*ratio
+        end    = start + (data['top'][-1] - start)*self.__theme.bias['ratio']
         start -= self.__theme.bias['offset']
+        resets[self.__bias].update(
+            value = self.__display.bias,
+            start = start,
+            end   = end,
+            step  = (end - start)/self.__theme.bias['step']
+        )
 
-        resets[self.__bias].update(value = self.__display.bias, start = start, end = end)
-        resets[self.__stretch].update(value = self.__display.stretch)
+        center = self.__display.cycles.display.estimatedstretch
+        resets[self.__stretch].update(
+            value = self.__display.stretch,
+            start = center*(1.-self.__theme.stretch['ratio']),
+            end   = center*(1.+self.__theme.stretch['ratio']),
+            step  = center*2.*self.__theme.stretch['ratio']/self.__theme.bias['step']
+        )
 
         track  = self.__ctrl.tasks.track(self.__ctrl.display.get('tasks', "roottask"))
         if track:

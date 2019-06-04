@@ -10,6 +10,7 @@ from eventdetection.processor.__config__ import ExtremumAlignmentTask
 from model.plots                         import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from taskcontrol.modelaccess             import TaskPlotModelAccess, TaskAccess
 from taskmodel                           import RootTask
+from taskmodel.application               import rescalingevent
 from utils                               import NoArgs, initdefaults
 from ..beadsubtraction                   import FixedBeadDetection, FixedList
 from ..processor.__config__              import (DataCleaningTask,
@@ -163,26 +164,13 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
         @ctrl.theme.observe
         @ctrl.display.observe
         def _ontasks(old = None, **_):
-            if 'rescaling' not in old and "roottask" not in old:
-                return
-
-            root  = ctrl.display.get("tasks", "roottask")
-            if root is None:
-                return
-
-            model = ctrl.theme.model("tasks")
-            instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
-            coeff = float(model.rescaling[instr]) if instr in model.rescaling else 1.
-            if abs(coeff - self._fixedbeadsconfig.rescaling) < 1e-5:
-                return
-
-            cur    = coeff
-            coeff /= self._fixedbeadsconfig.rescaling
-            ctrl.theme.update(
-                self._fixedbeadsconfig,
-                rescaling = cur,
-                **dict(self._fixedbeadsconfig.zscaled(coeff))
-            )
+            done, cur, coeff = rescalingevent(ctrl, old, self._fixedbeadsconfig.rescaling)
+            if not done:
+                ctrl.theme.update(
+                    self._fixedbeadsconfig,
+                    rescaling = cur,
+                    **dict(self._fixedbeadsconfig.zscaled(coeff))
+                )
 
         @ctrl.theme.observe(self._fixedbeadsconfig)
         def _onchangeconfig(**_):
