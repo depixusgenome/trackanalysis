@@ -15,3 +15,4 @@
 .. |dzdt| replace:: :math:`\frac{dz}{dt}`
 .. |absz| replace:: :math:`|z|`
 .. |pingpong| replace:: :math:`\sum |\frac{dz}{dt}|`
+.. |clipping| replace:: :math:`z \notin range(\phi_1 \rightarrow \phi_3)`

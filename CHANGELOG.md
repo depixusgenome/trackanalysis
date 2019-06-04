@@ -6,7 +6,16 @@
 ### Cleaning
 
 Colored spots have been added to the table of cycle statistics to facilitate
-reading the plots.
+reading the plots. The following columns were added or changed:
+
+* *alignment*: the alignment value, with a median enforced at 0 for clarity.
+There could be NaN values wich imply that the cycle could not be aligned and is
+thus discarded.
+* *z ∉ range(φ₁ → φ₃)*: the percentage of frames sitting outside a range
+defined using median values in phases 1 and 3. Theses frames are discarded.
+This might be refered to as the *clipping* stage.
+* *discarded*: the percentage of frames discarded wether through data cleaning,
+alignment or clipping.
 
 ## cycles_v6.8
 

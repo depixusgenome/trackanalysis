@@ -167,7 +167,12 @@ The plot's |z| values are color-coded as follows:
 * Cycles with too few correct values are pink
 * |pingpong| cycles with too few correct values are pink
 * Non-closing cycles are dark orange.
-* |absz| and |dzdt|: outliers are red.
+* |absz| and |dzdt|: outliers are marked in red.
+* |clipping|: outliers as defined by the range of values in *aligned*
+  cycles (see below) are marked in purple.
+
+These colors are reported again in the table, using colored dots in the column
+headers.
 
 Cycle Alignment
 ===============
@@ -183,6 +188,7 @@ beads reduces Brownian motion the most. In practice, we find that:
 * There can be some variability in the bead's full extent, due either to some
   change in the way the oligonucleotide sequence is attached to the surface or
   the bead, or due to secondary structures forming in te sequence.
+
 
 The *best* alignment
 --------------------
@@ -206,8 +212,16 @@ The user can select the alignment described above or others:
 #. `φ1`: aligning all cycles on phase 1.
 #. `φ3`: aligning all cycles on phase 3.
 
-Post alignment cleaning
------------------------
+The median bias
+---------------
+
+Alignment values are reported in the table for each cycle. Only their value
+relative to one another is truly important. For the sake of clarity, in the
+table, values are reported after subtracting the median. In plots, the median
+bias is set such that the baseline is at zero.
+
+Post alignment cleaning: |clipping| 
+-----------------------------------
 
 Some data-cleaning is performed post-alignment: values in phase 5 are discarded
 which sit below the phase 1 values or above phase 3 values. The exact thresholds are:
@@ -215,7 +229,8 @@ which sit below the phase 1 values or above phase 3 values. The exact thresholds
 * low:  :math:`\mathrm{median}_\mathrm{\phi 1}(z)-\sigma[HF] \alpha`
 * high: :math:`\mathrm{median}_\mathrm{\phi 3}(z)`
 
-The value :math:`\alpha` can be set from the *advanced* settings.
+The value :math:`\alpha` can be set from the *advanced* settings. Values
+reported in the table is the percentage of outlier frames in phase 5.
 
 Advanced Options
 ================
