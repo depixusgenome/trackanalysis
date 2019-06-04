@@ -117,11 +117,14 @@ class TrackViewConfigMixin:
             self.actions.append(partial(self._f_samples, samples))
         return self
 
-    def withcopy(self:CSelf, cpy:bool = True) -> CSelf:
+    def withcopy(self:CSelf, cpy:bool = True, index:Optional[int] = None) -> CSelf:
         "specifies that a copy of the data should or shouldn't be made"
         fcn = getattr(self, 'copy', _m_copy)
         if cpy and fcn not in self.actions:
-            self.actions.append(fcn)
+            if index is None:
+                self.actions.append(fcn)
+            else:
+                self.actions.insert(index, fcn)
         elif not cpy and fcn in self.actions:
             self.actions.remove(fcn)
         return self

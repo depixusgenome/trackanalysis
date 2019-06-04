@@ -33,7 +33,7 @@ class TrackReaderProcessor(Processor[_tasks.TrackReaderTask]):
     @classmethod
     def __get(cls, attr, cpy, trk):
         vals = (trk,) if isinstance(trk, Track) else trk.values()
-        return tuple(getattr(i, attr).withcopy(cpy) for i in vals)
+        return tuple(getattr(i, attr).withcopy(cpy, 0) for i in vals)
 
     def run(self, args:'Runner'):
         "updates frames"

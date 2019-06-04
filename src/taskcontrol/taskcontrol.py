@@ -36,7 +36,7 @@ PATHTYPES = Union[PATHTYPE,Tuple[PATHTYPE,...]]
 class ProcessorController:
     "data and model for tasks"
     __slots__ = ('model', 'data', 'copy')
-    def __init__(self, copy = False):
+    def __init__(self, copy = True):
         self.model: List[Task] = []
         self.data              = Cache()
         self.copy              = copy

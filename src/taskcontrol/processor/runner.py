@@ -198,7 +198,7 @@ class Runner:
             if not proc.task.disabled:
                 proc.run(self)
                 if first and copy:
-                    self.gen = tuple(frame.withcopy(True) for frame in self.gen)
+                    self.gen = tuple(frame.withcopy(True, 0) for frame in self.gen)
                 first  = False
         return () if self.gen is None else self.gen
 
