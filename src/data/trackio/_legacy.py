@@ -13,7 +13,8 @@ from    ._pickle           import PickleIO
 
 class LegacyTrackIO(TrackIO):
     "checks and opens legacy track paths"
-    TRKEXT = '.trk'
+    PRIORITY = -1000
+    TRKEXT   = '.trk'
     @classmethod
     def check(cls, path:PATHTYPES, **_) -> Optional[PATHTYPES]:
         "checks the existence of a path"

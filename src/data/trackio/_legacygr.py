@@ -16,6 +16,7 @@ from    ._legacy           import LegacyTrackIO
 
 class LegacyGRFilesIO(TrackIO):
     "checks and opens legacy GR files"
+    PRIORITY  = -2000
     TRKEXT    = '.trk'
     GREXT     = '.gr'
     CGREXT    = '.cgr'

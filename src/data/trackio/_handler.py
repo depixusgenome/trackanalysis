@@ -13,7 +13,7 @@ from    ._base    import TrackIO, globfiles, PATHTYPES
 if TYPE_CHECKING:
     from    ._base import Track
 
-_CALLERS = TrackIO.__subclasses__
+_CALLERS = lambda: sorted(TrackIO.__subclasses__(), key = lambda i: -i.PRIORITY)
 
 class Handler:
     "A handler for opening the provided path"

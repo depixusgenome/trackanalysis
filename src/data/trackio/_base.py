@@ -33,6 +33,7 @@ def globfiles(path:str):
 
 class TrackIO(ABC):
     "interface class for Track IO"
+    PRIORITY = 1000
     @classmethod
     @abstractmethod
     def check(cls, path:PATHTYPES, **_) -> Optional[PATHTYPES]:
