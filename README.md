@@ -36,32 +36,33 @@ miniconda is in the *PATH*: use the *Anaconda Prompt* powershell.
 
 ```shell
 git clone http:\\GIT-REPO
-git submodule update --init --recursive
-
-python3 waf setup [-e myenv]
-[conda activate myenv]
-
-python3 waf configure [--boost-includes=BOOST_INCLUDEPATH --boost-libs=BOOST_LIBSPATH]
-
-python3 waf build
+python3 waf setup [-e myenv]     # create a conda environmnent with all required 3rd party libraries
+python3 waf configure [-e myenv] [--fulldist] # configure the project using that environment
+python3 waf build                # build the project
+python3 waf test --alltests      # test the project
+python3 waf install              # create a directory with all the required files.
 ```
 
-Items in between [] are optional or specific to windows:
+The [-e myevn] item is optional. It can be used to define which conda
+environment to use.  By default, the setting is `-e branch` which uses the git
+branch name as the conda environment name. The latter is usually `master`.
 
-* [-e myenv] is optional. [conda activate myenv] is mandatory if and
-  only if the [-e myenv] option was used.
+The *configure* and *setup* steps should be run every time dependencies change.
+The *build* step is required any time sources change. The *test* step runs
+tests situated in *core/tests* and *tests* directories. They will be run by the
+continuous integration tool upon commit but should be run prior to an *push*.
 
-* [--boost ... ] are mandatory only if BOOST was installed manually.
-
-The *configure* and *setup* steps are every time new dependencies
-are added. The *build* step is required any time sources are
-changed.
+Running `python waf install` created a directory with all relevant files setup
+for distribution. This includes a python environment if and only if the
+`[--fulldist]` was selected during the configuration step. Note that it's
+possible to reconfigure, using or removing the flag, with the build or test
+steps being needed again.
 
 ## Installing on windows
 
 Required by windows for compiling the C++ is Visual Studio c++. It's been tested
 to work on MSVC community edtion 2019. The following options were checked
-(a shorter list *might also work as well):
+(a shorter list *might also work as well*):
 
 * Python: everything can be unchecked
 * C++:
@@ -83,8 +84,10 @@ to work on MSVC community edtion 2019. The following options were checked
 #### pyembed error on LINUX
 
 The default python installed by conda might not be compatible with compiling
-native code (*pybind11*) modules. The solution is to look for and install a
-version of python as follows:
+native code (*pybind11*) modules. When creating a new environment, `python waf setup`
+will automatically select the correct python version. If installing the
+environment manually, the solution is to look for and install a version of
+python as follows:
 
 ```shell
 conda search -f python -c conda-forge
