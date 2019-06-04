@@ -4,10 +4,10 @@
 Saves stuff from session to session
 """
 from   copy                    import deepcopy
-from   typing                  import Tuple, List, Optional
+from   typing                  import Tuple, List, Optional, Union, Callable
 
 from   data.__scripting__      import Track, TracksDict
-from   taskmodel.application   import TasksConfig
+from   taskmodel.application   import TasksConfig, InstrumentType
 from   taskmodel.__scripting__ import Tasks, Task
 from   utils                   import initdefaults
 from   utils.decoration        import addto
@@ -87,15 +87,20 @@ def tasksmodel(name = None, defaultmodel = False, **kwa):
     return scriptapp.tasksmodel(name, defaultmodel, **kwa)
 
 @addto(Tasks, classmethod)
-def save(cls, task: Task):
+def save(
+        cls,
+        task: Task,
+        instrument: Union[None, str, InstrumentType] = None, # pylint: disable=redefined-outer-name
+):
     "saves the task to the default config"
     cpy = deepcopy(task)
     if getattr(cpy, '__scripting_save__', lambda: True)():
-        name = getattr(cls, '_cnv')(cls(task).name)
-        mdl  = cls.tasksmodel()
-        out  = dict(mdl.tasks)
+        name  = getattr(cls, '_cnv')(cls(task).name)
+        mdl   = cls.tasksmodel()
+        instr = InstrumentType(mdl.instrument if instrument is None else instrument).value
+        out   = dict(getattr(mdl, instr))
         out[name] = cpy
-        cls.tasksmodel(**{mdl.instrument: out})
+        cls.tasksmodel(**{instr: out})
         scriptapp.writeuserconfig()
 
 @addto(Tasks, classmethod)
@@ -110,31 +115,36 @@ def instrument(cls, instrument = None) -> str: # pylint: disable=redefined-outer
     return cls.tasksmodel().instrument
 
 @addto(Tasks)
-def let(self, *resets, instrument = None, **kwa) -> Task: # pylint: disable=redefined-outer-name
+def let(
+        self,
+        *resets,
+        instrument: Union[None, str, InstrumentType] = None, # pylint: disable=redefined-outer-name
+        **kwa
+):
     """
     Same as Tasks.__call__ but saves the configuration as the default
     """
-    if instrument is not None:
-        old = self.tasksmodel().instrument
-        self.tasksmodel(instrument = instrument)
-        try:
-            res = self(*resets, **kwa)
-            self.save(res)
-        finally:
-            self.tasksmodel(instrument = old)
-    else:
-        res = self(*resets, **kwa)
-        self.save(res)
+    res = self(*resets, instrument = instrument, **kwa)
+    self.save(res, instrument = instrument)
     return res
 
 @addto(Tasks)
-def __call__(self, *resets, __old__ = Tasks.__call__, **kwa) -> Task:
+def __call__(
+        self,
+        *resets,
+        instrument: Union[None, str, InstrumentType] = None, # pylint: disable=redefined-outer-name
+        __old__:    Callable                         = Tasks.__call__,
+        **kwa
+) -> Task:
     if Ellipsis in resets:
         cnf = self.default()
     else:
-        mdl = self.tasksmodel()
+        mdl   = self.tasksmodel()
+        name  = getattr(self, '_cnv')(self.name)
+        instr = InstrumentType(mdl.instrument if instrument is None else instrument).value
+
         # pylint: disable=protected-access
-        cnf = mdl.tasks.get(self._cnv(self.name), None)
+        cnf = getattr(mdl, instr).get(name, None)
     if cnf is None:
         return __old__(self, *resets, **kwa)
     res = __old__(self, *resets, current = cnf, **kwa)
