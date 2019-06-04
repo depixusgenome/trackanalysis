@@ -209,17 +209,17 @@ class CleaningPlotTheme(PlotTheme):
     points           = PlotAttrs('color', 'o', 1, alpha = .5)
     figsize          = PlotTheme.defaultfigsize(500, 700)
     maxfixedbeads    = 15
-    widgetwidth      = 470
+    widgetwidth      = 535
     ntitles          = 5
     order            = ('aberrant', 'hfsigma', 'extent', 'population',
-                        'pingpong', 'saturation', 'good')
+                        'pingpong', 'clipping', 'saturation', 'good')
     colors           = dict(good       = '#6baed6', # blue
                             hfsigma    = 'gold',
                             extent     = 'orange',
                             population = 'hotpink',
                             pingpong   = 'hotpink',
                             saturation = 'chocolate',
-                            clipping   = 'red',
+                            clipping   = 'darkorchid',
                             aberrant   = 'red')
     tooltips         = [(u'(cycle, t, z)', '(@cycle, $~x{1}, $data_y{1.1111})')]
     toolbar          = dict(PlotTheme.toolbar)

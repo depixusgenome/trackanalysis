@@ -9,7 +9,7 @@ from bokeh.models             import (ColumnDataSource, Range1d, TapTool, HoverT
 from bokeh.plotting           import Figure
 
 from control.action           import Action
-from cleaning.processor       import DataCleaningErrorMessage
+from cleaning.names           import NAMES
 from data                     import BEADKEY
 from model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from qualitycontrol.view      import QualityControlModelAccess
@@ -49,7 +49,7 @@ class FoVPlotTheme(PlotTheme):
     calibimg    = PlotAttrs('Greys256', 'image', x = 0, y = 0)
     calibsize   = 6./16
     tooltips    = '<table>@ttips{safe}</table>'
-    tooltiptype = dict(DataCleaningErrorMessage.NAMES)
+    tooltiptype = dict(NAMES)
     tooltiprow  = ('<tr>'
                    +'<td>{cycle}</td><td>cycle{plural} with:</td>'
                    +'<td>{type}</td><td>{message}</td>'

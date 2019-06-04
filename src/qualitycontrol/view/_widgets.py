@@ -9,7 +9,7 @@ from    bokeh.models        import (ColumnDataSource, DataTable, TableColumn,
 from    bokeh               import layouts
 import  numpy               as     np
 
-from    cleaning.processor       import DataCleaningErrorMessage
+from    cleaning.names           import NAMES
 from    taskcontrol.beadscontrol import TaskWidgetEnabler
 from    utils                    import dataclass, dflt
 from    utils.gui                import intlistsummary
@@ -263,7 +263,7 @@ class MessagesListWidgetTheme:
     "MessagesListWidgetTheme"
     name    : str = "qc.messages"
     height  : int = 150
-    labels  : Dict[str, str] = dflt(DataCleaningErrorMessage.NAMES)
+    labels  : Dict[str, str] = dflt(NAMES)
     columns : List[List]     = dflt([['bead',    u'Bead',    '0', 65],
                                      ['type',    u'Type',    '',  (320-65)//3],
                                      ['cycles',  u'Cycles',  '0', (320-65)//3],

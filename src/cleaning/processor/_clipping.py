@@ -103,8 +103,6 @@ class ClippingErrorMessage(DataCleaningErrorMessage):
         pop  = self.config.get('minpopulation', self.tasktype().minpopulation)
         return [(None, 'clipping', '< %d' % pop)]
 
-DataCleaningErrorMessage.NAMES['clipping'] = "z ∉ range(φ₁ → φ₃)"
-
 class ClippingExeption(DataCleaningException):
     "a clipping exception"
 

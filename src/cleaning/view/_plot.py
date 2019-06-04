@@ -29,10 +29,13 @@ class GuiClippingProcessor(ClippingProcessor):
     @classmethod
     def _cache_action(cls, cache, task, frame, info):
         cpy = np.copy(info[1])
+        raw = np.copy(cpy)
         task(frame.track, info[0], cpy)
         if task.minpopulation > 0.:
             cache['exc'] = cls.test(task, frame, (info[0], cpy))
         cache['gui'] = np.isnan(cpy)
+        if np.any(cache['gui']):
+            cache['partial'] = task.partial(frame.track, info[0], raw)
         return info
 
     @classmethod
@@ -71,15 +74,21 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
     def runbead(cls, mdl, **kwa):
         "updates the cache in the gui and returns the nans"
         ctx   = mdl.runcontext(cls, GuiClippingProcessor, **kwa)
-        items = nans = exc = None
+        items = exc = None
+        nans: Dict[str, np.ndarray]  = {}
         with ctx as cycles:
             if cycles is not None:
                 items = list(cycles[mdl.bead, ...])
 
-                for tsk in (mdl.cleaning.task, mdl.clipping.task):
+                for name, tsk in (('aberrant', mdl.cleaning.task), ('clipping', mdl.clipping.task)):
                     if tsk:
-                        exc  = ctx.taskcache(tsk).pop('exc', None) if exc is None else exc
-                        nans = ctx.taskcache(tsk).pop('gui', None)
+                        exc        = ctx.taskcache(tsk).pop('exc', None) if exc is None else exc
+                        nans[name] = ctx.taskcache(tsk).pop('gui', None)
+
+                clipping = ctx.taskcache(mdl.clipping.task).pop('partial', None)
+                if clipping:
+                    val           = ctx.taskcache(mdl.cleaning.task)
+                    val[mdl.bead] = (val[mdl.bead][0]+(clipping,), val[mdl.bead][1])
         return items, nans, exc
 
 class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotModel],
@@ -173,9 +182,9 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         tmp    = np.full(items.shape, hexes['good'], dtype = '<U7')
         cache  = self._model.cleaning.cache
         for name in self._theme.order:
-            if name == 'aberrant' and nancache is not None:
+            if name in nancache:
                 color   = hexes[name]
-                cycnans = GuiDataCleaningProcessor.nans(self._model, nancache)
+                cycnans = GuiDataCleaningProcessor.nans(self._model, nancache[name])
                 for cyc, nans in enumerate(cycnans):
                     tmp[order[cyc],:len(nans)][nans] = color
 
@@ -189,6 +198,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
                 else:
                     tmp[order[value.min]] = color
                     tmp[order[value.max]] = color
+
         return tmp.ravel()
 
     def observe(self, ctrl, noerase = True):

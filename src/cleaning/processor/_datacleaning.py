@@ -11,6 +11,7 @@ from    data.views              import BEADKEY
 from    taskcontrol.processor   import Processor, ProcessorException
 from    taskmodel               import Task, Level, PHASE
 from    utils                   import initdefaults
+from    ..names                 import NAMES
 from    ..datacleaning          import DataCleaning
 
 class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
@@ -43,9 +44,6 @@ class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
 
 class DataCleaningErrorMessage:
     "creates the error message upon request"
-    NAMES = {'saturation': 'non-closing', 'population': '% good',
-             'hfsigma':    'σ[HF]',       'extent':     'Δz',
-             'pingpong':   '∑|dz|'}
     def __init__(self, stats, cnf:Dict[str,Any], # pylint: disable=too-many-arguments
                  tasktype:Type[DataCleaningTask],
                  beadid: BEADKEY,
@@ -102,11 +100,11 @@ class DataCleaningErrorMessage:
 
         if percentage and self.ncycles > 0:
             templ = '{:.0f}% cycles: {} {}'
-            return '\n'.join(templ.format(i[0]/self.ncycles*100, self.NAMES[i[1]], i[2])
+            return '\n'.join(templ.format(i[0]/self.ncycles*100, NAMES[i[1]], i[2])
                              for i in data)
 
         templ = '{} cycles: {} {}'
-        return '\n'.join(templ.format(i[0], self.NAMES[i[1]], i[2]) for i in data)
+        return '\n'.join(templ.format(i[0], NAMES[i[1]], i[2]) for i in data)
 
     @classmethod
     def message(cls, tasktype, stats, beadid = None, parents = (), **cnf) -> str:
@@ -163,9 +161,11 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
         tested = False
         if cache is not None:
             val, discard = cache.get(info[0], ('', False))
+            tested       = val != ''
+            if tested:
+                val = tuple(i for i in val if hasattr(cls.tasktype, i.name))
             if discard:
                 return cls.__exc(val, cnf, info, frame)
-            tested       = val != ''
 
         discard = DataCleaning(**cnf).aberrant(info[1])
         if not tested:

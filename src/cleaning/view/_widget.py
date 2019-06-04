@@ -19,6 +19,7 @@ from    utils                    import initdefaults
 from    utils.gui                import parseints, intlistsummary
 from    view.static              import route
 from    view.plots               import DpxNumberFormatter, CACHE_TYPE
+from    ..names                  import NAMES
 from    ._model                  import (DataCleaningModelAccess, DataCleaningTask,
                                          CleaningPlotModel, FixedBeadDetectionConfig)
 
@@ -70,13 +71,14 @@ class CyclesListTheme:
         <div style="border-style:solid;border-color:{};border-radius:5px;float:left;"></div>
         <div>{}</div>
     """.strip()
-    columns = [['cycle',      u'Cycle',       '0'],
-               ['population', u'% good',      '0.'],
-               ['hfsigma',    u'σ[HF]',       '0.0000'],
-               ['extent',     u'Δz',          '0.00'],
-               ['pingpong',   u'∑|dz|',       '0.0'],
-               ['saturation', u'Non-closing', ''],
-               ['discarded',  u'Discarded',   '']]
+    columns = [['cycle',      u'Cycle',          '0'],
+               ['population', u'% good',         '0.'],
+               ['hfsigma',    NAMES['hfsigma'],  '0.0000'],
+               ['extent',     NAMES['extent'],   '0.00'],
+               ['pingpong',   NAMES['pingpong'], '0.0'],
+               ['clipping',   NAMES['clipping'], '0.0%'],
+               ['saturation', u'Non-closing',    ''],
+               ['discarded',  u'Discarded',      '']]
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -280,31 +282,31 @@ class WidgetMixin(ABC):
         advanced = tab(
             f"""
             ## Fixed Beads
-            Δz <                                 %({fix}:maxextent).3F
-            σ[HF] <                              %({fix}:maxhfsigma).3F
-            φ₅ repeatability: max(|z-mean(z)|) < %({fix}:maxdiff).2F
-            drops: dz/dt < -                     %({fix}:drops.mindzdt).3F
-            drops: number < cycles ∙             %({fix}:drops.maxdrops)D
+            {NAMES['extent']}  <                    %({fix}:maxextent).3F
+            {NAMES['hfsigma']} <                    %({fix}:maxhfsigma).3F
+            φ₅ repeatability: max(|z-mean(z)|) <    %({fix}:maxdiff).2F
+            drops: dz/dt < -                        %({fix}:drops.mindzdt).3F
+            drops: number < cycles ∙                %({fix}:drops.maxdrops)D
             %(BeadSubtractionModalDescriptor:)
 
             ## Cleaning
 
-            |z| <                                 %(cleaning.maxabsvalue).1F
-            |dz/dt| <                             %(cleaning.maxderivate).3F
-            Δz >                                  %(cleaning.minextent).3F
-            Δz <                                  %(cleaning.maxextent).3F
-            σ[HF] >                               %(cleaning.minhfsigma).3F
-            σ[HF] <                               %(cleaning.maxhfsigma).3F
-            % good frames >                       %(cleaning.minpopulation)D
-            ∑|dz| <                               %(cleaning.maxpingpong).3F
+            |z| <                                   %(cleaning.maxabsvalue).1F
+            |dz/dt| <                               %(cleaning.maxderivate).3F
+            {NAMES['extent']} >                     %(cleaning.minextent).3F
+            {NAMES['extent']} <                     %(cleaning.maxextent).3F
+            {NAMES['hfsigma']} >                    %(cleaning.minhfsigma).3F
+            {NAMES['hfsigma']} <                    %(cleaning.maxhfsigma).3F
+            % good frames >                         %(cleaning.minpopulation)D
+            {NAMES['pingpong']} <                   %(cleaning.maxpingpong).3F
 
             <b> Non-closing cycles</b>
-            Cycles are closed if |z(φ₁)-z(φ₅)| <  %(cleaning.maxdisttozero).3F
-            % non-closing cycles <                %(cleaning.maxsaturation)D
+            Cycles are closed if |z(φ₁)-z(φ₅)| <    %(cleaning.maxdisttozero).3F
+            % non-closing cycles <                  %(cleaning.maxsaturation)D
 
             <b></b>
             %(AlignmentModalDescriptor:)
-            Discard z(∈ φ₅) < z(φ₁)-σ[HF]⋅α, α =  %(clipping.lowfactor).1oF
+            Discard z(∈ φ₅) < z(φ₁)-σ[HF]⋅α, α =    %(clipping.lowfactor).1oF
             """,
             accessors = globals(),
             figure    = (CleaningPlotModel,),
