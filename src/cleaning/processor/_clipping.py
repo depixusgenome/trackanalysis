@@ -9,6 +9,7 @@ from   taskmodel                import Level, PHASE, Task
 from   taskcontrol.processor    import Processor
 from   utils                    import initdefaults
 from   ._datacleaning           import DataCleaningErrorMessage, DataCleaningException
+from   ..datacleaning           import Partial
 
 class ClippingTask(Task):
     "Task discarding phase 5 data below phase 1 or above phase 3"
@@ -64,6 +65,31 @@ class ClippingTask(Task):
             for i in itms:
                 i[~np.isfinite(i)]         = maxv+1
                 i[(i < minv) | (i > maxv)] = self.replacement
+
+    def partial(self, track:Track, key:int, data: np.ndarray) -> Optional[Partial]:
+        "Create an output similar to ones from DataCleaningTask"
+        maxv = self.maxthreshold(track, key, data)
+        minv = self.minthreshold(track, key, data)
+        if minv is None and maxv is None:
+            return None
+
+        pha    = track.phase.select(..., [self.correction, self.correction+1]).ravel()
+        itms   = np.split(data, pha)[1::2]
+
+        maxarr = (
+            np.array([(i>maxv).sum() for i in itms], dtype = 'i4')  if maxv is not None else
+            np.zeros(len(itms), dtype = 'i4')
+        )
+        minarr = (
+            np.array([(i<minv).sum() for i in itms], dtype = 'i4')  if maxv is not None else
+            np.zeros(len(itms), dtype = 'i4')
+        )
+        return Partial(
+            "clipping",
+            np.nonzero(minarr > 0)[0],
+            np.nonzero(maxarr > 0)[0],
+            (minarr + maxarr) / np.median(np.diff(pha))
+        )
 
 class ClippingErrorMessage(DataCleaningErrorMessage):
     "a clipping exception message"
