@@ -3,7 +3,7 @@
 "Processors apply tasks to a data flow"
 from   enum               import Enum
 from   functools          import partial
-from   typing             import Optional, NamedTuple, Tuple
+from   typing             import Optional, NamedTuple, Tuple, cast
 import warnings
 
 import numpy                 as     np
@@ -96,6 +96,14 @@ class ExtremumAlignmentTask(Task, zattributes = ('delta', 'minrelax', 'pull', 'o
     def __init__(self, **_):
         super().__init__()
 
+
+class _Args(NamedTuple):
+    cycles:  'ExtremumAlignment._Utils'
+    initial: np.ndarray
+    pull:    np.ndarray
+    measure: np.ndarray
+
+_OUT = Tuple[np.ndarray, '_Args']
 class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
     "Aligns cycles to zero"
     class _Utils:
@@ -134,23 +142,17 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
             translate(delete, bias, self.phase(0), self.bead)
             return self.info
 
-    _Args = NamedTuple('_Args',
-                       [('cycles',  _Utils),
-                        ('initial', np.ndarray),
-                        ('pull',    np.ndarray),
-                        ('measure', Optional[np.ndarray])])
-
     @classmethod
     def _get(cls, kwa:dict, name:str):
         return kwa.get(name, getattr(cls.tasktype, name))
 
     @classmethod
-    def _apply_initial(cls, kwa, frame, info):
+    def _bias_initial(cls, kwa, frame, info) -> _OUT:
         args = cls.__args(kwa, frame, info, False)
-        return cls.__align_on_3('initial', args.initial, args, kwa)
+        return cls.__bias_on_3('initial', args.initial, args, kwa)
 
     @classmethod
-    def _apply_pull(cls, kwa, frame, info):
+    def _bias_pull(cls, kwa, frame, info) -> _OUT:
         args  = cls.__args(kwa, frame, info, True)
         delta = args.initial-args.pull
         if not np.any(np.isfinite(delta)):
@@ -167,10 +169,10 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
                 bias[bad] = args.initial[bad]
 
         cls.__filter_on_relax(args, kwa, bias)
-        return args.cycles.translate(cls._get(kwa, 'delete'), bias)
+        return cast(np.ndarray, bias), args
 
     @classmethod
-    def _apply_measure(cls, kwa, frame, info):
+    def _bias_measure(cls, kwa, frame, info) -> _OUT:
         args = cls.__args(kwa, frame, info, True)
         bias = args.measure
 
@@ -180,27 +182,26 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
             tmp = cls.__distance_to_3(bias, args, kwa)
             if (tmp > 1).sum() > (tmp >= 0).sum() * cls._get(kwa, 'fiveratio'):
                 # too many cycles are saturated
-                return cls.__align_on_3('initial', args.initial, args, kwa)
+                return cls.__bias_on_3('initial', args.initial, args, kwa)
 
             bad       = np.logical_and(bad, cls.__deltas('initial', 'outlier', args, kwa) >= 1.)
             bias      = np.copy(bias)
             bias[bad] = args.initial[bad]+np.nanmedian(args.measure-args.initial)
 
-        return cls.__align_on_3('measure', bias, args, kwa)
+        return cls.__bias_on_3('measure', bias, args, kwa)
 
     @classmethod
-    def _apply_onlyinitial(cls, kwa, frame, info):
+    def _bias_onlyinitial(cls, kwa, frame, info) -> _OUT:
         args = cls.__args(kwa, frame, info, False)
-        return args.cycles.translate(cls._get(kwa, 'delete'), args.initial)
+        return args.initial, args
 
     @classmethod
-    def _apply_onlypull(cls, kwa, frame, info):
+    def _bias_onlypull(cls, kwa, frame, info) -> _OUT:
         args = cls.__args(kwa, frame, info, False)
-        bias = args.pull + np.nanmedian(args.initial-args.pull)
-        return args.cycles.translate(cls._get(kwa, 'delete'), bias)
+        return args.pull + np.nanmedian(args.initial-args.pull), args
 
     @classmethod
-    def __args(cls, kwa, frame, info, meas) -> 'ExtremumAlignmentProcessor._Args':
+    def __args(cls, kwa, frame, info, meas) -> '_Args':
         cycles     = cls._Utils(frame, info)
         window     = cls._get(kwa, 'window')
         edge       = cls._get(kwa, 'edge')
@@ -209,10 +210,14 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
         inits = cycles.bias(PHASE.initial, window, edge,      percentile) # ≈ min
         pulls = cycles.bias(PHASE.pull,    window, edge, 100.-percentile) # ≈ max
         if meas:
-            return cls._Args(cycles, inits, pulls,
-                             cycles.bias(PHASE.measure, window, 'right', percentile))
+            return _Args(
+                cycles,
+                inits,
+                pulls,
+                cycles.bias(PHASE.measure, window, 'right', percentile)
+            )
 
-        return cls._Args(cycles, inits, pulls, None)
+        return _Args(cycles, inits, pulls, None)
 
     @classmethod
     def __deltas(cls, attr:str, outlier: str, args:_Args, kwa):
@@ -259,7 +264,7 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
         return tmp
 
     @classmethod
-    def __align_on_3(cls, attr, bias, args, kwa):
+    def __bias_on_3(cls, attr, bias, args, kwa) -> _OUT:
         tmp = cls.__distance_to_3(bias, args, kwa) > 1.
         if any(tmp):
             bad  = np.logical_or(cls.__deltas('initial', 'opening', args, kwa) >= 1.,
@@ -267,6 +272,11 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
 
             np.logical_and(bad, tmp, bad)
             bias[bad] = args.pull[bad]+np.nanmedian(getattr(args, attr)-args.pull)
+        return bias, args
+
+    @classmethod
+    def _apply_method(cls, kwa, method, frame, info):
+        bias, args = method(kwa, frame, info)
         return args.cycles.translate(cls._get(kwa, 'delete'), bias)
 
     @classmethod
@@ -274,11 +284,16 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
         "applies the task to a frame or returns a function that does so"
         assert cls._get(kwa, 'percentile') <= 50.
         mode   = cls._get(kwa, 'phase')
-        action = getattr(cls, '_apply_'+mode.name)
+        action = getattr(cls, '_bias_'+mode.name)
 
         def _apply(frame):
-            return frame.withaction(partial(action, kwa))
+            return frame.withaction(partial(cls._apply_method, kwa, action))
         return _apply if toframe is None else _apply(toframe)
+
+    @classmethod
+    def bias(cls, kwa, frame, info) -> np.ndarray:
+        "return the biases per cycle"
+        return getattr(cls, '_bias_'+cls._get(kwa, 'phase').name)(kwa, frame, info)[0]
 
     def run(self, args):
         "updates frames"
