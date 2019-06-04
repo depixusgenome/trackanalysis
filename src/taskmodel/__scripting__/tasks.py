@@ -302,7 +302,7 @@ class Tasks(Enum):
             ival = ind
             while ival > 0 and getattr(lst[ival-1], 'level', None) is Level.none:
                 ival -= 1
-            if ival == 0 or not isinstance(lst[ival-1], torder[i+1]):
+            if ival == 0 or not any(isinstance(k, torder[i+1]) for k in lst[:ival]):
                 lst.insert(ind, cls._missing_(torder[i+1])(**kwa))
         return lst
 
