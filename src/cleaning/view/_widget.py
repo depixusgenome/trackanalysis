@@ -78,9 +78,12 @@ class CyclesListTheme:
                ['extent',     NAMES['extent'],   '0.00'],
                ['pingpong',   NAMES['pingpong'], '0.0'],
                ['saturation', u'Non-closing',    ''],
-               ['alignment',  'Alignment',       '0.000'],
+               ['alignment',  'Alignment (µm)',  '0.000'],
                ['clipping',   NAMES['clipping'], '0%'],
                ['discarded',  u'Discarded',      '0%']]
+    text     = dict(text_align = 'center', font_style = 'bold')
+    number   = dict(text_align = 'right')
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -90,26 +93,14 @@ class CyclesListWidget:
     __widget: DataTable
     __model : CyclesListTheme
     def __init__(self, ctrl, task) -> None:
-        self.__task  = task
-        self.__model = ctrl.theme.add(CyclesListTheme())
+        self.__task   = task
+        self.__model  = ctrl.theme.add(CyclesListTheme())
+        self.__colors = ctrl.theme.model(self.__model.colors)
 
     def addtodoc(self, _, ctrl) -> List[Widget]:
         "creates the widget"
-        clrs   = (
-            self.__model.colors  if isinstance(self.__model.colors, dict) else
-            ctrl.theme.get(self.__model.colors, "colors")
-        )
-        dot   = lambda i, j: self.__model.dot.format(clrs[i], j) if i in clrs else j
-        fmt   = lambda i, j: (
-            StringFormatter(text_align = 'center', font_style = 'bold') if i == '' else
-            NumberFormatter(format = i, text_align = 'right')           if j else
-            DpxNumberFormatter(format = i, text_align = 'right')
-        )
-        cols  = list(TableColumn(field      = i[0],
-                                 title      = dot(i[0], i[1]),
-                                 formatter  = fmt(i[2], i[0] == 'alignment'))
-                     for i in self.__model.columns)
-
+        self.__colors = ctrl.theme.model(self.__model.colors)
+        cols          = self.__cols()
         self.__widget = DataTable(source         = ColumnDataSource(self.__data()),
                                   columns        = cols,
                                   editable       = False,
@@ -122,8 +113,32 @@ class CyclesListWidget:
     def reset(self, resets:CACHE_TYPE):
         "this widget has a source in common with the plots"
         itm  = self.__widget.source if resets is None else resets[self.__widget.source]
-        data = self.__data()
-        itm.update(data = data)
+        itm.update(data = self.__data())
+
+        itm  = self.__widget if resets is None else resets[self.__widget]
+        itm.update(columns = self.__cols())
+
+    def __cols(self):
+        track = self.__task.track
+        dim   = track.instrument['dimension'] if track else 'µm'
+
+        clrs  = self.__colors.colors
+        dot   = lambda i, j: self.__model.dot.format(clrs[i], j) if i in clrs else j
+        fmt   = lambda i, j: (
+            StringFormatter(**self.__model.text)
+            if i == '' else
+            (
+                (NumberFormatter if j else DpxNumberFormatter)
+                (format = i, **self.__model.number)
+            )
+        )
+        return [
+            TableColumn(
+                field      = i[0],
+                title      = dot(i[0], i[1].replace('µm', dim)),
+                formatter  = fmt(i[2], i[0] == 'alignment')
+            ) for i in self.__model.columns
+        ]
 
     def __data(self) -> dict:
         cache = self.__task.cache
