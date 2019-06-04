@@ -7,7 +7,8 @@ from    abc             import ABC
 import  bokeh.core.properties as props
 from    bokeh.plotting  import Figure
 from    bokeh.models    import (ColumnDataSource, DataTable, TableColumn,
-                                Widget, StringFormatter, CustomJS, Slider)
+                                Widget, StringFormatter, CustomJS, Slider,
+                                NumberFormatter)
 
 import  numpy       as     np
 
@@ -64,7 +65,7 @@ class CyclesListTheme:
     name    = "cleaning.cycleslist"
     order   = ('population', 'hfsigma', 'extent', 'aberrant',
                'pingpong', 'saturation', 'good')
-    width   = 65
+    width   = 55
     height  = 300
     colors  = CleaningPlotModel.theme.name
     dot     = """
@@ -76,9 +77,10 @@ class CyclesListTheme:
                ['hfsigma',    NAMES['hfsigma'],  '0.0000'],
                ['extent',     NAMES['extent'],   '0.00'],
                ['pingpong',   NAMES['pingpong'], '0.0'],
-               ['clipping',   NAMES['clipping'], '0.0%'],
                ['saturation', u'Non-closing',    ''],
-               ['discarded',  u'Discarded',      '']]
+               ['alignment',  'Alignment',       '0.000'],
+               ['clipping',   NAMES['clipping'], '0%'],
+               ['discarded',  u'Discarded',      '0%']]
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -98,12 +100,14 @@ class CyclesListWidget:
             ctrl.theme.get(self.__model.colors, "colors")
         )
         dot   = lambda i, j: self.__model.dot.format(clrs[i], j) if i in clrs else j
-        fmt   = lambda i: (StringFormatter(text_align = 'center',
-                                           font_style = 'bold') if i == '' else
-                           DpxNumberFormatter(format = i, text_align = 'right'))
+        fmt   = lambda i, j: (
+            StringFormatter(text_align = 'center', font_style = 'bold') if i == '' else
+            NumberFormatter(format = i, text_align = 'right')           if j else
+            DpxNumberFormatter(format = i, text_align = 'right')
+        )
         cols  = list(TableColumn(field      = i[0],
                                  title      = dot(i[0], i[1]),
-                                 formatter  = fmt(i[2]))
+                                 formatter  = fmt(i[2], i[0] == 'alignment'))
                      for i in self.__model.columns)
 
         self.__widget = DataTable(source         = ColumnDataSource(self.__data()),
@@ -126,19 +130,11 @@ class CyclesListWidget:
         if cache is None or len(cache) == 0:
             return {i: [] for i, _1, _2 in self.__model.columns}
         names = set(i[0] for i in self.__model.columns) & set(cache)
-        bad   = self.__task.nbadcycles(cache)
         order = self.__task.sorted(self.__model.order, cache)
         info  = {i: cache[i].values[order] for i in names}
 
         info['saturation'] = np.zeros(len(order), dtype = 'U1')
         info['saturation'][self.__task.saturatedcycles(cache)] = '✗'
-
-        info['discarded']  = np.zeros(len(order), dtype = 'U1')
-        if len(cache['saturation'].max):
-            info['discarded'][:]    = '✗'
-        else:
-            info['discarded'][:bad] = '✗'
-
         info['cycle'] = order
         return info
 
@@ -146,7 +142,7 @@ class DownSamplingTheme:
     "stuff for downsampling"
     name     = "cleaning.downsampling"
     title    = "Downsampling"
-    tooltips = "Display only 1 out of every few data points"
+    tooltips = "Display only 1 out of every few gata points"
     policy   = "mouseup"
     start    = 0
     value    = 5

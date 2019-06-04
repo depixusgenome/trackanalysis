@@ -50,6 +50,13 @@ class DataCleaningAccess(TaskAccess, tasktype = DataCleaningTask):
                     np.arange(self.track.ncycles, dtype = 'i4'))
 
         stats = astats if isinstance(astats, dict) else dict(astats)
+        if 'discarded' in stats:
+            cpy = np.copy(stats['discarded'].values)
+            nan = np.isnan(cpy)
+            cpy[~nan] *= -1
+            cpy[nan]   = np.nonzero(nan)[0]+1
+            return np.argsort(cpy)
+
         res   = np.full(len(next(iter(stats.values())).values), -1, dtype = 'i4')
         for i, name in enumerate(order):
             stat = stats.get(name, None)

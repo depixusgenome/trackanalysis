@@ -9,6 +9,7 @@ from    bokeh                       import layouts
 
 import  numpy                       as     np
 
+from    taskmodel                   import PHASE, Task
 from    utils.array                 import repeat
 from    utils.logconfig             import getLogger
 from    view.colors                 import tohex
@@ -16,16 +17,43 @@ from    taskview.plots              import (
     PlotError, PlotView, DpxHoverTool, CACHE_TYPE, TaskPlotCreator
 )
 
+from    eventdetection.processor    import ExtremumAlignmentProcessor
 from    ._model                     import (DataCleaningModelAccess, CleaningPlotModel,
                                             CleaningPlotTheme)
 from    ._widget                    import WidgetMixin
-from    ..datacleaning              import DataCleaning
+from    ..datacleaning              import DataCleaning, Partial
 from    ..processor                 import (DataCleaningProcessor,
                                             ClippingProcessor, ClippingTask)
 LOGS = getLogger(__name__)
 
+class GuiExtremumAlignmentProcessor(ExtremumAlignmentProcessor):
+    "gui processor for alignment"
+    @classmethod
+    def _cache_action(cls, cache, kwa, frame, info):
+        bias, args = getattr(cls, '_bias_'+cls._get(kwa, 'phase').name)(kwa, frame, info)
+        cache['alignment'] = Partial(
+            "alignment",
+            np.empty(0, dtype = 'i4'),
+            np.empty(0, dtype = 'i4'),
+            bias - np.nanmedian(bias),
+        )
+        return args.cycles.translate(cls._get(kwa, 'delete'), bias)
+
+    @classmethod
+    def apply(cls, toframe = None, **cnf):
+        "applies the task to a frame or returns a method that will"
+        if toframe is None:
+            return partial(cls.apply, **cnf)
+        cache = cnf.pop('cache')
+        return toframe.withaction(partial(cls._cache_action, cache, cnf))
+
+    def run(self, args):
+        "updates the frames"
+        cache = args.data.setcachedefault(self, dict())
+        return args.apply(partial(self.apply, cache = cache, **self.config()))
+
 class GuiClippingProcessor(ClippingProcessor):
-    "gui data cleaning processor"
+    "gui processor clipping"
     @classmethod
     def _cache_action(cls, cache, task, frame, info):
         cpy = np.copy(info[1])
@@ -35,7 +63,17 @@ class GuiClippingProcessor(ClippingProcessor):
             cache['exc'] = cls.test(task, frame, (info[0], cpy))
         cache['gui'] = np.isnan(cpy)
         if np.any(cache['gui']):
-            cache['partial'] = task.partial(frame.track, info[0], raw)
+            cache['clipping'] = task.partial(frame.track, info[0], raw)
+            cache['clipping'].values[cache['clipping'].values == 0.] = np.NaN
+
+        pha           = frame.track.phase.select(..., [PHASE.measure, PHASE.measure+1]).ravel()
+        cache['discarded'] = Partial(
+            "discarded",
+            np.empty(0, dtype = 'i4'),
+            np.empty(0, dtype = 'i4'),
+            np.array([i.sum()/len(i) for i in np.split(np.isnan(cpy), pha)[1::2]], dtype = "f4")
+        )
+        cache['discarded'].values[cache['discarded'].values == 0.] = np.NaN
         return info
 
     @classmethod
@@ -73,7 +111,7 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
     @classmethod
     def runbead(cls, mdl, **kwa):
         "updates the cache in the gui and returns the nans"
-        ctx   = mdl.runcontext(cls, GuiClippingProcessor, **kwa)
+        ctx   = mdl.runcontext(cls, GuiExtremumAlignmentProcessor, GuiClippingProcessor, **kwa)
         items = exc = None
         nans: Dict[str, np.ndarray]  = {}
         with ctx as cycles:
@@ -85,11 +123,18 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
                         exc        = ctx.taskcache(tsk).pop('exc', None) if exc is None else exc
                         nans[name] = ctx.taskcache(tsk).pop('gui', None)
 
-                clipping = ctx.taskcache(mdl.clipping.task).pop('partial', None)
-                if clipping:
-                    val           = ctx.taskcache(mdl.cleaning.task)
-                    val[mdl.bead] = (val[mdl.bead][0]+(clipping,), val[mdl.bead][1])
+                cls.__add(ctx, mdl, mdl.alignment.task, "alignment")
+                cls.__add(ctx, mdl, mdl.clipping.task,  "clipping")
+                cls.__add(ctx, mdl, mdl.clipping.task,  "discarded")
+
         return items, nans, exc
+
+    @classmethod
+    def __add(cls, ctx, mdl, tsk: Task, name: str):
+        clipping = ctx.taskcache(tsk).pop(name, None)
+        if clipping:
+            val           = ctx.taskcache(mdl.cleaning.task)
+            val[mdl.bead] = (val[mdl.bead][0]+(clipping,), val[mdl.bead][1])
 
 class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotModel],
                           WidgetMixin):
