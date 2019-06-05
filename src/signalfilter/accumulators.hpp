@@ -530,26 +530,34 @@ namespace signalfilter { namespace stats
         if(i >= sz-1)
             return std::numeric_limits<T>::quiet_NaN();
 
-        T last = dt[i++];
+        T first = dt[i++];
         while(i < sz && !std::isfinite(dt[i]))
             ++i;
 
         if(i == sz)
             return std::numeric_limits<T>::quiet_NaN();
 
-        acc_t<bat::median> quant;
-        quant((double) std::abs(last-dt[i]));
-        last = dt[i];
         if(sample < 1)
             sample = 1;
-        for(++i; i < sz; i += sample)
-            if(std::isfinite(dt[i]))
-            {
-                T cur = dt[i];
-                quant((double) std::abs(cur-last));
-                last  = cur;
-            }
-        return (T) compute(quant);
+
+        T val = 0.;
+        for(size_t k = 0, i0 = i; k < sample; ++k)
+        {
+            acc_t<bat::median> quant;
+            i = i0+k;
+
+            quant((double) std::abs(first-dt[i]));
+            T last = dt[i];
+            for(++i; i < sz; i += sample)
+                if(std::isfinite(dt[i]))
+                {
+                    T cur = dt[i];
+                    quant((double) std::abs(cur-last));
+                    last  = cur;
+                }
+            val += (T) compute(quant);
+        }
+        return val/sample;
     }
 
     template <typename T, typename K>

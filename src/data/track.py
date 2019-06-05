@@ -509,7 +509,7 @@ class Track:
     _rawprecisions               = {}
     _path:        Optional[PATHTYPES] = None
     _axis                             = Axis.Zaxis
-    _RAWPRECION_RATE                  = 30.
+    _RAWPRECION_RATE                  = 10.
 
     @overload
     def rawprecision(self, ibead: int) -> float:
@@ -528,7 +528,7 @@ class Track:
         if val is None:
             rate = max(1, int(self.framerate/self._RAWPRECION_RATE+.5))
             def _rp(data, first, last) -> float:
-                return max(PrecisionAlg.MINPRECISION, nanhfsigma(data, zip(first, last)), rate)
+                return max(PrecisionAlg.MINPRECISION, nanhfsigma(data, zip(first, last), rate))
 
             first  = (self.phases[:,PHASE.initial if first is None else first]
                       - self.phases[0,0])
