@@ -518,7 +518,7 @@ namespace signalfilter { namespace stats
     }
 
     template <typename T>
-    inline T nanhfsigma(size_t sz, T const * dt)
+    inline T nanhfsigma(size_t sz, T const * dt, size_t sample)
     {
         if(sz == 0)
             return std::numeric_limits<T>::quiet_NaN();
@@ -540,7 +540,9 @@ namespace signalfilter { namespace stats
         acc_t<bat::median> quant;
         quant((double) std::abs(last-dt[i]));
         last = dt[i];
-        for(++i; i < sz; ++i)
+        if(sample < 1)
+            sample = 1;
+        for(++i; i < sz; i += sample)
             if(std::isfinite(dt[i]))
             {
                 T cur = dt[i];
@@ -624,7 +626,7 @@ namespace signalfilter { namespace stats
     }
 
     template <typename T>
-    inline T nanmediandeviation(size_t sz, T const * dt)
+    inline T nanmediandeviation(size_t sz, T const * dt, size_t sample)
     {
         if(sz == 0)
             return std::numeric_limits<T>::quiet_NaN();
@@ -638,7 +640,9 @@ namespace signalfilter { namespace stats
 
         acc_t<bat::mediandeviation> quant;
         quant((double) dt[i]);
-        for(++i; i < sz; ++i)
+        if(sample < 1)
+            sample = 1;
+        for(++i; i < sz; i+= sample)
             if(std::isfinite(dt[i]))
                 quant((double) dt[i]);
         return (T) compute(quant);
