@@ -221,7 +221,10 @@ class TaskAccess:
     @property
     def defaultconfigtask(self) -> Task:
         "returns the config task"
-        mdl = self._ctrl.theme.get("tasks", self.instrument, defaultmodel = True)
+        mdl  = self._ctrl.theme.get("tasks", self.instrument, defaultmodel = True)
+        resc = self._ctrl.theme.get("tasks", "rescaling").get(self.instrument, None)
+        if resc:
+            return mdl[self.configname].rescale(float(resc))
         return mdl[self.configname]
 
     @property

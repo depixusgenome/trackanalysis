@@ -11,6 +11,7 @@ from bokeh.models       import Widget, Button
 from view.fonticon      import FontIcon
 from utils              import initdefaults, dataclass, dflt
 from utils.logconfig    import getLogger
+from taskmodel.base     import Rescaler
 from modaldialog        import dialog
 LOGS = getLogger(__name__)
 
@@ -218,15 +219,29 @@ class AdvancedDescriptor:
         return getattr(getattr(inst, '_ctrl'), self.ctrlgroup)
 
     def __get(self, inst, defaultmodel):
-        ctrl = self._controller(inst)
-        if '.' not in self.ctrlname:
-            return ctrl.get(self.cnf, self.ctrlname, defaultmodel = defaultmodel)
+        ctrl  = getattr(inst, '_ctrl')
+        out   = getattr(ctrl, self.ctrlgroup).model(self.cnf, defaultmodel)
+        first = defaultmodel
+        def _resc(out):
+            mdl   = ctrl.theme.model("tasks")
+            track = ctrl.display.get("tasks", "roottask")
+            if track is None:
+                instr = mdl.instrument
+            else:
+                instr = ctrl.tasks.track(track).instrument["type"].value
+            resc = mdl.rescaling.get(instr, None)
+            return out.rescale(float(resc)) if resc else out
 
-        vals = self.ctrlname.split('.')
-        mdl  = ctrl.get(self.cnf, vals[0], defaultmodel = defaultmodel)
-        for i in vals[1:]:
-            mdl = getattr(mdl, i)
-        return mdl
+        if first and isinstance(out, Rescaler):
+            out   = _resc(out)
+            first = False
+
+        for i in self.ctrlname.split('.'):
+            out = getattr(out, i)
+            if first and isinstance(out, Rescaler):
+                out   = _resc(out)
+                first = False
+        return out
 
     def __get__(self, inst, _):
         return self if inst is None else self.__get(inst, False)
@@ -434,17 +449,20 @@ class AdvancedWidget:
                 return title, '', ''
             keys         = val[val.rfind('%(')+2:val.rfind(')')].split('.')
             dfval, found = _default(keys)
-            if not found or dfval == _value(keys):
+            curval       = _value(keys)
+            if not found or dfval == curval:
                 return title, '', val
 
             if '|' in val:
                 opts = val[val.rfind(')')+1:]
                 dico = dict(i.split(':') for i in opts.split('|') if ':' in i)
                 disp = dico.get(str(dfval), '?')
+                cur  = dico.get(str(curval), '?')
             else:
                 disp = _format(val, dfval)
+                cur  = _format(val, curval)
 
-            return title, f'({disp})', val
+            return (title, '' if cur == disp else f'({disp})', val)
 
         bdy  = self._body()
         if len(bdy) and isinstance(bdy[0], AdvancedTab):
