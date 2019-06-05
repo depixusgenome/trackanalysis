@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Cycles plot view for cleaning data"
 from    functools                   import partial
-from    typing                      import Dict
+from    typing                      import Dict, Optional
 from    bokeh.plotting              import Figure
 from    bokeh.models                import LinearAxis, ColumnDataSource, Range1d
 from    bokeh                       import layouts
@@ -34,10 +34,11 @@ class GuiExtremumAlignmentProcessor(ExtremumAlignmentProcessor):
         cache['alignment'] = Partial(
             "alignment",
             np.empty(0, dtype = 'i4'),
-            np.empty(0, dtype = 'i4'),
+            np.nonzero(np.isnan(bias))[0],
             bias - np.nanmedian(bias),
         )
-        return args.cycles.translate(cls._get(kwa, 'delete'), bias)
+
+        return args.cycles.translate(False, bias)
 
     @classmethod
     def apply(cls, toframe = None, **cnf):
@@ -130,8 +131,17 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
         return items, nans, exc
 
     @classmethod
-    def __add(cls, ctx, mdl, tsk: Task, name: str):
-        clipping = ctx.taskcache(tsk).pop(name, None)
+    def __add(cls, ctx, mdl, tsk: Optional[Task], name: str):
+        if tsk is None:
+            clipping = Partial(
+                name,
+                np.empty(0, dtype = 'i4'),
+                np.empty(0, dtype = 'i4'),
+                np.zeros(mdl.track.ncycles, dtype = 'f4')
+            )
+        else:
+            clipping = ctx.taskcache(tsk).pop(name, None)
+
         if clipping:
             val           = ctx.taskcache(mdl.cleaning.task)
             val[mdl.bead] = (val[mdl.bead][0]+(clipping,), val[mdl.bead][1])
@@ -205,9 +215,13 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         if items is None or len(items) == 0 or not any(len(i) for _, i in items):
             return {i: [] for i in ("t", "z", "cycle", "color")}
 
-        order = self._model.cleaning.sorted(self._theme.order)
-        size  = max(len(i) for _, i in items)+5
-        val   = np.full((len(items), size), np.NaN, dtype = 'f4')
+        dsampl = self._ctrl.theme.get('cleaning.downsampling', 'value', 0)
+        order  = self._model.cleaning.sorted(self._theme.order)
+        if dsampl > 1:
+            size = (max(len(i) for _, i in items)//dsampl+1)*dsampl+1
+        else:
+            size = max(len(i) for _, i in items)+1
+        val    = np.full((len(items), size), np.NaN, dtype = 'f4')
         for (_, i), j in items:
             val[order[i],:len(j)] = j
 
@@ -217,9 +231,13 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
                    color = self.__color(order, nans, val))
         assert all(len(i) == val.size for  i in res.values())
 
-        dsampl = self._ctrl.theme.get('cleaning.downsampling', 'value', 0)
-        if dsampl:
-            res = {i: j[::dsampl] for i, j in res.items()}
+        if dsampl > 1:
+            inds  = np.random.randint(0, dsampl, (val.shape[0], (size-1)//dsampl+1))
+            inds += (np.arange(inds.shape[1])*dsampl).T
+            inds[:,-1:] = size-1
+            inds += (np.arange(inds.shape[0])*size)[None].T
+            inds  = inds.ravel()
+            res   = {i: j[inds] for i, j in res.items()}
         return res
 
     def __color(self, order, nancache, items) -> np.ndarray:

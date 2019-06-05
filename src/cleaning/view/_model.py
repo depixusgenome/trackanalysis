@@ -207,13 +207,14 @@ class CleaningPlotTheme(PlotTheme):
     widgetwidth      = 535
     ntitles          = 5
     order            = ('aberrant', 'hfsigma', 'extent', 'population',
-                        'pingpong', 'clipping', 'saturation', 'good')
+                        'pingpong', 'alignment', 'clipping', 'saturation', 'good')
     colors           = dict(good       = '#6baed6', # blue
                             hfsigma    = 'gold',
                             extent     = 'orange',
                             population = 'hotpink',
-                            pingpong   = 'hotpink',
+                            pingpong   = 'firebrick',
                             saturation = 'chocolate',
+                            alignment  = 'darkgray',
                             clipping   = 'darkorchid',
                             aberrant   = 'red')
     tooltips         = [(u'(cycle, t, z)', '(@cycle, $~x{1}, $data_y{1.1111})')]

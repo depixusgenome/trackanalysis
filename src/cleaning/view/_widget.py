@@ -159,9 +159,9 @@ class DownSamplingTheme:
     title    = "Downsampling"
     tooltips = "Display only 1 out of every few gata points"
     policy   = "mouseup"
-    start    = 0
+    start    = 1
     value    = 5
-    end      = 5
+    end      = 20
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):

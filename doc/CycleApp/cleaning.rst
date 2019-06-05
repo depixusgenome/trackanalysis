@@ -161,15 +161,16 @@ Plot Colors
 
 The plot's |z| values are color-coded as follows:
 
-* Values without problems are blue
-* |NOISE|: noisy cycles are yellow
-* |DZ|: cycles with an incorrect extent are orange
-* Cycles with too few correct values are pink
-* |pingpong| cycles with too few correct values are pink
+* Values without problems are blue.
+* |NOISE|: noisy cycles are yellow.
+* |DZ|: cycles with an incorrect extent are orange.
+* Cycles with too few correct values are pink.
+* |pingpong| cycles with too few correct values are red-brown.
 * Non-closing cycles are dark orange.
 * |absz| and |dzdt|: outliers are marked in red.
-* |clipping|: outliers as defined by the range of values in *aligned*
-  cycles (see below) are marked in purple.
+* Cycles which could not be aligned are dark gray.
+* |clipping|: outliers as defined by the range of values in *aligned*.
+  Such cycles are marked in purple.
 
 These colors are reported again in the table, using colored dots in the column
 headers.

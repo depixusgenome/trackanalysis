@@ -90,13 +90,17 @@ void translate(DataInfo const && data, bool del, float * ptr)
     if(data.ncycles == 0 || data.size == 0)
         return;
 
+    using signalfilter::stats::nanmedian;
     auto delta(data.data);
+
     auto apply = [&](float tmp, size_t r1, size_t r2)
                   {
+                      if(!std::isfinite(tmp) && !del)
+                          tmp = -nanmedian(std::vector<float>(ptr+r1, ptr+r2));
                       if(std::isfinite(tmp))
                           for(size_t j = r1; j < r2; ++j)
                               ptr[j] += tmp;
-                      else if(del)
+                      else
                           std::fill(ptr+r1, ptr+r2, std::numeric_limits<float>::quiet_NaN());
                   };
     for(size_t i = 0u, e = data.ncycles-1; i < e; ++i)
