@@ -25,6 +25,9 @@ and the directory must be either the same or vary only by replacing 'trk' by
 
 Can now deal with any polarity in µV as well as non-opening cycles.
 
+Furthermore, the σ[HF] is now normalized depending on its frame rate: the
+signal used to estimate σ[HF]] is downsampled to a rate of 30Hz.
+
 ## cycles_v6.8
 
 * 2019-04-23 10:20:10 +0200  (tag: cycles_v6.8)

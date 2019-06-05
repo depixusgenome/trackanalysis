@@ -47,6 +47,9 @@ frequency) fluctuations. This is done by:
 #. taking the median of these values over all cycles. This last median means
    that |NOISE| is not affected by a few missbehaving cycles.
 
+In the situation when the framerate is higher than 30Hz, that of the optical
+instruments, the signal is downsampled appropriatly. In practice, this should
+only affect the micro-wells data.
 
 A Size Indicator, |DZ|
 ----------------------------------

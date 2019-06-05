@@ -9,10 +9,11 @@ from    copy        import deepcopy
 from    enum        import Enum
 import  numpy       as     np
 
-from    taskmodel   import levelprop, Level, PHASE, InstrumentType
-from    utils       import initdefaults
-from   .views       import Beads, Cycles, BEADKEY, isellipsis, TrackView
-from   .trackio     import opentrack, PATHTYPES
+from    signalfilter import nanhfsigma, PrecisionAlg
+from    taskmodel    import levelprop, Level, PHASE, InstrumentType
+from    utils        import initdefaults
+from   .views        import Beads, Cycles, BEADKEY, isellipsis, TrackView
+from   .trackio      import opentrack, PATHTYPES
 
 IDTYPE       = Union[None, int, range] # missing Ellipsys as mypy won't accept it
 PIDTYPE      = Union[IDTYPE, slice, Sequence[int]]
@@ -508,6 +509,7 @@ class Track:
     _rawprecisions               = {}
     _path:        Optional[PATHTYPES] = None
     _axis                             = Axis.Zaxis
+    _RAWPRECION_RATE                  = 30.
 
     @overload
     def rawprecision(self, ibead: int) -> float:
@@ -524,23 +526,22 @@ class Track:
         val   = cache.get(ibead, None)
 
         if val is None:
-            from signalfilter import nanhfsigma, PrecisionAlg
+            rate = max(1, int(self.framerate/self._RAWPRECION_RATE+.5))
+            def _rp(data, first, last) -> float:
+                return max(PrecisionAlg.MINPRECISION, nanhfsigma(data, zip(first, last)), rate)
+
             first  = (self.phases[:,PHASE.initial if first is None else first]
                       - self.phases[0,0])
             last   = (self.phases[:,PHASE.measure+1 if last is None else last]
                       - self.phases[0,0])
             if np.isscalar(ibead):
-                beads        = self.beads
-                cache[ibead] = val = max(PrecisionAlg.MINPRECISION,
-                                         nanhfsigma(beads[ibead], zip(first, last)))
+                cache[ibead] = val = _rp(self.beads[ibead], first, last)
             else:
                 beads = self.beads
                 ibead = set(beads.keys()) if ibead is None or ibead is Ellipsis else set(ibead)
 
                 if len(ibead-set(cache)) > 0:
-                    cache.update((i, max(PrecisionAlg.MINPRECISION,
-                                         nanhfsigma(beads[i], zip(first, last))))
-                                 for i in ibead-set(cache))
+                    cache.update((i, _rp(beads[i], first, last)) for i in ibead-set(cache))
                 val = iter((i, cache[i]) for i in ibead)
         return val
 
