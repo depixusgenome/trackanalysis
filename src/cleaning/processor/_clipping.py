@@ -91,11 +91,12 @@ class ClippingTask(Task):
                 np.array([(i<minv).sum() for i in itms], dtype = 'i4')  if maxv is not None else
                 np.zeros(len(itms), dtype = 'i4')
             )
+            sizes = np.array([len(i) for i in itms], dtype = 'i4')
         return Partial(
             "clipping",
             np.empty(0, dtype = 'i4'),
             np.empty(0, dtype = 'i4'),
-            (minarr + maxarr) / np.median(np.diff(pha))
+            (minarr + maxarr) / sizes
         )
 
 class ClippingErrorMessage(DataCleaningErrorMessage):
