@@ -304,7 +304,7 @@ def test_muwells(tmp_path):
         tmp_path/"lio.txt",
     ))
     output2 = MuWellsFilesIO.open(paths)
-    assert output2['phases'].shape == (20, 8)
+    assert output2['phases'].shape == (22, 8)
 
 def test_allleaves():
     'tests pairing of track files and gr-files in the absence of cgr'
