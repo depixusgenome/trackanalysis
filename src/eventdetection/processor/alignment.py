@@ -156,7 +156,7 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
         args  = cls.__args(kwa, frame, info, True)
         delta = args.initial-args.pull
         if not np.any(np.isfinite(delta)):
-            return args.cycles.info
+            return np.zeros(len(delta), dtype = 'f4'), args
 
         bias = args.pull + np.nanpercentile(delta, 100.-cls._get(kwa, 'percentile'))
         bad  = cls.__less(args.measure-args.pull, kwa, 'opening')
