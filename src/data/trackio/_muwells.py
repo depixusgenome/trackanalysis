@@ -23,6 +23,7 @@ class LIAFilesIOConfiguration:
     colnames:        str = '% Time (s), Amplitude (V)'
     indexpower:      float     = .8
     indexthreshold:  float     = .8
+    maxdistanceratio:float     = .025
     softthreshold:   float     = .1
     framerateapprox: float     = .1
     phases:          List[int] = [1, 4]
@@ -238,11 +239,23 @@ class MuWellsFilesIO(TrackIO):
                     & (diff[2:-1] > thr-dist*pow(cnf.indexpower, i))
                 )[0]
                 idiff   = np.diff(inds)
-                meddist = int(np.median(idiff)*cnf.indexthreshold)
-                if np.any(idiff < meddist):
-                    continue
+                meddist = np.median(idiff)
+                good    = np.ones(len(inds), dtype = 'bool')
+                for j in np.nonzero(idiff < meddist*cnf.indexthreshold)[0]:
+                    delta  = (inds-inds[j])/meddist
+                    delta -= np.round(delta)
+                    if np.abs(np.mean(delta)) > cnf.maxdistanceratio:
+                        good[j] = False
 
-                meddist = int(np.median(idiff))
+                    delta  = (inds-inds[j+1])/meddist
+                    delta -= np.round(delta)
+                    if np.abs(np.mean(delta)) > cnf.maxdistanceratio:
+                        good[j+1] = False
+
+                inds = inds[good]
+                if len(inds) < 2:
+                    continue
+                meddist = int(np.median(np.diff(inds)))
                 return np.concatenate(
                     [
                         [k for k in range(inds[i],inds[i+1]-meddist//2, meddist)]
