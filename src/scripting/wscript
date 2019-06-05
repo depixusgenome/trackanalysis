@@ -1,5 +1,13 @@
-require(python = dict(holoviews      = '1.10.9',
-                      jupyter        = '1.0',
-                      jupyter_client = '5.2.3'),
-        rtime = False)
+suggest(
+    python = dict(
+        holoviews      = '1.10.9',
+        jupyter        = '1.0',
+        jupyter_client = '5.2.3',
+        panel          = '0.4.0',
+        ipywidgets     = '7.4.2',
+        ipyparallel    = '6.2.3',
+        jupyter_contrib_nbextensions = '0.5.1',
+    ),
+    rtime = False
+)
 make(locals())
