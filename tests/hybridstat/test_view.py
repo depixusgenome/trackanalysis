@@ -8,6 +8,7 @@ from pathlib                    import Path
 import warnings
 import asyncio
 import numpy as np
+import selenium.common.exceptions
 CTX = warnings.catch_warnings()
 CTX.__enter__()
 for _msg_ in (".*html argument of XMLParser.*", ".*Using or importing the ABCs.*"):
@@ -322,7 +323,11 @@ def test_hybridstat(bokehaction):
         filters = FILTERS,
         runtime = 'selenium'
     )
-    server.selenium[".dpx-modal-done"].click()
+    try:
+        server.selenium[".dpx-modal-done"].click()
+    except selenium.common.exceptions.NoSuchElementException:
+        pass
+
     server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
     tabs = next(iter(server.doc.select({'type': Tabs})))
     for i in range(len(tabs.tabs)):
@@ -350,14 +355,16 @@ def test_hybridstat(bokehaction):
 @integrationmark
 def test_muwells(bokehaction):
     "test hybridstat"
-    import selenium.common.exceptions
     server = bokehaction.start(
         'hybridstat.view.HybridStatView',
         'taskapp.toolbar',
         filters = FILTERS,
         runtime = 'selenium'
     )
-    server.selenium[".dpx-modal-done"].click()
+    try:
+        server.selenium[".dpx-modal-done"].click()
+    except selenium.common.exceptions.NoSuchElementException:
+        pass
     server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
 
     tabs    = next(iter(server.doc.select({'type': Tabs})))
