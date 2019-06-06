@@ -8,7 +8,16 @@ from pathlib                    import Path
 import warnings
 import asyncio
 import numpy as np
+CTX = warnings.catch_warnings()
+CTX.__enter__()
+for _msg_ in (".*html argument of XMLParser.*", ".*Using or importing the ABCs.*"):
+    warnings.filterwarnings(
+        'ignore',
+        category = DeprecationWarning,
+        message  = _msg_
+    )
 
+# pylint: disable=wrong-import-position
 from bokeh.plotting             import Figure
 from bokeh.models               import Tabs, FactorRange
 from tornado.gen                import sleep
@@ -21,24 +30,21 @@ from view.plots                 import DpxKeyedRow
 
 from peakfinding.reporting.batch         import createmodels as _pmodels
 
-with warnings.catch_warnings():
-    warnings.filterwarnings(
-        'ignore',
-        category = DeprecationWarning,
-        message  = ".*html argument of XMLParser.*"
-    )
-    from hybridstat.reporting.identification import writeparams
-
-from cleaning.processor                  import BeadSubtractionTask
+from hybridstat.reporting.identification import writeparams
 from hybridstat.reporting.batch          import createmodels as _hmodels
 from hybridstat.view._io                 import ConfigXlsxIO
+
+from cleaning.processor                  import BeadSubtractionTask
 from peakcalling.processor.__config__    import FitToHairpinTask
 from peakcalling.tohairpin               import PeakGridFit, ChiSquareFit, Symmetry
+CTX.__exit__(None, None, None)
 
 FILTERS = [
     (FutureWarning,      ".*elementwise comparison failed;.*"),
     (RuntimeWarning,     ".*All-NaN slice encountered.*"),
-    (DeprecationWarning, ".*elementwise comparison failed;*"),
+    (DeprecationWarning, ".*elementwise comparison failed;.*"),
+    (DeprecationWarning, '.*Using or importing the ABCs from.*'),
+    (DeprecationWarning, '.*the html argument of XMLParser.*'),
 ]
 
 @integrationmark
@@ -145,7 +151,7 @@ def _t_e_s_t_peaks(server, bkact): # pylint: disable=too-many-statements
 
     menu = server.widget['Cycles:Sequence'].menu
     lst  = tuple(i if i is None else i[0] for i in list(menu))
-    assert lst == ('₁ GF4', '₂ GF3', '₃ GF1', '₄ GF2', '✗ 015',
+    assert lst == ('₁ GF4', '₂ GF2', '₃ GF1', '₄ GF3', '✗ 015',
                    None, 'Select a hairpin path')
 
     def _hascstr(yes):
@@ -313,8 +319,10 @@ def test_hybridstat(bokehaction):
     server = bokehaction.start(
         'hybridstat.view.HybridStatView',
         'taskapp.toolbar',
-        filters = FILTERS
+        filters = FILTERS,
+        runtime = 'selenium'
     )
+    server.selenium[".dpx-modal-done"].click()
     server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
     tabs = next(iter(server.doc.select({'type': Tabs})))
     for i in range(len(tabs.tabs)):
@@ -349,6 +357,7 @@ def test_muwells(bokehaction):
         filters = FILTERS,
         runtime = 'selenium'
     )
+    server.selenium[".dpx-modal-done"].click()
     server.ctrl.theme.update("hybridstat.precomputations", ncpu = 0)
 
     tabs    = next(iter(server.doc.select({'type': Tabs})))

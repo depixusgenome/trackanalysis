@@ -81,7 +81,7 @@ on_change_sequence(
         if (emit)
             peaks.source.change.emit()
 
-        if (menu.value in Object.keys(this.stretches))
+        if (Object.keys(this.stretches).indexOf(menu.value) > -1)
         {
             this.updating = 'seq'
             this.stretch  = this.stretches[menu.value]

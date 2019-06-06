@@ -166,18 +166,25 @@ class ConfigMuWellsFilesIO(ConfigTrackIO):
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
         ctrl.theme.add(MuWellsFilesIO.DEFAULT)
-        ctrl.display.observe("tasks", partial(self._onchangedisplay, ctrl))
+        ctrl.display.observe("tasks", partial(self._onchangedisplay, ctrl, []))
         ctrl.theme.observe("tasks", partial(self._onrescale, ctrl))
 
     @staticmethod
-    def _onchangedisplay(ctrl, **_):
-        root  = ctrl.display.get('tasks', 'roottask')
-        if root is None:
+    def _onchangedisplay(ctrl, cur, **_):
+        root        = ctrl.display.get('tasks', 'roottask')
+        old, cur[:] = cur[:], []
+        if root is None or cur == old:
             return
+
         if MuWellsFilesIO.check(root.path):
             bead  = ctrl.display.get('tasks', 'bead')
+            cur   = [root, bead]
+            if cur == old:
+                return
+
             track = ctrl.tasks.track(root)
             if bead in getattr(track, 'experimentallength', ()):
+                cur = [root, bead]
                 model = ctrl.theme.model('tasks')
                 ctrl.theme.update(model, **model.rescale(track, bead))
 

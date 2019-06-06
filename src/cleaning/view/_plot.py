@@ -124,9 +124,10 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
                         exc        = ctx.taskcache(tsk).pop('exc', None) if exc is None else exc
                         nans[name] = ctx.taskcache(tsk).pop('gui', None)
 
-                cls.__add(ctx, mdl, mdl.alignment.task, "alignment")
-                cls.__add(ctx, mdl, mdl.clipping.task,  "clipping")
-                cls.__add(ctx, mdl, mdl.clipping.task,  "discarded")
+                if mdl.cleaning.task is not None:
+                    cls.__add(ctx, mdl, mdl.alignment.task, "alignment")
+                    cls.__add(ctx, mdl, mdl.clipping.task,  "clipping")
+                    cls.__add(ctx, mdl, mdl.clipping.task,  "discarded")
 
         return items, nans, exc
 
