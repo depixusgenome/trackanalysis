@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "Runs an app"
 import sys
-sys.path.insert(0, ".")
+from   pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 # pylint: disable=wrong-import-position
 from app.cmdline import defaultclick, defaultmain, defaultinit, click, INITIAL_ORDERS
 
