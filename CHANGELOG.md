@@ -1,7 +1,7 @@
 # CycleApp
 ## cycles_v6.9
 
-* 2019-xx-xx 10:20:10 +0200  (tag: cycles_v6.9)
+* 2019-06-06 10:20:10 +0200  (tag: cycles_v6.9)
 
 ### Cleaning
 
@@ -21,7 +21,9 @@ alignment or clipping.
 
 Added automated detection of LIA data: the files must have a '.txt' extension
 and the directory must be either the same or vary only by replacing 'trk' by
-'txt' in the path.
+'txt' in the path: a track file in `C:\Users\MyName\Data\trk\2019010101.trk`
+will have the software look for files `C:\Users\MyName\Data\txt\2019010101.txt`
+or `C:\Users\MyName\Data\trk\2019010101.txt`.
 
 Can now deal with any polarity in µV as well as non-opening cycles.
 
