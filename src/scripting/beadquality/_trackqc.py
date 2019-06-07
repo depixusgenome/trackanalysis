@@ -7,9 +7,9 @@ Means for creating and displaying the quality of a set of tracks
 from   itertools import product
 from   typing    import cast
 
-import holoviews as hv
 import pandas    as pd
 import numpy     as np
+import holoviews as hv  # pylint: disable=import-error
 
 from   data.__scripting__.track      import Track
 from   data.__scripting__.tracksdict import TracksDict

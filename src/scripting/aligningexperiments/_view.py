@@ -4,11 +4,10 @@
 Scripts for aligning beads & tracks
 """
 from   typing       import cast
+from   bokeh.models import LinearAxis,FuncTickFormatter, FixedTicker
 import pandas       as     pd
 import numpy        as     np
-import holoviews    as     hv
-from   bokeh.models                         import (LinearAxis,FuncTickFormatter,
-                                                    FixedTicker)
+import holoviews    as     hv   # pylint: disable=import-error
 
 from   taskmodel.__scripting__              import Tasks
 from   peakfinding.processor                import PeaksDict, PeakSelectorTask

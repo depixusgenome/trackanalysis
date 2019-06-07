@@ -10,7 +10,7 @@ require(cxx    = {'msvc'     : 14.0,
         rtime = False)
 
 PYVERS         = (
-    '3.6.4' if sys.platform.startswith("win") else
+    '3.7' if sys.platform.startswith("win") else
     '=3.7.0=hfd72cd7_0=conda-forge'
 )
 
@@ -20,7 +20,9 @@ require(python = {'python': PYVERS, 'numpy': '1.14.2', 'pandas': '0.21.0'},
 require(python = {'pybind11'    : '2.2.1',
                   'pylint'      : '=2.2.2',
                   'astroid'     : '=2.1.0',
-                  'mypy'        : '=0.701'},
+                  'mypy'        : '=0.701',
+                  'sphinx'      : '2.1',
+                  'pandoc'      : '2.2.3'},
         rtime  = False)
 
 MODULES.addbuild(locals())

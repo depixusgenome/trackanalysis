@@ -13,7 +13,7 @@ from typing import List, NamedTuple, Tuple, Optional
 
 import numpy as np
 import pandas as pd
-from holoviews import Curve, Overlay
+from holoviews import Curve, Overlay # pylint: disable=import-error
 
 from sequences import Translator, overlap
 from utils import initdefaults

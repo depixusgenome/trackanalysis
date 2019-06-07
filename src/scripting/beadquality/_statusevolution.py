@@ -5,9 +5,9 @@ Means for creating and displaying the quality of a set of tracks
 """
 from   typing    import Union, List, cast
 
-import holoviews as hv
-import pandas    as pd
 from   bokeh.models  import HoverTool, FactorRange, CategoricalAxis
+import pandas    as pd
+import holoviews as hv # pylint: disable=import-error
 
 from   utils         import initdefaults
 from   ._trackqc     import TrackQC

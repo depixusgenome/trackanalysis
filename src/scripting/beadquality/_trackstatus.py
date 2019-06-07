@@ -6,9 +6,9 @@ Means for creating and displaying the quality of a set of tracks
 
 from   typing    import Union, List
 
-import holoviews as hv
 import pandas    as pd
 import numpy     as np
+import holoviews as hv  # pylint: disable=import-error
 
 from   utils     import initdefaults
 from   ._trackqc import TrackQC, mostcommonerror, beadqualitysummary
