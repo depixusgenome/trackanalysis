@@ -318,9 +318,9 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
         args = dict(text = """
                        Cycle lines alpha    %(CyclePlotTheme:frames.alpha).2f
                        Grid line alpha      %(theme.grid_line_alpha).2f
-                       Font                 %(theme.font)s
-                       Tick font size       %(theme.major_label_text_font_size)s
-                       Axis label font size %(theme.axis_label_text_font_size)s
+                       Font                 %(theme.font)os
+                       Tick font size       %(theme.major_label_text_font_size)os
+                       Axis label font size %(theme.axis_label_text_font_size)os
                        """,
                     peaks     = theme,
                     cnf       = getattr(self._cycle, '_plotmodel'),
