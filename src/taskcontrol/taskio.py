@@ -166,7 +166,7 @@ class ConfigMuWellsFilesIO(ConfigTrackIO):
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
         ctrl.theme.add(MuWellsFilesIO.DEFAULT)
-        ctrl.display.observe("tasks", partial(self._onchangedisplay, ctrl, []))
+        ctrl.display.observe("tasks", partial(self._onchangedisplay, ctrl, [None]))
         ctrl.theme.observe("tasks", partial(self._onrescale, ctrl))
 
     @staticmethod

@@ -14,13 +14,14 @@ from    ._base                   import TrackIO, PATHTYPE, PATHTYPES
 
 class LIAFilesIOConfiguration:
     "model for opening LIA files"
-    name:            str = "track.open.liafile"
-    clipcycles:      int = 2
-    sep:             str = "[;,]"
-    header:          int = 4
-    engine:          str ="python"
-    indexbias:       int = -7
-    colnames:        str = '% Time (s), Amplitude (V)'
+    name:            str       = "track.open.liafile"
+    clipcycles:      int       = 2
+    sep:             str       = "[;,]"
+    header:          int       = 4
+    engine:          str       ="python"
+    indexbias:       int       = -7
+    colnames:        str       = '% Time (s), Amplitude (V)'
+    maxcycles:       float     = 1.3
     indexpower:      float     = .8
     indexthreshold:  float     = .8
     maxdistanceratio:float     = .025
@@ -256,23 +257,27 @@ class MuWellsFilesIO(TrackIO):
                 if len(inds) < 2:
                     continue
                 meddist = int(np.median(np.diff(inds)))
-                return np.concatenate(
+                out = np.concatenate(
                     [
                         [k for k in range(inds[i],inds[i+1]-meddist//2, meddist)]
                         for i in range(len(inds)-1)
                     ]
                     +[inds[-1:]]
                 )
+                if len(out) < cnf.maxcycles*trk['phases'].shape[0]:
+                    return out
             return None
 
-        inds  = _extract()
-        if inds is None:
-            name         = tuple(frames)[1]
-            frames[name] = -frames[name]
-            inds         = _extract()
-            if inds is None:
-                raise IOError("Could not extract peak threshold")
-        return inds
+        inds1        = _extract()
+        name         = tuple(frames)[1]
+        frames[name] = -frames[name]
+        inds2        = _extract()
+        if inds2 is None and inds1 is None:
+            raise IOError("Could not extract peak threshold")
+        if inds2 is not None and (inds1 is None or len(inds1) < len(inds2)):
+            return inds2
+        frames[name] = -frames[name]
+        return inds1
 
     @staticmethod
     def __bestfit(left, right):
