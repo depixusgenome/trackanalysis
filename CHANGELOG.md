@@ -1,7 +1,8 @@
 # CycleApp
 ## cycles_v6.9
 
-* 2019-06-06 10:20:10 +0200  (tag: cycles_v6.9)
+* 2019-06-11 11:12:58 +0200  (tag: cycles_v6.9.1)
+* 2019-06-06 16:12:58 +0200  (tag: cycles_v6.9)
 
 ### Cleaning
 
