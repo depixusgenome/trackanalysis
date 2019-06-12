@@ -62,19 +62,10 @@ class GuiClippingProcessor(ClippingProcessor):
         task(frame.track, info[0], cpy)
         if task.minpopulation > 0.:
             cache['exc'] = cls.test(task, frame, (info[0], cpy))
-        cache['gui'] = np.isnan(cpy)
+        cache['gui'] = np.isnan(cpy) & ~np.isnan(raw)
         if np.any(cache['gui']):
             cache['clipping'] = task.partial(frame.track, info[0], raw)
             cache['clipping'].values[cache['clipping'].values == 0.] = np.NaN
-
-        pha           = frame.track.phase.select(..., [PHASE.measure, PHASE.measure+1]).ravel()
-        cache['discarded'] = Partial(
-            "discarded",
-            np.empty(0, dtype = 'i4'),
-            np.empty(0, dtype = 'i4'),
-            np.array([i.sum()/len(i) for i in np.split(np.isnan(cpy), pha)[1::2]], dtype = "f4")
-        )
-        cache['discarded'].values[cache['discarded'].values == 0.] = np.NaN
         return info
 
     @classmethod
@@ -125,11 +116,37 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
                         nans[name] = ctx.taskcache(tsk).pop('gui', None)
 
                 if mdl.cleaning.task is not None:
+                    cls.__discarded(ctx, mdl, nans)
                     cls.__add(ctx, mdl, mdl.alignment.task, "alignment")
                     cls.__add(ctx, mdl, mdl.clipping.task,  "clipping")
-                    cls.__add(ctx, mdl, mdl.clipping.task,  "discarded")
 
         return items, nans, exc
+
+    @classmethod
+    def __discarded(cls, ctx, mdl, nans):
+        vals = None
+        for i in nans.values():
+            if vals is None:
+                vals  = np.copy(i)
+            else:
+                vals |= i
+
+        pha  = mdl.track.phase.select(..., [PHASE.measure, PHASE.measure+1]).ravel()
+        disc = Partial(
+            "discarded",
+            np.empty(0, dtype = 'i4'),
+            np.empty(0, dtype = 'i4'),
+            np.array([i.sum()/len(i) for i in np.split(vals, pha)[1::2]], dtype = "f4")
+        )
+
+        if mdl.alignment.task:
+            cache = ctx.taskcache(mdl.alignment.task).get("alignment", None)
+            if cache:
+                disc.values[np.isnan(cache.values)] = 1.
+
+        disc.values[disc.values == 0.] = np.NaN
+        val           = ctx.taskcache(mdl.cleaning.task)
+        val[mdl.bead] = (val[mdl.bead][0]+(disc,), val[mdl.bead][1])
 
     @classmethod
     def __add(cls, ctx, mdl, tsk: Optional[Task], name: str):
