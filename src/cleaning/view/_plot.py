@@ -9,7 +9,9 @@ from    bokeh                       import layouts
 
 import  numpy                       as     np
 
+from    data                        import Track
 from    taskmodel                   import PHASE, Task
+from    taskcontrol.modelaccess     import ReplaceProcessors, ProcessorController
 from    utils.array                 import repeat
 from    utils.logconfig             import getLogger
 from    view.colors                 import tohex
@@ -101,29 +103,47 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
                 for i in mdl.track.cycles.withdata({0:nans}).values())
 
     @classmethod
-    def runbead(cls, mdl, **kwa):
+    def computeall(cls, track:Track, bead:int, ctrl:ProcessorController, **tasks: Optional[Task]):
         "updates the cache in the gui and returns the nans"
-        ctx   = mdl.runcontext(cls, GuiExtremumAlignmentProcessor, GuiClippingProcessor, **kwa)
+        ctx   = ReplaceProcessors(
+            ctrl,
+            cls,
+            GuiExtremumAlignmentProcessor,
+            GuiClippingProcessor,
+            copy = True
+        )
         items = exc = None
         nans: Dict[str, np.ndarray]  = {}
         with ctx as cycles:
             if cycles is not None:
-                items = list(cycles[mdl.bead, ...])
+                items = list(cycles[bead, ...])
 
-                for name, tsk in (('aberrant', mdl.cleaning.task), ('clipping', mdl.clipping.task)):
-                    if tsk:
+                for name, tskname in (('aberrant', 'cleaning'), ('clipping', 'clipping')):
+                    if tasks.get(tskname, None):
+                        tsk        = tasks[tskname]
                         exc        = ctx.taskcache(tsk).pop('exc', None) if exc is None else exc
                         nans[name] = ctx.taskcache(tsk).pop('gui', None)
 
-                if mdl.cleaning.task is not None:
-                    cls.__discarded(ctx, mdl, nans)
-                    cls.__add(ctx, mdl, mdl.alignment.task, "alignment")
-                    cls.__add(ctx, mdl, mdl.clipping.task,  "clipping")
+                if tasks.get('cleaning', None):
+                    cls.__discarded(ctx, track, bead, tasks, nans)
+                    cls.__add(ctx, track, bead, tasks, "alignment")
+                    cls.__add(ctx, track, bead, tasks, "clipping")
 
         return items, nans, exc
 
     @classmethod
-    def __discarded(cls, ctx, mdl, nans):
+    def runbead(cls, mdl):
+        "updates the cache in the gui and returns the nans"
+        return cls.computeall(
+            mdl.track, mdl.bead, mdl.processors(),
+            cleaning  = mdl.cleaning.task,
+            alignment = mdl.alignment.task,
+            clipping  = mdl.clipping.task,
+        )
+
+    # pylint: disable=too-many-arguments
+    @classmethod
+    def __discarded(cls, ctx, track: Track, bead: int, tasks:Dict[str, Optional[Task]], nans):
         vals = None
         for i in nans.values():
             if vals is None:
@@ -131,7 +151,7 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
             else:
                 vals |= i
 
-        pha  = mdl.track.phase.select(..., [PHASE.measure, PHASE.measure+1]).ravel()
+        pha  = track.phase.select(..., [PHASE.measure, PHASE.measure+1]).ravel()
         disc = Partial(
             "discarded",
             np.empty(0, dtype = 'i4'),
@@ -139,30 +159,30 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
             np.array([i.sum()/len(i) for i in np.split(vals, pha)[1::2]], dtype = "f4")
         )
 
-        if mdl.alignment.task:
-            cache = ctx.taskcache(mdl.alignment.task).get("alignment", None)
+        if tasks.get('alignment', None):
+            cache = ctx.taskcache(tasks['alignment']).get("alignment", None)
             if cache:
                 disc.values[np.isnan(cache.values)] = 1.
 
         disc.values[disc.values == 0.] = np.NaN
-        val           = ctx.taskcache(mdl.cleaning.task)
-        val[mdl.bead] = (val[mdl.bead][0]+(disc,), val[mdl.bead][1])
+        val       = ctx.taskcache(tasks['cleaning'])
+        val[bead] = (val[bead][0]+(disc,), val[bead][1])
 
     @classmethod
-    def __add(cls, ctx, mdl, tsk: Optional[Task], name: str):
-        if tsk is None:
+    def __add(cls, ctx, track:Track, bead: int, tasks: Dict[str, Optional[Task]], name: str):
+        if tasks.get(name, None) is None:
             clipping = Partial(
                 name,
                 np.empty(0, dtype = 'i4'),
                 np.empty(0, dtype = 'i4'),
-                np.zeros(mdl.track.ncycles, dtype = 'f4')
+                np.zeros(track.ncycles, dtype = 'f4')
             )
         else:
-            clipping = ctx.taskcache(tsk).pop(name, None)
+            clipping = ctx.taskcache(tasks[name]).pop(name, None)
 
         if clipping:
-            val           = ctx.taskcache(mdl.cleaning.task)
-            val[mdl.bead] = (val[mdl.bead][0]+(clipping,), val[mdl.bead][1])
+            val       = ctx.taskcache(tasks['cleaning'])
+            val[bead] = (val[bead][0]+(clipping,), val[bead][1])
 
 class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotModel],
                           WidgetMixin):

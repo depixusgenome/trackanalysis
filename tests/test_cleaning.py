@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
+from   typing                   import Tuple
+import pytest
 import numpy as np
 from   numpy.testing            import assert_equal, assert_allclose
 
@@ -19,7 +21,7 @@ from   cleaning.beadsubtraction import (SubtractAverageSignal, SubtractMedianSig
 import cleaning._core           as     cleaningcore # pylint:disable=no-name-in-module,import-error
 from   data                       import Beads, Track
 from   taskcontrol.taskcontrol    import create
-from   taskmodel.track            import TrackReaderTask
+from   taskmodel.track            import TrackReaderTask, Task
 from   simulator                  import randtrack, setseed
 from   simulator.bindings         import Experiment
 
@@ -431,6 +433,57 @@ def test_clippingtask():
     assert len(nzer) == 5
     assert np.all(np.isnan(arr[nzer]))
 
+@pytest.mark.parametrize("bead", [0, 11, 15])
+@pytest.mark.parametrize("taskcount", [0, 1, 2, -2])
+def test_cycletable(bead: int, taskcount: int):
+    "test rescaling"
+    from eventdetection.processor import ExtremumAlignmentTask
+    from cleaning.view._plot      import GuiDataCleaningProcessor
+    tasks: Tuple[Task,...] =  (
+        TrackReaderTask(path = utpath("big_legacy")),
+        DataCleaningTask(),
+    )
+    if taskcount in (1, 2):
+        tasks += (ExtremumAlignmentTask(),)
+    if taskcount in (-2, 2):
+        tasks += (ClippingTask(),)
+
+    find = lambda tpe: next((i for i in tasks if isinstance(i, tpe)), None)
+
+    ctrl  = create(tasks)
+    _     = next(iter(ctrl.run()))[0] # get the track
+    track = ctrl.data.getcache(tasks[0])()
+
+    GuiDataCleaningProcessor.computeall(
+        track, bead, ctrl,
+        cleaning  = find(DataCleaningTask),
+        alignment = find(ExtremumAlignmentTask),
+        clipping  = find(ClippingTask)
+    )
+
+    info = {i.name: i.values for i in ctrl.data.getcache(DataCleaningTask)()[bead][0]}
+    assert set(info.keys()) == {
+        'population', 'hfsigma', 'extent', 'pingpong', 'saturation', 'discarded',
+        'alignment', 'clipping'
+    }
+    assert all(len(i) == track.ncycles for i in info.values())
+
+    if find(ExtremumAlignmentTask):
+        nans = np.isnan(info['alignment'])
+        assert nans.sum() == {0: 0, 11: 0, 15:23}[bead]
+        assert_equal(info['discarded'][nans], np.ones(nans.sum(), dtype = 'f4'))
+    else:
+        assert_equal(info['alignment'], np.zeros(track.ncycles, dtype = 'f4'))
+
+    if find(ClippingTask):
+        assert (
+            (info['discarded'][np.isfinite(info['clipping'])]+1e-5)
+            <
+            info['clipping'][np.isfinite(info['clipping'])]
+        ).sum() == 0
+    else:
+        assert_equal(info['clipping'], np.zeros(track.ncycles, dtype = 'f4'))
+
 def test_rescaling():
     "test rescaling"
     attrs = (
@@ -473,4 +526,4 @@ def test_rescaling():
         assert abs(getattr(new, i) - (j*5. if i in attrs else j)) < 1e-5
 
 if __name__ == '__main__':
-    test_rescaling()
+    test_cycletable(0, -2)

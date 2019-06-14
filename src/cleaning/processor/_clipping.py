@@ -3,7 +3,6 @@
 "all cleaning related tasks"
 from   functools                import partial
 from   typing                   import Optional
-import warnings
 import numpy                    as     np
 from   data                     import Track
 from   taskmodel                import Level, PHASE, Task
@@ -75,23 +74,17 @@ class ClippingTask(Task):
             return None
 
         pha    = track.phase.select(..., [self.correction, self.correction+1]).ravel()
-        itms   = np.split(data, pha)[1::2]
+        itms   = [(i[np.isfinite(i)], len(i)) for i in np.split(data, pha)[1::2]]
 
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                'ignore',
-                category = RuntimeWarning,
-                message  = ".*invalid value encountered.*"
-            )
-            maxarr = (
-                np.array([(i>maxv).sum() for i in itms], dtype = 'i4')  if maxv is not None else
-                np.zeros(len(itms), dtype = 'i4')
-            )
-            minarr = (
-                np.array([(i<minv).sum() for i in itms], dtype = 'i4')  if maxv is not None else
-                np.zeros(len(itms), dtype = 'i4')
-            )
-            sizes = np.array([len(i) for i in itms], dtype = 'i4')
+        maxarr = (
+            np.array([(i>maxv).sum() for i, _ in itms], dtype = 'i4')  if maxv is not None else
+            np.zeros(len(itms), dtype = 'i4')
+        )
+        minarr = (
+            np.array([(i<minv).sum() for i, _ in itms], dtype = 'i4')  if maxv is not None else
+            np.zeros(len(itms), dtype = 'i4')
+        )
+        sizes = np.array([i for _, i in itms], dtype = 'i4')
         return Partial(
             "clipping",
             np.empty(0, dtype = 'i4'),
