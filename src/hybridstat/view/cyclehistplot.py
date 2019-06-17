@@ -120,7 +120,7 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
             if evts is not None:
                 procs = procs.keepupto(evts, False)
 
-            itms, _, exc = GuiDataCleaningProcessor.runbead(self._model, ctrl = procs, copy = True)
+            itms, _, exc = GuiDataCleaningProcessor.runbead(self._model, ctrl = procs)
             return [i for _, i in itms], exc
 
         def _display(items: Optional[Tuple[List[np.ndarray], Optional[Exception]]]):

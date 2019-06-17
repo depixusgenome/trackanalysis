@@ -132,10 +132,11 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
         return items, nans, exc
 
     @classmethod
-    def runbead(cls, mdl):
+    def runbead(cls, mdl, ctrl = None):
         "updates the cache in the gui and returns the nans"
         return cls.computeall(
-            mdl.track, mdl.bead, mdl.processors(),
+            mdl.track, mdl.bead,
+            mdl.processors() if ctrl is None else ctrl,
             cleaning  = mdl.cleaning.task,
             alignment = mdl.alignment.task,
             clipping  = mdl.clipping.task,
