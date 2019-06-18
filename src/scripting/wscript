@@ -6,6 +6,7 @@ suggest(
         panel          = '0.4.0',
         ipywidgets     = '7.4.2',
         ipyparallel    = '6.2.3',
+        nb_conda       = '2.2.1',
         jupyter_contrib_nbextensions = '0.5.1',
     ),
     rtime = False
