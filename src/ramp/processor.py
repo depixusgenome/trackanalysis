@@ -9,6 +9,7 @@ from   typing            import (NamedTuple, Callable, Union, Tuple, Dict, Any,
 import numpy             as np
 import pandas            as pd
 
+from   data.views            import Beads
 from   signalfilter          import nanhfsigma
 from   taskcontrol.processor import Processor, ProcessorException
 from   taskmodel             import Task, Level
@@ -18,11 +19,12 @@ class RampStatsTask(Task):
     """
     Extract open/close information from each cycle and return a pd.DataFrame
     """
-    level       = Level.bead
-    scale       = 10.0
-    percentiles = 25., 75.
-    extension   = .05, .4, 1.5
-    hfsigma     = 1.e-4, 5.e-3
+    level                                       = Level.bead
+    scale:           float                      = 10.0
+    percentiles:     Tuple[float, float]        = (25., 75.)
+    extension:       Tuple[float, float, float] = (.05, .4, 1.5)
+    hfsigma:         Tuple[float, float]        = (1.e-4, 5.e-3)
+    fixedcycleratio: float                      = 90.
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -103,7 +105,7 @@ class RampDataFrameProcessor(Processor[RampStatsTask]):
                   & (frame.extent  < tsk.extension[2])
                   & good, "status"] = "ok"
         frame.loc[(frame.extent  <= tsk.extension[1])
-                  & (frame.fixedsum == frame.fixedcount)
+                  & (frame.fixedsum * 1e-2 * tsk.fixedcycleratio < frame.fixedcount)
                   & good, "status"] = "fixed"
 
         if "status" in data.columns:
@@ -129,8 +131,13 @@ class RampDataFrameProcessor(Processor[RampStatsTask]):
         return cls.status(data, task)
 
     @classmethod
-    def _row(cls, task, frame, info):
-        dzdt         = np.copy(info[1])
+    def dzdt(
+            cls,
+            task: RampStatsTask,
+            arr:  np.ndarray
+    ) -> np.ndarray:
+        "compute dz/dt"
+        dzdt         = np.copy(arr)
         dzdt[1:-1]   = dzdt[2:] - dzdt[:-2]
         dzdt[[0,-1]] = np.NaN
 
@@ -138,18 +145,31 @@ class RampDataFrameProcessor(Processor[RampStatsTask]):
         dzdt[np.isnan(dzdt)] = 0.
         rng    = task.scale*(quants[1]-quants[0])
         outl   = np.logical_or(dzdt > quants[1]+rng, dzdt < quants[0]-rng)
-        zmag   = frame.track.secondaries.zmag[frame.phase(info[0][1], 0):][:len(dzdt)]
+        dzdt[outl] = 0
+        return dzdt
 
-        tmp            = np.nonzero(outl & (dzdt > 0))[0]
+    @classmethod
+    def _row(
+            cls,
+            task: RampStatsTask,
+            frame:Beads,
+            info: Tuple[Tuple[int, int], np.ndarray]
+    ) -> RampCycleTuple:
+        dzdt = cls.dzdt(task, info[1])
+        zmag = frame.track.secondaries.zmag[frame.phase(info[0][1], 0):][:len(dzdt)]
+
+        tmp            = np.nonzero(dzdt > 0)[0]
         iopen, zopen   = (tmp[-1], zmag[tmp[-1]]) if len(tmp) else (np.NaN, np.NaN)
-        tmp            = np.nonzero(outl & (dzdt < 0))[0]
+        tmp            = np.nonzero(dzdt < 0)[0]
         iclose, zclose = (tmp[0], zmag[tmp[0]])   if len(tmp) else (np.NaN, np.NaN)
-        return RampCycleTuple(info[0][0], info[0][1],
-                              pd.Series(info[1]).corr(pd.Series(zmag)),
-                              np.nanmax(info[1])- np.nanmin(info[1]),
-                              iopen,  zopen,
-                              iclose, zclose,
-                              nanhfsigma(info[1]))
+        return RampCycleTuple(
+            info[0][0], info[0][1],
+            pd.Series(info[1]).corr(pd.Series(zmag)),
+            np.nanmax(info[1])- np.nanmin(info[1]),
+            iopen,  zopen,
+            iclose, zclose,
+            nanhfsigma(info[1])
+        )
 
 class RampConsensusBeadProcessor(Processor[RampConsensusBeadTask]):
     """
