@@ -2,11 +2,15 @@
 # -*- coding: utf-8 -*-
 "Adds shortcuts for using holoview"
 from   functools         import partial
+from   typing            import Optional, List
 import pandas            as     pd
 import numpy             as     np
 
+from   utils.array       import popclip
 from   utils.holoviewing import hv, BasicDisplay
 from   data.track        import Track, isellipsis # pylint: disable=unused-import
+from   eventdetection.processor import ExtremumAlignmentTask
+from   taskmodel.__scripting__  import Tasks
 from   ..analysis        import (RampAnalysis, RampConsensusBeadTask,
                                  RampStatsTask, RampConsensusBeadProcessor)
 
@@ -18,23 +22,16 @@ class RampDisplay(BasicDisplay, ramp = Track):
 
     * *beads*: the list of bead to display
     * *cycles*: the list of cycles to display
-    * *align*: can be
-
-        * *first*:   align all cycles on their 1st values
-        * *last*:  align all cycles on their last values
-        * *max*:    align all cycles around their *zmag* max position
-        * *None*: don't align cycles
-
-    * *alignmentlength*: if *align* is not *None*, will use this number of
-    frames for aligning cycles
+    * *align*: an optional alignment task
     * *legend*: legend position, *None* for no legend
+    * *alpha*: applies an alpha to all curves
     """
-    _beads           = None
-    _cycles          = None
-    _align           = 'max'
-    _alignmentlength = 5
-    _stretch         = 1.
-    _bias            = 0.
+    _beads:   Optional[List[int]]             = None
+    _cycles:  Optional[List[int]]             = None
+    _align:   Optional[ExtremumAlignmentTask] = None
+    _stretch: float                           = 1.
+    _bias:    float                           = 0.
+    _alpha:   float                           = .25
     KEYWORDS         = frozenset({i for i in locals() if i[0] == '_' and i[1] != '_'})
     def dataframe(self, percycle = True, **kwa) -> pd.DataFrame:
         """
@@ -132,35 +129,23 @@ class RampDisplay(BasicDisplay, ramp = Track):
         if self._cycles is None:
             cycles = ... if self._cycles is None else self._cycles
 
-        items  = self._items.cycles
-        zcyc   = self._items.cycles.withdata({0: self._items.secondaries.zmag})
-        zmag   = {i[1]: j for i, j in zcyc}
-        length = self._alignmentlength
-        if self._align.lower() == 'first':
-            imax = dict.fromkeys(zmag.keys(), slice(length))        # type: ignore
-        elif self._align.lower() == 'last':
-            imax  = dict.fromkeys(zmag.keys(), slice(-length,0))    # type: ignore
-        elif self._align.lower() == 'max':
-            maxes = {i: int(.1+np.median((j == np.nanmax(j)).nonzero()[0]))
-                     for i, j in zmag.items()}
-            imax  = {i: slice(max(0, j-length//2), j+length//2) for i, j in maxes.items()}
-        else:
-            imax  = None # type: ignore
+        items  = self._items.apply(
+            self._align if self._align else Tasks.alignment
+        )[...,...]
 
-        def _concat(itms, order):
-            return np.concatenate([itms[i] if j else [np.NaN] for i in order for j in range(2)])
+        def _concat(itms):
+            return popclip(
+                np.concatenate([(i if j else [np.NaN]) for i in itms for j in (0,1)])
+            )
 
+        zcyc = _concat(self._items.secondaries.zmagcycles.values())
         def _show(bead):
-            data = {i[1]: j for i, j in items[bead,cycles]}
-            if imax:
-                data = {i: data[i] - np.nanmean(data[i][j]) for i, j in imax.items()}
-
-            zero = np.nanmedian([np.nanmean(j[:length]) for j in data.values()])
-            for j in data.values():
-                j[:] = (j-zero-self._bias)*self._stretch
-
-            return hv.Curve((_concat(zmag, data), _concat(data, data)),
-                            kdims = ['zmag'], vdims = ['z'])
+            data = _concat([(j-self._bias)*self._stretch  for i, j in items[bead,cycles]])
+            return hv.Curve(
+                (zcyc, data),
+                kdims = ['zmag'],
+                vdims = ['z']
+            ).options(alpha = self._alpha)
         return _show
 
     def getredim(self):
