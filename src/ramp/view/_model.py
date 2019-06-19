@@ -76,6 +76,7 @@ class RampPlotTheme(PlotTheme):
     figsize          = PlotTheme.defaultfigsize(500, 700)
     widgetwidth      = 500
     dataformat       = "raw"
+    clip             = 99., .1
     toolbar          = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,reset,save'
     @initdefaults(frozenset(locals()))

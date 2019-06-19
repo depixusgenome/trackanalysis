@@ -18,6 +18,7 @@ from    taskcontrol.taskio     import TaskIO
 from    view.base              import spawn, ThreadPoolExecutor, threadmethod
 from    utils.logconfig        import getLogger
 from    utils.gui              import startfile
+from    utils.array            import popclip
 
 from    ._model                import (RampPlotModel, RampPlotTheme,
                                        RampPlotDisplay, RampTaskPlotModelAccess,
@@ -220,9 +221,10 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
 
         conc = lambda x: np.concatenate(list(x))
         if self._theme.dataformat == "raw":
-            get2 = lambda x: conc([np.NaN] if j else i for i in x for j in (0, 1))
-            outp[2].update(z = get2(cycles), zmag  = get2(zmag))
-
+            def _get2(vals):
+                out  = conc(([np.NaN] if j else i) for i in vals for j in (0, 1))
+                return popclip(out, *self._theme.clip)
+            outp[2].update(z = _get2(cycles), zmag  = _get2(zmag))
         else:
             cons = self._plotmodel.getdisplay("consensus")
             if cons is not None:
