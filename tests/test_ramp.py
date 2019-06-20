@@ -3,15 +3,24 @@
 "tests opening, reading and analysis of a ramp.trk file"
 from taskcontrol.taskcontrol    import create
 from taskmodel                  import TrackReaderTask
-from ramp.processor             import RampStatsTask
+from ramp.processor             import RampStatsTask, RampEventTuple, RampCycleTuple
 from ramp.view._widget          import DpxRamp, Slider # pylint: disable=protected-access
 from tests.testutils            import integrationmark
 from tests.testingcore          import path
 
 def test_dataframe():
     "test ramp dataframe"
-    next(create(TrackReaderTask(path = path("ramp_legacy")),
-                RampStatsTask()).run())
+    out = next(create(
+        TrackReaderTask(path = path("ramp_legacy")),
+        RampStatsTask()
+    ).run())
+    assert {i for i in out.columns}  == set(RampCycleTuple.fields()) | {'fixed', 'status'}
+
+    out = next(create(
+        TrackReaderTask(path = path("ramp_legacy")),
+        RampStatsTask(events = True)
+    ).run())
+    assert {i for i in out.columns}  == set(RampEventTuple.fields()) | {'fixed', 'status'}
 
 @integrationmark
 def test_rampview(bokehaction): # pylint: disable=redefined-outer-name
@@ -60,5 +69,4 @@ def test_rampview(bokehaction): # pylint: disable=redefined-outer-name
         server.change(slider, 'value', (slider.start + slider.end)*.5)
 
 if __name__ == '__main__':
-    from tests.testutils.bokehtesting import BokehAction
-    test_rampview(BokehAction(None))
+    test_dataframe()
