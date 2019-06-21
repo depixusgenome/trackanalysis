@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot view for cleaning data"
-from    typing         import Dict, Tuple, List, Optional, cast
+from    typing         import Dict, Tuple, List, Optional, Iterator, cast
 from    pathlib        import Path
 import time
 
 from    bokeh.models   import ColumnDataSource, Range1d
 from    bokeh.plotting import Figure
-from    bokeh          import layouts
+from    bokeh          import layouts, palettes
 
 import  numpy          as     np
 import  pandas         as     pd
@@ -170,7 +170,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
                 self.reset(False)
 
     def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument
-        self.__src = [ColumnDataSource(data = i) for i in self.__data(None, None)]
+        self.__src = [ColumnDataSource(data = i) for i in self.__data(None, None, None)]
         label      = (self._theme.ylabel if self._theme.dataformat != "norm" else
                       self._theme.ylabelnormalized)
         self.__fig = fig = self.figure(y_range      = Range1d,
@@ -181,6 +181,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
             self.addtofig(fig, i, x = 'zmag', y = 'zbead', source = j)
         for i, j in zip(("consensusarea", "consensusline", "beadcycles"), self.__src):
             self.addtofig(fig, i, x = 'zmag', y = 'z', source = j)
+        self.addtofig(fig, "frames", x = 'zmag', y = 'z', source = self.__src[-1])
         self.linkmodeltoaxes(fig)
 
         mode = self.defaultsizingmode(width = self._theme.widgetwidth)
@@ -194,11 +195,19 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
             if track is not None:
                 view    = self._model.runbead()
                 if view is not None:
-                    cycles  = list(cast(Beads, view)[self._model.bead,...].values())
-                    zmag    = list(track.secondaries.zmagcycles.values())
+                    cycles  = list(
+                        cast(Beads, view)[self._model.bead,...]
+                        .withphases(*self._theme.phaserange)
+                        .values()
+                    )
+                    zmag    = list(
+                        track.secondaries.zmagcycles
+                        .withphases(*self._theme.phaserange)
+                        .values()
+                    )
                     disable = False
         finally:
-            data = self.__data(cycles, zmag)
+            data = self.__data(track, cycles, zmag)
             extr = lambda x: ([np.nanmin(i[x])  for i in data if len(i[x])]
                               +[np.nanmax(i[x]) for i in data if len(i[x])])
 
@@ -211,39 +220,69 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
                 cache[j]['data'] = i
             self.__widgets.reset(cache, disable)
 
-    def __data(self, cycles, zmag) -> _DataType:
+    def __data(self, track, cycles, zmag) -> _DataType:
         empty           = np.empty(0, dtype = 'f4')
-        outp: _DataType = tuple({i: empty for i in ("z", "zmag", "zbead")}
+        outp: _DataType = tuple({i: empty for i in ("z", "zmag", "zbead", "phase")}
                                 for j in range(3))
-        outp[2].pop("zbead")
+        for i, j in enumerate(("phase", "phase", "zbead")):
+            outp[i].pop(j)
         if cycles is None or len(cycles) == 0:
             return outp
 
-        conc = lambda x: np.concatenate(list(x))
         if self._theme.dataformat == "raw":
-            def _get2(vals):
-                out  = conc(([np.NaN] if j else i) for i in vals for j in (0, 1))
-                return popclip(out, *self._theme.clip)
-            outp[2].update(z = _get2(cycles), zmag  = _get2(zmag))
+            upd = self.__rawdata(track, cycles, zmag)
         else:
-            cons = self._plotmodel.getdisplay("consensus")
-            if cons is not None:
-                bead = self._model.bead
-                if self._theme.dataformat == "norm":
-                    name   = "normalized"
-                    factor = 100. / np.nanmax(cons[bead, 1])
-                else:
-                    name   = "consensus"
-                    factor = 1.
+            upd = self.__consensusdata()
 
-                get0 = lambda i, j, k: conc([cons[i, j], cons[i, k][::-1]])
-                outp[0].update(z     = get0(name, 0, 2),
-                               zmag  = get0("zmag", "", ""),
-                               zbead = get0(bead, 0, 2)*factor)
-                outp[1].update(z     = cons[name, 1],
-                               zmag  = cons["zmag", ""],
-                               zbead = cons[bead, 1]*factor)
+        for old, new in zip(outp, upd):
+            old.update(new)
         return outp
+
+    def __rawdata(self, track, cycles, zmag) -> Iterator[Dict[str, np.ndarray]]:
+        yield {}
+        yield {}
+
+        conc = lambda x: np.concatenate(list(x))
+        def _get2(vals):
+            out  = conc(([np.NaN] if j else i) for i in vals for j in (0, 1))
+            return popclip(out, *self._theme.clip)
+
+        colors = np.array(getattr(palettes, self._theme.phases))
+        phase = conc(
+            [colors[0]] if j else colors[1:][i]
+            for i in (
+                track.secondaries.phasecycles
+                .withphases(self._theme.phaserange)
+                .values()
+            )
+            for j in (0,1)
+        )
+        yield dict(z = _get2(cycles), zmag = _get2(zmag), phase = phase)
+
+    def __consensusdata(self) -> Iterator[Dict[str, np.ndarray]]:
+        conc = lambda x: np.concatenate(list(x))
+        cons = self._plotmodel.getdisplay("consensus")
+        if cons is not None:
+            bead = self._model.bead
+            if self._theme.dataformat == "norm":
+                name   = "normalized"
+                factor = 100. / np.nanmax(cons[bead, 1])
+            else:
+                name   = "consensus"
+                factor = 1.
+
+            get0 = lambda i, j, k: conc([cons[i, j], cons[i, k][::-1]])
+            yield dict(
+                z     = get0(name, 0, 2),
+                zmag  = get0("zmag", "", ""),
+                zbead = get0(bead, 0, 2)*factor
+            )
+
+            yield dict(
+                z     = cons[name, 1],
+                zmag  = cons["zmag", ""],
+                zbead = cons[bead, 1]*factor
+            )
 
 class RampPlotView(PlotView[RampPlotCreator]):
     "Peaks plot view"
