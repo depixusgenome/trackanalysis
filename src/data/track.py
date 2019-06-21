@@ -160,6 +160,23 @@ class Secondaries:
     zmag    = cast(np.ndarray, property(lambda self: self.__track._secondaries["zmag"],
                                         doc = "the magnet altitude sampled at frame rate"))
     @property
+    def phase(self) -> np.ndarray:
+        "return the phases per frame"
+        arr = np.zeros(self.__track.nframes, dtype = 'i1')
+        nph = self.__track.nphases
+        for i, j  in enumerate(np.split(
+                arr,
+                self.__track.phases.ravel()-self.__track.phases[0,0]
+        )):
+            j[:] = i % nph
+        return arr
+
+    @property
+    def phasecycles(self) -> Cycles:
+        "return the phases per frame in cycles"
+        return self.__track.cycles.withdata({"phase": self.phase})
+
+    @property
     def zmagcycles(self) -> Cycles:
         "the magnet altitude sampled at frame rate"
         return self.__track.cycles.withdata({"zmag": self.zmag})
