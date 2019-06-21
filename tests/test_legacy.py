@@ -29,12 +29,12 @@ def test_opentrack_big():
     u"test a big track file"
     trk  = readtrack(path("big_legacy"))
     assert trk['cyclemin']  == 3
-    assert trk['cyclemax']  == 104
+    assert trk['cyclemax']  == 105
     assert trk['nphases']   == 8
-    assert trk['t'].size    == 49802
-    assert trk['zmag'].size == 49802
+    assert trk['t'].size    == 50290
+    assert trk['zmag'].size == 50290
     for i in range(39):
-        assert trk[i].size  == 49802
+        assert trk[i].size  == 50290
     assert (frozenset(x for x in trk if isinstance(x, int))
             == frozenset([x for x in range(39)]))
 
@@ -42,12 +42,12 @@ def test_opentrack_small():
     u"test a small track file"
     trk  = readtrack(path("small_legacy"))
     assert trk['cyclemin']   == 3
-    assert trk['cyclemax']   == 3
+    assert trk['cyclemax']   == 4
     assert trk['nphases']    == 8
-    assert trk['t'].size     == 498
-    assert trk['zmag'].size  == 498
+    assert trk['t'].size     == 996
+    assert trk['zmag'].size  == 996
     for i in range(39):
-        assert trk[i].size == 498
+        assert trk[i].size == 996
     assert (frozenset(x for x in trk if isinstance(x, int))
             == frozenset([x for x in range(92)]))
 

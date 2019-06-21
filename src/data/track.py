@@ -276,7 +276,7 @@ class PhaseManipulator:
             tmp  = cycs+1
             last = trk.phases[tmp[tmp < len(trk.phases)],0]
         if len(last) < len(first):
-            np.append(last, trk.nframes)
+            last = np.append(last, trk.nframes)
 
         inds   = np.concatenate([np.arange(j, dtype = 'i4')+i for i, j in zip(first, last-first)])
         inds  -= self._track.phases[0, 0]

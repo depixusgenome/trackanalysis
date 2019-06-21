@@ -102,7 +102,24 @@ namespace legacy
 
         auto cycles  = rec.cycles();
         auto first   = notall ? cycles[3*rec.nphases()]             : 0;
-        auto last    = notall ? cycles[cycles.size()-rec.nphases()] : rec.nrecs();
+        auto last    = rec.nrecs();
+        auto remlast = 0;
+        if(notall)
+        {
+            int meds = 0, cnt = 0, je = rec.nphases();
+            for(int i = 3, ie = rec.ncycles()-1; i < ie; ++i, ++cnt)
+                meds += cycles[(i+1)*je]-cycles[i*je];
+            meds /= cnt;
+            if(std::any_of(
+                        cycles.begin()+(rec.ncycles()-1)*je,
+                        cycles.end(),
+                        [](auto a) { return a <= 0; }))
+            {
+                remlast = 1;
+                last    = cycles[rec.ncycles()*je-2*je]+meds;
+            } else
+                last    = cycles[rec.ncycles()*je-je]+meds;
+        }
         auto sz      = last-first;
 
         auto add = [&](auto key, auto && val)
@@ -127,8 +144,8 @@ namespace legacy
         add("zmag", [&]() { return rec.zmag(); });
         res["nbeads"]    = pybind11::cast(rec.nbeads());
         res["cyclemin"]  = pybind11::cast((notall ?  3 : 0) + rec.cyclemin());
-        res["cyclemax"]  = pybind11::cast((notall ? -1 : 0) + rec.cyclemax());
-        res["ncycles"]   = pybind11::cast((notall ? -4 : 0) + rec.ncycles());
+        res["cyclemax"]  = pybind11::cast(rec.cyclemax() - remlast);
+        res["ncycles"]   = pybind11::cast((notall ? -3-remlast : 0) + rec.ncycles());
         res["nphases"]   = pybind11::cast(rec.nphases());
         res["framerate"] = pybind11::cast(rec.camerafrequency());
         res["fov"]       = _readrecfov(rec);
@@ -187,7 +204,7 @@ namespace legacy
                                                  pybind11::make_tuple(std::get<2>(dim),
                                                                       std::get<3>(dim)));
 
-        std::vector<size_t> shape   = {rec.ncycles()-(notall ? 4: 0), rec.nphases()};
+        std::vector<size_t> shape   = {rec.ncycles()-(notall ? 3+remlast: 0), rec.nphases()};
         res["phases"] = _toimage<typename decltype(cycles)::value_type>
                             (shape, cycles.data()+(notall ? 3*rec.nphases() : 0));
         return std::move(res);
