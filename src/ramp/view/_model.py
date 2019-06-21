@@ -11,13 +11,14 @@ import pandas                   as     pd
 from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from   taskcontrol.beadscontrol import DataSelectionBeadController
 from   taskcontrol.modelaccess  import TaskAccess, TaskPlotModelAccess
-from   taskmodel.application    import TasksDisplay
+from   taskmodel.application    import TasksDisplay, InstrumentType
 from   utils                    import initdefaults
 from   view.base                import spawn
 from   ..processor              import RampConsensusBeadProcessor, RampDataFrameProcessor
 
 
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
+from   cleaning.processor.__config__       import DataCleaningTask
 from   eventdetection.processor.__config__ import ExtremumAlignmentTask
 from   ..__config__                        import RampConsensusBeadTask, RampStatsTask
 
@@ -103,10 +104,32 @@ class RampPlotModel(PlotModel):
 class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
     "access to ExtremumAlignmentTask"
 
+class DataCleaningTaskAccess(TaskAccess, tasktype = DataCleaningTask):
+    "access to ExtremumAlignmentTask"
+    __DEFAULT = dict(minextent = 0., maxextent = 10., maxsaturation = 100.)
+    def __init__(self, mdl):
+        super().__init__(mdl)
+        for dflt in (True, False):
+            args = {
+                i: dict(mdl.ctrl.theme.get("tasks", i, defaultmodel = dflt))
+                for i in InstrumentType.__members__
+            }
+            for task in args.values():
+                task['datacleaning'] = deepcopy(task['datacleaning'])
+                for i, j in self.__DEFAULT.items():
+                    setattr(task['datacleaning'], i, j)
+
+            if dflt:
+                mdl.ctrl.theme.updatedefaults("tasks", **args)
+            else:
+                mdl.ctrl.theme.update("tasks", **args)
+
+
 class RampTaskPlotModelAccess(TaskPlotModelAccess):
     "access ramp task model"
     def __init__(self, ctrl) -> None:
         super().__init__(ctrl)
+        self.cleaning  = DataCleaningTaskAccess(self)
         self.alignment = ExtremumAlignmentTaskAccess(self)
 
 def _run(cache, proc):

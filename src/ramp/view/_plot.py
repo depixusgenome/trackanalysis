@@ -247,7 +247,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
 
 class RampPlotView(PlotView[RampPlotCreator]):
     "Peaks plot view"
-    TASKS = ('extremumalignment',)
+    TASKS = ('datacleaning', 'extremumalignment',)
     def ismain(self, ctrl):
         "Cleaning and alignment, ... are set-up by default"
         self._ismain(

@@ -2,17 +2,14 @@
 # -*- coding: utf-8 -*-
 "Adds shortcuts for using holoview"
 from   functools         import partial
-from   typing            import Optional, List
+from   typing            import Optional, List, Tuple
 import pandas            as     pd
 import numpy             as     np
 
 from   utils.array       import popclip
 from   utils.holoviewing import hv, BasicDisplay
 from   data.track        import Track, isellipsis # pylint: disable=unused-import
-from   eventdetection.processor import ExtremumAlignmentTask
-from   taskmodel.__scripting__  import Tasks
-from   ..analysis        import (RampAnalysis, RampConsensusBeadTask,
-                                 RampStatsTask, RampConsensusBeadProcessor)
+from   .analysis         import RampAnalysis, RampConsensusBeadProcessor
 
 class RampDisplay(BasicDisplay, ramp = Track):
     """
@@ -25,23 +22,25 @@ class RampDisplay(BasicDisplay, ramp = Track):
     * *align*: an optional alignment task
     * *legend*: legend position, *None* for no legend
     * *alpha*: applies an alpha to all curves
+    * *analysis*: a RampAnalysis object used throughout
     """
-    _beads:   Optional[List[int]]             = None
-    _cycles:  Optional[List[int]]             = None
-    _align:   Optional[ExtremumAlignmentTask] = None
-    _stretch: float                           = 1.
-    _bias:    float                           = 0.
-    _alpha:   float                           = .25
+    _beads:   Optional[List[int]] = None
+    _cycles:  Optional[List[int]] = None
+    _stretch: float               = 1.
+    _bias:    float               = 0.
+    _alpha:   float               = .25
+    _popclip: Tuple[float, ...]   = (99., .1)
+    _tasks:   list                = []
+    _analysis: RampAnalysis       = RampAnalysis()
     KEYWORDS         = frozenset({i for i in locals() if i[0] == '_' and i[1] != '_'})
     def dataframe(self, percycle = True, **kwa) -> pd.DataFrame:
         """
         return a dataframe containing all info
         """
-        if percycle:
-            ana = RampAnalysis(dataframetask = RampStatsTask(**kwa))
-            return ana.dataframe(self._items, self._beads)
-        ana = RampAnalysis(consensustask = RampConsensusBeadTask(**kwa))
-        return ana.consensus(self._items, self._beads)
+        return getattr(
+            self._analysis,
+            'dataframe' if percycle else 'consensus'
+        )(self._items, self._beads, **kwa)
 
     def status(self, **kwa) -> hv.Table:
         "return the status of the beads"
@@ -55,8 +54,7 @@ class RampDisplay(BasicDisplay, ramp = Track):
 
     def beads(self, status = "ok", **kwa):
         "return beads which make it through a few filters"
-        ana = RampAnalysis(dataframetask = RampStatsTask(**kwa))
-        return ana.beads(self._items, status, self._beads)
+        return self._analysis.beads(self._items, status, self._beads, **kwa)
 
     @staticmethod
     def _name(i):
@@ -89,11 +87,10 @@ class RampDisplay(BasicDisplay, ramp = Track):
             return hv.Area(data, "zmag", cols[1:], label = ind.name).options(**tmp)*crv
         assert False
 
-    def consensus(self, opts = None, hmap = True, normalize: bool = True, **kwa):
+    def consensus(self, opts = None, hmap = True, normalize = True, **kwa):
         "return average bead"
-        ana          = RampAnalysis(consensustask = RampConsensusBeadTask(**kwa))
-        data         = ana.consensus(self._items, self._beads, normalize)
-        RampConsensusBeadProcessor.consensus(data, self.beads("ok"))
+        data = self.dataframe(False, normalize = normalize, **kwa)
+        RampConsensusBeadProcessor.consensus(data, normalize, self.beads("ok"))
 
         data.columns = [self._name(i) for i in data.columns]
         cols         = [i for i in data.columns
@@ -129,23 +126,34 @@ class RampDisplay(BasicDisplay, ramp = Track):
         if self._cycles is None:
             cycles = ... if self._cycles is None else self._cycles
 
-        items  = self._items.apply(
-            self._align if self._align else Tasks.alignment
-        )[...,...]
+        items = self._analysis.beadsview(self._items, *self._tasks)[...,...]
 
         def _concat(itms):
             return popclip(
-                np.concatenate([(i if j else [np.NaN]) for i in itms for j in (0,1)])
+                np.concatenate([(i if j else [np.NaN]) for i in itms for j in (0,1)]),
+                *self._popclip
             )
 
         zcyc = _concat(self._items.secondaries.zmagcycles.values())
+        zpha = _concat(self._items.secondaries.phasecycles.values())
         def _show(bead):
-            data = _concat([(j-self._bias)*self._stretch  for i, j in items[bead,cycles]])
-            return hv.Curve(
-                (zcyc, data),
-                kdims = ['zmag'],
-                vdims = ['z']
-            ).options(alpha = self._alpha)
+            try:
+                data = _concat([(j-self._bias)*self._stretch  for i, j in items[bead,cycles]])
+                exc  = ""
+            except Exception as _: # pylint: disable=broad-except
+                exc  = str(_)
+
+                data =  np.zeros(len(zcyc))
+            info = pd.DataFrame({"zmag": zcyc, "z": data, "phase": zpha})
+            crv  = (
+                hv.Curve(info, 'zmag', ["z", "phase"])
+                .options(alpha = self._alpha, color = "gray")
+            )
+            return (
+                crv
+                * crv.to.scatter().opts(color = "phase", cmap ="greens")
+                * hv.Text(info.zmag.mean(), .5, exc)
+            )
         return _show
 
     def getredim(self):
