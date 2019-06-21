@@ -7,6 +7,7 @@ from control.decentralized  import Indirection
 from fov                    import BaseFoVPlotCreator, FoVPlotModel
 from view.plots             import PlotView
 from taskview.tabs          import TabsView, TabsTheme, initsubclass
+from cleaning.view          import CleaningView
 from ._plot                 import RampPlotView
 from ._model                import RampTaskPlotModelAccess, RampPlotDisplay
 
@@ -33,7 +34,7 @@ class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess, # type: ignore
 class FoVPlotView(PlotView[FoVPlotCreator]):
     "FoV plot view"
 
-PANELS = {FoVPlotView: 'fov', RampPlotView: 'ramp'}
+PANELS = {FoVPlotView: 'fov', CleaningView: 'cleaning', RampPlotView: 'ramp'}
 
 class RampTabTheme(TabsTheme):
     "Ramps tab theme"
