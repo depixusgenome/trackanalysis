@@ -81,7 +81,7 @@ def test_cycles_iterkeys():
     track = data.Track(path = utpath("big_legacy"))
     cycs  = lambda: data.Cycles(track = track, data = _MyItem(track.data))
     cids  = lambda _: {(i,_) for i in range(39)}
-    bids  = lambda _: {(_,i) for i in range(102)}
+    bids  = lambda _: {(_,i) for i in range(103)}
     assert len(tuple(cycs().selecting(0).keys()))  == len(bids(0))
     assert len(tuple(cycs()[:,0].keys()))          == len(cids(0))
     assert len(tuple(cycs()[...,0].keys()))        == len(cids(0))
@@ -126,7 +126,7 @@ def test_cycles_iterkeys2():
 
     beads = track.beads.withcycles(...)
     cycles = beads.new(data.Cycles)
-    assert len(tuple(cycles[0, ...])) == 102
+    assert len(tuple(cycles[0, ...])) == 103
 
 def test_cycles_mixellipsisnumbers():
     "mixing ellipis and lists of numbers in the indexes"
@@ -412,7 +412,7 @@ def test_selectcycles():
     assert_allclose(other.phases[0,:], trk.phases[2,:]-trk.phases[2,0])
 
     other = selectcycles(trk, slice(None, None, 2))
-    assert other.ncycles == trk.ncycles//2
+    assert abs(other.ncycles - trk.ncycles//2) <= 1
     assert set(other.beads.keys()) == set(trk.beads.keys())
     assert_allclose(other.phases[0,:], trk.phases[0,:]-trk.phases[0,0])
 
