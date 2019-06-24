@@ -20,3 +20,10 @@ def _path(path):
     LOGS.debug("Test is opening: %s", path)
     return utpath(path)
 _ManagedServerLoop.path = staticmethod(_path)
+_ManagedServerLoop.roottask = property(lambda self: self.ctrl.display.get("tasks", "roottask"))
+_ManagedServerLoop.track    = property(lambda self: self.ctrl.tasks.track(self.roottask))
+def task(self, task):
+    "returns a task"
+    return self.ctrl.tasks.task(self.roottask, task)
+_ManagedServerLoop.task = task
+
