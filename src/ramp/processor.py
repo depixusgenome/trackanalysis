@@ -114,10 +114,7 @@ class RampStatsTask(Task):
     @staticmethod
     def dzdt(arr:np.ndarray) -> np.ndarray:
         "compute dz/dt"
-        dzdt         = np.copy(arr)
-        dzdt[1:-1]   = dzdt[2:] - dzdt[:-2]
-        dzdt[[0,-1]] = np.NaN
-        return dzdt
+        return np.concatenate([[np.NaN], np.diff(arr)])
 
     def eventindexes(
             self,
@@ -132,6 +129,9 @@ class RampStatsTask(Task):
             if np.any(np.isfinite(arr)):
                 quants = np.nanpercentile(arr, self.percentiles)
                 limits = quants[1-i] + self.scale*(quants[1-i]-quants[i])
+
+                arr = np.copy(arr)
+                arr[np.isnan(arr)] = 0.
 
                 inds   = np.nonzero(comp(arr, limits))[0] + pha[0]
                 inds   = np.concatenate([inds[:1], inds[1:][np.diff(inds) > 1]])
