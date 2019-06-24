@@ -7,7 +7,7 @@ from control.decentralized  import Indirection
 from fov                    import BaseFoVPlotCreator, FoVPlotModel
 from view.plots             import PlotView
 from taskview.tabs          import TabsView, TabsTheme, initsubclass
-from cleaning.view          import CleaningView
+from cleaning.view          import CleaningPlotCreator,  CleaningWidgets
 from ._plot                 import RampPlotView
 from ._model                import RampTaskPlotModelAccess, RampPlotDisplay
 
@@ -33,6 +33,19 @@ class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess, # type: ignore
 
 class FoVPlotView(PlotView[FoVPlotCreator]):
     "FoV plot view"
+
+
+class RampCleaningPlotCreator(CleaningPlotCreator):
+    "cleaning for ramps"
+    def __init__(self, ctrl):
+        super().__init__(ctrl, text = '\n'.join(CleaningWidgets.text(None).split('\n')[:-2]))
+
+class CleaningView(PlotView[RampCleaningPlotCreator]):
+    "Peaks plot view"
+    TASKS = 'aberrant', 'datacleaning', 'extremumalignment'
+    def ismain(self, ctrl):
+        "Cleaning and alignment, ... are set-up by default"
+        self._ismain(ctrl, tasks  = self.TASKS)
 
 PANELS = {FoVPlotView: 'fov', CleaningView: 'cleaning', RampPlotView: 'ramp'}
 

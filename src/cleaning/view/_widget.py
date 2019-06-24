@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cleaning beads"
-from    typing          import List, Tuple, Union
-from    abc             import ABC
+from    typing          import List, Tuple, Union, Optional
 
 import  bokeh.core.properties as props
 from    bokeh.plotting  import Figure
@@ -285,13 +284,29 @@ class CleaningFilterWidget:
             args = dict(mdl = self.__widget)
         )
 
-class WidgetMixin(ABC):
+class CleaningWidgets:
     "Everything dealing with changing the config"
     __objects : TaskWidgetEnabler
-    def __init__(self, ctrl, model):
-        fix      = FixedBeadDetectionConfig.__name__
+    def __init__(self, ctrl, model, text = None):
         advanced = tab(
-            f"""
+            self.text(text),
+            accessors = globals(),
+            figure    = (CleaningPlotModel,),
+            base      = tab.taskwidget
+        )
+        self.__widgets = dict(table    = CyclesListWidget(ctrl, model.cleaning),
+                              align    = AlignmentWidget(ctrl, model.alignment),
+                              cleaning = CleaningFilterWidget(model),
+                              sampling = DownsamplingWidget(ctrl),
+                              advanced = advanced(ctrl, model))
+
+    @staticmethod
+    def text(text: Optional[str]) -> str:
+        "the default text"
+        if text:
+            return text
+        fix      = FixedBeadDetectionConfig.__name__
+        return f"""
             ## Fixed Beads
             {NAMES['extent']}  <                    %({fix}:maxextent).3F
             {NAMES['hfsigma']} <                    %({fix}:maxhfsigma).3F
@@ -318,35 +333,29 @@ class WidgetMixin(ABC):
             <b></b>
             %(AlignmentModalDescriptor:)
             Discard z(∈ φ₅) < z(φ₁)-σ[HF]⋅α, α =    %(clipping.lowfactor).1oF
-            """,
-            accessors = globals(),
-            figure    = (CleaningPlotModel,),
-            base      = tab.taskwidget
-        )
-        self.__widgets = dict(table    = CyclesListWidget(ctrl, model.cleaning),
-                              align    = AlignmentWidget(ctrl, model.alignment),
-                              cleaning = CleaningFilterWidget(model),
-                              sampling = DownsamplingWidget(ctrl),
-                              advanced = advanced(ctrl, model))
+        """
 
-    def _widgetobservers(self, ctrl):
+    def observe(self, mainview, ctrl):
+        "observe the controller"
         for widget in self.__widgets.values():
             if hasattr(widget, 'observe'):
                 widget.observe(ctrl)
 
         def _ondownsampling(old = None, **_):
             if 'value' in old:
-                self.reset(False)
+                mainview.reset(False)
         ctrl.theme.observe("cleaning.downsampling", _ondownsampling)
 
-    def _createwidget(self, ctrl, doc, fig):
-        widgets = {i: j.addtodoc(self, ctrl) for i, j in self.__widgets.items()}
+    def addtodoc(self, mainview, ctrl, doc, fig):
+        "add to the document"
+        widgets = {i: j.addtodoc(mainview, ctrl) for i, j in self.__widgets.items()}
         self.__widgets['advanced'].callbacks(doc)
         self.__widgets['cleaning'].setfigure(fig)
         self.__objects = TaskWidgetEnabler(widgets)
         return widgets
 
-    def _resetwidget(self, cache: CACHE_TYPE, disable: bool):
+    def reset(self, cache: CACHE_TYPE, disable: bool):
+        "reset all"
         for ite in self.__widgets.values():
             getattr(ite, 'reset')(cache)
         self.__objects.disable(cache, disable)
