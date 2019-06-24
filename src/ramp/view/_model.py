@@ -33,6 +33,24 @@ class RampConfig:
     def __init__(self, **_):
         pass
 
+    def observe(self, ctrl):
+        "update config to fit the cleaning task's"
+        @ctrl.tasks.observe("addtask", "updatetask", "opentrack")
+        def _ontasks(task = None, model = None, **_):
+            if not isinstance(task, DataCleaningTask):
+                task = next((i for i in model if isinstance(i, DataCleaningTask)), None)
+
+            if (
+                    isinstance(task, DataCleaningTask)
+                    and (
+                        task.minextent != self.dataframe.extension[0]
+                        or task.maxextent != self.dataframe.extension[2]
+                    )
+            ):
+                dframe           = deepcopy(self.dataframe)
+                dframe.extension = (task.minextent, dframe.extension[1], task.maxextent)
+                ctrl.theme.update(self, dataframe = dframe)
+
 class RampPlotDisplay(PlotDisplay):
     """
     ramp plot display
@@ -109,7 +127,11 @@ class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
 
 class DataCleaningTaskAccess(TaskAccess, tasktype = DataCleaningTask):
     "access to ExtremumAlignmentTask"
-    __DEFAULT = dict(minextent = 0., maxextent = 10., maxsaturation = 100.)
+    __DEFAULT = dict(
+        minextent     = RampStatsTask().extension[0],
+        maxextent     = RampStatsTask().extension[2],
+        maxsaturation = 100.
+    )
     def __init__(self, mdl):
         super().__init__(mdl)
         for dflt in (True, False):
@@ -127,6 +149,26 @@ class DataCleaningTaskAccess(TaskAccess, tasktype = DataCleaningTask):
             else:
                 mdl.ctrl.theme.update("tasks", **args)
 
+    def observe(self, ctrl):
+        "observe the RampStatsTask"
+        @ctrl.theme.observe("ramp")
+        def _onrampstatstask(old = (),  model = None, **_):
+            if (
+                    'dataframe' not in old
+                    or self.task is None
+                    or (
+                        model.dataframe.extension[0] ==  self.task.minextent
+                        and model.dataframe.extension[2] ==  self.task.maxextent
+                    )
+            ):
+                return
+
+            ctrl.tasks.updatetask(
+                self.roottask,
+                self.task,
+                minextent = model.dataframe.extension[0],
+                maxextent = model.dataframe.extension[2]
+            )
 
 class RampTaskPlotModelAccess(TaskPlotModelAccess):
     "access ramp task model"
@@ -135,11 +177,16 @@ class RampTaskPlotModelAccess(TaskPlotModelAccess):
         self.cleaning  = DataCleaningTaskAccess(self)
         self.alignment = ExtremumAlignmentTaskAccess(self)
 
+    def addto(self, ctrl, noerase = False):
+        "add to the controller"
+        self.cleaning.observe(ctrl)
+
 def _run(cache, proc):
     return proc.dataframe(next(iter(cache.run())), **proc.config())
 
 def observetracks(self: RampPlotModel, ctrl):
     "sets-up model observers"
+    self.config.observe(ctrl)
 
     proctype                           = {"dataframe": RampDataFrameProcessor,
                                           "consensus": RampConsensusBeadProcessor}
