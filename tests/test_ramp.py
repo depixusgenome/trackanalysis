@@ -1,12 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "tests opening, reading and analysis of a ramp.trk file"
+from   bokeh.models               import Tabs
+import selenium.common.exceptions
 from taskcontrol.taskcontrol    import create
 from taskmodel                  import TrackReaderTask
 from ramp.processor             import RampStatsTask, RampEventTuple, RampCycleTuple
 from ramp.view._widget          import DpxRamp, Slider # pylint: disable=protected-access
 from tests.testutils            import integrationmark
 from tests.testingcore          import path
+
+FILTERS = [
+    (FutureWarning,      ".*elementwise comparison failed;.*"),
+    (RuntimeWarning,     ".*All-NaN slice encountered.*"),
+    (DeprecationWarning, ".*elementwise comparison failed;.*"),
+    (DeprecationWarning, '.*Using or importing the ABCs from.*'),
+    (DeprecationWarning, '.*the html argument of XMLParser.*'),
+]
+
 
 def test_dataframe():
     "test ramp dataframe"
@@ -31,17 +42,10 @@ def test_rampview(bokehaction): # pylint: disable=redefined-outer-name
             done[0] += 1
         else:
             done[0] -= 1
-    server = bokehaction.start(
-        'ramp.view.RampPlotView',
-        'taskapp.toolbar',
-        filters = [
-            (FutureWarning,      ".*elementwise comparison failed.*"),
-            (RuntimeWarning,     ".*All-NaN slice encountered.*"),
-            (DeprecationWarning, ".*elementwise comparison failed.*")
-        ]
-    )
+    server = bokehaction.start('ramp.view.RampPlotView', 'taskapp.toolbar', filters = FILTERS)
     server.ctrl.display.observe("ramp.pool", _ondone)
     server.load('ramp_5HPs_mix.trk')
+    server.change(server.widget.get('Main:toolbar'), 'bead', 2, rendered = True)
 
     assert 'config.tasks' not in server.savedconfig
 
@@ -68,5 +72,44 @@ def test_rampview(bokehaction): # pylint: disable=redefined-outer-name
         server.change(slider, 'value', slider.end)
         server.change(slider, 'value', (slider.start + slider.end)*.5)
 
+@integrationmark
+def test_cleaningview(bokehaction): # pylint: disable=redefined-outer-name
+    "test changing extensions in ramps or cleaning"
+    server = bokehaction.start(
+        'ramp.view.RampView', 'taskapp.toolbar',
+        filters = FILTERS,
+        runtime = "selenium",
+    )
+    tabs = next(iter(server.doc.select({'type': Tabs})))
+    try:
+        server.selenium[".dpx-modal-done"].click()
+    except selenium.common.exceptions.NoSuchElementException:
+        pass
+
+    server.load('ramp_5HPs_mix.trk')
+    server.change(server.widget.get('Main:toolbar'), 'bead', 2, rendered = True)
+
+    get   = lambda x: server.selenium[
+        "#dpx-rp-maxextension" if x else "#dpx-cl-maxextent"
+    ].get_attribute("value")
+    xinit = get(True)
+
+    server.change(tabs, 'active', 1, rendered = True)
+    assert get(False) == xinit
+    server.change('Cleaning:Filter', 'maxextent', float(xinit)+1)
+    assert get(False) == str(float(xinit)+1)
+    server.wait()
+
+    assert server.ctrl.theme.get("ramp", "dataframe").extension[2] == float(xinit)+1
+    server.change(tabs, 'active', 2, rendered = True)
+    assert get(True) == str(float(xinit)+1)
+    server.change('Ramp:Filter', 'maxextension', float(xinit))
+    assert get(True) == xinit
+
+    server.change(tabs, 'active', 1, rendered = True)
+    assert get(False) == xinit
+
 if __name__ == '__main__':
-    test_dataframe()
+    from tests.testingcore.bokehtesting import BokehAction
+    with BokehAction(None) as bka:
+        test_cleaningview(bka)
