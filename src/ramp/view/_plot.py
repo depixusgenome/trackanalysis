@@ -208,10 +208,12 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
                     disable = False
         finally:
             data = self.__data(track, cycles, zmag)
-            extr = lambda x: ([np.nanmin(i[x])  for i in data if len(i[x])]
-                              +[np.nanmax(i[x]) for i in data if len(i[x])])
+            extr = lambda x: sum(
+                ([np.nanmin(i[x]), np.nanmax(i[x])]  for i in data if len(i.get(x, ()))),
+                []
+            )
 
-            self.setbounds(cache, self.__fig, extr("zmag"), extr("z"))
+            self.setbounds(cache, self.__fig, extr("zmag"), extr("z")+extr("zbead"))
 
             label = (self._theme.ylabel if self._theme.dataformat != "norm" else
                      self._theme.ylabelnormalized)
