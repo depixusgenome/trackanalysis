@@ -15,21 +15,6 @@ to testing oligos or antibodies.
 
 Nonetheless, it's possible to export the ramp data in xlsx or csv.
 
-The Field of View
-=================
-
-This tab displays an image of the field of view. Beads have different colors
-depending on what their quality appears to be:
-
-* *green* beads should be good quality.
-* *chocolate* beads should be fixed: no opening jump is detected in phase 2.
-* *orange* beads have too high a |NOISE|.
-* *red* beads have been discarded by the user
-
-For the |PICO| instrument, the calibration image of the current bead is
-displayed. For the |SDI| instrument, it is simply a blow-up of field of view
-around the current bead.
-
 The Ramps Tab
 =============
 
@@ -50,7 +35,10 @@ The tab contains:
 #. A choice of plots:
 
    #. `raw data` displays cycles one on top of the other. The only doctoring
-      performed is to subtract the initial |z| value from each cycle.
+      performed is to subtract the initial |z| value from each cycle. Colors
+      vary depending on the phase of the of the data point. As there
+      basically are only two phases for which *zmag* varies, one should see
+      two colors.
 
    #. `Z (% strand size)` displays the average behaviour for a bead (in blue)
       versus that of all *ok* beads (gray). See below for how an average
