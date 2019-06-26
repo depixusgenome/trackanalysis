@@ -61,11 +61,11 @@ class RampFilterWidget:
             elif attr == "maxhfsigma":
                 task.hfsigma = task.hfsigma[0], new
             elif attr == "minextension":
-                task.extension = (new,) + task.extension[1:]
+                task.extension = (new, *task.extension[1:])
             elif attr == "maxextension":
-                task.extension = task.extension[:2] + (new,)
+                task.extension = (*task.extension[:2], new)
             elif attr == "fixedextension":
-                task.extension = task.extension[0], new, task.extension[2]
+                task.extension = (task.extension[0], new, task.extension[2])
             else:
                 raise KeyError(f"unknown: {attr}")
             if task != self.__model.config.dataframe:

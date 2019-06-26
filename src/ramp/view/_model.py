@@ -11,13 +11,14 @@ import pandas                   as     pd
 from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from   taskcontrol.beadscontrol import DataSelectionBeadController
 from   taskcontrol.modelaccess  import TaskAccess, TaskPlotModelAccess
-from   taskmodel.application    import TasksDisplay
+from   taskmodel.application    import TasksDisplay, InstrumentType
 from   utils                    import initdefaults
 from   view.base                import spawn
 from   ..processor              import RampConsensusBeadProcessor, RampDataFrameProcessor
 
 
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
+from   cleaning.processor.__config__       import DataCleaningTask
 from   eventdetection.processor.__config__ import ExtremumAlignmentTask
 from   ..__config__                        import RampConsensusBeadTask, RampStatsTask
 
@@ -31,6 +32,24 @@ class RampConfig:
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
+
+    def observe(self, ctrl):
+        "update config to fit the cleaning task's"
+        @ctrl.tasks.observe("addtask", "updatetask", "opentrack")
+        def _ontasks(task = None, model = None, **_):
+            if not isinstance(task, DataCleaningTask):
+                task = next((i for i in model if isinstance(i, DataCleaningTask)), None)
+
+            if (
+                    isinstance(task, DataCleaningTask)
+                    and (
+                        task.minextent != self.dataframe.extension[0]
+                        or task.maxextent != self.dataframe.extension[2]
+                    )
+            ):
+                dframe           = deepcopy(self.dataframe)
+                dframe.extension = (task.minextent, dframe.extension[1], task.maxextent)
+                ctrl.theme.update(self, dataframe = dframe)
 
 class RampPlotDisplay(PlotDisplay):
     """
@@ -70,12 +89,16 @@ class RampPlotTheme(PlotTheme):
     consensusline    = PlotAttrs(consensusarea.color, 'line',  1, alpha = .5)
     beadarea         = PlotAttrs('~blue', 'patch', 1, alpha = .5)
     beadline         = PlotAttrs(beadarea.color, 'line',  1, alpha = .5)
-    beadcycles       = PlotAttrs(beadarea.color, 'line',  1, alpha = .2)
+    beadcycles       = PlotAttrs(beadarea.color, 'line',  1, alpha = .5)
+    frames           = PlotAttrs("phase", 'o',  5, alpha = .25)
+    phases           = "RdYlGn9"
+    phaserange       = (..., ...)
     ylabelnormalized = "Z (% strand size)"
     xlabel           = 'Z magnet (mm)'
     figsize          = PlotTheme.defaultfigsize(500, 700)
     widgetwidth      = 500
     dataformat       = "raw"
+    clip             = 99., .1
     toolbar          = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,reset,save'
     @initdefaults(frozenset(locals()))
@@ -102,17 +125,68 @@ class RampPlotModel(PlotModel):
 class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
     "access to ExtremumAlignmentTask"
 
+class DataCleaningTaskAccess(TaskAccess, tasktype = DataCleaningTask):
+    "access to ExtremumAlignmentTask"
+    __DEFAULT = dict(
+        minextent     = RampStatsTask().extension[0],
+        maxextent     = RampStatsTask().extension[2],
+        maxsaturation = 100.
+    )
+    def __init__(self, mdl):
+        super().__init__(mdl)
+        for dflt in (True, False):
+            args = {
+                i: dict(mdl.ctrl.theme.get("tasks", i, defaultmodel = dflt))
+                for i in InstrumentType.__members__
+            }
+            for task in args.values():
+                task['datacleaning'] = deepcopy(task['datacleaning'])
+                for i, j in self.__DEFAULT.items():
+                    setattr(task['datacleaning'], i, j)
+
+            if dflt:
+                mdl.ctrl.theme.updatedefaults("tasks", **args)
+            else:
+                mdl.ctrl.theme.update("tasks", **args)
+
+    def observe(self, ctrl):
+        "observe the RampStatsTask"
+        @ctrl.theme.observe("ramp")
+        def _onrampstatstask(old = (),  model = None, **_):
+            if (
+                    'dataframe' not in old
+                    or self.task is None
+                    or (
+                        model.dataframe.extension[0] ==  self.task.minextent
+                        and model.dataframe.extension[2] ==  self.task.maxextent
+                    )
+            ):
+                return
+
+            ctrl.tasks.updatetask(
+                self.roottask,
+                self.task,
+                minextent = model.dataframe.extension[0],
+                maxextent = model.dataframe.extension[2]
+            )
+
 class RampTaskPlotModelAccess(TaskPlotModelAccess):
     "access ramp task model"
     def __init__(self, ctrl) -> None:
         super().__init__(ctrl)
+        self.cleaning  = DataCleaningTaskAccess(self)
         self.alignment = ExtremumAlignmentTaskAccess(self)
+
+    def addto(self, ctrl, noerase = False):
+        "add to the controller"
+        self.cleaning.observe(ctrl)
 
 def _run(cache, proc):
     return proc.dataframe(next(iter(cache.run())), **proc.config())
 
 def observetracks(self: RampPlotModel, ctrl):
     "sets-up model observers"
+    self.config.observe(ctrl)
 
     proctype                           = {"dataframe": RampDataFrameProcessor,
                                           "consensus": RampConsensusBeadProcessor}

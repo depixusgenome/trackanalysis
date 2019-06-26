@@ -22,7 +22,7 @@ from    taskview.plots              import (
 from    eventdetection.processor    import ExtremumAlignmentProcessor
 from    ._model                     import (DataCleaningModelAccess, CleaningPlotModel,
                                             CleaningPlotTheme)
-from    ._widget                    import WidgetMixin
+from    ._widget                    import CleaningWidgets
 from    ..datacleaning              import DataCleaning, Partial
 from    ..processor                 import (DataCleaningProcessor,
                                             ClippingProcessor, ClippingTask)
@@ -185,18 +185,18 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
             val       = ctx.taskcache(tasks['cleaning'])
             val[bead] = (val[bead][0]+(clipping,), val[bead][1])
 
-class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotModel],
-                          WidgetMixin):
+class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotModel]):
     "Building the graph of cycles"
-    _model:   DataCleaningModelAccess
-    _theme:   CleaningPlotTheme
-    _errors:  PlotError
-    __source: ColumnDataSource
-    __fig:    Figure
-    def __init__(self,  ctrl) -> None:
+    _model:    DataCleaningModelAccess
+    _theme:    CleaningPlotTheme
+    _errors:   PlotError
+    _widgets:  CleaningWidgets
+    __source:  ColumnDataSource
+    __fig:     Figure
+    def __init__(self,  ctrl, **kwa) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl, noerase = False)
-        WidgetMixin.__init__(self, ctrl, self._model)
+        self._widgets = CleaningWidgets(ctrl, self._model, **kwa)
 
     def _addtodoc(self, ctrl, doc, *_):
         self.__source = ColumnDataSource(data = self.__data(None, None))
@@ -222,7 +222,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         self.linkmodeltoaxes(fig)
 
         mode    = self.defaultsizingmode(width = self._theme.widgetwidth)
-        widgets = self._createwidget(ctrl, doc, fig)
+        widgets = self._widgets.addtodoc(self, ctrl, doc, fig)
         order   = 'cleaning', 'align', 'advanced', 'table', 'sampling'
         left    = layouts.widgetbox(sum((widgets[i] for i in order), []), **mode)
         return self._keyedlayout(ctrl, fig, left = left)
@@ -248,7 +248,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
                 lbl = self._theme.ylabel.split('(')[0]
                 cache[self.__fig.yaxis[0]].update(axis_label = f"{lbl} ({dim})")
 
-            self._resetwidget(cache, disable)
+            self._widgets.reset(cache, disable)
 
     def __data(self, items, nans) -> Dict[str, np.ndarray]:
         if items is None or len(items) == 0 or not any(len(i) for _, i in items):
@@ -306,7 +306,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
     def observe(self, ctrl, noerase = True):
         "sets-up model observers"
         super().observe(ctrl, noerase)
-        self._widgetobservers(ctrl)
+        self._widgets.observe(self, ctrl)
 
 class CleaningView(PlotView[CleaningPlotCreator]):
     "Peaks plot view"

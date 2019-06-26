@@ -23,4 +23,6 @@ to testing oligos or antibodies.
    :maxdepth: 2
    :caption: Contents:
 
+   fov
+   cleaning
    ramps

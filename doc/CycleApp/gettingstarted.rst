@@ -114,6 +114,22 @@ positions, rates and durations, matching, ect...
     Creating a report requires a bit of time. When it's over, :program:`excel`
     or an equivalent is automatically launched, displaying the report.
 
+
+Excel reports come with two tabs, the first one providing a summary of the
+second.  When a fasta file and oligos are provided by the user, the beads which
+have the same sequence as best fit are reported together. In such a case, the
+graphs show:
+
+1. Green circles: the experimental peaks, with their z value on the x-axis and
+   their hybridisation rate on the y-axis.  sequence.
+2. Blue squares: the theoretical binding positions on the x-axis. The y-axis
+   reports the median hybridization rate for all beads pertaining to that
+   sequence.
+
+Changing the stretch or bias in the 1st tab changes graphs in both tabs as well
+as some information in the 2nd tab.
+
+
 Navigating through Displays
 ===========================
 

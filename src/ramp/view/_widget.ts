@@ -50,7 +50,7 @@ export class DpxRampView extends WidgetView {
                     <td>${this.mk_inp('maxextension', 10.0, 0.05)}</td></tr>
                 <tr><td></td>
                     <td ${ttips[0]}>Δz fixed ≤</td>
-                    <td>${this.mk_inp('fixedextension')}</td></tr>"
+                    <td>${this.mk_inp('fixedextension')}</td></tr>
              </table><div class='dpx-span'>
              <label class='bk-bs-radio' style='display: none !important;'>
              </label>`

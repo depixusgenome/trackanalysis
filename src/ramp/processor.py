@@ -5,28 +5,214 @@ Create dataframe containing ramp info
 """
 from   functools         import partial
 from   typing            import (NamedTuple, Callable, Union, Tuple, Dict, Any,
-                                 Optional, Sequence, cast)
+                                 Optional, Sequence, Iterator, cast)
 import numpy             as np
 import pandas            as pd
 
+from   data.views            import Cycles, Beads
 from   signalfilter          import nanhfsigma
 from   taskcontrol.processor import Processor, ProcessorException
 from   taskmodel             import Task, Level
 from   utils                 import initdefaults
 
+class RampCycleTuple(NamedTuple):
+    bead            : int
+    cycle           : int
+    population      : int
+    zmagcorrelation : float
+    extent          : float
+    hfsigma         : float
+    iopen           : int
+    zmagopen        : float
+    iclose          : int
+    zmagclose       : float
+    @classmethod
+    def fields(cls) -> Tuple[str, ...]:
+        "return the fields"
+        return cls._fields
+
+class RampEventTuple(NamedTuple):
+    bead            : int
+    cycle           : int
+    population      : int
+    zmagcorrelation : float
+    extent          : float
+    hfsigma         : float
+    phase           : float
+    ievent          : int
+    dzdt            : float
+    zbead           : float
+    zmag            : float
+    @classmethod
+    def fields(cls) -> Tuple[str,...]:
+        "return the fields"
+        return cls._fields
+
 class RampStatsTask(Task):
     """
     Extract open/close information from each cycle and return a pd.DataFrame
     """
-    level       = Level.bead
-    scale       = 10.0
-    percentiles = 25., 75.
-    extension   = .05, .4, 1.5
-    hfsigma     = 1.e-4, 5.e-3
+    level                                       = Level.bead
+    scale:           float                      = 10.0
+    percentiles:     Tuple[float, float]        = (25., 75.)
+    population:      int                        = 80
+    extension:       Tuple[float, float, float] = (.05, .4, 1.5)
+    hfsigma:         Tuple[float, float]        = (1.e-4, 5.e-3)
+    fixedcycleratio: float                      = 90.
+    events:          bool                       = False
+    phases:          Tuple[int,int]             = (2, 4)
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
+
+    def dataframe(self, frame) -> pd.DataFrame:
+        "return all data from a frame"
+        fields = RampEventTuple.fields() if self.events else RampCycleTuple.fields()
+        lst    = list(self.stats(frame))
+        data   = pd.DataFrame({
+            j: [k[i] for k in lst] for i,j in enumerate(fields) # type: ignore
+        })
+        return self.status(data)
+
+    __AGGS = {
+        "extent":     "median",
+        "hfsigma":    "median",
+        "population": "mean",
+        "fixed":      ("sum", "count")
+    }
+
+    def status(self, data: pd.DataFrame) -> pd.DataFrame:
+        "return a frame with a new status"
+        data.set_index(["bead", "cycle"], inplace = True)
+        data = data.assign(fixed = (
+            data.zmagopen.isna()        if 'zmagopen' in data else
+            data[data.phase == self.phases[0]].groupby(level = [0, 1]).zmag.count() == 0
+        ))
+
+        frame = data[list(self.__AGGS)].dropna().groupby(level = 0).agg(self.__AGGS)
+        frame.columns = [i[0] if i[1] in ("median", "mean") else "".join(i) for i in frame.columns]
+        good  = (
+            (frame.hfsigma > self.hfsigma[0])
+            & (frame.hfsigma < self.hfsigma[1])
+            & (frame.population > self.population)
+        )
+        frame["status"] = ["bad"] * len(frame)
+        frame.loc[(frame.extent    > self.extension[0])
+                  & (frame.extent  < self.extension[2])
+                  & good, "status"] = "ok"
+        frame.loc[(frame.extent  <= self.extension[1])
+                  & (frame.fixedsum * 1e-2 * self.fixedcycleratio < frame.fixedcount)
+                  & good, "status"] = "fixed"
+
+        if "status" in data.columns:
+            data.pop("status")
+        data = data.join(frame[["status"]])
+        data.reset_index(inplace = True)
+        return data
+
+    @staticmethod
+    def dzdt(arr:np.ndarray) -> np.ndarray:
+        "compute dz/dt"
+        return np.concatenate([[np.NaN], np.diff(arr)])
+
+    def eventindexes(
+            self,
+            cycles: Cycles,
+            cycle:  int,
+            dzdt:   np.ndarray
+    ) -> Iterator[np.ndarray]:
+        "compute dz/dt events"
+        for i, comp in enumerate((np.greater, np.less)):
+            pha    = tuple(cycles.phase(cycle, self.phases[i]+j) for j in range(2))
+            arr    = dzdt[pha[0]:pha[1]]
+            if np.any(np.isfinite(arr)):
+                quants = np.nanpercentile(arr, self.percentiles)
+                limits = quants[1-i] + self.scale*(quants[1-i]-quants[i])
+
+                arr = np.copy(arr)
+                arr[np.isnan(arr)] = 0.
+
+                inds   = np.nonzero(comp(arr, limits))[0] + pha[0]
+                inds   = np.concatenate([inds[:1], inds[1:][np.diff(inds) > 1]])
+            else:
+                inds   = np.zeros(0, dtype = 'i8')
+            yield inds
+
+    def eventstats(
+            self,
+            frame: Union[Cycles, Beads],
+            key:   Tuple[int, int],
+            arr:   np.ndarray
+    ) -> Iterator[RampEventTuple]:
+        "compute the info per cycle"
+        cycles        = frame[:,:] if isinstance(frame, Beads) else frame
+        dzdt          = self.dzdt(arr)
+        opens, closes = self.eventindexes(cycles, key[1], dzdt)
+        zmag          = (
+            cycles.track.secondaries.zmag
+            [cycles.phase(key[1], 0):]
+            [:len(dzdt)]
+        )
+        info = self.__cyclebaseinfo(key, arr, zmag)
+        get  = lambda i, j: RampEventTuple( # type: ignore
+            *info,
+            self.phases[j], i, dzdt[i], arr[i], zmag[i]
+        )
+        yield from (get(i, 0) for i in opens)
+        yield from (get(i, 1) for i in closes)
+
+    def cyclestats(
+            self,
+            frame: Union[Cycles, Beads],
+            key:   Tuple[int, int],
+            arr:   np.ndarray
+    ) -> RampCycleTuple:
+        "compute the info per cycle"
+        nans          = np.NaN, np.NaN
+        cycles        = frame[:,:] if isinstance(frame, Beads) else frame
+        dzdt          = self.dzdt(arr)
+        opens, closes = self.eventindexes(cycles, key[1], dzdt)
+        zmag          = (
+            cycles.track.secondaries.zmag
+            [cycles.phase(key[1], 0):]
+            [:len(dzdt)]
+        )
+        return RampCycleTuple(                       # type: ignore
+            *self.__cyclebaseinfo(key, arr, zmag),
+            *((opens[-1], zmag[opens[-1]]) if len(opens)  else nans),
+            *((closes[0], zmag[closes[0]]) if len(closes) else nans)
+        )
+
+    def stats(self, frame: Beads) -> Union[Iterator[RampCycleTuple], Iterator[RampEventTuple]]:
+        "iterate through the rows of stats"
+        cycles = frame[:,:] if isinstance(frame, Beads) else frame
+        if self.events:
+            for i in cycles.keys():
+                try:
+                    yield from self.eventstats(cycles, i, cycles[i])
+                except ProcessorException:
+                    continue
+        else:
+            for i in cycles.keys():
+                try:
+                    yield self.cyclestats(cycles, i, cycles[i])
+                except ProcessorException:
+                    continue
+    @staticmethod
+    def __cyclebaseinfo(
+            key:  Tuple[int, int],
+            arr:  np.ndarray,
+            zmag: np.ndarray
+    ) -> Tuple[int, int, float, float, float, float]:
+        pop = np.isfinite(arr).sum()*100./max(1, len(arr))
+        return (
+            key[0], key[1],
+            pop,
+            0. if pop == 0. else pd.Series(arr).corr(pd.Series(zmag)),
+            0. if pop == 0. else np.nanmax(arr)- np.nanmin(arr),
+            nanhfsigma(arr)
+        )
 
 class RampConsensusBeadTask(Task):
     """
@@ -52,17 +238,6 @@ class RampConsensusBeadTask(Task):
             return partial(fcn, **cast(dict, arg[1]), axis = 0)
         raise AttributeError("unknown numpy action")
 
-class RampCycleTuple(NamedTuple):
-    bead            : int
-    cycle           : int
-    zmagcorrelation : float
-    extent          : float
-    iopen           : int
-    zmagopen        : float
-    iclose          : int
-    zmagclose       : float
-    hfsigma         : float
-
 class RampDataFrameProcessor(Processor[RampStatsTask]):
     """
     Generates pd.DataFrames
@@ -81,75 +256,17 @@ class RampDataFrameProcessor(Processor[RampStatsTask]):
         args.apply(self.apply(**self.config()))
 
     @classmethod
-    def status(cls, data, task: Optional[RampStatsTask]= None, **kwa) -> pd.DataFrame:
-        "return a frame with a new status"
-        if isinstance(task, RampStatsTask):
-            tsk = task
-            assert len(kwa) == 0
-        else:
-            tsk = cast(RampStatsTask, cast(type, cls.tasktype)(**kwa))
-
-        data.set_index(["bead", "cycle"], inplace = True)
-        data  = data.assign(fixed = data.zmagopen.isna())
-        frame = (data[["extent", "hfsigma", "fixed"]]
-                 .dropna()
-                 .groupby(level = 0)
-                 .agg({"extent": "median", "hfsigma": "median",
-                       "fixed": ("sum", "count")}))
-        frame.columns = [i[0] if i[1] == "median" else "".join(i) for i in frame.columns]
-        good  = (frame.hfsigma > tsk.hfsigma[0]) & (frame.hfsigma < tsk.hfsigma[1])
-        frame["status"] = ["bad"] * len(frame)
-        frame.loc[(frame.extent    > tsk.extension[0])
-                  & (frame.extent  < tsk.extension[2])
-                  & good, "status"] = "ok"
-        frame.loc[(frame.extent  <= tsk.extension[1])
-                  & (frame.fixedsum == frame.fixedcount)
-                  & good, "status"] = "fixed"
-
-        if "status" in data.columns:
-            data.pop("status")
-        data = data.join(frame[["status"]])
-        data.reset_index(inplace = True)
-        return data
-
-    @classmethod
     def dataframe(cls, frame, **kwa) -> pd.DataFrame:
         "return all data from a frame"
-        # pylint: disable=not-callable
-        task  = cast(RampStatsTask, cast(type, cls.tasktype)(**kwa))
-        lst   = []
-        frame = frame[...,...]
-        for i in frame.keys():
-            try:
-                lst.append(cls._row(task, frame, (i, frame[i])))
-            except ProcessorException:
-                continue
-        fields = getattr(RampCycleTuple, '_fields')
-        data   = pd.DataFrame({j: [k[i] for k in lst] for i,j in enumerate(fields)})
-        return cls.status(data, task)
+        return RampStatsTask(**kwa).dataframe(frame)
 
     @classmethod
-    def _row(cls, task, frame, info):
-        dzdt         = np.copy(info[1])
-        dzdt[1:-1]   = dzdt[2:] - dzdt[:-2]
-        dzdt[[0,-1]] = np.NaN
-
-        quants               = np.nanpercentile(dzdt, task.percentiles)
-        dzdt[np.isnan(dzdt)] = 0.
-        rng    = task.scale*(quants[1]-quants[0])
-        outl   = np.logical_or(dzdt > quants[1]+rng, dzdt < quants[0]-rng)
-        zmag   = frame.track.secondaries.zmag[frame.phase(info[0][1], 0):][:len(dzdt)]
-
-        tmp            = np.nonzero(outl & (dzdt > 0))[0]
-        iopen, zopen   = (tmp[-1], zmag[tmp[-1]]) if len(tmp) else (np.NaN, np.NaN)
-        tmp            = np.nonzero(outl & (dzdt < 0))[0]
-        iclose, zclose = (tmp[0], zmag[tmp[0]])   if len(tmp) else (np.NaN, np.NaN)
-        return RampCycleTuple(info[0][0], info[0][1],
-                              pd.Series(info[1]).corr(pd.Series(zmag)),
-                              np.nanmax(info[1])- np.nanmin(info[1]),
-                              iopen,  zopen,
-                              iclose, zclose,
-                              nanhfsigma(info[1]))
+    def status(cls, data, task: Optional[RampStatsTask]= None, **kwa) -> pd.DataFrame:
+        "return a frame with a new status"
+        return (
+            (task if isinstance(task, RampStatsTask) else RampStatsTask(**kwa))
+            .status(data)
+        )
 
 class RampConsensusBeadProcessor(Processor[RampConsensusBeadTask]):
     """
