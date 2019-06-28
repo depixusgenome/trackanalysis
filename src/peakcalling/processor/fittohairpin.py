@@ -8,7 +8,7 @@ from   typing                      import (
 
 import numpy                       as     np
 
-from   data.views                  import BEADKEY, TaskView, TrackView
+from   data.views                  import BEADKEY, TaskView
 from   peakfinding.peaksarray      import (
     Output as PeakFindingOutput, PeakListArray, PeaksArray
 )
@@ -145,11 +145,13 @@ PeakEventsTuple = Tuple[BEADKEY, PeakEvents]
 _PEAKS          = Tuple[np.ndarray, PeakListArray]
 Input           = Union[PeaksDict, PeakEvents]
 class FitBead(NamedTuple):
-    key        : BEADKEY
-    silhouette : float
-    distances  : Dict[Optional[str], Distance]
-    peaks      : PEAKS_TYPE
-    events     : PeakListArray
+    key:          BEADKEY
+    silhouette:   float
+    distances:    Dict[Optional[str], Distance]
+    peaks:        PEAKS_TYPE
+    events:       PeakListArray
+    baseline:     Optional[float]
+    singlestrand: Optional[float]
 
 class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=too-many-ancestors
     "iterator over peaks grouped by beads"
@@ -166,43 +168,28 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
         """
         return getattr(self.data, 'phaseposition', lambda *_: None)(phase, ibead)
 
-    @staticmethod
-    def __topeaks(aevts:PeakEvents) -> PeakListArray:
-        "converts PeakEvents to PeakListArray"
-        if not isinstance(aevts, Iterator):
-            evts = cast(Sequence[PeakFindingOutput], aevts)
-            if getattr(evts, 'dtype', 'O') == 'f4':
-                return PeakListArray([(i, PeaksArray([])) for i in evts])
-        else:
-            evts = tuple(aevts)
-
-        disc = (getattr(evts, 'discarded', 0) if hasattr(evts, 'discarded') else
-                0                             if len(evts) == 0             else
-                getattr(evts[0][1], 'discarded', 0))
-        evts = asobjarray(((i, asobjarray(j)) for i, j in evts),
-                          view      = PeakListArray,
-                          discarded = disc).astype(getattr(PeakListArray, '_dtype'))
-        return cast(PeakListArray, evts)
-
-    @classmethod
-    def _transform_ids(cls, sel):
-        return cls._transform_to_bead_ids(sel)
-
     def distances(
             self,
-            key: BEADKEY,
-            inp: Optional[PeakListArray] = None
+            key:      BEADKEY,
+            inp:      Optional[PeakListArray] = None,
+            baseline: Optional[bool]          = None,
+            strand:   Optional[bool]          = None,
     )->Dict[Optional[str], Distance]:
         "compute distances from peak data"
         if inp is None:
             inp = self.__topeaks(cast(PeakEvents, cast(dict, self.data)[key]))
         bead = inp['peaks']
-        return {name: calc.optimize(bead) for name, calc in self.fits(key, inp).items()}
+        return {
+            name: calc.optimize(bead)
+            for name, calc in self.fits(key, inp, baseline, strand).items()
+        }
 
     def fits(
             self,
-            key: BEADKEY,
-            inp: Optional[PeakListArray] = None
+            key:      BEADKEY,
+            inp:      Optional[PeakListArray] = None,
+            baseline: Optional[bool]          = None,
+            strand:   Optional[bool]          = None
     ) -> Dict[Optional[str], HairpinFitter]:
         "compute distances from peak data"
         if inp is None:
@@ -223,9 +210,9 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
                 extent *= self.config.pullphaseratio
                 fits    = {i: j for i, j in fits.items() if j.withinrange(extent)}
 
-        args = cast(TrackView, self.data), key, inp
         if any(i.hassinglestrand for i in fits.values()):
-            strand = SingleStrandProcessor(task = self.config.singlestrand).detected(*args)
+            strand = self.__singlestrand(key, inp) is not None if strand is None else strand
+
             if strand is True:
                 # single-strand found: use it as a pivot
                 fits.update((i, updatecopy(j, pivot = Pivot.top))
@@ -235,26 +222,12 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
                 fits.update((i, updatecopy(j, peaks = j.peaks[:-1]))
                             for i, j in fits.items() if j.hassinglestrand)
 
-        if BaselinePeakProcessor(task = self.config.baseline).detected(*args) is False:
+        if baseline is False or self.__baseline(key, inp) is False:
             # baseline missing: don't use it as a pivot
             fits.update((i, updatecopy(j, pivot = Pivot.absolute))
                         for i, j in fits.items() if not j.hassinglestrand)
 
         return fits
-
-    def __beadoutput(self,
-                     key     : BEADKEY,
-                     events  : PeakListArray,
-                     dist    : Dict[Optional[str], Distance],
-                    ) -> FitBead:
-        if len(dist) == 0:
-            return FitBead(key, -1., dist, PeakMatching.empty(events['peaks']), events)
-
-        best = cast(str, min(dist, key = dist.__getitem__))
-        silh = HairpinFitter.silhouette(dist, best)
-        alg  = self.config.match.get(best, self.config.DEFAULT_MATCH())
-        ids  = alg.pair(events['peaks'], *dist.get(best, (0., 1., 0))[1:])
-        return FitBead(key, silh, dist, ids, events)
 
     # pylint: disable=arguments-differ
     def compute(self, aitem: Union[BEADKEY, PeakEventsTuple]) -> FitBead:
@@ -266,9 +239,70 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
             bead, inp = cast(PeakEventsTuple, aitem)
 
 
-        events = self.__topeaks(inp)
-        dist   = self.distances(bead, events)
-        return self.__beadoutput(bead, events, dist)
+        events       = self.__topeaks(inp)
+        baseline     = self.__baseline(bead, inp)
+        singlestrand = self.__singlestrand(bead, inp)
+        dist         = self.distances(
+            bead,
+            events,
+            baseline     is not None,
+            singlestrand is not None
+        )
+        return self.__beadoutput(bead, events, dist, (baseline, singlestrand))
+
+    @staticmethod
+    def __topeaks(aevts:PeakEvents) -> PeakListArray:
+        "converts PeakEvents to PeakListArray"
+        if not isinstance(aevts, Iterator):
+            evts = cast(Sequence[PeakFindingOutput], aevts)
+            if getattr(evts, 'dtype', 'O') == 'f4':
+                return PeakListArray([(i, PeaksArray([])) for i in evts])
+        else:
+            evts = tuple(aevts)
+
+        disc = (getattr(evts, 'discarded', 0) if hasattr(evts, 'discarded') else
+                0                             if len(evts) == 0             else
+                getattr(evts[0][1], 'discarded', 0))
+        evts = asobjarray(((i, asobjarray(j)) for i, j in evts),
+                          view      = PeakListArray,
+                          discarded = disc).astype(getattr(PeakListArray, '_dtype'))
+        return cast(PeakListArray, evts)
+
+    def __baseline(self, bead:int, peaks: PeakListArray) -> Optional[float]:
+        out = (
+            BaselinePeakProcessor(task = self.config.baseline)
+            .index(self.data, bead, peaks)
+        )
+        return None if out is None else peaks[out][0]
+
+    def __singlestrand(self, bead:int, peaks: PeakListArray) -> Optional[float]:
+        out = (
+            SingleStrandProcessor(task = self.config.singlestrand)
+            .index(self.data, bead, peaks)
+        )
+        return None if out is None or out >= len(peaks) else peaks[out][0]
+
+    @classmethod
+    def _transform_ids(cls, sel):
+        return cls._transform_to_bead_ids(sel)
+
+    def __beadoutput(
+            self,
+            key     : BEADKEY,
+            events  : PeakListArray,
+            dist    : Dict[Optional[str], Distance],
+            refs    : Tuple[Optional[float], Optional[float]]
+    ) -> FitBead:
+        if len(dist) == 0:
+            return FitBead(
+                key, -1., dist, PeakMatching.empty(events['peaks']), events, *refs
+            )
+
+        best = cast(str, min(dist, key = dist.__getitem__))
+        silh = HairpinFitter.silhouette(dist, best)
+        alg  = self.config.match.get(best, self.config.DEFAULT_MATCH())
+        ids  = alg.pair(events['peaks'], *dist.get(best, (0., 1., 0))[1:])
+        return FitBead(key, silh, dist, ids, events, *refs)
 
 class FitToHairpinProcessor(TaskViewProcessor[FitToHairpinTask, FitToHairpinDict, BEADKEY]):
     "Groups beads per hairpin"

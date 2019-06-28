@@ -8,12 +8,18 @@ from functools          import partial
 from typing             import Dict, List, Tuple, Any, Union, Sequence, cast
 from bokeh.document     import Document
 from bokeh.models       import Widget, Button
+import numpy as np
 from view.fonticon      import FontIcon
 from utils              import initdefaults, dataclass, dflt
 from utils.logconfig    import getLogger
 from taskmodel.base     import Rescaler
 from modaldialog        import dialog
-LOGS = getLogger(__name__)
+LOGS      = getLogger(__name__)
+TITLE     = "# "
+SUBTITLE  = "## "
+PARAGRAPH = "### "
+BOLD      = "* "
+EMPHASIS  = "** "
 
 class AdvancedTab:
     "a tab in the widget"
@@ -422,11 +428,13 @@ class AdvancedWidget:
                 mdl = getattr(mdl, key.split('|')[0])
             return mdl
 
-        def _format(label, val):
+        def _format(label, val): # pylint: disable=too-many-return-statements
             if isinstance(val, bool):
                 return '▢✓'[val]
-            if isinstance(val, str):
-                return val
+            if val is None:
+                return ''
+            if not np.isscalar(val):
+                return str(val)
 
             fmt = label[label.rfind("%")+1:]
             if ')' in fmt:
@@ -617,7 +625,7 @@ class TabCreator:
         title = ""
         if isinstance(args[0], str) and '%' not in args[0]:
             title = args[0].strip()
-            if title.startswith('##'):
+            if title.startswith(SUBTITLE):
                 title = title[2:].strip()
 
             args  = args[1:]
@@ -627,7 +635,7 @@ class TabCreator:
         args = [i.strip() if isinstance(i, str) else i
                 for i in args
                 if not (isinstance(i, str) and len(i.strip()) == 0)]
-        inds = [i for i, j in enumerate(args) if isinstance(j, str) and j.startswith('##')]
+        inds = [i for i, j in enumerate(args) if isinstance(j, str) and j.startswith(SUBTITLE)]
         inds.append(len(args))
         if inds[0] != 0:
             inds.insert(0, 0)
@@ -647,10 +655,10 @@ class TabCreator:
                 if len(j) == 0:
                     continue
 
-                if j.startswith("##"):
+                if j.startswith(SUBTITLE):
                     title = j[2:].strip()
                     continue
-                if j.startswith("#"):
+                if j.startswith(TITLE):
                     continue
 
                 assert len(title)
@@ -660,11 +668,16 @@ class TabCreator:
                     elem = (tpe(j) if callable(getattr(tpe, '__get__', None)) else
                             cls.line(tpe, j))
                 else:
-                    elem = (j                            if "%"  not in j else
-                            cls.line(j)                  if "%(" not in j else
-                            ThemeAttributesDescriptor(j) if '%(theme.' in info  else
-                            cls.taskattr(j)              if '.'        in info  else
-                            cls.line(j))
+                    elem = (
+                        cls.__bold(j)                if j.startswith(BOLD)  else
+                        cls.__emphasis(j)            if j.startswith(EMPHASIS)  else
+                        cls.__paragraph(j)           if j.startswith(PARAGRAPH) else
+                        j                            if "%"  not in j           else
+                        cls.line(j)                  if "%(" not in j           else
+                        ThemeAttributesDescriptor(j) if '%(theme.' in info      else
+                        cls.taskattr(j)              if '.'        in info      else
+                        cls.line(j)
+                    )
             else:
                 elem = (cls.taskattr(**j) if isinstance(j, dict)  else
                         cls.line(*j)      if isinstance(j, tuple) else
@@ -672,6 +685,26 @@ class TabCreator:
 
             itms.append((f"{''.join(title.split()).lower()}{i}", elem))
         return title, itms
+
+    @staticmethod
+    def __bold(line):
+        return (
+            '<b>'
+            +line[2:-1 if line.endswith(BOLD[::-1]) else None].strip()
+            +'</b>'
+        )
+
+    @staticmethod
+    def __emphasis(line):
+        return (
+            '<i>'
+            +line[3:-2 if line.endswith(EMPHASIS[::-1]) else None].strip()
+            +'</i>'
+        )
+
+    @staticmethod
+    def __paragraph(line):
+        return f'<b style="text-decoration-line:underline">{line[4:].strip()}</b>'
 
     @staticmethod
     def __createwrapper(title, first, itms):
@@ -711,7 +744,7 @@ class TabCreator:
     @classmethod
     def __addtitle(cls, args):
         for i in args:
-            if isinstance(i, str) and i.startswith("#") and not i.startswith("##"):
+            if isinstance(i, str) and i.startswith(TITLE) and not i.startswith(SUBTITLE):
                 return [cls.title(i[1:].strip())]
         return []
 

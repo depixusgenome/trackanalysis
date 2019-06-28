@@ -11,6 +11,7 @@ from   eventdetection.data              import Events
 from   peakfinding.histogram            import HistogramData
 from   peakfinding.processor.dataframe  import PeaksDataFrameFactory, DataFrameFactory
 from   peakfinding.processor.selector   import PeakListArray, PeaksDict
+from   tasksequences                    import StretchFactor
 from   taskcontrol.processor.runner     import run as _runprocessors
 from   taskcontrol.processor.taskview   import TaskViewProcessor
 from   taskmodel                        import Task, Level
@@ -93,14 +94,13 @@ class _DefaultFitData:
         inst.__dict__['defaultdata'] = out
         return out
 
-
 class FitToReferenceTask(Task, zattributes = ('fitalg', "~window")):
     "Fits a bead to a reference"
     level                  = Level.peak
     defaultdata            = None
     fitdata                = cast(Fitters, _FitDataDescriptor())
     fitalg  : ReferenceFit = ChiSquareHistogramFit()
-    window  : float        = 10./8.8e-4
+    window  : float        = 10./StretchFactor.DNA.value
     @initdefaults(frozenset(locals()) - {'level'},
                   peaks       = lambda self, val: self.frompeaks (val),
                   events      = lambda self, val: self.fromevents(val))

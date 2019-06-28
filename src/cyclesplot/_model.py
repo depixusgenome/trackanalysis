@@ -7,6 +7,7 @@ from model.plots               import PlotTheme, PlotModel, PlotAttrs, PlotDispl
 from taskcontrol.modelaccess   import TaskAccess
 from taskmodel                 import RootTask
 from taskmodel.application     import TasksDisplay, rescalingevent
+from tasksequences             import StretchFactor
 from tasksequences.modelaccess import SequencePlotModelAccess
 from utils                     import NoArgs, initdefaults
 
@@ -23,7 +24,7 @@ class CyclesModelConfig:
     showevents       = False
     binwidth         = 0.01
     minframes        = 10
-    estimatedstretch = 1./8.8e-4
+    estimatedstretch = StretchFactor.DNA.value
     rescaling        = 1.
 
     @initdefaults(frozenset(locals()))
@@ -55,7 +56,7 @@ class BeadInfo:
     """
     bead related info
     """
-    stretch: float           = CyclesModelConfig.estimatedstretch
+    stretch: float           = StretchFactor.DNA.value
     bias   : Optional[float] = None
     @initdefaults
     def __init__(self, **kwa):

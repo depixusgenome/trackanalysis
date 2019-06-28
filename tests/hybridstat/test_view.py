@@ -203,11 +203,28 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-
     server = bokehaction.start(
         'hybridstat.view.peaksplot.PeaksPlotView',
         'taskapp.toolbar',
-        filters = FILTERS
+        filters = FILTERS,
+        runtime = 'selenium'
     )
     server.ctrl.display.observe("hybridstat.peaks", _printrng)
     server.load('big_legacy')
 
+    assert server.selenium['.dpx-peakstatdiv'].text == (
+        'Cycles\n'              '103\n'
+        'Stretch (base/µm)\n'   '1136.364\n'
+        'Bias (µm)\n'           '0.0090\n'
+        'σ[HF] (µm)\n'          '0.0018\n'
+        'σ[Peaks] (µm)\n'       '0.0021 ± 0.0008\n'
+        'Average Skew\n'        '-0.06 ± 0.11\n'
+        'Peak count\n'          '16\n'
+        'Baseline (µm)\n'       '0.009\n'
+        'Singlestrand (µm)\n'
+        'Events per Cycle\n'    '0.2 ± 0.2\n'
+        'Down Time Φ₅ (s)\n'    '7.2\n'
+        'Sites found\n'
+        'Silhouette\n'
+        'reduced χ²'
+    )
     krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
     def _press(val):
         server.press(val, krow)
@@ -229,6 +246,24 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-
     _press('Shift-ArrowDown')
 
     _t_e_s_t_peaks(server, bokehaction)
+
+    assert server.selenium['.dpx-peakstatdiv'].text == (
+        'Cycles\n'             '103\n'
+        'Stretch (base/µm)\n'  '1287.613\n'
+        'Bias (µm)\n'          '0.0113\n'
+        'σ[HF] (µm)\n'         '0.0018\n'
+        'σ[Peaks] (µm)\n'      '0.0021 ± 0.0008\n'
+        'Average Skew\n'       '-0.06 ± 0.11\n'
+        'Peak count\n'         '16\n'
+        'Baseline (µm)\n'      '0.009\n'
+        'Singlestrand (µm)\n'
+        'Events per Cycle\n'   '0.2 ± 0.2\n'
+        'Down Time Φ₅ (s)\n'   '7.2\n'
+        'Sites found\n'        '5/8\n'
+        'Silhouette\n'         '1.0\n'
+        'reduced χ²\n'         '0.2'
+    )
+
 
 @integrationmark
 def test_cyclehistplot(bokehaction): # pylint: disable=too-many-statements,too-many-locals
@@ -452,4 +487,4 @@ if __name__ == '__main__':
     # pylint: disable=ungrouped-imports
     from tests.testingcore.bokehtesting import BokehAction
     with BokehAction(None) as bka:
-        test_advancedmenu(bka)
+        test_peaksplot(bka)

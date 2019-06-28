@@ -7,11 +7,12 @@ from   typing       import (
     NamedTuple, Dict, Any, Optional, Union,
     Iterator, Tuple, List, cast
 )
-from   copy         import copy
-from   enum         import Enum
-from   itertools    import product
-import numpy        as     np
-from   utils        import initdefaults
+from   copy           import copy
+from   enum           import Enum
+from   itertools      import product
+import numpy          as     np
+from   utils          import initdefaults
+from   tasksequences  import StretchFactor, StretchRange
 
 DEFAULT_BEST = float(np.finfo('f4').max)
 
@@ -84,13 +85,38 @@ def config(self:OptimType, **kwa) -> Dict[str, float]:
 
 class OptimizationParams:
     "Optimizing parameters"
-    defaultstretch  = 1./8.8e-4
-    stretch          = Range(defaultstretch, 200., 100.)
+    defaultstretch   = StretchFactor.DNA.value
+    stretch          = Range(defaultstretch, StretchRange.DNA.value, 100.)
     bias             = Range(None,       60./defaultstretch, 60./defaultstretch)
     optim: OptimType = LBFGSParameters(1e-4, 1e-8, 1e-4, 1e-8, 100)
+
+    def __delayed_init__(self, _):
+        if {self.defaultstretch, self.stretch} & {'dna', 'DNA'}:
+            dflt                = StretchFactor.DNA.value
+            self.defaultstretch = dflt
+            self.stretch        = Range(dflt, StretchRange.DNA.value, 100.)
+        elif {self.defaultstretch, self.stretch} & {'rna', 'RNA'}:
+            dflt                = StretchFactor.RNA.value
+            self.defaultstretch = dflt
+            self.stretch        = Range(dflt, StretchRange.RNA.value, 100.)
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
+
+    @classmethod
+    def dnadefaults(cls) -> 'OptimizationParams':
+        "create params for dna"
+        return cls()
+
+    @classmethod
+    def rnadefaults(cls) -> 'OptimizationParams':
+        "create params for dna"
+        dflt = StretchFactor.RNA.value
+        return cls(
+            defaultstretch = dflt,
+            stretch        = Range(dflt, 500., 100.)
+        )
 
     def rescale(self, value:float) -> 'OptimizationParams':
         "rescale factors (from µm to V for example) for a given bead"

@@ -101,8 +101,11 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         good  = lambda evt: len(evt) and evt[0][0] < start
         return [[i for i in cycles if good(peak[i])] for _, peak in peaks]
 
-    def index(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> int:
+    def index(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[int]:
         "Removes the single strand peak if detected"
+        if not hasattr(frame, 'phaseposition') or not hasattr(peaks, '__len__'):
+            # can occur in tests
+            return None
         itr = self.__index(frame, beadid, peaks)
         return len(peaks) if itr is None else next(itr, len(peaks)-1)+1
 
@@ -147,9 +150,9 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         if isinstance(frame, Track):
             beads = cast(Track, frame).beads
         else:
-            beads = cast(Beads, frame.data)
+            beads = cast(Beads, getattr(frame, 'data', None))
             while beads is not None and not isinstance(beads, Beads):
-                beads = cast(Beads, beads.data)
+                beads = cast(Beads, getattr(beads, 'data', None))
 
             if beads is None:
                 beads = frame.track.beads # type: ignore
@@ -201,6 +204,10 @@ class BaselinePeakProcessor(Processor[BaselinePeakTask]):
     "Find the peak corresponding to the baseline"
     def index(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[int]:
         "Removes the single strand peak if detected"
+        if not hasattr(frame, 'phaseposition') or not hasattr(peaks, '__len__'):
+            # can occur in tests
+            return None
+
         peaks = _topeakarray(peaks)
         if len(peaks) == 0:
             return None
