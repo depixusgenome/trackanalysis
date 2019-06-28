@@ -16,15 +16,19 @@ from cleaning.view              import DataCleaningModelAccess
 from control.decentralized      import Indirection
 from model.plots                import PlotModel, PlotTheme, PlotAttrs, PlotDisplay
 from peakfinding.histogram      import interpolator
+from peakfinding.selector       import PeakSelectorDetails
+from peakfinding.processor      import BaselinePeakProcessor, SingleStrandProcessor
 from peakcalling                import match
 from peakcalling.toreference    import ChiSquareHistogramFit
 from peakcalling.tohairpin      import Distance
 from peakcalling.processor.fittoreference   import FitData
-from peakcalling.processor.fittohairpin     import (Constraints, HairpinFitter,
-                                                    PeakMatching, Range,
-                                                    DistanceConstraint)
+from peakcalling.processor.fittohairpin     import (
+    Constraints, HairpinFitter, PeakMatching, Range,
+    DistanceConstraint, FitBead
+)
 from taskcontrol.modelaccess    import TaskAccess
 from taskmodel                  import RootTask, DataSelectionTask
+from tasksequences              import StretchFactor
 from tasksequences.modelaccess  import SequencePlotModelAccess
 from utils                      import updatecopy, initdefaults, NoArgs
 from view.base                  import spawn
@@ -73,19 +77,21 @@ class PeaksPlotConfig:
     "PeaksPlotConfig"
     def __init__(self):
         self.name:             str   = "hybridstat.peaks"
-        self.estimatedstretch: float = 1./8.8e-4
+        self.estimatedstretch: float = StretchFactor.DNA.value
         self.rescaling:        float = 1.
 
 class PeaksPlotDisplay(PlotDisplay):
     "PeaksPlotDisplay"
-    name                              = "hybridstat.peaks"
-    observing                         = False
-    distances : Dict[str, Distance]   = dict()
-    peaks:      Dict[str, np.ndarray] = dict()
-    precompute: int                   = False
-    estimatedbias                     = 0.
-    constraintspath: Any              = None
-    useparams: bool                   = False
+    name:            str                   = "hybridstat.peaks"
+    observing:       bool                  = False
+    distances:       Dict[str, Distance]   = dict()
+    peaks:           Dict[str, np.ndarray] = dict()
+    baseline:        Optional[float]       = None
+    singlestrand:    Optional[float]       = None
+    precompute:      int                   = False
+    estimatedbias:   float                 = 0.
+    constraintspath: Any                   = None
+    useparams:       bool                  = False
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -525,8 +531,39 @@ class SingleStrandTaskAccess(TaskAccess, tasktype = SingleStrandTask):
         "resets the model"
         self.update(disabled = not (self.__config.automated and mdl.hassinglestrand))
 
+    def compute(
+            self,
+            fitdata: Optional[FitBead],
+            dtl: Optional[PeakSelectorDetails]
+    ) -> Optional[float]:
+        "return the index of the baseline if it exists"
+        if dtl is None or len(dtl) == 0:
+            return None
+        if fitdata:
+            return fitdata.singlestrand
+        proc   = SingleStrandProcessor(self.task if self.task else self.defaultconfigtask)
+        dframe = next(iter(self.processors(PeakSelectorTask).run(copy = True)))
+        out    = proc.index(dframe, self.bead, dtl)
+        return None if out is None or out >= len(dtl) else dtl[out][0]
+
 class BaselinePeakFilterTaskAccess(TaskAccess, tasktype = BaselinePeakFilterTask):
     "access to the BaselinePeakFilterTask"
+    def compute(
+            self,
+            fitdata: Optional[FitBead],
+            dtl: Optional[PeakSelectorDetails]
+    ) -> Optional[float]:
+        "return the index of the single strand peak if it exists"
+        if dtl is None or len(dtl) == 0:
+            return None
+        if fitdata:
+            return fitdata.baseline
+        proc   = BaselinePeakProcessor(self.task if self.task else self.defaultconfigtask)
+        dframe = next(iter(self.processors(PeakSelectorTask).run(copy = True)))
+        out    = proc.index(dframe, self.bead, dtl)
+        return None if out is None else dtl[out][0]
+
+
 
 class ObserversDisplay:
     "PeaksPlotDisplay"
@@ -630,7 +667,7 @@ class PoolComputations:
 
             while len(pipes) and keepgoing():
                 await _sleep(self._config.waittime)
-                for i, inp in enumerate(list(pipes)):
+                for i, inp in list(enumerate(pipes))[::-1]:
                     while inp.poll() and keepgoing():
                         out = inp.recv()
                         if out[0] is None:
@@ -783,15 +820,17 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         pkinfo   = PeakInfoModelAccess(self)
         out      = runbead(self.processors(), self.bead, self.fittoreference.refcache)
         tmp, dtl = out if isinstance(out, tuple) else (None, None) # type: ignore
+        data     = tuple(() if pksel is None else pksel.details2output(dtl))
 
         self._ctrl.display.update(
             self.peaksmodel.display,
             distances     = getattr(tmp, 'distances', {}),
-            estimatedbias = getattr(dtl, 'peaks', [0.])[0]
+            estimatedbias = getattr(dtl, 'peaks', [0.])[0],
+            baseline      = self.baselinefilter.compute(tmp, data),
+            singlestrand  = self.singlestrand.compute(tmp, data),
         )
 
         # pkinfo.createpeaks requires the distances to be already set!
-        data = tuple(() if pksel is None else pksel.details2output(dtl))
         self._ctrl.display.update(
             self.peaksmodel.display,
             peaks = pkinfo.createpeaks(data),

@@ -1,2 +1,2 @@
-require('cxx', ('boost_preprocessor',), 1.63, False)
+require('cxx', ('boost_preprocessor',), '1.70', False)
 make(locals(), use=['BOOST'])

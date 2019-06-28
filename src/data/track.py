@@ -167,7 +167,7 @@ class Secondaries:
         for i, j  in enumerate(np.split(
                 arr,
                 self.__track.phases.ravel()-self.__track.phases[0,0]
-        )):
+        )[1:]):
             j[:] = i % nph
         return arr
 

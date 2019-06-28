@@ -1,8 +1,27 @@
 # CycleApp
+## cycles_v6.10
+
+* 2019-06-27 11:51:58 +0200  (tag: cycles_v6.10)
+
+### Peaks
+
+Two pieces of information have been added: the baseline and the singlestrand
+peak positions. These are left empty if not detected.
+
+In the advanced menu, it's now possible to set the range of stretches and biases
+considered for fitting to the sequences. The three new entries are:
+
+* **Expected stretch (bases per µm)** is the central value in the range of tested stretches.
+* **Stretch range (bases per µm)** is the range of stretches explored both above
+  and below the expected stretch.
+* **Bias range (µm)** is the range of biases explored both above and below the the
+  bias default value. The latter can be the baseline, the single-strand peak or
+  zero depending on the list of *oligos* provided.
+
 ## cycles_v6.9
 
-* 2019-06-10 11:51:58 +0200  (tag: cycles_v6.9.3)
-* 2019-06-10 10:51:58 +0200  (tag: cycles_v6.9.2)
+* 2019-06-12 11:15:11 +0200  (tag: cycles_v6.9.3)
+* 2019-06-12 10:20:08 +0200  (tag: cycles_v6.9.2)
 * 2019-06-11 11:51:58 +0200  (tag: cycles_v6.9.1)
 * 2019-06-06 16:12:58 +0200  (tag: cycles_v6.9)
 
@@ -915,6 +934,19 @@ New application for viewing cycles
     * then open the *.gr* files. You can select all of them in one go.
 
 # RampApp
+
+## ramp_v2.2
+
+* 2019-06-26 09:02:39 +0200  (tag: ramp_v2.2)
+
+### Cleaning
+
+This version adds the *Cleaning* tab which already exists in *CycleApp*.
+Results in the *Ramp* tab are affected by the cleaning: some beads are rejected
+at the cleaning stage.
+
+The raw data plots have been improved: different phases are now displayed in
+different colors.
 
 ## ramp_v2.1
 

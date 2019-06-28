@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creating a dictionnary with all peak related stuff"
-from typing                     import Dict, List, TYPE_CHECKING, cast
+from typing                     import Dict, List, Optional, TYPE_CHECKING, cast
 from abc                        import ABC, abstractmethod
 from itertools                  import product
 
 import numpy                    as     np
 
 from eventdetection.processor   import EventDetectionTask
+from peakfinding.peaksarray     import PeakListArray
 from peakfinding.probabilities  import Probability
 from sequences                  import markedoligos
 from utils                      import NoArgs
@@ -66,7 +67,7 @@ class PeakInfoModelAccess:
         "return the current track"
         return self._model.eventdetection.task
 
-    def createpeaks(self, peaks) -> Dict[str, np.ndarray]:
+    def createpeaks(self, peaks: PeakListArray) -> Dict[str, np.ndarray]:
         "Creates the peaks data"
         dico: Dict[str, np.ndarray] = {}
         classes                     = self._classes
@@ -89,10 +90,19 @@ class PeakInfo(ABC):
         "returns the list of keys"
 
     @abstractmethod
-    def values(self, mdl: PeakInfoModelAccess, peaks, dico: Dict[str, np.ndarray]):
+    def values(
+            self,
+            mdl:   PeakInfoModelAccess,
+            peaks: PeakListArray,
+            dico:  Dict[str, np.ndarray]
+    ):
         "sets current bead peaks and computes the fits"
 
-    def defaults(self, mdl, peaks) -> Dict[str, np.ndarray]:
+    def defaults(
+            self,
+            mdl:   PeakInfoModelAccess,
+            peaks: PeakListArray
+    ) -> Dict[str, np.ndarray]:
         "sets current bead peaks and computes the fits"
         size = len(peaks)
         return {i: np.full(size, np.NaN, dtype = 'f4') for i in self.keys(mdl)}
@@ -105,7 +115,11 @@ class ZPeakInfo(PeakInfo):
         return ['z']
 
     @staticmethod
-    def values(mdl: PeakInfoModelAccess, peaks, dico: Dict[str, np.ndarray]):
+    def values(
+            mdl:   PeakInfoModelAccess,
+            peaks: PeakListArray,
+            dico:  Dict[str, np.ndarray]
+    ):
         "sets current bead peaks and computes the fits"
         dico['z'] = np.array([i for i, _ in peaks], dtype = 'f4')
 
@@ -115,7 +129,12 @@ class ReferencePeakInfo(PeakInfo):
         "returns the list of keys"
         return [] if mdl.hasidentification else ['id', 'distance']
 
-    def values(self, mdl: PeakInfoModelAccess, peaks, dico: Dict[str, np.ndarray]):
+    def values(
+            self,
+            mdl:   PeakInfoModelAccess,
+            peaks: PeakListArray,
+            dico:  Dict[str, np.ndarray]
+    ):
         "sets current bead peaks and computes the fits"
         zvals  = np.array([i for i, _ in peaks], dtype = 'f4')
         ided   = mdl.identifiedpeaks(zvals)
@@ -133,7 +152,7 @@ class IdentificationPeakInfo(PeakInfo):
         names = self.basekeys()
         return names + [''.join(i) for i in product(mdl.sequences(), names)]
 
-    def defaults(self, mdl: PeakInfoModelAccess, peaks) -> Dict[str, np.ndarray]:
+    def defaults(self, mdl: PeakInfoModelAccess, peaks: PeakListArray) -> Dict[str, np.ndarray]:
         dflt = super().defaults(mdl, peaks)
         for i in dflt:
             if i.endswith('orient'):
@@ -141,12 +160,22 @@ class IdentificationPeakInfo(PeakInfo):
         return dflt
 
     @classmethod
-    def defaultstrand(cls, mdl, peaks):
+    def defaultstrand(
+            cls,
+            mdl: PeakInfoModelAccess,
+            peaks: PeakListArray
+    ) -> np.ndarray:
         "return the empty strand array"
-        return cls.strand(mdl, None, None, peaks, None)
+        return cls.strand(mdl, None, None, peaks, np.empty([]))
 
     @staticmethod
-    def strand(mdl, seq, hyb, ids, bases):
+    def strand(
+            mdl:   PeakInfoModelAccess,
+            seq:   Optional[str],
+            hyb:   Optional[np.ndarray],
+            ids:   np.ndarray,
+            bases: np.ndarray
+    ) -> np.ndarray:
         "return the strand array"
         oligs = markedoligos(mdl.oligos())
         neigh = 2
@@ -171,7 +200,12 @@ class IdentificationPeakInfo(PeakInfo):
 
         return arr
 
-    def values(self, mdl: PeakInfoModelAccess, peaks, dico: Dict[str, np.ndarray]):
+    def values(
+            self,
+            mdl:   PeakInfoModelAccess,
+            peaks: PeakListArray,
+            dico:  Dict[str, np.ndarray]
+    ):
         "sets current bead peaks and computes the fits"
         zvals         = np.array([i[0] for i in peaks], dtype = 'f4')
         dist          = mdl.getfitparameters(mdl.sequencekey)
@@ -198,7 +232,12 @@ class StatsPeakInfo(PeakInfo):
         "returns the list of keys"
         return ['duration', 'sigma', 'count', 'skew']
 
-    def values(self, mdl: PeakInfoModelAccess, peaks, dico: Dict[str, np.ndarray]):
+    def values(
+            self,
+            mdl:   PeakInfoModelAccess,
+            peaks: PeakListArray,
+            dico:  Dict[str, np.ndarray]
+    ):
         "sets current bead peaks and computes the fits"
         if len(peaks) == 0:
             return
@@ -215,7 +254,7 @@ class StatsPeakInfo(PeakInfo):
             dico['count'][i]    = min(100., val.hybridisationrate*100.)
             dico['skew'][i]     = np.nanmedian(prob.skew(evts))
 
-def createpeaks(self, peaks) -> Dict[str, np.ndarray]:
+def createpeaks(self, peaks: PeakListArray) -> Dict[str, np.ndarray]:
     "Creates the peaks data"
     if not isinstance(self, PeakInfoModelAccess):
         return PeakInfoModelAccess(self).createpeaks(peaks)

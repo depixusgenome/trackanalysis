@@ -213,9 +213,9 @@ class TaskAccess:
             return self._ctrl.theme.get("tasks", "instrument")
         return self._ctrl.tasks.instrumenttype(self.roottask)
 
-    def processors(self) -> Optional[ProcessorController]:
+    def processors(self, task = None) -> Optional[ProcessorController]:
         "returns a tuple (dataitem, bead) to be displayed"
-        task = self.task
+        task = self.task if task is None else task
         return None if task is None else self._tasksdisplay.processors(self._ctrl, task)
 
     @property

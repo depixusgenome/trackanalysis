@@ -1,2 +1,2 @@
-require('cxx', ('boost_math', 'boost_accumulators'), 1.63, False)
+require('cxx', ('boost_math', 'boost_accumulators'), '1.70', False)
 make(locals(), use=['BOOST'])

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
 import os
+from enum                       import IntEnum, auto
 from pathlib               import Path
 from typing                import Any, Dict, List, Optional, Tuple
 
@@ -14,9 +15,10 @@ from bokeh.models               import (DataTable, TableColumn, CustomJS,
 from cleaning.view              import BeadSubtractionModalDescriptor
 from eventdetection.view        import AlignmentModalDescriptor
 from excelreports.creation      import writecolumns
-from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit, Symmetry
+from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit, Symmetry, Range
 from peakfinding.groupby        import FullEm, ByHistogram
 from signalfilter               import rawprecision
+from tasksequences              import StretchFactor, StretchRange
 from tasksequences.view         import (SequenceTicker, SequenceHoverMixin,
                                         OligoListWidget, SequencePathWidget)
 from taskcontrol.beadscontrol   import TaskWidgetEnabler
@@ -155,6 +157,23 @@ _LINE = """
     </div>
     """.strip().replace("    ", "").replace("\n", "")
 
+class PeaksStatsOrder(IntEnum):
+    "order of information in PeaksStatsWidget"
+    cycles       = auto()
+    stretch      = auto()
+    bias         = auto()
+    sigmahf      = auto()
+    sigmapeaks   = auto()
+    skew         = auto()
+    peaks        = auto()
+    baseline     = auto()
+    singlestrand = auto()
+    events       = auto()
+    downtime     = auto()
+    sites        = auto()
+    silhouette   = auto()
+    chi2         = auto()
+
 @dataclass
 class PeaksStatsWidgetTheme:
     "PeaksStatsWidgetTheme"
@@ -163,18 +182,22 @@ class PeaksStatsWidgetTheme:
     openhairpin : str =  ' & open hairpin'
     orientation : str = '-+ '
     style       : Dict[str, Any]  = dflt({})
-    lines       : List[List[str]] = dflt([['cycles',            '.0f'],
-                                          ['Stretch (base/µm)', '.3f'],
-                                          ['Bias (µm)',         '.4f'],
-                                          ['σ[HF] (µm)',        '.4f'],
-                                          ['σ[Peaks] (µm)',     '.4f'],
-                                          ['Average Skew ',     '.2f'],
-                                          ['Peak count',        '.0f'],
-                                          ['Events per Cycle',  '.1f'],
-                                          ['Down Time Φ₅ (s)',  '.1f'],
-                                          ['Sites found',       ''],
-                                          ['Silhouette',        '.1f'],
-                                          ['reduced χ²',        '.1f']])
+    lines       : List[List[str]] = dflt([
+        ['Cycles',            '.0f'],
+        ['Stretch (base/µm)', '.3f'],
+        ['Bias (µm)',         '.4f'],
+        ['σ[HF] (µm)',        '.4f'],
+        ['σ[Peaks] (µm)',     '.4f'],
+        ['Average Skew ',     '.2f'],
+        ['Peak count',        '.0f'],
+        ['Baseline (µm)',     '.3f'],
+        ['Singlestrand (µm)', '.3f'],
+        ['Events per Cycle',  '.1f'],
+        ['Down Time Φ₅ (s)',  '.1f'],
+        ['Sites found',       ''],
+        ['Silhouette',        '.1f'],
+        ['reduced χ²',        '.1f']
+    ])
 
 class PeaksStatsWidget:
     "Table containing stats per peaks"
@@ -186,7 +209,7 @@ class PeaksStatsWidget:
 
     def addtodoc(self, *_) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
-        self.__widget = PeaksStatsDiv(style = self.__theme.style)
+        self.__widget = PeaksStatsDiv(style = self.__theme.style, css_classes = ['dpx-peakstatdiv'])
         self.reset(None)
         return [self.__widget]
 
@@ -200,7 +223,7 @@ class PeaksStatsWidget:
         "creates the html table containing stats"
         def __init__(self, theme: PeaksStatsWidgetTheme) -> None:
             self.titles = [tuple(i) for i in theme.lines]
-            self.values = ['']*len(self.titles)
+            self.values = ['']*(len(self.titles)+1)
             self.line   = theme.line
             self.openhp = theme.openhairpin
 
@@ -208,33 +231,48 @@ class PeaksStatsWidget:
             "all track dependant stats"
             if mdl.track is None:
                 return
+            _           = PeaksStatsOrder
             dim         = mdl.track.instrument['dimension']
             self.titles = [(i.replace('µm', dim), j) for i,j in self.titles]
 
-            self.values[0] = mdl.track.ncycles
-            self.values[3] = rawprecision(mdl.track, mdl.bead)
+            self.values[_.cycles]  = mdl.track.ncycles
+            self.values[_.sigmahf] = rawprecision(mdl.track, mdl.bead)
             if len(mdl.peaks['z']):
-                self.values[4] = mdl.peaks['sigma']
-            self.values[5] = mdl.peaks['skew']
-            self.values[6] = len(mdl.peaks['z'])
-            self.values[7] = 0.     if self.values[6] < 1 else mdl.peaks['count'][1:]/100.
-            self.values[8] = np.NaN if self.values[6] < 1 else mdl.peaks['duration'][0]
+                self.values[_.sigmapeaks] = mdl.peaks['sigma']
+            self.values[_.skew] = mdl.peaks['skew']
+            if len(mdl.peaks['z']):
+                self.values[_.peaks]    = len(mdl.peaks['z'])
+                self.values[_.events]   = mdl.peaks['count'][1:]/100.
+                self.values[_.downtime] = mdl.peaks['duration'][0]
+            else:
+                self.values[_.peaks]    = 0
+                self.values[_.events]   = 0.
+                self.values[_.downtime] = np.NaN
+
+            for name in ('baseline', 'singlestrand'):
+                val = getattr(mdl.peaksmodel.display, name)
+                if val is not None:
+                    self.values[getattr(_, name)] = val
+
 
         def sequencedependant(self, mdl, dist, key):
             "all sequence dependant stats"
-            self.values[1] = dist[key].stretch
-            self.values[2] = dist[key].bias
-
-            task             = mdl.identification.task
-            nfound           = np.isfinite(mdl.peaks[key+'id']).sum()
-            self.values[9]   = f'{nfound}/{len(task.match[key].peaks)}'
-            self.values[10]  = PeakGridFit.silhouette(dist, key)
+            self.default(mdl)
+            _                           = PeaksStatsOrder
+            task                        = mdl.identification.task
+            nfound                      = np.isfinite(mdl.peaks[key+'id']).sum()
+            self.values[_.sites]        = f'{nfound}/{len(task.match[key].peaks)}'
+            self.values[_.silhouette]   = PeakGridFit.silhouette(dist, key)
 
             if nfound > 2:
-                stretch         = dist[key].stretch
-                self.values[11] = (np.nansum(mdl.peaks[key+'distance']**2)
-                                   / ((np.mean(self.values[3]*stretch))**2
-                                      * (nfound - 2)))
+                stretch             = dist[key].stretch
+                self.values[_.chi2] = (
+                    np.nansum(mdl.peaks[key+'distance']**2)
+                    / (
+                        (np.mean(self.values[_.sigmahf]*stretch))**2
+                        * (nfound - 2)
+                    )
+                )
 
         def referencedependant(self, mdl):
             "all sequence dependant stats"
@@ -242,23 +280,29 @@ class PeaksStatsWidget:
             if fittoref.referencepeaks is None:
                 return
 
-            self.values[1] = fittoref.stretch
-            self.values[2] = fittoref.bias
+            self.default(fittoref)
 
-            nfound          = np.isfinite(mdl.peaks['id']).sum()
-            self.values[9]  = f'{nfound}/{len(fittoref.referencepeaks)}'
+            _                      = PeaksStatsOrder
+            nfound                 = np.isfinite(mdl.peaks['id']).sum()
+            self.values[_.sites]   = f'{nfound}/{len(fittoref.referencepeaks)}'
             if nfound > 2:
-                self.values[10] = (np.nansum((mdl.peaks['distance'])**2)
-                                   / ((np.mean(self.values[3]))**2
-                                      * (nfound - 2)))
+                self.values[_.chi2] = (
+                    np.nansum((mdl.peaks['distance'])**2)
+                    / (
+                        (np.mean(self.values[_.sigmahf]))**2
+                        * (nfound - 2)
+                    )
+                )
+
         def default(self, mdl):
             "default values"
-            self.values[1] = mdl.stretch
-            self.values[2] = mdl.bias
+            _                      = PeaksStatsOrder
+            self.values[_.stretch] = mdl.stretch
+            self.values[_.bias]    = mdl.bias
 
         def __call__(self) -> str:
             return ''.join(self.line.format(i[0], self.__fmt(i[1], j))
-                           for i, j in zip(self.titles, self.values))
+                           for i, j in zip(self.titles, self.values[1:]))
 
         @staticmethod
         def __fmt(fmt, val):
@@ -556,11 +600,15 @@ class _IdAccessor:
         if attr == 'alg':
             self._fget = lambda i: isinstance(i, PeakGridFit)
             self._fset = lambda j, i: (
-                (ChiSquareFit, PeakGridFit)[i](symmetry = (
-                    Symmetry.both if j.symmetry == Symmetry.both else
-                    Symmetry.left if i else
-                    Symmetry.right
-                )),
+                (ChiSquareFit, PeakGridFit)[i](
+                    symmetry = (
+                        Symmetry.both if j.symmetry == Symmetry.both else
+                        Symmetry.left if i else
+                        Symmetry.right
+                    ),
+                    defaultstretch = j.defaultstretch,
+                    stretch        = j.stretch
+                ),
             )
         elif attr == 'fpos':
             self._fget = lambda i: i.symmetry == Symmetry.both
@@ -571,12 +619,37 @@ class _IdAccessor:
                     Symmetry.right
                 )
             }
+        elif attr == 'stretch':
+            self._fget = lambda i: i.defaultstretch
+            self._fset = lambda j, i: {
+                'defaultstretch': float(i),
+                'stretch':        Range(i, j.stretch[1], j.stretch[2])
+            }
+        elif attr == 'stretchrange':
+            self._fget = lambda i: i.stretch[1]
+            self._fset = lambda j, i: {'stretch': Range(j.stretch[0], i, j.stretch[2])}
+        elif attr == 'biasrange':
+            self._fget = lambda i: i.bias[1]
+            self._fset = lambda j, i: {'bias': Range(None, i, j.bias[2])}
         else:
             self._fget = lambda i: getattr(i, attr)
             self._fset = lambda _, i: {attr: i}
 
+    class _Value:
+        def __init__(self, tpe):
+            self.tpe = tpe
+        def __str__(self):
+            return  ', '.join(f'{i.name} = {i.value:.1f}' for i in self.tpe.__members__.values())
+        def __eq__(self, value):
+            return False
+
     def getdefault(self, inst, usr = False):
         "returns the default value"
+        if usr is False:
+            if 'Default stretch range' in self._label:
+                return self._Value(StretchRange)
+            if 'Default stretch' in self._label:
+                return self._Value(StretchFactor)
         ident = getattr(inst, '_model').identification
         return self._fget(ident.defaultattribute(self._name, usr))
 
@@ -623,8 +696,6 @@ class _PeakDescriptor:
 
 def advanced(**kwa):
     "create the advanced button"
-    msg  = ("<b>To fit to the baseline (singlestrand) peak, add '0'"
-            " ('singlestrand') to the oligos.<b>")
     acc  = (
         BeadSubtractionModalDescriptor,
         AlignmentModalDescriptor,
@@ -644,15 +715,24 @@ def advanced(**kwa):
 
         ## Peaks
 
-        {msg}
-
-        {kwa.pop("peakstext", "")}
+        ### Events in Peaks
         Min frame count per hybridisation       %(eventdetection.events.select.minlength)D
         Min hybridisations per peak             %(peakselection.finder.grouper.mincount)D
         Re-align cycles using peaks             %(peakselection.align)b
+        {kwa.pop('peakstext', '')}
+
+        ### Fitting Algorithm
+        * \u261B To fit to the baseline (singlestrand) peak, *
+        * \u261B add '0' ('$' or 'singlestrand') to oligos. *
+
         Peak kernel size (blank ⇒ auto)         %(peakselection.precision).4oF
+        Expected stretch (bases per µm)         %(_IdAccessor:stretch).0F
+        Stretch range (bases per µm)            %(_IdAccessor:stretchrange)D
+        Bias range (µm)                         %(_IdAccessor:biasrange).3F
         Exhaustive fit algorithm                %(_IdAccessor:alg)b
         Score is affected by false positives    %(_IdAccessor:fpos)b
+
+        ### Binding Position Identification
         Max Δ to theoretical peak               %(_IdAccessor:window)d
         """,
         accessors = {i.__name__: i for i in acc},

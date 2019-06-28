@@ -87,6 +87,14 @@ The following *bead* characteristics are reported:
 * `Events per cycle` is the number of events per cycle on all peaks together,
   notwithstanding the baseline peak. It's an indicator of the number of cycles
   *wasted* for lack of any blockings occurring.
+* `Baseline (µm)` is the position of the peak expected to be the baseline. The
+  latter is the peak closest to the median altitude of the bead at phase 1,
+  with at least a 10% hybridisation rate. If listed (add a '0') with the list of oligos,
+  this peak will be used to better estimate the bias.
+* `Singlestrand (µm)` is the position of the peak expected to be the
+  single-strand peak. The latter is estimated as the highest peak such that
+  phase 4 ends without any break. If listed (add a '$') with the list of
+  oligos, this peak will be used to better estimate the bias.
 * `Downtime φ₅ (s)` is the average time remaining in a cycle after all
   blockings notwithstanding the baseline peak are done. It's an indicator of
   the amount of time *wasted* for lack of any blockings occurring.
@@ -236,18 +244,33 @@ Cleaning
 Peaks
 -----
 
+Events in Peaks
+^^^^^^^^^^^^^^^
 * `Min frame count per hybridisation` is the minimum number of |z| measures per
   hybridization event.
 * `Min hybridisations per peak` is the number of events per Hybridization
   position below which it is discarded.
 * `Re-align cycles using peaks` should be unchecked if the density of peaks is
   too high (> 1/(3|NOISE|)).
+
+Fitting Algorithm
+^^^^^^^^^^^^^^^^^
 * `Peak kernel size (blank ⇒ auto)` is the kernel width used to create the
   histogram. This should be higher than |NOISE|. It' currently at 1 |NOISE| for
   the |SDI| and 2 |NOISE| for the |PICO|.
+* `Expected stretch (bases per µm)` is the central value in the range of tested
+  stretches.
+* `Stretch range (bases per µm)` is the range of stretches explored both above
+  and below the expected stretch.
+* `Bias range (µm)` is the range of biases explored above and below the the
+  bias default value. The latter can be the baseline, the single-strand peak or
+  zero depending on the list of *oligos* provided.
 * `Exhaustive fit algorithm` allows selecting one or the other fit algorithm.
 * `Score is affected by false positives` means that the best fit should also
   account for a low number of unidentified peaks. That was *not* the case prior
   to version 6.8
+
+Binding Position Identification
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 * `Max Δ to theoretical peak` sets a threshold on how far an experimental peak
   can be from to theoretical position for identification.
