@@ -310,7 +310,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
 
 class CleaningView(PlotView[CleaningPlotCreator]):
     "Peaks plot view"
-    TASKS = 'aberrant', 'datacleaning', 'extremumalignment'
+    TASKS = 'undersampling', 'aberrant', 'datacleaning', 'extremumalignment'
     def ismain(self, ctrl):
         "Cleaning and alignment, ... are set-up by default"
         self._ismain(ctrl, tasks  = self.TASKS)

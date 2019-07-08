@@ -81,7 +81,7 @@ class ClippingTask(Task):
             np.zeros(len(itms), dtype = 'i4')
         )
         minarr = (
-            np.array([(i<minv).sum() for i, _ in itms], dtype = 'i4')  if maxv is not None else
+            np.array([(i<minv).sum() for i, _ in itms], dtype = 'i4')  if minv is not None else
             np.zeros(len(itms), dtype = 'i4')
         )
         sizes = np.array([i for _, i in itms], dtype = 'i4')

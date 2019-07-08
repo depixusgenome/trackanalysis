@@ -15,7 +15,7 @@ from   data.trackio     import LegacyGRFilesIO, savetrack, PickleIO, LegacyTrack
 from   data.trackio     import MuWellsFilesIO
 from   data.track       import FoV, Track
 from   data.trackops    import (
-    concatenatetracks, selectcycles, dropbeads, clone, dataframe
+    concatenatetracks, selectcycles, dropbeads, clone, dataframe, undersample
 )
 from   data.tracksdict  import TracksDict
 from   tests.testingcore      import path as utpath
@@ -468,5 +468,37 @@ def test_beadextension():
     trk1 = Track(path = utpath("big_legacy"))
     assert abs(trk1.beadextension(0) - 0.951788546331226) < 1e-5
 
+def test_resampling():
+    "test resampling"
+    track = Track(path = utpath("big_legacy"))
+    track.rawprecision(0)
+    assert undersample(track, 1) is track
+
+    under = undersample(track, 3)
+    assert_equal(under.phases, track.phases//3)
+    assert_equal(under.beads[0], track.beads[0][::3])
+    assert_equal(under.secondaries.zmag, track.secondaries.zmag[::3])
+    assert_equal(under.secondaries.tsample['index'], track.secondaries.tsample['index']//3)
+    assert track.ncycles    == under.ncycles
+    assert track.nframes//3+1 == under.nframes
+    assert len(track._rawprecisions)
+    assert len(under._rawprecisions) == 0
+    assert under.path is None
+    assert under.framerate == track.framerate/3
+    assert under.fov       is track.fov
+
+
+    under = undersample(track, 3, 'mean')
+    assert_equal(under.beads[0], np.nanmean(track.beads[0][:50289].reshape((-1,3)), axis = 1))
+    assert track.nframes//3 == under.nframes
+
+    under = undersample(track, 3, np.median)
+    assert_equal(under.beads[0], np.nanmedian(track.beads[0][:50289].reshape((-1,3)), axis = 1))
+    assert track.nframes//3 == under.nframes
+
+    beads = track.beads.withaction(lambda _, i: (i[0], i[1]*2))
+    under = undersample(beads, 3)
+    assert_equal(under.beads[0], track.beads[0][::3]*2)
+
 if __name__ == '__main__':
-    test_dataframe()
+    test_resampling()

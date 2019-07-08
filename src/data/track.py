@@ -564,8 +564,7 @@ class Track:
 
     def rawprecision(self, ibead, first = None, last = None):
         "Obtain the raw precision for a given bead"
-        cache = self._rawprecisions
-        val   = cache.get(ibead, None)
+        val   = self._rawprecisions.get(ibead, None)
 
         if val is None:
             rate = max(1, int(self.framerate/self._RAWPRECION_RATE+.5))
@@ -577,14 +576,16 @@ class Track:
             last   = (self.phases[:,PHASE.measure+1 if last is None else last]
                       - self.phases[0,0])
             if np.isscalar(ibead):
-                cache[ibead] = val = _rp(self.beads[ibead], first, last)
+                self._rawprecisions[ibead] = val = _rp(self.beads[ibead], first, last)
             else:
                 beads = self.beads
                 ibead = set(beads.keys()) if ibead is None or ibead is Ellipsis else set(ibead)
+                if len(ibead-set(self._rawprecisions)) > 0:
+                    self._rawprecisions.update(
+                        (i, _rp(beads[i], first, last)) for i in ibead-set(self._rawprecisions)
+                    )
 
-                if len(ibead-set(cache)) > 0:
-                    cache.update((i, _rp(beads[i], first, last)) for i in ibead-set(cache))
-                val = iter((i, cache[i]) for i in ibead)
+                val = iter((i, self._rawprecisions[i]) for i in ibead)
         return val
 
     def beadextension(self, ibead: Union[BEADKEY, np.ndarray], rng = (5., 95.)) -> float:

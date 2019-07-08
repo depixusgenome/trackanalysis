@@ -2,22 +2,23 @@
 # -*- coding: utf-8 -*-
 "Provides plots for temperatures and bead extensions"
 import warnings
-from   typing               import Dict, Union, Tuple, List, Any, cast
+from   typing                import Dict, Union, Tuple, List, Any, cast
 
-from   bokeh                import layouts
-from   bokeh.models         import ColumnDataSource, Range1d, ToolbarBox
-from   bokeh.plotting       import Figure
-import numpy                as     np
+from   bokeh                 import layouts
+from   bokeh.models          import (
+    ColumnDataSource, Range1d, ToolbarBox, CustomAction, CustomJS, Div
+)
+from   bokeh.plotting        import Figure
+import numpy                 as     np
 
-from   data                 import Beads, Track
-from   taskview.plots       import TaskPlotCreator, CACHE_TYPE
+from   data                  import Beads, Track
+from   taskview.plots        import TaskPlotCreator, CACHE_TYPE
 
-from   ..computations       import extensions
-from   ._model              import (QualityControlModelAccess,
-                                    DriftControlPlotModel,
-                                    DriftControlPlotTheme,
-                                    DriftControlPlotConfig, PlotDisplay,
-                                    ExtensionPlotTheme, ExtensionPlotConfig)
+from   ..computations        import extensions
+from   ._model               import (
+    QualityControlModelAccess, DriftControlPlotModel, DriftControlPlotTheme,
+    DriftControlPlotConfig, PlotDisplay, ExtensionPlotTheme, ExtensionPlotConfig
+)
 
 class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
                                               DriftControlPlotModel]):
@@ -51,6 +52,8 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
                                 name               = self.__class__.__name__)
         self._src = [ColumnDataSource(i) for i in self._data()]
 
+        if self.__class__.__name__.startswith("T"):
+            self._src[0].tags = ["csvtemperatures", self.__class__.__name__[:-len('PlotCreator')]]
         val = self.addtofig(self._fig, 'measures',
                             y = 'measures', x = 'cycles', source = self._src[0])
         self._rends = [('measures', val)]
@@ -220,7 +223,8 @@ class QualityControlPlots:
         for i in plots[1:]:
             i[0].x_range = plots[0][0].x_range
         for i in plots[:-1]:
-            i[0].xaxis.visible = False
+            i[-1].xaxis.visible = False
+        css  = self.__add_csvaction(plots)
 
         tmp  = TSamplePlotCreator.fig(getattr(self.tsample, '_theme')).figargs()
         tbar = tmp['toolbar_location']
@@ -228,4 +232,52 @@ class QualityControlPlots:
         # pylint: disable=not-an-iterable
         tbar = next(i for i in grid.children if isinstance(i, ToolbarBox))
         tbar.toolbar.logo = None
-        return grid
+        return layouts.column(css, grid, **mode)
+
+    @staticmethod
+    def __add_csvaction(plots):
+        srcs = sum((i[0].select(tags = 'csvtemperatures') for i in plots), [])
+        plots[0][0].tools = plots[0][0].tools + [CustomAction(
+            action_tooltip = "Save temperatures to CSV",
+            callback       = CustomJS(
+                code = """
+                    var csvFile = 'cycle;value;sensor;\\n';
+                    var ind     = 0;
+                    for(ind = 0; ind < data.length; ++ind)
+                    {
+                        var sensor = ',"'+names[ind]+'"\\n';
+                        var src    = data[ind].data;
+                        var j      = 0;
+                        var je     = src['cycles'].length;
+                        for(j = 0; j < je; ++j)
+                        {
+                            csvFile += src["cycles"][j].toString()+',';
+                            csvFile += src["measures"][j].toString()+sensor;
+                        }
+                    }
+
+                    var blob = new Blob([csvFile], { type: 'text/csv;charset=utf-8;' });
+                    if (navigator.msSaveBlob) { // IE 10+
+                        navigator.msSaveBlob(blob, "temperatures.csv");
+                    } else {
+                        var link = document.createElement("a");
+                        if (link.download !== undefined) { // feature detection
+                            // Browsers that support HTML5 download attribute
+                            var url = URL.createObjectURL(blob);
+                            link.setAttribute("href", url);
+                            link.setAttribute("download", "temperatures.csv");
+                            link.style.visibility = 'hidden';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
+                    }
+                """,
+                args = {'data':  srcs, 'names': [i.tags[1] for i in srcs]}
+            )
+        )]
+        return Div(
+            text   = "<link rel='stylesheet' type='text/css' href='view/qualitycontrol.css'>",
+            width  = 0,
+            height = 0
+        )

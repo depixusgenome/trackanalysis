@@ -4,16 +4,16 @@
 Operations on tracks
 """
 from    copy        import copy as shallowcopy, deepcopy
-from    typing      import Union, Tuple, List, TypeVar, cast
+from    functools   import partial
+from    typing      import Union, Tuple, List, TypeVar, Optional, cast
 from    pathlib     import Path
 
 import  numpy       as     np
-from    numpy.lib.stride_tricks import as_strided
 import  pandas      as     pd
 
 from   .track       import Track
 from   .tracksdict  import TracksDict
-from   .views       import BEADKEY
+from   .views       import BEADKEY, Beads
 
 TRACKS = TypeVar('TRACKS', Track, TracksDict)
 
@@ -162,33 +162,55 @@ def trackname(track:Track) -> str:
         return ""
     return Path(path[0] if isinstance(path, (list, tuple)) else path).stem
 
-def undersample(track:Track, cnt: int, mean = False) -> str:
-    "undersample the track"
-    # pylint: disable=protected-access
-    cpy                 = shallowcopy(track)
-    cpy.framerate      /= cnt
-    cpy._phase          = np.copy(cpy._phase)//cnt
+def _undersample_first(cnt, _, info):
+    return (info[0], info[1][::cnt])
 
-    def _agg(vect):
-        if not mean:
-            return vect[::cnt]
-        return np.nanmean(
-            as_strided(vect, shape = (len(vect)//cnt, cnt), strides = (cnt, 1)),
-            axis = 1
-        )
+def _undersample_agg(fcn, cnt, _, info):
+    arr = info[1]
+    return (info[0], fcn(arr[:(len(arr)//cnt)*cnt].reshape((-1, cnt)), axis = 1))
+
+def undersample(itm: Union[Track, Beads], cnt: int, agg: Optional[str] = None) -> Track:
+    "undersample the track"
+    track: Track = getattr(itm, 'track', itm)
+    if cnt <= 1:
+        return track
+
+    track.load()
+    # pylint: disable=protected-access
+    cpy            = shallowcopy(track)
+    cpy._phases    = np.copy(cpy.phases)//cnt
+    if cpy.key is None:
+        cpy.key   = str(track.path)
+        cpy._path = None
+
+    if agg in {None, 'none'}:
+        fcn    = partial(_undersample_first, cnt)
+    else:
+        arrfcn = getattr(np, 'nan'+str(getattr(agg, '__name__', agg)).replace('nan', ''))
+        # pylint: disable=not-callable
+        fcn    = partial(_undersample_agg, arrfcn, cnt)
 
     def _temp(vals):
-        vals          = np.copy(vals)
-        vals['index'] = (vals['index']-track.phases[0,0]) // cnt + track.phases[0,0]
-        return np.concatenate([vals[:1], vals[1:][vals['index'].diff() > 0]])
+        vals            = np.copy(vals)
+        vals['index'] //= cnt
+        diff            = np.diff(vals['index']) > 0
+        if np.any(diff):
+            return np.concatenate([vals[:1], vals[1:][diff]])
+        return vals
 
+    cpy._data = (
+        dict(fcn(None, i) for i in track._data.items())
+        if isinstance(itm, Track) else
+        itm.withaction(fcn)
+    )
 
-    cpy._data           = {i: _agg(j) for i, j in track._data.items()}
-    cpy._secondaries    = {
-        i:  _agg(j) if i in ('t', 'zmag') else _temp(j)
+    cpy._secondaries    = dict(
+        fcn(None, (i, j)) if i in ('t', 'zmag') else (i, _temp(j))
         for i, j in track._secondaries. items()
-    }
+    )
 
+    cpy.fov             = track.fov
+    cpy.framerate       = track.framerate/cnt
     cpy._rawprecisions  = {}
     return cpy
 

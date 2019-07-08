@@ -125,8 +125,12 @@ class TaskDescriptor:
         if len(self.keys) == 1:
             return False if mdl is None else not mdl.disabled
 
-        for key in self.keys[1:]:
-            mdl = getattr(mdl, key)
+        if '|' not in self.fmt and 'o' in self.fmt:
+            for key in self.keys[1:]:
+                mdl = getattr(mdl, key, None)
+        else:
+            for key in self.keys[1:]:
+                mdl = getattr(mdl, key)
 
         if self.fmt == 'b' and not isinstance(mdl, bool):
             return mdl is not None

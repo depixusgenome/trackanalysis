@@ -98,7 +98,8 @@ class TaskPlotModelAccess(PlotModelAccess):
     @property
     def track(self) -> Optional[Track]:
         "returns the current track"
-        return self._tasksdisplay.track(self._ctrl)
+        proc = self._tasksdisplay.processors(self._ctrl)
+        return None if proc is None else next(iter(proc.run())).track
 
     @property
     def bead(self) -> Optional[BEADKEY]:
@@ -124,7 +125,7 @@ class TaskPlotModelAccess(PlotModelAccess):
 
     def processors(self) -> Optional[ProcessorController]:
         "returns a tuple (dataitem, bead) to be displayed"
-        if self.track is None:
+        if self.roottask is None:
             return None
 
         check = tuple(i.check for i in self.__dict__.values() if isinstance(i, TaskAccess))
