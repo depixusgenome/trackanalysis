@@ -1,4 +1,22 @@
 # CycleApp
+## cycles_v6.11
+
+* 2019-07-08 11:51:58 +0200  (tag: cycles_v6.11)
+
+### Cambridge Features
+
+The following were requested for better processing µwells data:
+
+1. It's now possible to undersample the data. Microwells data is usually
+   measured at a rate of 100Hz with a low-pass hardware filter with a low
+   cut-off, possibly lower than 30Hz. This affects the behaviour of algorithms.
+   In order to compare it to picotwist/SDI data, it was requested the data be
+   resampled to a 30Hz rate. From the *cleaning* tab, it's possible to set the
+   target frame rate as well as how values are aggregated.
+
+2. The temperatures in the *QC* tab can be extracted to CSV using a button
+   above all plots.
+
 ## cycles_v6.10
 
 * 2019-06-27 11:51:58 +0200  (tag: cycles_v6.10)

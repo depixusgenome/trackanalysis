@@ -5,6 +5,7 @@ from typing import Iterable, Iterator, Type
 from .base  import Task
 
 TASK_ORDER = ['taskmodel.RootTask',
+              'taskmodel.track.UndersamplingTask',
               'taskmodel.track.CycleSamplingTask',
               'cleaning.processor.BeadSubtractionTask',
               'taskmodel.DataSelectionTask',

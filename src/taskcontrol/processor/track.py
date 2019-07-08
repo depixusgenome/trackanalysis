@@ -3,10 +3,14 @@
 "Processors apply tasks to a data flow"
 from    copy             import deepcopy
 from    functools        import partial
-from    typing           import TYPE_CHECKING, Iterable, Union, Sequence, cast
+from    typing           import (
+    TYPE_CHECKING, Iterable, Union, Sequence, Dict, Any, cast
+)
 
-from    data.track       import Track
-from    data.trackops    import selectcycles
+import  numpy            as     np
+
+from    data.track       import Track, Beads
+from    data.trackops    import selectcycles, undersample
 from    data.tracksdict  import TracksDict
 import  taskmodel.track  as     _tasks
 from    taskmodel        import Level
@@ -53,6 +57,45 @@ class TrackReaderProcessor(Processor[_tasks.TrackReaderTask]):
     def beads(cache, selected: Iterable[int]) -> Iterable[int]: # pylint: disable=unused-argument
         "Beads selected/discarded by the task"
         return cache.beads.keys()
+
+class UndersamplingProcessor(Processor[_tasks.UndersamplingTask]):
+    """
+    Resample the track
+    """
+    @staticmethod
+    def binwidth(
+            task: _tasks.UndersamplingTask,
+            itm: Union[Track, Beads, float, int]
+    ) -> int:
+        "the number of old frames per new frame"
+        old: float = (
+            itm.framerate       if isinstance(itm, Track) else
+            itm.track.framerate if isinstance(itm, Beads) else
+            itm
+        )
+        cnt: int   = max(1, int(np.floor(old/task.framerate)))
+        if abs(old/cnt-task.framerate) > abs(old/(cnt+1)-task.framerate):
+            return cnt+1
+        return cnt
+
+    @classmethod
+    def apply(cls, task: _tasks.UndersamplingTask, itm: Beads) -> Beads:
+        "create a new track"
+        width = cls.binwidth(task, itm)
+        return itm if width <= 1 else undersample(itm, width, task.aggregation).beads
+
+    def track(self, itm: Track) -> Track:
+        "create a new track"
+        width = self.binwidth(self.task, itm)
+        return itm if width <= 1 else undersample(itm, width, self.task.aggregation)
+
+    def run(self, args):
+        "updates frames"
+        args.apply(partial(self._apply, self.config()), levels = self.levels)
+
+    @classmethod
+    def _apply(cls, kwa: Dict[str, Any], beads:Beads):
+        return cls.apply(_tasks.UndersamplingTask(**kwa), beads)
 
 class CycleCreatorProcessor(Processor[_tasks.CycleCreatorTask]):
     "Generates output from a _tasks.CycleCreatorTask"

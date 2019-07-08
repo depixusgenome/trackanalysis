@@ -56,6 +56,20 @@ class TrackReaderTask(RootTask):
         # making sure the axis is a str
         self.axis = getattr(self.axis, 'name', self.axis)
 
+class UndersamplingTask(Task):
+    """
+    Resample the track up to a given frequency.
+
+    The resampling is exact: a track at 30Hz with a framerate at 9 or 11Hz will
+    be resampled at 10Hz, i.e with 3 old frames per new frame
+    """
+    level:       Level = Level.bead
+    framerate:   float = 30.
+    aggregation: str   = 'mean'
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
+
 class CycleCreatorTask(Task):
     "Iterate over cycles and beads"
     levelin              = Level.bead

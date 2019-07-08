@@ -254,7 +254,16 @@ Fixed Beads
 Cleaning
 --------
 
-The first 8 elements are repeats of inputs available in the main window. The
+The first two elements allow undersampling a track file. By default track files
+are undersampled so as to reach a sampling rate of about 30Hz. The sampling is
+integral: for an initial rate of 100Hz, the values will be undersampled by a
+factor 3 - not 3.333 - reaching a final sampling rate of 33Hz rather than
+exactly 30Hz. The sampling can be done by averaging the frames or by picking
+the first one. If a low-pass filter with a cut-off below 30 Hz was applied to
+the initial data, the latter is preferable. With a cut-off above 30Hz, the
+former is preferable.
+
+The following 8 elements are repeats of inputs available in the main window. The
 advantage of having them here is simply to have their default value indicated
 again. The following are additionnal:
 

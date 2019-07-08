@@ -13,8 +13,12 @@ from taskmodel                           import RootTask
 from taskmodel.application               import rescalingevent
 from utils                               import NoArgs, initdefaults
 from ..beadsubtraction                   import FixedBeadDetection, FixedList
-from ..processor.__config__              import (DataCleaningTask,
-                                                 BeadSubtractionTask, ClippingTask)
+from ..processor.__config__              import (
+    DataCleaningTask, BeadSubtractionTask, ClippingTask, UndersamplingTask
+)
+
+class UndersamplingTaskAccess(TaskAccess, tasktype = UndersamplingTask):
+    "access to undersampling task"
 
 class DataCleaningAccess(TaskAccess, tasktype = DataCleaningTask):
     "access to data cleaning"
@@ -144,6 +148,7 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
     _fixedbeadsstore  = Indirection()
     def __init__(self, ctrl, **_):
         super().__init__(ctrl)
+        self.undersampling     = UndersamplingTaskAccess(self)
         self._fixedbeadsconfig = FixedBeadDetectionConfig()
         self._fixedbeadsstore  = FixedBeadDetectionStore()
         self.alignment         = ExtremumAlignmentTaskAccess(self)

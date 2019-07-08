@@ -21,7 +21,7 @@ from   cleaning.beadsubtraction import (SubtractAverageSignal, SubtractMedianSig
 import cleaning._core           as     cleaningcore # pylint:disable=no-name-in-module,import-error
 from   data                       import Beads, Track
 from   taskcontrol.taskcontrol    import create
-from   taskmodel.track            import TrackReaderTask, Task
+from   taskmodel.track            import TrackReaderTask, Task, UndersamplingTask
 from   simulator                  import randtrack, setseed
 from   simulator.bindings         import Experiment
 
@@ -394,6 +394,26 @@ def test_cleaningview(bokehaction):
 
     server.change('Cleaning:Filter', 'subtracted', "11,30")
 
+@integrationmark
+def test_undersampling(bokehaction):
+    "test the view"
+    server = bokehaction.start(
+        'cleaning.view.CleaningView',
+        'taskapp.toolbar',
+        runtime = 'selenium')
+    server.load('big_legacy')
+    modal  = server.selenium.modal("//span[@class='icon-dpx-cog']", True)
+    assert server.task(UndersamplingTask).framerate == 30.
+    src    = server.widget.get('Clean:Cycles').renderers[6].data_source
+    assert src.data['t'].shape == (10403,)
+    with modal:
+        modal.tab("Cleaning")
+        modal.input("Target frame rate (Hz)", 10)
+    server.wait()
+    assert src.data['t'].shape == (3605,)
+
+    assert server.task(UndersamplingTask).framerate == 10.
+
 def test_fixedbeadsorting():
     "test fixed bead detection"
     import cleaning.beadsubtraction as B
@@ -526,4 +546,6 @@ def test_rescaling():
         assert abs(getattr(new, i) - (j*5. if i in attrs else j)) < 1e-5
 
 if __name__ == '__main__':
-    test_cycletable(0, -2)
+    from tests.testingcore.bokehtesting import BokehAction
+    with BokehAction(None) as bka:
+        test_undersampling(bka)

@@ -3,13 +3,14 @@
 "Test control"
 # pylint: disable=import-error,missing-docstring
 import  numpy
-from    data.views              import Cycles, Beads, TrackView
-from    taskcontrol.taskcontrol import TaskController
-from    taskcontrol.processor   import Processor, Cache, Runner
+from    data.views                  import Cycles, Beads, TrackView
+from    taskcontrol.taskcontrol     import TaskController
+from    taskcontrol.processor       import Processor, Cache, Runner
+from    taskcontrol.processor.track import UndersamplingProcessor
 from    taskcontrol.processor.cache import CacheReplacement
-import  taskmodel               as tasks
+import  taskmodel                   as     tasks
 
-from    tests.testingcore       import path as utpath
+from    tests.testingcore           import path as utpath
 
 def test_task_mutations():
     "testing task control"
@@ -300,5 +301,14 @@ def test_replacement():
     _test('213', Proc2(), Proc1(), Proc3())
     _test('231', Proc2(), Proc3(), Proc1())
 
+def test_undersampling():
+    "test undersampling"
+    proc = UndersamplingProcessor()
+    proc.task.framerate = 10.
+    assert proc.binwidth(proc.task, 31.) == 3
+    assert proc.binwidth(proc.task, 29.) == 3
+    proc.task.framerate = 30.
+    assert proc.binwidth(proc.task, 100.) == 3
+
 if __name__ == '__main__':
-    test_task_expandandcollapse()
+    test_undersampling()

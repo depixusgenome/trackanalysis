@@ -317,6 +317,11 @@ class CleaningWidgets:
 
             ## Cleaning
 
+            ### Undersampling
+            Target frame rate (Hz)                  %(undersampling.framerate)D
+            Aggregation                             %(undersampling.aggregation)|mean:mean|none:none|
+
+            ### Data cleaning
             |z| <                                   %(cleaning.maxabsvalue).1F
             |dz/dt| <                               %(cleaning.maxderivate).3F
             {NAMES['extent']} >                     %(cleaning.minextent).3F
@@ -326,11 +331,11 @@ class CleaningWidgets:
             % good frames >                         %(cleaning.minpopulation)D
             {NAMES['pingpong']} <                   %(cleaning.maxpingpong).3F
 
-            <b> Non-closing cycles</b>
+            ### Non-closing cycles
             Cycles are closed if |z(φ₁)-z(φ₅)| <    %(cleaning.maxdisttozero).3F
             % non-closing cycles <                  %(cleaning.maxsaturation)D
 
-            <b></b>
+            ### Alignment & post-alignment
             %(AlignmentModalDescriptor:)
             Discard z(∈ φ₅) < z(φ₁)-σ[HF]⋅α, α =    %(clipping.lowfactor).1oF
         """
