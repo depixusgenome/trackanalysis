@@ -263,6 +263,7 @@ class TracksDict(_TracksDict):
             if 'track' not in getattr(out.index, 'names', ()):
                 return out
 
+            lst = out.tasklist
             ind = out.index.names
             out = out.reset_index()
             out = out[[i for i in out.columns if i != 'index']]
@@ -271,12 +272,16 @@ class TracksDict(_TracksDict):
                    .reset_index()
                    .groupby('bead').track.count()
                    .rename('trackcount'))
-            return (out
-                    .join(mod, on = ['track'])
-                    .join(cnt, on = ['bead'])
-                    .sort_values(['modification'])
-                    .assign(bead = out.bead.astype(int))
-                    .set_index(ind))
+            out = (
+                out
+                .join(mod, on = ['track'])
+                .join(cnt, on = ['bead'])
+                .sort_values(['modification'])
+                .assign(bead = out.bead.astype(int))
+                .set_index(ind)
+            )
+            out.__dict__['tasklist'] = lst
+            return out
         return par
 
     def dataframe(self, *tasks,

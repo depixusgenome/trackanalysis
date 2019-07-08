@@ -25,7 +25,8 @@ from   ..trackio               import savetrack
 from   ..views                 import TrackView, Cycles, Beads
 from   ..track                 import Track, LazyProperty, BEADKEY, isellipsis
 from   ..trackops              import (selectbeads, dropbeads, selectcycles,
-                                       concatenatetracks, renamebeads, clone)
+                                       concatenatetracks, renamebeads, clone,
+                                       dataframe)
 from   .tracksdict             import TracksDict
 
 @addproperty(Track, 'pathinfo')
@@ -241,6 +242,8 @@ class _TrackMixin:
             beads = tuple(self.beads.keys()) # type: ignore
         fcn = lambda i: renamebeads(selectbeads(cast(self, Task), i), (i, 0)) # type: ignore
         return TracksDict({i: fcn(i) for i in beads})
+
+    dataframe = dataframe
 
     def __getitem__(self, value):
         if isinstance(value, (Task, Tasks)):

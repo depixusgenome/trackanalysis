@@ -935,6 +935,18 @@ New application for viewing cycles
 
 # RampApp
 
+## ramp_v2.3
+
+* 2019-07-08 09:02:39 +0200  (tag: ramp_v2.3)
+
+This version changes the information displayed for ramps. It removes the last
+table with fixed zmag and replaces it with one which reports how many beads
+close for what percentage of their size depending on the zmag slider value.
+This zmag value is materialized as a red line on the plot.
+
+The table reporting clusters of beads per size is moved to the bottom of the
+screen.
+
 ## ramp_v2.2
 
 * 2019-06-26 09:02:39 +0200  (tag: ramp_v2.2)

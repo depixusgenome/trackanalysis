@@ -91,7 +91,7 @@ class RampPlotTheme(PlotTheme):
     beadline         = PlotAttrs(beadarea.color, 'line',  1, alpha = .5)
     beadcycles       = PlotAttrs(beadarea.color, 'line',  1, alpha = .5)
     frames           = PlotAttrs("phase", 'o',  5, alpha = .25)
-    phases           = "RdYlGn9"
+    phases           = ['lightblue']*5 +['darkgreen']*4
     phaserange       = (..., ...)
     ylabelnormalized = "Z (% strand size)"
     xlabel           = 'Z magnet (mm)'

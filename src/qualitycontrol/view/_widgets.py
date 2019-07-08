@@ -30,7 +30,7 @@ def addtodoc(ctrl, theme, data) -> Tuple[Any, ColumnDataSource, DataTable]:
                        editable       = False,
                        index_position = None,
                        width          = sum(i[2] for i in theme.columns),
-                       height         = theme.height,
+                       height         = theme.tableheight,
                        header_row     = theme.headers)
     return theme, src, widget
 
@@ -78,7 +78,7 @@ class QCBeadStatusTheme:
     "RampBeadStatusTheme"
     name:    str            = "qc.status"
     status:  Dict[str, str] = dflt({i: i for i in ("ok", "fixed", "bad", "missing")})
-    height:  int            = 120
+    tableheight:  int       = 80
     headers: bool           = False
     columns: List[List]     = dflt([["status",  "Status", 60, ""],
                                     ["count",   "Count",  40, "0"],
@@ -103,9 +103,9 @@ class QCBeadStatusWidget:
 
     def addtodoc(self, _, ctrl) -> List[Widget]:
         "creates the widget"
-        self.__theme, self.__src, self.__widget = addtodoc(ctrl,
-                                                           self.__theme,
-                                                           self.__data())
+        self.__theme, self.__src, self.__widget = addtodoc(
+            ctrl, self.__theme, self.__data()
+        )
         return [self.__widget]
 
     def observe(self, _, ctrl):
@@ -162,18 +162,21 @@ class QCBeadStatusWidget:
 @dataclass
 class QCHairpinSizeTheme:
     "RampBeadStatusTheme"
-    name:     str   = "qc.hairpinsize"
-    title:    str   = "Hairpins bin size"
-    binsize:  float = .1
-    binstart: float = .05
-    binend:   float = 1.
-    binstep:  float = .05
-    headers:  bool  = False
-    height:   int   = 125
-    columns: List[List] = dflt([["z",       "Δz (µm)", 60, ""],
-                                ["count",   "Count",   40, "0"],
-                                ["percent", "(%)",     40, ""],
-                                ["beads",   "Beads",  180, ""]])
+    name:         str        = "qc.hairpinsize"
+    title:        str        = "Hairpins bin size"
+    binsize:      float      = .1
+    binstart:     float      = .05
+    binend:       float      = 1.
+    binstep:      float      = .05
+    headers:      bool       = False
+    tableheight:  int        = 125
+    sliderheight: int        = 48
+    columns:      List[List] = dflt([
+        ["z",       "Δz (µm)", 60, ""],
+        ["count",   "Count",   40, "0"],
+        ["percent", "(%)",     40, ""],
+        ["beads",   "Beads",  180, ""]
+    ])
     def __post_init__(self):
         # pylint: disable=unsubscriptable-object
         cols = self.columns
@@ -199,8 +202,9 @@ class QCHairpinSizeWidget:
         self._theme, self.__src, self.__table = addtodoc(ctrl,
                                                          self._theme,
                                                          self.__tabledata())
-        self.__slider = Slider(title = self._theme.title,
-                               step  = self._theme.binstep,
+        self.__slider = Slider(title  = self._theme.title,
+                               step   = self._theme.binstep,
+                               height = self._theme.sliderheight,
                                **self.__sliderdata())
 
         @mainview.actionifactive(ctrl)

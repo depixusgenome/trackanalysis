@@ -61,7 +61,8 @@ class Parallel:
                     lst.extend(j for j in i if j is not None)
                 elif i is not None:
                     lst.append(i)
-            return pd.concat(lst)
+            out = pd.concat(lst)
+            out.__dict__['tasklist'] = [i.tasklist for i in lst if hasattr(i, 'tasklist')]
 
         if callable(endaction):
             return [cast(Callable, endaction)(i) for i in pool.map(self.run, self.args)]
