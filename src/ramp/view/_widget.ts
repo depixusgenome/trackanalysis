@@ -45,13 +45,13 @@ export class DpxRampView extends WidgetView {
                 <tr><td>${this.mk_inp('minhfsigma', 0.05, 0.0001)}</td>
                     <td ${ttips[2]}>≤ σ[HF] ≤</td>
                     <td>${this.mk_inp('maxhfsigma', 0.05,  0.001)}</td></tr>
-                <tr><td>${this.mk_inp('minextension', 10.0, 0.05)}</td>
+                <tr><td>${this.mk_inp('minextension', 10.0, 0.0)}</td>
                     <td ${ttips[1]}>≤ Δz ≤</td>
-                    <td>${this.mk_inp('maxextension', 10.0, 0.05)}</td></tr>
-                <tr><td></td>
-                    <td ${ttips[0]}>Δz fixed ≤</td>
-                    <td>${this.mk_inp('fixedextension')}</td></tr>
-             </table><div class='dpx-span'>
+                    <td>${this.mk_inp('maxextension', 10.0, 0.0)}</td></tr>
+             </table><table><tr>
+                <td ${ttips[0]}>Fixed beads: |z(open)-z(closed)| ≤ </td>
+                <td>${this.mk_inp('fixedextension')}</td>
+             </tr></table><div class='dpx-span'>
              <label class='bk-bs-radio' style='display: none !important;'>
              </label>`
         )
@@ -107,7 +107,7 @@ export class DpxRampView extends WidgetView {
 
     static initClass() : void {
         this.prototype.tagName = "div"
-        this.prototype.cl_inputs = ['minhfsigma', 'maxhfsigma', 'minextension', 'maxextension']
+        this.prototype.cl_inputs = ['minhfsigma', 'maxhfsigma', 'fixedextension', 'minextension', 'maxextension']
     }
 }
 DpxRampView.initClass()
@@ -142,7 +142,7 @@ export class DpxRamp extends Widget {
             maxhfsigma:     [p.Number,  5e-3],
             minextension:   [p.Number,  .05],
             fixedextension: [p.Number,  .4],
-            maxextension:   [p.Number,  1.5],
+            maxextension:   [p.Number,  5.],
             displaytype:    [p.Number,  0]
         })
         this.override({css_classes: ["dpx-ramp", "dpx-widget"]})

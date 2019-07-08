@@ -44,12 +44,26 @@ class RampDisplay(BasicDisplay, ramp = Track):
 
     def status(self, **kwa) -> hv.Table:
         "return the status of the beads"
-        info = (self.dataframe(**kwa)
-                .groupby("bead")
-                .status.first().reset_index()
-                .groupby("status")
-                .agg({'bead': ('unique', 'count')}).reset_index())
-        info.columns = "status", "beads", "count"
+        status = (
+            self.dataframe(**kwa)
+            .groupby("bead")
+            .status.first().reset_index()
+            .groupby("status")
+            .bead.unique()
+        )
+
+        inds = {i: status.loc[i] for i in status.index.unique()}
+        empt = np.empty(0, dtype = 'i4')
+        bad  = list(self._items.beads.keys())
+        for i in ('ok', 'fixed'):
+            bad = np.setdiff1d(bad, inds.get(i, empt))
+
+        info = pd.DataFrame(dict(
+            status = ["ok", "fixed", "bad"],
+            beads  = [*(inds.get(i, empt) for i in ('ok', 'fixed')), bad]
+        ))
+        info['count'] = info.beads.apply(len)
+
         return hv.Table(info, kdims = ["status"], vdims = ["beads", "count"])
 
     def beads(self, status = "ok", **kwa):
@@ -134,6 +148,7 @@ class RampDisplay(BasicDisplay, ramp = Track):
                 *self._popclip
             )
 
+        zcid = _concat(self._items.secondaries.cidcycles.values())
         zcyc = _concat(self._items.secondaries.zmagcycles.values())
         zpha = _concat(self._items.secondaries.phasecycles.values())
         def _show(bead):
@@ -144,7 +159,7 @@ class RampDisplay(BasicDisplay, ramp = Track):
                 exc  = str(_)
 
                 data =  np.zeros(len(zcyc))
-            info = pd.DataFrame({"zmag": zcyc, "z": data, "phase": zpha})
+            info = pd.DataFrame({"zmag": zcyc, "z": data, "phase": zpha, "cycle": zcid})
             crv  = (
                 hv.Curve(info, 'zmag', ["z", "phase"])
                 .options(alpha = self._alpha, color = "gray")

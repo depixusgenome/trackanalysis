@@ -6,7 +6,7 @@ from   copy                        import copy as shallowcopy
 import pandas                      as     pd
 import numpy                       as     np
 from   utils.decoration            import addto
-from   taskcontrol.processor.dataframe import SafeDataFrameProcessor
+from   taskcontrol.processor.dataframe import SafeDataFrameProcessor, DataFrameTask
 from   ..views                     import Cycles, Beads
 
 @addto(Beads)
@@ -92,10 +92,25 @@ def adddataframe(*classes):
         if assign is not None:
             transform.insert(0, lambda x: x.assign(**assign))
 
-        return SafeDataFrameProcessor.apply(shallowcopy(self),
-                                            transform = transform,
-                                            measures  = kwa,
-                                            merge     = merge)
+        data = SafeDataFrameProcessor.apply(
+            shallowcopy(self),
+            transform = transform,
+            measures  = kwa,
+            merge     = merge
+        )
+        if data is None:
+            return None
+
+        lst = [
+            *self.tasklist,
+            DataFrameTask(
+                transform = transform,
+                measures  = kwa,
+                merge     = merge
+            )
+        ]
+        data.__dict__['tasklist'] = lst
+        return data
 
     dataframe.__doc__ = SafeDataFrameProcessor.factory(classes[0]).__doc__+doc
     classes[0].dataframe = dataframe

@@ -5,9 +5,9 @@ from    typing         import Dict, Tuple, List, Optional, Iterator, cast
 from    pathlib        import Path
 import time
 
-from    bokeh.models   import ColumnDataSource, Range1d
+from    bokeh.models   import ColumnDataSource, Range1d, Spacer
 from    bokeh.plotting import Figure
-from    bokeh          import layouts, palettes
+from    bokeh          import layouts
 
 import  numpy          as     np
 import  pandas         as     pd
@@ -16,6 +16,7 @@ from    data.views             import Beads
 from    taskview.plots         import PlotView, CACHE_TYPE, TaskPlotCreator
 from    taskcontrol.taskio     import TaskIO
 from    view.base              import spawn, ThreadPoolExecutor, threadmethod
+from    view.colors            import tohex
 from    utils.logconfig        import getLogger
 from    utils.gui              import startfile
 from    utils.array            import popclip
@@ -184,9 +185,16 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
         self.addtofig(fig, "frames", x = 'zmag', y = 'z', source = self.__src[-1])
         self.linkmodeltoaxes(fig)
 
-        mode = self.defaultsizingmode(width = self._theme.widgetwidth)
-        left = layouts.widgetbox(self.__widgets.create(self, ctrl), **mode)
-        return self._keyedlayout(ctrl, fig, left = left)
+        left = self.__widgets.create(self, ctrl, fig, self._theme.widgetwidth)
+        out  = self._keyedlayout(ctrl, fig)
+        out.width  = fig.plot_width
+        out.height = fig.plot_height
+        return layouts.row(
+            [left, Spacer(width = 20, height = left.height), out],
+            width  = left.width+out.width+20,
+            height = max(left.height, out.height),
+            **self.defaultsizingmode()
+        )
 
     def _reset(self, cache: CACHE_TYPE):
         cycles, zmag, disable = None, None, True
@@ -249,8 +257,8 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
             out  = conc(([np.NaN] if j else i) for i in vals for j in (0, 1))
             return popclip(out, *self._theme.clip)
 
-        colors = np.array(getattr(palettes, self._theme.phases))
-        phase = conc(
+        colors = np.array(tohex(self._theme.phases))
+        phase  = conc(
             [colors[0]] if j else colors[1:][i]
             for i in (
                 track.secondaries.phasecycles

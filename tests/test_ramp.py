@@ -18,20 +18,31 @@ FILTERS = [
     (DeprecationWarning, '.*the html argument of XMLParser.*'),
 ]
 
-
 def test_dataframe():
     "test ramp dataframe"
+    add = {'fixed', 'status', 'good'}
     out = next(create(
         TrackReaderTask(path = path("ramp_legacy")),
         RampStatsTask()
     ).run())
-    assert {i for i in out.columns}  == set(RampCycleTuple.fields()) | {'fixed', 'status'}
+    assert set(out.columns)  == set(RampCycleTuple.fields()) | add
 
     out = next(create(
         TrackReaderTask(path = path("ramp_legacy")),
         RampStatsTask(events = True)
     ).run())
-    assert {i for i in out.columns}  == set(RampEventTuple.fields()) | {'fixed', 'status'}
+    assert set(out.columns)  == set(RampEventTuple.fields()) | add
+
+    out = next(create(
+        TrackReaderTask(path = path("ramp_Hela_mRNA_CIP_4ul_F9.trk")),
+        RampStatsTask()
+    ).run())
+    assert set(out.columns)  == set(RampCycleTuple.fields()) | add
+
+    status  = out.reset_index().groupby("status").bead.unique()
+    assert sorted(status.loc['ok'])    == [1, 2, 3, 4, 7,  8, 9, 11, 12]
+    assert sorted(status.loc['fixed']) == [0, 5, 10, 13]
+    assert sorted(status.loc['bad'])   == [6]
 
 @integrationmark
 def test_rampview(bokehaction): # pylint: disable=redefined-outer-name
@@ -97,12 +108,12 @@ def test_cleaningview(bokehaction): # pylint: disable=redefined-outer-name
     server.change(tabs, 'active', 1, rendered = True)
     assert get(False) == xinit
     server.change('Cleaning:Filter', 'maxextent', float(xinit)+1)
-    assert get(False) == str(float(xinit)+1)
+    assert get(False) == str(float(xinit)+1).replace('.0', '')
     server.wait()
 
     assert server.ctrl.theme.get("ramp", "dataframe").extension[2] == float(xinit)+1
     server.change(tabs, 'active', 2, rendered = True)
-    assert get(True) == str(float(xinit)+1)
+    assert get(True) == str(float(xinit)+1).replace('.0', '')
     server.change('Ramp:Filter', 'maxextension', float(xinit))
     assert get(True) == xinit
 

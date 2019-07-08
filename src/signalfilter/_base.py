@@ -25,7 +25,7 @@ def _add_doc(other):
     return _wrapper
 
 @_add_doc(hfsigma)
-def nanhfsigma(arr: np.ndarray, ranges = None, sampling: int = 1):
+def nanhfsigma(arr: np.ndarray, ranges = None, sampling: int = 1)->float:
     "hfsigma which takes care of nans."
     arr = np.asarray(arr).ravel()
     if len(arr) and not np.isscalar(arr[0]):
@@ -33,7 +33,7 @@ def nanhfsigma(arr: np.ndarray, ranges = None, sampling: int = 1):
     return _nanhfsigma(arr, ranges, sampling)
 
 @_add_doc(mediandeviation)
-def nanmediandeviation(arr: np.ndarray, ranges = None):
+def nanmediandeviation(arr: np.ndarray, ranges = None) -> float:
     "mediandeviation which takes care of nans."
     arr = np.asarray(arr).ravel()
     if len(arr) and not np.isscalar(arr[0]):

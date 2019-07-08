@@ -8,6 +8,8 @@ from    typing      import Union, Tuple, List, TypeVar, cast
 from    pathlib     import Path
 
 import  numpy       as     np
+from    numpy.lib.stride_tricks import as_strided
+import  pandas      as     pd
 
 from   .track       import Track
 from   .tracksdict  import TracksDict
@@ -159,3 +161,52 @@ def trackname(track:Track) -> str:
     if path is None:
         return ""
     return Path(path[0] if isinstance(path, (list, tuple)) else path).stem
+
+def undersample(track:Track, cnt: int, mean = False) -> str:
+    "undersample the track"
+    # pylint: disable=protected-access
+    cpy                 = shallowcopy(track)
+    cpy.framerate      /= cnt
+    cpy._phase          = np.copy(cpy._phase)//cnt
+
+    def _agg(vect):
+        if not mean:
+            return vect[::cnt]
+        return np.nanmean(
+            as_strided(vect, shape = (len(vect)//cnt, cnt), strides = (cnt, 1)),
+            axis = 1
+        )
+
+    def _temp(vals):
+        vals          = np.copy(vals)
+        vals['index'] = (vals['index']-track.phases[0,0]) // cnt + track.phases[0,0]
+        return np.concatenate([vals[:1], vals[1:][vals['index'].diff() > 0]])
+
+
+    cpy._data           = {i: _agg(j) for i, j in track._data.items()}
+    cpy._secondaries    = {
+        i:  _agg(j) if i in ('t', 'zmag') else _temp(j)
+        for i, j in track._secondaries. items()
+    }
+
+    cpy._rawprecisions  = {}
+    return cpy
+
+def dataframe(track:Track) -> pd.DataFrame:
+    "create a dataframe of the track"
+    temps = 'tsink', 'tsample', 'tservo'
+    def _temp(name):
+        data = getattr(track.secondaries, name)
+        arr  = np.full(track.nframes, np.NaN, dtype = 'f4')
+        arr[data['index']-track.phases[0,0]] = data['value']
+        return arr
+
+    frame = pd.DataFrame(
+        dict(
+            **{f'b{i}': j for i, j in track.beads},
+            **{i: getattr(track.secondaries, i) for i in ('zmag', 'phase', 'cid')},
+            **{i: _temp(i) for i in temps}
+        ),
+        index = np.arange(track.nframes)+track.phases[0,0]
+    )
+    return frame

@@ -14,7 +14,9 @@ from   data.views       import ITrackView
 from   data.trackio     import LegacyGRFilesIO, savetrack, PickleIO, LegacyTrackIO
 from   data.trackio     import MuWellsFilesIO
 from   data.track       import FoV, Track
-from   data.trackops    import concatenatetracks, selectcycles, dropbeads, clone
+from   data.trackops    import (
+    concatenatetracks, selectcycles, dropbeads, clone, dataframe
+)
 from   data.tracksdict  import TracksDict
 from   tests.testingcore      import path as utpath
 
@@ -416,6 +418,16 @@ def test_selectcycles():
     assert set(other.beads.keys()) == set(trk.beads.keys())
     assert_allclose(other.phases[0,:], trk.phases[0,:]-trk.phases[0,0])
 
+def test_dataframe():
+    'test whether two Track stack properly'
+    trk = Track(path = utpath("small_legacy"))
+    dframe = dataframe(trk)
+    for i, j in trk.beads:
+        assert_equal(dframe[f'b{i}'], j)
+    for i in ("zmag", "phase", "cid"):
+        assert_equal(dframe[i], getattr(trk.secondaries, i))
+    assert len({"tsample", "tsink", "tservo"} - set(dframe.columns)) == 0
+
 def test_concatenate():
     'test whether two Track stack properly'
     trk1 = Track(path = utpath("small_legacy"))
@@ -457,4 +469,4 @@ def test_beadextension():
     assert abs(trk1.beadextension(0) - 0.951788546331226) < 1e-5
 
 if __name__ == '__main__':
-    test_scancgr()
+    test_dataframe()

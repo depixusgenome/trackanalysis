@@ -36,9 +36,9 @@ The tab contains:
 
    #. `raw data` displays cycles one on top of the other. The only doctoring
       performed is to subtract the initial |z| value from each cycle. Colors
-      vary depending on the phase of the of the data point. As there
-      basically are only two phases for which *zmag* varies, one should see
-      two colors.
+      vary depending on the phase of the of the data points: blue for phases up
+      to three and green afterwards. Thus the opening occurs in blue, the
+      closing in green.
 
    #. `Z (% strand size)` displays the average behaviour for a bead (in blue)
       versus that of all *ok* beads (gray). See below for how an average
@@ -54,27 +54,29 @@ The tab contains:
       Using this plot allows seeing the number of bases which will be available
       for analysis at a given force.
 
-#. The number of beads per category:
+#. The status of the beads:
 
     #. *ok* are beads which don't raise any flags,
     #. *fixed* are beads which:
 
         * have a good |NOISE| level,
-        * are small enough,
-        * and for which a opening jump is detected in phase 2.
+        * with little difference between behaviors at opening and closing:
+          :math:`|z(zmag, opening) - z(zmag, closing)| < 50nm`
+        * for which a opening jump is detected in phase 2 or 4.
 
     #. *bad* are beads with incorrect |NOISE| or |DZ|.
 
+#. The slider reports the average height of beads at a given force. This
+   is the amount of material which will not be measurable because the force
+   does not allow the bead to close. The vertical green line on the plot
+   materialises that current force value. The table below reports the number of
+   beads closing at 95% or more, from 90 to 95%, etc... for the zmag value set
+   by the slider
+
 #. The size of *ok* beads. This size is simply a median of phase 3 minus the
    median of phase 1. These sizes are roughly clustered into bins of a given
-   size, which can be set by using the slider. The non-empty bins are reported.
-
-#. The second slider reports the average height of beads at a given force. This
-   is the amount of material which will not be measurable because the force
-   does not allow the bead to close.
-
-#. Finally the last table reports the average height of beads for a few select
-   forces.  
+   size, which can be set by using the slider. The non-empty bins only are
+   reported.
 
 Average Behaviours
 ==================
