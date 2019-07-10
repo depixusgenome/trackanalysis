@@ -328,15 +328,22 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
                 self._rate.reset(False)
         self._scatter.peaks.selected.on_change('indices', _update_cb)
 
-        loc   = self._ctrl.theme.get(HairpinGroupScatterTheme, 'toolbar')['location']
         mode  = self.defaultsizingmode()
-
         wbox  = self._widgets.addtodoc(self, ctrl, doc)
-        hists = layouts.gridplot([plots[1:]], **mode, toolbar_location = loc)
+        loc   = ctrl.theme.get(HairpinGroupScatterTheme, 'toolbar')['location']
+        hists = layouts.gridplot([plots[1:]], toolbar_location = loc, **mode)
         # pylint: disable=not-an-iterable
         tbar  = next(i for i in hists.children if isinstance(i, ToolbarBox))
         tbar.toolbar.logo = None
-        return layouts.layout([[plots[0]], [wbox, hists]], **mode)
+        out   = layouts.column(
+            [
+                layouts.row([plots[0]],    **mode),
+                layouts.row([hists, wbox], **mode)
+            ],
+            **mode
+        )
+        self.__resize(ctrl, out, plots)
+        return out
 
     def _statehash(self):
         return self._model.statehash(task = ...)
@@ -359,6 +366,36 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
                         self._widgets.reset(cache, done != 3)
                     finally:
                         pass
+
+    def __resize(self, ctrl, out, plots):
+        hists, wbox = out.children[1].children
+        borders  = ctrl.theme.get("theme", "borders")
+        tbheight = ctrl.theme.get("theme", "figtbheight")
+        sizes    = self.defaulttabsize(ctrl)
+
+        out.update(**sizes)
+        for i in plots[1:]:
+            i.update(
+                plot_width  = (sizes['width']-wbox.width)//2,
+                plot_height = max(i.plot_height for i in plots[1:])
+            )
+        hists.update(
+            width  = (sizes['width']-wbox.width),
+            height = plots[1].plot_height + tbheight
+        )
+        plots[0].update(
+            plot_height = sizes['height'] - hists.height - borders,
+            plot_width  = sizes['width']
+        )
+
+        out.children[0].update(
+            width  = plots[0].plot_width,
+            height = plots[0].plot_height,
+        )
+        out.children[1].update(
+            width  = sizes['width'],
+            height = hists.height
+        )
 
 @setupio
 class HairpinGroupPlotView(PlotView[HairpinGroupPlotCreator]):

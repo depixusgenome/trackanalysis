@@ -31,11 +31,33 @@ class CyclesPlotCreator( # pylint: disable=too-many-ancestors
         shape = self._createraw()
         self._createhist(doc, self._rawsource.data, shape, self._raw.y_range)
         self._finishraw(shape)
-        parent  = self._keyedlayout(ctrl, self._raw, self._hist)
+        mode    = self.defaultsizingmode()
+        sizes   = self.defaulttabsize(ctrl)
+
         widgets = self._createwidget(ctrl)
-        if 'fixed' in self.defaultsizingmode().values():
-            return [parent, widgets]
-        return [widgets, parent]
+        # pylint: disable=unsubscriptable-object
+        widgets.children[0].width = (
+            sizes['width'] - sum(i.width for i in widgets.children[1:])
+        )
+        for i in widgets.children[0].children:
+            i.width = widgets.children[0].width - ctrl.theme.get("theme", "borders")
+
+        widgets.width = sizes['width']
+        parent  = self._keyedlayout(ctrl, self._raw, self._hist)
+        for i in [parent]+parent.children:
+            i.update(
+                width  = sizes['width'],
+                height = sizes['height']-widgets.height
+            )
+        self._raw.update(
+            plot_width  = parent.width  - self._hist.plot_width,
+            plot_height = parent.height - ctrl.theme.get("theme", "figtbheight")
+        )
+        self._hist.plot_height = self._raw.height
+        return layouts.column(
+            [parent, widgets] if 'fixed' in mode.values() else [widgets, parent],
+            ** mode, **sizes
+        )
 
     def _reset(self, cache: CACHE_TYPE):
         shape, disable = self._DEFAULT_DATA[1], True

@@ -1,3 +1,3 @@
-#dpx-pk-stretch { width: 72px; min-width: 40px; margin-right: 5px }
-#dpx-pk-bias { width: 72px; min-width: 40px; }
-#dpx-pk-locksequence {width: 70px; margin-left:5px;}
+#dpx-pk-stretch { min-width: 40px; margin-right: 5px }
+#dpx-pk-bias { min-width: 40px; }
+#dpx-pk-locksequence { margin-left:5px;}

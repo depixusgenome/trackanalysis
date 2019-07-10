@@ -2,6 +2,7 @@ import * as p           from "core/properties"
 import {WidgetView, Widget} from "models/widgets/widget"
 
 declare function jQuery(...args: any[]): any
+declare var Bokeh: any
 
 export class DpxDiscardedBeadsView extends WidgetView {
     model: DpxDiscardedBeads
@@ -49,12 +50,13 @@ export class DpxDiscardedBeadsView extends WidgetView {
     get_height(): number { return 30 }
 
     _mkinp(name: string): string {
+        const bkclass  = Bokeh.version != '1.0.4' ? ' bk ' : ''
         let disabled: string = ' disabled=true'
         if((name != 'forced') || this.model.hassequence)
             disabled = this.model.frozen ? ' disabled=true' : ''
         const place = this.model[name+'help']
         return  `<input id='dpx-gb-${name}'`+
-            ` class='dpx-gb-freeze bk-widget-form-input'`+
+            ` class='dpx-gb-freeze ${bkclass} bk-input'`+
             ` type='text' value='${this.model[name]}'${disabled} `+
             ` placeholder='${place}'>`
 

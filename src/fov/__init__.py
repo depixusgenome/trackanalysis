@@ -13,9 +13,8 @@ from cleaning.names           import NAMES
 from data                     import BEADKEY
 from model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from qualitycontrol.view      import QualityControlModelAccess
-from signalfilter             import rawprecision
 from taskcontrol.beadscontrol import DataSelectionBeadController
-from taskview.plots           import TaskPlotCreator, TaskPlotModelAccess, PlotModelType
+from taskview.plots           import TaskPlotCreator, PlotModelType
 from taskview.plots.tasks     import TModelType
 from utils                    import initdefaults
 from view.colors              import tohex
@@ -107,7 +106,6 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
         self._calibfig.xaxis.visible     = False
         self._calibfig.yaxis.visible     = False
         self._calibfig.min_border        = 0
-        self._calibfig.v_symmetry        = True
 
         self._calibsource = ColumnDataSource(data = dict(image = [np.zeros((10, 10))],
                                                          dw    = [1], dh = [1]))
@@ -140,7 +138,11 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
 
         # pylint: disable=no-member
         self._beadssource.selected.on_change("indices", _onselect_cb)
-        return collayout([self._fig, self._calibfig])
+        return collayout(
+            [self._fig, self._calibfig],
+            **self.defaultsizingmode(),
+            **self.defaulttabsize(ctrl)
+        )
 
     def _reset(self, cache:CACHE_TYPE):
         fov = self._fov

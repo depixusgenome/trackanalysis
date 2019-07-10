@@ -75,7 +75,7 @@ class FitToHairpinTask(Task, zattributes = ('fit', 'constraints', 'singlestrand'
     * `peaks      : the peak position in nm together with the hairpin peak it's affected to.
     * `events     : peak events as out of an `Events` view.
     """
-    level                           = Level.peak
+    level       : Level             = Level.peak
     fit         : Fitters           = dict()
     constraints : Constraints       = dict()
     match       : Matchers          = dict()
@@ -155,7 +155,7 @@ class FitBead(NamedTuple):
 
 class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=too-many-ancestors
     "iterator over peaks grouped by beads"
-    level  = Level.bead
+    level: Level  = FitToHairpinTask.level
     def beadextension(self, ibead) -> Optional[float]:
         """
         Return the median bead extension (phase 3 - phase 1)
@@ -348,11 +348,11 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
     * nblockages:     the number of blockage positions detected on the bead.
     * hfsigma:        the high frequency noise for that bead.
     * considering blockage positions versus expected bindings:
-        * beadfalsepos:   the number of formers not assigned to any of the latters.
-        * beadfalseneg:   the number of latters without assignees.
-        * beadtruepos:    the number of assigned formers.
-        * beadresiduals:  the mean distance from a former to its assigned latter.
-        * beadduplicates: the number of assigned formers less the number of assigned latters.
+        * expfalsepos:   the number of formers not assigned to any of the latters.
+        * expfalseneg:   the number of latters without assignees.
+        * exptruepos:    the number of assigned formers.
+        * expresiduals:  the mean distance from a former to its assigned latter.
+        * expduplicates: the number of assigned formers less the number of assigned latters.
     * considering expected bindings versus blockage positions:
         * hpinfalsepos:   the number of formers not assigned to any of the latters.
         * hpinfalseneg:   the number of latters without assignees.
@@ -493,7 +493,11 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
                 )
                 if tpe != 'hpin':
                     self.__tp_fp_complex(out, frame, res, good)
-        return out
+        return {
+            i: np.array(j, dtype = 'f4' if 'residuals' in i else 'i4')
+            for i, j in out.items()
+        }
+
     @staticmethod
     def __pks_complex(res, dist, hpin, alg) -> Tuple[np.ndarray, np.ndarray]:
         return (
@@ -523,12 +527,14 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
         good  = np.abs(left[inds]-right) < dist
         ids   = inds[good]-1
 
+        if tpe == "bead":
+            tpe = "exp"
         out.setdefault(tpe+'truepos',    []).append(good.sum())
         out.setdefault(tpe+'falsepos',   []).append(good.size - good.sum())
         out.setdefault(tpe+'duplicates', []).append(good.size - np.unique(ids).size)
         out.setdefault(tpe+'residuals',  []).append(
             self.__aggregator(
-                np.abs(arrs[tpe == 'bead'][ids]-arrs[tpe != 'bead'][good])
+                np.abs(arrs[tpe == 'exp'][ids]-arrs[tpe != 'exp'][good])
                 **2
             )
         )

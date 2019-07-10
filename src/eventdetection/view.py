@@ -13,9 +13,11 @@ from    .processor              import AlignmentTactic
 
 class WidgetTheme:
     "WidgetTheme"
-    name   = "alignment"
-    labels = ['ø', 'best', 'Φ1', 'Φ3']
-    title  = 'css:dpx-alignment-widget'
+    name:   str       = "alignment"
+    width:  int       = 100
+    height: int       = 48
+    labels: List[str] = ['ø', 'best', 'Φ1', 'Φ3']
+    title:  str       = 'css:dpx-alignment-widget'
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
@@ -33,8 +35,11 @@ class BaseWidget(Generic[ButtonT]):
         "creates the widget"
         name          = self.__class__.__name__.replace("Widget", "")
         itm           = templateattribute(self, 0)
-        self.__widget = itm(labels = self._theme.labels, name = f'Cycles:{name}',
-                            **self._data())
+        self.__widget = itm(
+            name   = f'Cycles:{name}',
+            **{i: getattr(self._theme, i) for i in ('labels', 'width', 'height')},
+            **self._data()
+        )
         self.__widget.on_click(mainview.actionifactive(ctrl)(self._onclick_cb))
 
         if self._theme.title:

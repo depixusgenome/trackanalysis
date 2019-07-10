@@ -32,7 +32,7 @@ class BeadToolbarTheme:
     "BeadToolbarTheme"
     name         = "toolbar"
     width        = 1100
-    height       = 30
+    height       = 40
     openlabel    = 'Open'
     savelabel    = 'Save'
     quitlabel    = 'Quit'
@@ -519,11 +519,13 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         if not path.is_file():
             path = (path/ctrl.APPNAME/ctrl.APPNAME).with_suffix(".html")
 
-        tbar   = DpxToolbar(hasquit     = getattr(self._ctrl, 'FLEXXAPP', None) is not None,
-                            hasdoc      = path.exists(),
-                            helpmessage = self.__theme.placeholder,
-                            height      = self.__theme.height,
-                            width       = ctrl.APPSIZE[0])
+        tbar   = DpxToolbar(
+            hasquit     = getattr(self._ctrl, 'FLEXXAPP', None) is not None,
+            hasdoc      = path.exists(),
+            helpmessage = self.__theme.placeholder,
+            height      = self.__theme.height,
+            width       = ctrl.theme.get("theme", "appsize")[0]
+        )
 
         tbar.on_change("doc", lambda attr, old, new: startfile(str(path)))
 
@@ -578,7 +580,10 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         for cls in self._HELPERS:
             cls.setup(ctrl, tbar, doc)
 
-        mods = self.defaultsizingmode(height = self.__theme.height, width = ctrl.APPSIZE[0])
+        mods  = self.defaultsizingmode(
+            height = self.__theme.height,
+            width  = ctrl.theme.get("theme", "appsize")[0]
+        )
         return layouts.row([layouts.widgetbox(tbar, **mods)], **mods)
 
     def close(self):

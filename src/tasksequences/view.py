@@ -291,6 +291,7 @@ class SequencePathTheme:
     refcheck   : str = '(ref) '
     inds       : str = '₁₂₃₄₅₆₇₈₉'
     width      : int = 280
+    height     : int = 32
 
 class SequencePathWidget:
     "Dropdown for choosing a fasta file"
@@ -304,8 +305,9 @@ class SequencePathWidget:
 
     def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
         "creates the widget"
-        self._widget = Dropdown(name  = 'Cycles:Sequence',
-                                width = self._theme.width,
+        self._widget = Dropdown(name   = 'Cycles:Sequence',
+                                width  = self._theme.width,
+                                height = self._theme.height,
                                 **self._data())
 
         mainview.differedobserver(self._data, self._widget,
@@ -356,14 +358,14 @@ class SequencePathWidget:
         return dict(menu  = menu, label = label, value = '→' if val is None else val)
 
     def _onclick(self, ctrl, new):
-        if new == '←':
+        if new.item == '←':
             path = self._dialog.open()
             self._widget.value = '→'
             if self._model.setnewsequencepath(ctrl, path):
                 if path is not None:
                     raise IOError("Could not find any sequence in the file")
-        elif new != '→':
-            self._model.setnewkey(ctrl, new)
+        elif new.item != '→':
+            self._model.setnewkey(ctrl, new.item)
 
 @dataclass
 class OligoListTheme:
@@ -372,10 +374,15 @@ class OligoListTheme:
     title  : str = ""
     tooltip: str = 'c!cwgg, aat, +aaa, 0, singlestrand ...?'
     width  : int = 280
+    height : int = 32
+
+class DpxAutocompleteInput(AutocompleteInput): # pylint: disable=too-many-ancestors
+    "autocomplete which allows having no selection"
+    __implementation__ = "_autocomplete.ts"
 
 class OligoListWidget:
     "Input for defining a list of oligos"
-    __widget: AutocompleteInput
+    __widget: DpxAutocompleteInput
     __theme:  OligoListTheme
     __model:  SequenceModel
     def __init__(self, ctrl, noerase = False):
@@ -384,13 +391,14 @@ class OligoListWidget:
 
     def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
         "creates the widget"
-        css           = [] if self.__theme.title else ["dpx-no-top-margin"]
-        self.__widget = AutocompleteInput(**self.__data(),
-                                          placeholder = self.__theme.tooltip,
-                                          title       = self.__theme.title,
-                                          width       = self.__theme.width,
-                                          name        = 'Cycles:Oligos',
-                                          css_classes = css)
+        self.__widget = DpxAutocompleteInput(
+            **self.__data(),
+            placeholder = self.__theme.tooltip,
+            title       = self.__theme.title,
+            width       = self.__theme.width,
+            height      = self.__theme.height,
+            name        = 'Cycles:Oligos'
+        )
 
         fcn = ctrl.action(lambda attr, old, new: self.__model.setnewprobes(ctrl, new))
         self.__widget.on_change('value', fcn)

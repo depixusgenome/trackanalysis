@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Widgets for configuration"
 
-from    typing              import List, Tuple, Dict, Optional
+from    typing              import List, Tuple, Dict, Optional, Any
 from    abc                 import ABC
 
 from    bokeh               import layouts
@@ -23,13 +23,13 @@ from    ._model                  import (CyclesModelAccess, CyclesPlotTheme,
 
 class PeaksTableTheme:
     "peaks table theme"
-    name    = "cycles.peakstable"
-    height  = 80
-    width   = 280
-    title   = 'base ↔ µm'
-    columns = [CyclesPlotTheme.yrightlabel, CyclesPlotTheme.ylabel]
-    zstep   = 1e-4
-    zformat = '0.0000'
+    name:    str       = "cycles.peakstable"
+    height:  int       = 80
+    width:   int       = 280
+    title:   str       = 'base ↔ µm'
+    columns: List[str] = [CyclesPlotTheme.yrightlabel, CyclesPlotTheme.ylabel]
+    zstep:   float     = 1e-4
+    zformat: str       = '0.0000'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -128,10 +128,16 @@ class PeaksTableWidget:
 
 class ConversionSliderTheme:
     "Conversion slider table theme"
-    name    = "cycles.conversionslider"
-    stretch = dict(title = 'Stretch (base/µm)', step = 200, ratio = .25)
-    bias    = dict(title = 'Bias (µm)',         step = 200, ratio = .25, offset = .05)
-    width   = 280
+    name:    str            = "cycles.conversionslider"
+    stretch: Dict[str, Any] = dict(title = 'Stretch (base/µm)', step = 200, ratio = .25)
+    bias:    Dict[str, Any] = dict(
+        title  = 'Bias (µm)',
+        step   = 200,
+        ratio  = .25,
+        offset = .05
+    )
+    width:   int            = 280
+    height:  int            = 32
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -154,16 +160,18 @@ class ConversionSlidersWidget:
         "creates the widget"
         args           = dict(step = .1, start = 0, end = 10, value = 5)
         self.__stretch = Slider(
-            name  = 'Cycles:Stretch',
-            title = self.__theme.stretch['title'],
-            width = self.__theme.width,
+            name   = 'Cycles:Stretch',
+            title  = self.__theme.stretch['title'],
+            width  = self.__theme.width,
+            height = self.__theme.height,
             **args
         )
 
         self.__bias = Slider(
-            name  = 'Cycles:Bias',
-            title = self.__theme.bias['title'],
-            width = self.__theme.width,
+            name   = 'Cycles:Bias',
+            title  = self.__theme.bias['title'],
+            width  = self.__theme.width,
+            height = self.__theme.height,
             **args
         )
         return [self.__stretch, self.__bias]
@@ -210,9 +218,14 @@ class ConversionSlidersWidget:
 
 class DriftWidgetTheme:
     "drift widget theme"
-    name   = 'cycles.drift'
-    labels = ['Per bead', 'Per cycle']
-    title  = 'dpx-drift-widget'
+    name:   str       = 'cycles.drift'
+    labels: List[str] = ['Per bead', 'Per cycle']
+    width:  int       = 200
+    height: int       = 48
+    title:  str       = 'dpx-drift-widget'
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
 
 class DriftWidget:
     "Allows removing the drifts"
@@ -223,10 +236,14 @@ class DriftWidget:
 
     def addtodoc(self, mainview, ctrl) -> List[Widget]:
         "creates the widget"
-        self.__widget = CheckboxButtonGroup(labels = self.__theme.labels,
-                                            name   = 'Cycles:DriftWidget',
-                                            css_classes = [self.__theme.title],
-                                            **self.__data())
+        self.__widget = CheckboxButtonGroup(
+            labels      = self.__theme.labels,
+            name        = 'Cycles:DriftWidget',
+            width       = self.__theme.width,
+            height      = self.__theme.height,
+            css_classes = [self.__theme.title],
+            **self.__data()
+        )
         self.__widget.on_click(mainview.actionifactive(ctrl)(self._onclick_cb))
 
         return [self.__widget]
@@ -299,13 +316,37 @@ class WidgetMixin(ABC):
         self.__widgets['advanced'].callbacks(self._doc)
         self.__slave_to_hover(widgets)
 
-        mds = self.defaultsizingmode()
-        return layouts.layout([[layouts.widgetbox(widgets['seq']+widgets['oligos'], **mds),
-                                layouts.widgetbox(widgets['sliders'], **mds),
-                                layouts.widgetbox(widgets['table'], **mds)],
-                               [layouts.widgetbox(widgets[i], **mds)
-                                for i in ('align', 'drift', 'events')],
-                               [layouts.widgetbox(widgets['advanced'], **mds)]], **mds)
+        mode   = self.defaultsizingmode()
+        border = ctrl.theme.get("theme", "borders")
+        def _items(tpe, itms):
+            children = list(itms)
+            return getattr(layouts, tpe)(
+                children,
+                width  = max(i.width  for i in children)+border,
+                height = sum(i.height for i in children)+border*len(children)*2,
+                **mode,
+            )
+
+        def _wbox(names):
+            out = _items(
+                'widgetbox',
+                sum((widgets[i] for i in names.split(',')), [])
+            )
+            width = max(i.width for i in out.children)
+            for i in out.children:
+                i.width = width
+            return out
+
+        children = [
+            _wbox(i)
+            for i in ('seq,oligos,align', 'sliders,drift', 'table,events', 'advanced')
+        ]
+        return layouts.row(
+            children,
+            width  = sum(i.width for i in children),
+            height = max(i.height for i in children),
+            **mode
+        )
 
     def _resetwidget(self, cache: CACHE_TYPE, disable: bool):
         for ite in self.__widgets.values():

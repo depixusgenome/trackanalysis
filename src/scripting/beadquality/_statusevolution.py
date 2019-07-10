@@ -43,7 +43,8 @@ class StatusEvolution:
         frame = self.dataframe(trackqc)
         total = len(trackqc.status.index)
         for i in self.params:
-            frame[i] *= 100/total
+            if i in frame:
+                frame[i] *= 100/total
         hover                  = HoverTool(tooltips = self.tooltips)
         crvs: List[hv.Element] = []
         for tpe, opts in zip((hv.Points, hv.Curve), (self.ptsstyle, {})):
@@ -51,6 +52,7 @@ class StatusEvolution:
             crvs.extend(
                 tpe(frame, kdims = ['date', i], label = i).options(color = j, **opts)
                 for i, j in zip(self.params, self.colors)
+                if i in frame
             )
 
         def _newaxis(plot, _):

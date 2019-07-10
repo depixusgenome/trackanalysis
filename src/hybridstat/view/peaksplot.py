@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
-from typing                     import Dict, List, Tuple
+from typing                     import Dict, List, Tuple, cast
 
 import bokeh.core.properties as props
-from bokeh                      import layouts
 from bokeh.plotting             import Figure
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
                                         TapTool, HoverTool, CustomJS)
@@ -85,51 +84,12 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
         SequenceTicker.init(ctrl)
         PeaksSequenceHover.init(ctrl)
 
-    @property
-    def model(self):
-        "returns the model"
-        return self._model
-
-    def __colors(self, name):
-        return tohex(themed(self, getattr(self._theme, name).color)
-                     if hasattr(self._theme, name) else
-                     themed(self, self._theme.pkcolors)[name])
-
-    def __defaults(self):
-        empty = lambda *cols: {i: np.empty(0, dtype = 'f4') for i in cols}
-        return {'':        empty('z', 'count', 'ref'),
-                'events' : empty('z', 'count'),
-                'peaks':   self.__peaks(None)}
-
-    def __peaks(self, val):
-        return createpeaks(self._model, self._theme.pkcolors, val)
-
-    def __data(self) -> Dict[str, dict]:
-        dtl = self._model.runbead()
-        if dtl is None:
-            return self.__defaults()
-
-        fit2ref = self._model.fittoreference
-        zvals   = dtl.binwidth*np.arange(len(dtl.histogram), dtype = 'f4')+dtl.minvalue
-
-        data    = dict(z     = zvals,
-                       count = dtl.histogram,
-                       ref   = fit2ref.refhistogram(zvals))
-
-        pos     = np.concatenate(dtl.positions)
-        events  = dict(z     = pos,
-                       count = interpolator(data['z'], data['count'], fit2ref.hmin)(pos))
-        return {'': data, 'events': events, 'peaks': self.__peaks(dtl)}
-
-    def _addtodoc(self, ctrl, doc, *_):
-        "returns the figure"
-        self.__create_fig()
-        rends = self.__add_curves()
-        self.__setup_tools(doc, rends)
-
-        self._widgets.advanced.observefigsize(ctrl, self._theme, doc, self._fig)
-        return self._keyedlayout(ctrl, self._fig,
-                                 left = self.__setup_widgets(ctrl, doc))
+    hover       = cast(PeaksSequenceHover,   property(lambda self: self._hover))
+    ticker      = cast(SequenceTicker,       property(lambda self: self._ticker))
+    model       = cast(PeaksPlotModelAccess, property(lambda self: self._model))
+    plotfigures = cast(Tuple[Figure],        property(lambda self: (self._fig,)))
+    peaksdata   = cast(ColumnDataSource,     property(lambda self: self._src['peaks']))
+    plottheme   = cast(PeaksPlotTheme,       property(lambda self: self._theme))
 
     def observe(self, ctrl, noerase = True):
         "observes the model"
@@ -141,6 +101,18 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     def ismain(self, _):
         "specific setup for when this view is the main one"
         self._widgets.advanced.ismain(_)
+
+    def _addtodoc(self, ctrl, doc, *_):
+        "returns the figure"
+        self.__create_fig()
+        rends = self.__add_curves()
+        self.__setup_tools(doc, rends)
+
+        self._widgets.advanced.observefigsize(ctrl, self._theme, doc, self._fig)
+        left = self._widgets.addtodoc(self, ctrl, doc)
+        out  = self._keyedlayout(ctrl, self._fig, left = left)
+        self.__resize(ctrl, out, left)
+        return out
 
     def _reset(self, cache:CACHE_TYPE):
         def _color(name, axname, attr):
@@ -184,6 +156,38 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                 attrs.setcolor(rend, cache = cache, **args)
 
         self._errors(cache, self.__data, _reset)
+
+    def __colors(self, name):
+        return tohex(themed(self, getattr(self._theme, name).color)
+                     if hasattr(self._theme, name) else
+                     themed(self, self._theme.pkcolors)[name])
+
+    def __defaults(self):
+        empty = lambda *cols: {i: np.empty(0, dtype = 'f4') for i in cols}
+        return {'':        empty('z', 'count', 'ref'),
+                'events' : empty('z', 'count'),
+                'peaks':   self.__peaks(None)}
+
+    def __peaks(self, val):
+        return createpeaks(self._model, self._theme.pkcolors, val)
+
+    def __data(self) -> Dict[str, dict]:
+        dtl = self._model.runbead()
+        if dtl is None:
+            return self.__defaults()
+
+        fit2ref = self._model.fittoreference
+        zvals   = dtl.binwidth*np.arange(len(dtl.histogram), dtype = 'f4')+dtl.minvalue
+
+        data    = dict(z     = zvals,
+                       count = dtl.histogram,
+                       ref   = fit2ref.refhistogram(zvals))
+
+        pos     = np.concatenate(dtl.positions)
+        events  = dict(z     = pos,
+                       count = interpolator(data['z'], data['count'], fit2ref.hmin)(pos))
+        return {'': data, 'events': events, 'peaks': self.__peaks(dtl)}
+
 
     def __create_fig(self):
         self._fig    = self.figure(
@@ -236,16 +240,18 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                                       self._model.peaksmodel.theme.yrightlabel, "right")
         self._hover.jsslaveaxes(self._fig, self._src['peaks'])
 
-    def __setup_widgets(self, ctrl, doc):
-        wdg, enabler = self._widgets.addtodoc(self, ctrl, doc)
-        enabler.extend(self._fig)
-
-        mode     = self.defaultsizingmode()
-        wbox     = lambda x: layouts.widgetbox(children = x, **mode)
-        order    = 'ref', 'seq', 'fitparams', 'oligos','cstrpath', 'advanced'
-        children = [[wbox(sum((wdg[i] for i in order), [])), wbox(wdg['stats'])],
-                    [wbox(wdg['peaks'])]]
-        return layouts.layout(children = children, **mode)
+    def __resize(self, ctrl, out, left):
+        borders = ctrl.theme.get('theme', "borders")
+        self._widgets.resize(left, borders, self.defaulttabsize(ctrl)['height'])
+        out.update(**self.defaulttabsize(ctrl))
+        self._fig.update(
+            plot_width  = out.width - left.width,
+            plot_height = out.height - ctrl.theme.get('theme', 'figtbheight')
+        )
+        out.children[1].update(
+            width  = out.width - left.width,
+            height = out.height,
+        )
 
     def advanced(self):
         "triggers the advanced dialog"

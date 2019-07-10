@@ -53,12 +53,13 @@ export class DpxFitParamsView extends WidgetView {
             dbal+'Lock the sequence to the currently selected one'+pos
         ]
 
-                
-
+        var width ="";
+        if(this.model.width != null)
+            width = `style="width: ${((this.model.width-135)/2).toFixed(0)}px"`
         this.el.innerHTML = "<div class='dpx-span'>"+
-            this.mk_inp("stretch", "Stretch", ttips[0])+
-            this.mk_inp("bias",    "Bias (µm)", ttips[1])+
-            this.mk_check(ttips[2])+
+            this.mk_inp("stretch", "Stretch", ttips[0], width)+
+            this.mk_inp("bias",    "Bias (µm)", ttips[1], width)+
+            this.mk_check(ttips[2], 'style="width:46px;height:18px;margin-bottom:3px"')+
             "</div>"
 
         const elem = jQuery(this.el)
@@ -67,18 +68,18 @@ export class DpxFitParamsView extends WidgetView {
         elem.find("#dpx-pk-locksequence").click(() => this.on_lock())
     }
 
-    mk_inp(name: string, label: string, ttip: string): string {
+    mk_inp(name: string, label: string, ttip: string, style: string): string {
         const disabled = this.model.frozen ? ' disabled=true' : ''
-        return  `<input id='dpx-pk-${name}' ${ttip}`+
-            ` class='dpx-fp-freeze bk-widget-form-input' type='text' `+
+        return  `<input id='dpx-pk-${name}' ${ttip} ${style}`+
+            ` class='dpx-fp-freeze bk bk-input' type='text' `+
             ` placeholder='${label}' value='${this.model[name]}'${disabled}>`
     }
 
-    mk_check(ttip: string): string {
+    mk_check(ttip: string, style:string): string {
         const disabled = this.model.frozen ? ' disabled=true' : ''
         const icon     = this.model.locksequence ? 'lock' : 'unlocked'
-        return `<button type='button' id='dpx-pk-locksequence' ${ttip} `+
-            `class='dpx-fp-freeze bk-bs-btn bk-bs-btn-default'${disabled}>`+
+        return `<button type='button' id='dpx-pk-locksequence' ${ttip} ${style} `+
+            `class='dpx-fp-freeze bk bk-btn bk-btn-default'${disabled}>`+
             `<span class='icon-dpx-${icon}'${disabled} `+
             `id='dpx-pk-ls-icon'>Hairpin</span></button>`
     }

@@ -11,8 +11,8 @@ from   bokeh.models          import (
 from   bokeh.plotting        import Figure
 import numpy                 as     np
 
-from   data                  import Beads, Track
-from   taskview.plots        import TaskPlotCreator, CACHE_TYPE
+from   data                 import Beads, Track
+from   taskview.plots       import TaskPlotCreator, CACHE_TYPE
 
 from   ..computations        import extensions
 from   ._model               import (
@@ -219,20 +219,22 @@ class QualityControlPlots:
 
     def addtodoc(self, ctrl, doc, mode):
         "returns the plot grid"
-        plots   = [[getattr(i, '_addtodoc')(ctrl, doc)] for i in self.__dict__.values()]
-        for i in plots[1:]:
-            i[0].x_range = plots[0][0].x_range
+        plots  = [[getattr(i, '_addtodoc')(ctrl, doc)] for i in self.__dict__.values()]
         for i in plots[:-1]:
             i[-1].xaxis.visible = False
+        for i in plots:
+            i[0].x_range = plots[0][0].x_range
+
         css  = self.__add_csvaction(plots)
 
         tmp  = TSamplePlotCreator.fig(getattr(self.tsample, '_theme')).figargs()
         tbar = tmp['toolbar_location']
         grid = layouts.gridplot(plots, **mode, toolbar_location = tbar)
+
         # pylint: disable=not-an-iterable
         tbar = next(i for i in grid.children if isinstance(i, ToolbarBox))
         tbar.toolbar.logo = None
-        return layouts.column(css, grid, **mode)
+        return layouts.column([css, grid], **mode)
 
     @staticmethod
     def __add_csvaction(plots):
@@ -276,8 +278,7 @@ class QualityControlPlots:
                 args = {'data':  srcs, 'names': [i.tags[1] for i in srcs]}
             )
         )]
-        return Div(
-            text   = "<link rel='stylesheet' type='text/css' href='view/qualitycontrol.css'>",
-            width  = 0,
-            height = 0
+        text = "<link rel='stylesheet' type='text/css' href='view/qualitycontrol.css'>"
+        return layouts.widgetbox(
+            Div(text = text, width = 0, height = 0), width = 0, height = 0
         )

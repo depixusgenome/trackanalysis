@@ -158,7 +158,7 @@ class TracksDict(_TracksDict):
 
         if key not in self and ('w' in key.lower() or 's' in key.lower()):
             try:
-                int(key.lower().replace('w').replace('s'))
+                int(key.lower().replace('w', '').replace('s', ''))
             except ValueError:
                 pass
             else:
