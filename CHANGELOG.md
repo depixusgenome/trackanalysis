@@ -1,7 +1,8 @@
 # CycleApp
 ## cycles_v6.11
 
-* 2019-07-08 11:51:58 +0200  (tag: cycles_v6.11)
+* 2019-07-11 09:02:39 +0200  (tag: ramp_v2.3.1, tag: cycles_v6.11.1)
+* 2019-07-10 10:30:59 +0000  (tag: ramp_v2.3, tag: cycles_v6.11)
 
 ### Cambridge Features
 
@@ -19,7 +20,7 @@ The following were requested for better processing µwells data:
 
 ## cycles_v6.10
 
-* 2019-06-27 11:51:58 +0200  (tag: cycles_v6.10)
+* 2019-06-28 06:38:36 +0000  (tag: ramp_v2.2, tag: cycles_v6.10)
 
 ### Peaks
 
@@ -955,7 +956,8 @@ New application for viewing cycles
 
 ## ramp_v2.3
 
-* 2019-07-08 09:02:39 +0200  (tag: ramp_v2.3)
+* 2019-07-11 09:02:39 +0200  (tag: ramp_v2.3.1, tag: cycles_v6.11.1)
+* 2019-07-10 10:30:59 +0000  (tag: ramp_v2.3, tag: cycles_v6.11)
 
 This version changes the information displayed for ramps. It removes the last
 table with fixed zmag and replaces it with one which reports how many beads
@@ -967,7 +969,7 @@ screen.
 
 ## ramp_v2.2
 
-* 2019-06-26 09:02:39 +0200  (tag: ramp_v2.2)
+* 2019-06-28 06:38:36 +0000  (tag: ramp_v2.2, tag: cycles_v6.10)
 
 ### Cleaning
 
