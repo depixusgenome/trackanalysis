@@ -322,6 +322,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         # pylint: disable=unsubscriptable-object
         borders = ctrl.theme.get("theme", "borders")
         sizer.children[0].height = mode['height'] - borders
+        sizer.children[0].width += borders
         sizer.children[1].update(
             width  = mode['width']- sizer.children[0].width,
             height = sizer.children[0].height

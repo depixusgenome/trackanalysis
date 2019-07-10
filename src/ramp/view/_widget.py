@@ -189,7 +189,7 @@ class RampZMagResultsTheme:
     title:   str             = "Loosing {bead:.3f} ± {err:.3f} {unit} with Zmag ="
     ranges:  List[float]     = dflt([.05, .1, .2, .5, 1.])
     alpha                    = .5
-    color                    = 'indianred'
+    color                    = 'yellow'
     units:   List[str]       = dflt(RampZMagHintsTheme().units)
     columns: List[List]      = dflt([
         ["closing", "Closing ≥", 40, "0%"],

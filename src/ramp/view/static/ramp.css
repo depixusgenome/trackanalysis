@@ -1,2 +1,7 @@
-.dpx-ramp input[type=number] { width: 170px!important; }
+.dpx-ramp input[type=number] { width: 185px!important; }
+.dpx-ramp .dpx-span {
+  display:flex!important;
+  flex-direction: row!important;
+}
+.dpx-ramp label{ flex: 1 1 0}
 #dpx-rp-minhfsigma { margin-bottom: 5px!important;}

@@ -51,13 +51,13 @@ export class DpxRampView extends WidgetView {
              </table><table><tr>
                 <td ${ttips[0]}>Fixed beads: |z(open)-z(closed)| ≤ </td>
                 <td>${this.mk_inp('fixedextension')}</td>
-             </tr></table><div class='dpx-span'>`
+             </tr></table><div class='dpx-span bk bk-input-group'>`
         )
 
         let labels: string[] = ["raw data", "Z (% strand size)", "Z (µm)"]
         let disabled: string = this.model.frozen ? ' disabled=true' : ''
         for(let j = 0; j < 3; ++j) {
-            html += `<label class='bk bk-input-group'><input ${disabled}
+            html += `<label><input ${disabled}
                 ${j == this.model.displaytype ?' checked=true': ''}
                 type='radio' id='dpx-rp-displaytype-${j}'
                 class='dpx-rp-displaytype-itm dpx-rp-freeze'/>

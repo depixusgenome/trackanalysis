@@ -1,4 +1,10 @@
 .dpx-cleaning input { width: 80px!important; }
-#dpx-cl-subtracted {  height: 28px; margin-right: 1px; margin-bottom: 5px; }
-#dpx-cl-add { min-width: unset !important; width: 30px; height:29px; }
+#dpx-cl-subtracted {  height: 28px; margin-right: 1px; margin-bottom: 5px;  width: auto!important; }
+#dpx-cl-add {
+    min-width: unset !important;
+    width: 30px;
+    height:31px;
+    margin-bottom:3px;
+    padding: 0px!important;
+}
 #dpx-cl-minhfsigma { margin-bottom: 5px;}
