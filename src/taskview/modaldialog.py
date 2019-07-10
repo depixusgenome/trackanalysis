@@ -34,7 +34,7 @@ class AdvancedTab:
         "return the html version of the title"
         fcn  = "Bokeh.DpxModal.prototype.clicktab"
         head = "cur" if ind else ""
-        return ("<button type='button' class='bk-bs-btn bk-bs-btn-default "
+        return ("<button type='button' class='bk bk-btn bk-btn-default "
                 +f"bbm-dpx-{head}btn' id='bbm-dpx-btn-{self.ind}'"
                 +f'onclick="{fcn}({self.ind})">'
                 +self.title +"</button>")
@@ -67,11 +67,11 @@ AdvancedWidgetBody = Union[Tuple[Tuple[str, ...],...], Tuple[AdvancedTab,...]]
 
 class AdvancedWidgetTheme:
     "AdvancedWidgetTheme"
-    name   = "advancedwidget"
-    width  = 280
-    height = 20
-    label  = ""
-    icon   = "cog"
+    name:   str = "advancedwidget"
+    width:  int = 280
+    height: int = 32
+    label:  str = ""
+    icon:   str = "cog"
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass

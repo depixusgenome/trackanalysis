@@ -305,7 +305,7 @@ class TracksDictCleaningScript:
     @staticmethod
     def _compute(args) -> pd.DataFrame:
         "return messages"
-        itm = TrackCleaningScript(Track(path = args[0]))
+        itm = TrackCleaningScript(Track(**args[0]))
         return getattr(itm, args[1])(*args[2:-1], **args[-1])
 
     def __compute(self, name, beads, *args) -> pd.DataFrame:
@@ -313,7 +313,17 @@ class TracksDictCleaningScript:
         if beads is None:
             beads = self.tracks.availablebeads()
 
-        itr  = ((i.path, name, beads)+args for i in self.tracks.values())
+        itr  = (
+            (
+                {
+                    j: getattr(i, j)
+                    for j in ('path', 'key', '_modificationdate')
+                    if hasattr(i, j)
+                },
+                name, beads
+            )+args
+            for i in self.tracks.values()
+        )
         with ProcessPoolExecutor() as pool:
             items = list(pool.map(self._compute, itr))
         return pd.concat(items)

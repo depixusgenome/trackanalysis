@@ -128,12 +128,14 @@ class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
         hist    = self._hist.create(ctrl, doc)
         scatter = self._scatter.create(self._hist.events)
         mode    = self.defaultsizingmode()
-        widg, peaks = self._widgets.addtodoc(self, ctrl, doc, self._hist.peaks)
-        return layouts.row(
-            layouts.column(hist,    widg,  **mode),
-            layouts.column(scatter, peaks, **mode),
+        widg    = self._widgets.addtodoc(self, ctrl, doc, self._hist.peaks)
+        out         = layouts.row(
+            layouts.column(hist,  **mode),
+            layouts.column(scatter, widg, **mode),
             **mode
         )
+        self.__resize(ctrl, out)
+        return out
 
     def _statehash(self):
         return self._model.statehash(task = ...)
@@ -152,6 +154,36 @@ class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
                     self._widgets.reset(cache, done != 2)
                 finally:
                     pass
+
+    def __resize(self, ctrl, sizer):
+        sizer.update(**self.defaulttabsize(ctrl))
+        borders = ctrl.theme.get("theme", "borders")
+
+        hist           = sizer.children[0].children[0]
+        scatter, widg  = sizer.children[1].children
+
+        scatter.update(
+            plot_width  = widg.width,
+            plot_height = widg.width
+        )
+        widg.children[-1].height = (
+            sizer.height
+            - scatter.plot_height
+            - sum(i.height+2*borders for i in widg.children[:-1])
+        )
+        widg.height = sum(i.height for i in widg.children)
+        hist.update(
+            plot_width  = sizer.width - scatter.plot_width - borders,
+            plot_height = sizer.height
+        )
+        sizer.children[0].update(
+            width  = sizer.width - scatter.plot_width,
+            height = sizer.height
+        )
+        sizer.children[1].update(
+            width  = scatter.plot_width,
+            height = sizer.height
+        )
 
 @setupio
 class ConsensusPlotView(PlotView[ConsensusPlotCreator]):

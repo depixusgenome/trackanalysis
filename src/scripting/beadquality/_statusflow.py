@@ -57,7 +57,7 @@ class StatusFlow:
             for j, k in zip(('From', 'To'), tracks[i:i+2]):
                 tmp[j] = [nodes.loc[k, l].nodenumber for l in tmp[k]]
             tmp   = tmp.rename(columns = {tracks[i]: 'Left', tracks[i+1]: 'Right'})
-            edges = pd.concat([edges, tmp])
+            edges = pd.concat([edges, tmp], sort = True)
         return edges
 
     @classmethod

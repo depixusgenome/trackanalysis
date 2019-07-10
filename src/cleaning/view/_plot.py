@@ -198,34 +198,14 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         super().__init__(ctrl, noerase = False)
         self._widgets = CleaningWidgets(ctrl, self._model, **kwa)
 
+    def observe(self, ctrl, noerase = True):
+        "sets-up model observers"
+        super().observe(ctrl, noerase)
+        self._widgets.observe(self, ctrl)
+
     def _addtodoc(self, ctrl, doc, *_):
-        self.__source = ColumnDataSource(data = self.__data(None, None))
-
-        self.__fig = fig = self.figure(
-            y_range        = Range1d,
-            x_range        = Range1d,
-            name           = 'Clean:Cycles',
-            extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
-        )
-        self.addtofig(fig, 'lines', x = 't', y = 'z', source = self.__source)
-        glyph = self.addtofig(fig, 'points', x = 't', y = 'z', source = self.__source)
-        hover = fig.select(DpxHoverTool)
-        if hover:
-            hover[0].tooltips  = self._theme.tooltips
-            hover[0].renderers = [glyph]
-
-        axis = LinearAxis(x_range_name = "time", axis_label = self._theme.xtoplabel)
-        fig.add_layout(axis, 'above')
-
-        self._errors = PlotError(self.__fig, self._theme)
-
-        self.linkmodeltoaxes(fig)
-
-        mode    = self.defaultsizingmode(width = self._theme.widgetwidth)
-        widgets = self._widgets.addtodoc(self, ctrl, doc, fig)
-        order   = 'cleaning', 'align', 'advanced', 'table', 'sampling'
-        left    = layouts.widgetbox(sum((widgets[i] for i in order), []), **mode)
-        return self._keyedlayout(ctrl, fig, left = left)
+        self.__create()
+        return self.__resize(ctrl,  self.__layout(ctrl, doc))
 
     def _reset(self, cache: CACHE_TYPE):
         items   = nans = exc = None
@@ -303,10 +283,63 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
 
         return tmp.ravel()
 
-    def observe(self, ctrl, noerase = True):
-        "sets-up model observers"
-        super().observe(ctrl, noerase)
-        self._widgets.observe(self, ctrl)
+    def __create(self):
+        self.__source = ColumnDataSource(data = self.__data(None, None))
+
+        self.__fig = fig = self.figure(
+            y_range        = Range1d,
+            x_range        = Range1d,
+            name           = 'Clean:Cycles',
+            extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
+        )
+        self.addtofig(fig, 'lines', x = 't', y = 'z', source = self.__source)
+        glyph = self.addtofig(fig, 'points', x = 't', y = 'z', source = self.__source)
+        hover = fig.select(DpxHoverTool)
+        if hover:
+            hover[0].tooltips  = self._theme.tooltips
+            hover[0].renderers = [glyph]
+
+        axis = LinearAxis(x_range_name = "time", axis_label = self._theme.xtoplabel)
+        fig.add_layout(axis, 'above')
+
+        self._errors = PlotError(self.__fig, self._theme)
+        self.linkmodeltoaxes(fig)
+
+    __ORDER = 'cleaning', 'align', 'advanced', 'table', 'sampling'
+    def __layout(self, ctrl, doc):
+        widgets = self._widgets.addtodoc(self, ctrl, doc, self.__fig)
+        mode    = self.defaultsizingmode(
+            width  = max(widgets[i][0].width  for i in self.__ORDER if widgets[i][0].width),
+            height = sum(widgets[i][0].height for i in self.__ORDER)
+        )
+        left = layouts.widgetbox(sum((widgets[i] for i in self.__ORDER), []), **mode)
+        return self._keyedlayout(ctrl, self.__fig, left = left)
+
+    def __resize(self, ctrl, sizer):
+        mode = self.defaulttabsize(ctrl)
+        sizer.update(**mode)
+
+        # pylint: disable=unsubscriptable-object
+        borders = ctrl.theme.get("theme", "borders")
+        sizer.children[0].height = mode['height'] - borders
+        sizer.children[1].update(
+            width  = mode['width']- sizer.children[0].width,
+            height = sizer.children[0].height
+        )
+        self.__fig.update(
+            plot_width  = sizer.children[1].width  - borders,
+            plot_height = sizer.children[1].height - borders,
+        )
+
+        table = sizer.children[0].children[-2]
+        for i in sizer.children[0].children:
+            i.width = table.width
+
+        table.height = (
+            sizer.children[0].height - ctrl.theme.get("theme", "figtbheight")
+            - sum(i.height for i in sizer.children[0].children if i is not table)
+        )
+        return sizer
 
 class CleaningView(PlotView[CleaningPlotCreator]):
     "Peaks plot view"

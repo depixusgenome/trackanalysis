@@ -118,7 +118,7 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]): # pylint: disable=too-many-
         return cls._transform_to_bead_ids(sel)
 
     def _get_data_keys(self):
-        if isinstance(self.data, self.__class__):
+        if isinstance(self.data, PeaksDict):
             return (i for i in self.data.keys() if Beads.isbead(i))
         return (i for i, _ in self.data.keys() if Beads.isbead(i))
 

@@ -9,14 +9,11 @@ from   typing    import cast
 
 import pandas    as pd
 import numpy     as np
-import holoviews as hv  # pylint: disable=import-error
 
 from   data.__scripting__.track      import Track
 from   data.__scripting__.tracksdict import TracksDict
 from   utils                         import initdefaults
-from   utils.holoviewing             import displayhook as _displayhook
 
-@_displayhook(lambda x: hv.Table(x[0])+hv.Table(x[1])) # pylint: disable=missing-docstring
 class TrackQC:
     """
     Outputs:
@@ -65,10 +62,11 @@ class TrackQC:
 
         #if there is a good track after missing tracks,
         #then the previous tracks are not missing
+        columns = list(self.status.columns)
         for bead, vals in self.status.iterrows():
             ind = next((i for i, j in enumerate(pd.isnull(vals)[::-1]) if j), None)
             if ind is not None:
-                self.status.iloc[bead, 0:len(vals)-ind] = np.NaN
+                self.status.loc[bead, columns[-1:len(vals)-ind]] = np.NaN
 
         #if extent is too small, the bead is fixed, not missing
         _fill('fixed', 'extent', self.fixedextent, '<')
@@ -126,16 +124,19 @@ class TrackQC:
         frame = frame.pivot_table(index   = ['bead', 'track'],
                                   columns = 'longmessage',
                                   values  = 'cycles')
+        print(frame)
 
         frame['status'] = [self.status[j][i] for i, j in iter(frame.index)]
+        fixed           = frame.status.apply(lambda x: x in ('missing', 'fixed'))
         frame['status'] = frame.status.apply(lambda x: x if x in ('missing', 'fixed') else np.NaN)
 
         # remove errors corresponding to fixed beads
-        extent = next(i for i in cols if 'extent' in i and '<' in i)
-        frame.loc[frame.status == 'fixed', extent] = np.NaN
+        extent = next((i for i in cols if 'extent' in i and '<' in i), None)
+        if extent:
+            frame.loc[fixed, extent] = np.NaN
 
         # remove errors corresponding to missing beads
-        frame.loc[frame.status == 'fixed', list(set(frame.columns) - {'status'})] = np.NaN
+        frame.loc[fixed, list(set(frame.columns) - {'status'})] = np.NaN
 
         ind   = pd.MultiIndex.from_tuples(set(product(self.status.index, self.status.columns))
                                           .difference(frame.index))
@@ -165,7 +166,7 @@ def beadqualitysummary(trackqc: TrackQC) -> pd.DataFrame:
     as many columns as the nb of types of errors that can be detected for a
     bead.  If the bead is missing/fixed all errors are set to NaN
     """
-    trackqc.beadqualitysummary()
+    return trackqc.beadqualitysummary()
 
 def mostcommonerror(beadqc: pd.DataFrame,
                     fixedassingleerror = True) -> pd.DataFrame:

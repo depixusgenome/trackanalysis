@@ -3,11 +3,12 @@
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
 import os
 from enum                       import IntEnum, auto
-from pathlib               import Path
-from typing                import Any, Dict, List, Optional, Tuple
+from pathlib                    import Path
+from typing                     import Any, Dict, List, Tuple
 
 import numpy                 as np
 import bokeh.core.properties as props
+from bokeh                      import layouts
 from bokeh.models               import (DataTable, TableColumn, CustomJS,
                                         Widget, Div, StringFormatter, Dropdown)
 
@@ -39,9 +40,10 @@ LOGS = getLogger(__name__)
 @dataclass
 class ReferenceWidgetTheme:
     "ref widget theme"
-    name  : str = "hybridstat.fittoreference.widget"
-    title : str = 'Select a reference track'
-    width : int = 280
+    name:   str = "hybridstat.fittoreference.widget"
+    title:  str = 'Select a reference track'
+    width:  int = 280
+    height: int = 32
 
 class ReferenceWidget:
     "Dropdown for choosing the reference"
@@ -56,13 +58,16 @@ class ReferenceWidget:
     def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
         "creates the widget"
 
-        self.__widget = Dropdown(name  = 'HS:reference',
-                                 width = self.__theme.width,
-                                 **self.__data())
+        self.__widget = Dropdown(
+            name   = 'HS:reference',
+            width  = self.__theme.width,
+            height = self.__theme.height,
+            **self.__data()
+        )
 
         @mainview.actionifactive(ctrl)
         def _py_cb(new):
-            inew = int(new)
+            inew = int(new.item)
             val  = None if inew < 0 else [i for _, i in self.__files()][inew]
             self.__model.fittoreference.reference = val
 
@@ -198,6 +203,8 @@ class PeaksStatsWidgetTheme:
         ['Silhouette',        '.1f'],
         ['reduced χ²',        '.1f']
     ])
+    height: int = 20*14
+    width:  int = 230
 
 class PeaksStatsWidget:
     "Table containing stats per peaks"
@@ -209,7 +216,12 @@ class PeaksStatsWidget:
 
     def addtodoc(self, *_) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
-        self.__widget = PeaksStatsDiv(style = self.__theme.style, css_classes = ['dpx-peakstatdiv'])
+        self.__widget = PeaksStatsDiv(
+            style  = self.__theme.style,
+            width  = self.__theme.width,
+            height = self.__theme.height,
+            css_classes = ['dpx-peakstatdiv']
+        )
         self.reset(None)
         return [self.__widget]
 
@@ -257,10 +269,11 @@ class PeaksStatsWidget:
 
         def sequencedependant(self, mdl, dist, key):
             "all sequence dependant stats"
-            self.default(mdl)
             _                           = PeaksStatsOrder
             task                        = mdl.identification.task
             nfound                      = np.isfinite(mdl.peaks[key+'id']).sum()
+            self.values[_.stretch]      = dist[key].stretch
+            self.values[_.bias]         = dist[key].bias
             self.values[_.sites]        = f'{nfound}/{len(task.match[key].peaks)}'
             self.values[_.silhouette]   = PeakGridFit.silhouette(dist, key)
 
@@ -352,6 +365,11 @@ class PeakListTheme:
                                        ['sigma',    'σ (µm)',                 '0.0000'],
                                        ['skew',     'skew',                   '0.00']])
 
+    @property
+    def width(self) -> int:
+        "the table width"
+        return self.colwidth*len(self.columns)
+
 class PeakListWidget:
     "Table containing stats per peaks"
     __widget: DataTable
@@ -383,13 +401,15 @@ class PeakListWidget:
     def addtodoc(self, _1, _2, src) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
         "creates the widget"
         cols  = self.__cols(self.__ctrl)
-        self.__widget = DataTable(source         = src,
-                                  columns        = cols,
-                                  editable       = False,
-                                  index_position = None,
-                                  width          = self.theme.colwidth*len(cols),
-                                  height         = self.theme.height,
-                                  name           = "Peaks:List")
+        self.__widget = DataTable(
+            source         = src,
+            columns        = cols,
+            editable       = False,
+            index_position = None,
+            width          = self.theme.width,
+            height         = self.theme.height,
+            name           = "Peaks:List"
+        )
         return [self.__widget]
 
     def reset(self, resets):
@@ -399,13 +419,14 @@ class PeakListWidget:
 @dataclass
 class PeakIDPathTheme:
     "PeakIDPathTheme"
-    name       : str           = "hybridstat.peaks.idpath"
-    title      : Optional[str] = None
-    dialogtitle: str           = 'Select an id file path'
-    placeholder: str           = 'Id file path'
-    filechecks : int           = 500
-    width      : int           = 225
-    tableerror : List[str]     = dflt(['File extension must be .xlsx', 'warning'])
+    name:        str       = "hybridstat.peaks.idpath"
+    title:       str       = ""
+    dialogtitle: str       = 'Select an id file path'
+    placeholder: str       = 'Id file path'
+    filechecks:  int       = 500
+    width:       int       = 225
+    height:      int       = 32
+    tableerror:  List[str] = dflt(['File extension must be .xlsx', 'warning'])
 
 class PeakIDPathWidget:
     "Selects an id file"
@@ -482,10 +503,13 @@ class PeakIDPathWidget:
     def addtodoc(self, mainview, ctrl, # type: ignore # pylint: disable=arguments-differ
                  *_) -> List[Widget]:
         "creates the widget"
-        self.__widget = PathInput(width       = self.__theme.width,
-                                  placeholder = self.__theme.placeholder,
-                                  title       = self.__theme.title,
-                                  name        = 'Peaks:IDPath')
+        self.__widget = PathInput(
+            width       = self.__theme.width,
+            height      = self.__theme.height,
+            placeholder = self.__theme.placeholder,
+            title       = self.__theme.title,
+            name        = 'Peaks:IDPath'
+        )
 
         @mainview.actionifactive(ctrl)
         def _onclick_cb(attr, old, new):
@@ -520,8 +544,8 @@ class PeakIDPathWidget:
             )
             self._doresetmodel(ctrl)
 
-        self.__widget.on_change('click', _onclick_cb)
-        self.__widget.on_change('value', _onchangetext_cb)
+        self.__widget.on_change('clicks', _onclick_cb)
+        self.__widget.on_change('value',  _onchangetext_cb)
         return [self.__widget]
 
     def reset(self, resets):
@@ -551,7 +575,11 @@ class FitParamsWidget:
 
     def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
         "creates the widget"
-        self.__widget = DpxFitParams(**self.__data())
+        self.__widget = DpxFitParams(
+            **self.__data(),
+            width  = ctrl.theme.get(PeakIDPathTheme(), "width"),
+            height = ctrl.theme.get(PeakIDPathTheme(), "height")
+        )
 
         @mainview.actionifactive(ctrl)
         def _on_cb(attr, old, new):
@@ -754,23 +782,10 @@ class PeaksPlotWidgets: # pylint: disable=too-many-instance-attributes
         self.fitparams = FitParamsWidget(ctrl, mdl)
         self.advanced  = advanced(**kwa)(ctrl, mdl)
 
-    def addtodoc(self, mainview, ctrl, doc, **kwa):
+    def addtodoc(self, mainview, ctrl, doc):
         "creates the widget"
-        peaks = kwa.get('peaks', None)
-        if peaks is None:
-            peaks = getattr(mainview, "_src")['peaks']
-
-        wdg    = {i: j.addtodoc(mainview, ctrl, peaks) for i, j in self.__dict__.items()}
-        enable = dict(wdg)
-        enable.pop('fitparams')
-        self.enabler = TaskWidgetEnabler(enable)
-        self.cstrpath.callbacks(ctrl, doc)
-        if hasattr(mainview, '_hover'):
-            self.seq.callbacks(getattr(mainview, '_hover'),
-                               getattr(mainview, '_ticker'),
-                               wdg['stats'][-1], wdg['peaks'][-1])
-        self.advanced.callbacks(doc)
-        return wdg, self.enabler
+        wdg = self._create(mainview, ctrl, doc)
+        return self._assemble(mainview.defaultsizingmode(), wdg)
 
     def observe(self, ctrl):
         "oberver"
@@ -784,3 +799,65 @@ class PeaksPlotWidgets: # pylint: disable=too-many-instance-attributes
             if key != 'enabler':
                 widget.reset(cache)
         self.enabler.disable(cache, disable)
+
+    @staticmethod
+    def resize(sizer, borders:int, height:int):
+        "resize elements in the sizer"
+        wbox    = lambda x: x.update(
+            width  = max(i.width  for i in x.children),
+            height = sum(i.height for i in x.children)
+        )
+
+        stats = sizer.children[0].children[1].children[0]
+        pks   = sizer.children[1].children[0]
+        for i in sizer.children[0].children[0].children:
+            i.width = pks.width - stats.width - borders
+        wbox(sizer.children[0].children[0])
+        sizer.children[0].children[0].width += borders
+        wbox(sizer.children[0].children[1])
+        sizer.children[0].update(
+            width  = sum(i.width  for i in sizer.children[0].children),
+            height = max(i.height for i in sizer.children[0].children),
+        )
+
+        pks.height = height - max(sizer.children[0].height, stats.height)
+        wbox(sizer.children[1])
+        wbox(sizer)
+        sizer.width += borders
+
+    def _create(self, mainview, ctrl, doc):
+        wdg    = {
+            i: j.addtodoc(mainview, ctrl, mainview.peaksdata)
+            for i, j in self.__dict__.items()
+        }
+
+        enable = dict(wdg)
+        enable.pop('fitparams')
+        self.enabler = TaskWidgetEnabler(enable)
+        self.enabler.extend(mainview.plotfigures)
+
+        self.cstrpath.callbacks(ctrl, doc)
+        if hasattr(mainview, 'hover'):
+            self.seq.callbacks(
+                mainview.hover, mainview.ticker, wdg['stats'][-1], wdg['peaks'][-1]
+            )
+        self.advanced.callbacks(doc)
+        return wdg
+
+    @staticmethod
+    def _assemble(mode, wdg):
+        wbox  = lambda x: layouts.widgetbox(children = x, **mode)
+        order = 'ref', 'seq', 'fitparams', 'oligos', 'cstrpath', 'advanced'
+        return layouts.column(
+            [
+                layouts.row(
+                    [
+                        wbox(sum((wdg[i] for i in order), [])),
+                        wbox(wdg['stats'])
+                    ],
+                    **mode
+                ),
+                wbox(wdg['peaks'])
+            ],
+            **mode
+        )

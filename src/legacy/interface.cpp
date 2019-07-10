@@ -106,8 +106,8 @@ namespace legacy
         auto remlast = 0;
         if(notall)
         {
-            int meds = 0, cnt = 0, je = rec.nphases();
-            for(int i = 3, ie = rec.ncycles()-1; i < ie; ++i, ++cnt)
+            int meds = 0, cnt = 0, je = (int) rec.nphases();
+            for(int i = 3, ie = (int)rec.ncycles()-1; i < ie; ++i, ++cnt)
                 meds += cycles[(i+1)*je]-cycles[i*je];
             meds /= cnt;
             if(std::any_of(

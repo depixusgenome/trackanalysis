@@ -98,6 +98,7 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
     _src:    ColumnDataSource
     _fig:    Figure
     _errors: PlotError
+    plot = cast(Figure,           property(lambda self: self._fig))
     def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument
         self._src  = ColumnDataSource(data = self._data(None))
         self._fig  = self.figure(y_range = Range1d, x_range = Range1d)
@@ -184,6 +185,8 @@ class BaseHistPlotCreator(TaskPlotCreator[TModelAccess, PlotModelType]):
     _src: Dict[str, ColumnDataSource]
     _exp: LinearAxis
     _ref: LinearAxis
+    peaksdata = cast(ColumnDataSource, property(lambda self: self._src['peaks']))
+    plot      = cast(Figure,           property(lambda self: self._fig))
     def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument
         "returns the figure"
         self._fig = self.figure(y_range = Range1d, x_range = Range1d)
@@ -285,6 +288,7 @@ class HistPlotCreator(BaseHistPlotCreator[PeaksPlotModelAccess, # type: ignore
                                           HistPlotModel]):
     "Creates a histogram of peaks"
 
+
 class _StateDescriptor:
     def __get__(self, inst, owner):
         if inst is None:
@@ -304,6 +308,37 @@ class _StateDescriptor:
         fcn   = getattr(inst, '_ctrl').display.update
         fcn("cyclehist.plot.hist",  state = state)
         fcn("cyclehist.plot.cycle", state = state)
+
+class CycleHistPlotWidgets(PeaksPlotWidgets):
+    "PeaksPlotWidgets with a different layout"
+    @staticmethod
+    def resize(sizer, borders:int, width:int): # pylint: disable=arguments-differ
+        "resize elements in the sizer"
+        wbox    = lambda x: x.update(
+            width  = max(i.width  for i in x.children),
+            height = sum(i.height for i in x.children)
+        )
+
+        stats = sizer.children[1].children[0]
+        pks   = sizer.children[2].children[0]
+        for i in sizer.children[0].children:
+            i.width = width - pks.width - stats.width - borders
+        for i in sizer.children:
+            wbox(i)
+        sizer.children[0].width += borders
+        sizer.update(
+            width  = sum(i.width  for i in sizer.children),
+            height = max(i.height for i in sizer.children)+borders,
+        )
+
+    @classmethod
+    def _assemble(cls, mode, wdg):
+        # pylint: disable=unsubscriptable-object
+        out  = super()._assemble(mode, wdg)
+        return layouts.row(
+            [ *out.children[0].children, out.children[1]],
+            **mode
+        )
 
 class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
     "Creates plots for peaks & cycles"
@@ -326,12 +361,21 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
                     cnf       = getattr(self._cycle, '_plotmodel'),
                     accessors = (CyclePlotTheme,),
                     xaxis     = True)
-        self._widgets = PeaksPlotWidgets(ctrl, self._model, **args)
+
+        self._widgets = CycleHistPlotWidgets(ctrl, self._model, **args)
         self.addto(ctrl)
 
-    @property
-    def _plots(self):
-        return [self._cycle, self._hist]
+
+    _plots      = cast(
+        Tuple[CyclePlotCreator, HistPlotCreator],
+        property(lambda self: (self._cycle, self._hist))
+    )
+    plotfigures = cast(
+        Tuple[Figure, Figure],
+        property(lambda self: (self._cycle.plot, self._hist.plot))
+    )
+    peaksdata    = cast(ColumnDataSource, property(lambda self: self._hist.peaksdata))
+    plottheme    = cast(PeaksPlotTheme,   property(lambda self: self._theme))
 
     def observe(self, ctrl, noerase = True):
         "observes the model"
@@ -376,28 +420,21 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
 
     def _addtodoc(self, ctrl, doc, *_):
         "returns the figure"
-        plots = [getattr(i, '_addtodoc')(ctrl, doc) for i in self._plots]
-        for i in plots[1:]:
-            i.y_range = plots[0].y_range
-            i.yaxis[0].update(axis_label = "", major_label_text_font_size = '0pt')
+        for i in self._plots:
+            getattr(i, '_addtodoc')(ctrl, doc)
+        self._hist.plot.y_range = self._cycle.plot.y_range
+        self._hist.plot.yaxis[0].update(axis_label = "", major_label_text_font_size = '0pt')
+        self._cycle.plot.yaxis[1].major_label_text_font_size = '0pt'
 
         # add a grid to the advanced menu because some themes are missing
         # a grid_line_alpha attribute
         attr = getattr(type(self._widgets.advanced), 'theme1')
-        attr.items.append(plots[0].grid[0])
+        attr.items.append(self._cycle.plot.grid[0])
 
-        plots[0].yaxis[1].major_label_text_font_size = '0pt'
-        wdg, enabler = self._widgets.addtodoc(self, ctrl, doc,
-                                              peaks = getattr(self._hist, '_src')['peaks'])
-        enabler.extend([getattr(i, '_fig') for i in self._plots])
-
-        mode     = self.defaultsizingmode()
-        order    = [('ref', 'seq', 'fitparams', 'oligos','cstrpath', 'advanced'),
-                    ('stats',), ('peaks',)]
-        children = [layouts.widgetbox(children = i, **mode)
-                    for i in (sum((wdg[i] for i in j), []) # type: ignore
-                              for j in order)]
-        return self._keyedlayout(ctrl, *plots, bottom = layouts.row(children, **mode))
+        bottom = self._widgets.addtodoc(self, ctrl, doc)
+        out    = self._keyedlayout(ctrl, *self.plotfigures, bottom = bottom)
+        self.__resize(ctrl, out, self.plotfigures, bottom)
+        return out
 
     def advanced(self):
         "triggers the advanced dialog"
@@ -418,6 +455,26 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
                 done += 1
             finally:
                 self._widgets.reset(cache, done != 2)
+
+    def __resize(self, ctrl, sizer, plots, bottom):
+        borders = ctrl.theme.get('theme', "borders")
+        self._widgets.resize(bottom, borders, self.defaulttabsize(ctrl)['width'])
+        sizer.update(**self.defaulttabsize(ctrl))
+        width = sum(i.plot_width for i in plots)
+        for fig in plots:
+            fig.update(
+                plot_width  = int((fig.plot_width/width)*sizer.width),
+                plot_height = (
+                    sizer.height
+                    - ctrl.theme.get('theme', 'figtbheight')
+                    - bottom.height
+                )
+            )
+        for i in (sizer.children[0], sizer.children[0].children[0]):
+            i.update(
+                width  = sizer.width,
+                height = sizer.height - bottom.height
+            )
 
 class CycleHistPlotView(PlotView[CycleHistPlotCreator]):
     "Peaks plot view"

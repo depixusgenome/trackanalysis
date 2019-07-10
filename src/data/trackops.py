@@ -85,8 +85,27 @@ def selectcycles(trk:TRACKS, indexes:Union[slice, range, List[int]])-> TRACKS:
             inds = np.clip(np.int32(j['index']-trk.phases[0,0]), 0, len(vals)-1)
             secs[i] = j[vals[inds]]
 
+    start = None
+    if trk.path:
+        path  = Path(str(trk.path[0] if isinstance(trk.path, (list, tuple)) else trk.path))
+        start = (
+            indexes.stop  if getattr(indexes, 'stop',  None) is not None else
+            indexes.start if getattr(indexes, 'start', None) else
+            indexes[-1]   if hasattr(indexes, '__getitem__') else
+            None
+        )
+    if start is not None:
+        track['_modificationdate'] = (
+            path.stat().st_ctime + trk.nframes/trk.framerate
+            if start >= trk.phases.shape[0] else
+            path.stat().st_ctime + trk.phases[start,0]/trk.framerate
+        )
+
     trk = Track(**track)
+    if start:
+        setattr(trk, '_modificationdate', track['_modificationdate'])
     setattr(trk, '_lazydata_', False)
+
     return trk
 
 def concatenatetracks(trk:TRACKS, *tracks:TRACKS)-> TRACKS:

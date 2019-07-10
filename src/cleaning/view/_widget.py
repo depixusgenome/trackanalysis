@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cleaning beads"
-from    typing          import List, Tuple, Union, Optional
+from    typing          import List, Tuple, Union, Optional, Dict
 
 import  bokeh.core.properties as props
 from    bokeh.plotting  import Figure
@@ -154,13 +154,15 @@ class CyclesListWidget:
 
 class DownSamplingTheme:
     "stuff for downsampling"
-    name     = "cleaning.downsampling"
-    title    = "Downsampling"
-    tooltips = "Display only 1 out of every few gata points"
-    policy   = "mouseup"
-    start    = 1
-    value    = 5
-    end      = 20
+    name:     str = "cleaning.downsampling"
+    title:    str = "Downsampling"
+    tooltips: str = "Display only 1 out of every few gata points"
+    policy:   str = "mouseup"
+    width:    int = len(CyclesListTheme.columns)*CyclesListTheme.width
+    height:   int = 20
+    start:    int = 1
+    value:    int = 5
+    end:      int = 20
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -175,9 +177,13 @@ class DownsamplingWidget:
 
     def addtodoc(self, mainview, ctrl) -> List[Widget]:
         "creates the widget"
-        self.__widget = Slider(**{i: getattr(self.__model, i.split('_')[-1])
-                                  for i in ('title', 'value', 'start', 'end',
-                                            'callback_policy')})
+        self.__widget = Slider(**{
+            i: getattr(self.__model, i.split('_')[-1])
+            for i in (
+                'title', 'value', 'start', 'end',
+                'callback_policy', 'width', 'height'
+            )
+        })
         @mainview.actionifactive(ctrl)
         def _onchange_cb(attr, old, new):
             ctrl.theme.update(self.__model, value = new)
@@ -212,19 +218,34 @@ class DpxCleaning(Widget):
     maxsaturation      = props.Float(__DFLT.maxsaturation)
     del __DFLT
 
+class CleaningFilterTheme:
+    "cleaning filter theme"
+    width:  int            = len(CyclesListTheme.columns)*CyclesListTheme.width
+    height: int            = 230
+    name:   str            = "Cleaning:Filter"
+    rnd:    Dict[str, int] = dict(
+        maxabsvalue   = 1, maxderivate   = 1,
+        minpopulation = 1, minhfsigma    = 4,
+        minextent     = 2, maxextent     = 2,
+        maxhfsigma    = 4, maxsaturation = 0
+    )
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
 class CleaningFilterWidget:
     "All inputs for cleaning"
-    RND = dict(maxabsvalue   = 1, maxderivate   = 1,
-               minpopulation = 1, minhfsigma    = 4,
-               minextent     = 2, maxextent     = 2,
-               maxhfsigma    = 4, maxsaturation = 0)
     __widget: DpxCleaning
-    def __init__(self, model:DataCleaningModelAccess) -> None:
+    __theme:  CleaningFilterTheme
+    def __init__(self, ctrl, model:DataCleaningModelAccess) -> None:
         self.__model = model
+        self.__theme = ctrl.theme.add(CleaningFilterTheme())
 
     def addtodoc(self, mainview, ctrl) -> List[Widget]:
         "creates the widget"
-        self.__widget = DpxCleaning(name = "Cleaning:Filter")
+        self.__widget = DpxCleaning(**{
+            i: getattr(self.__theme, i) for i in ('name', 'width', 'height')
+        })
 
         @mainview.actionifactive(ctrl)
         def _on_cb(attr, old, new):
@@ -268,7 +289,7 @@ class CleaningFilterWidget:
             task = mdl.cleaning.configtask
 
         info = dict(
-            ((i, np.around(getattr(task, i), j)) for i, j in self.RND.items()),
+            ((i, np.around(getattr(task, i), j)) for i, j in self.__theme.rnd.items()),
             framerate  = getattr(mdl.track, 'framerate', 1./30.),
             subtracted = ', '.join(str(i) for i in sorted(mdl.subtracted.beads)),
             fixedbeads = self.__fixedbeads
@@ -296,7 +317,7 @@ class CleaningWidgets:
         )
         self.__widgets = dict(table    = CyclesListWidget(ctrl, model.cleaning),
                               align    = AlignmentWidget(ctrl, model.alignment),
-                              cleaning = CleaningFilterWidget(model),
+                              cleaning = CleaningFilterWidget(ctrl, model),
                               sampling = DownsamplingWidget(ctrl),
                               advanced = advanced(ctrl, model))
 

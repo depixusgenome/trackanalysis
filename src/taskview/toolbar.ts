@@ -3,7 +3,6 @@ import * as p   from "core/properties"
 import {WidgetView, Widget} from "models/widgets/widget"
 declare function jQuery(...args: any[]): any
 
-
 export class DpxToolbarView extends WidgetView {
     model: DpxToolbar
     on_bead(): void {
@@ -59,14 +58,13 @@ export class DpxToolbarView extends WidgetView {
     }
 
     make_btn(name: string, label: string, ttip: string = '', freeze: string = 'dpx-freeze') : string {
-        const bkclass = Bokeh.version != '1.0.4' ? ' bk ' : ''
         let str = ""
         if(ttip == '')
             str = `<button type='button' id='dpx-tb-${name}' `+
-                `class='${freeze} ${bkclass} bk-bs-btn bk-bs-btn-default'>${label}</button>`
+                `class='${freeze} bk bk-btn bk-btn-default'>${label}</button>`
         else
             str = `<button type='button' id='dpx-tb-${name}' `+
-                `class='${freeze} ${bkclass} bk-bs-btn bk-bs-btn-default' `+
+                `class='${freeze} bk bk-btn bk-btn-default' `+
                   `data-balloon='${ttip}' `+
                     'data-balloon-length="medium" data-balloon-pos="right">'+
                   label+'</button>'
@@ -74,23 +72,21 @@ export class DpxToolbarView extends WidgetView {
     }
 
     make_filelist(): string {
-        const bkclass = Bokeh.version != '1.0.4' ? ' bk ' : ''
-        const bkcaret = Bokeh.version != '1.0.4' ? ' bk-caret bk-down' : 'bk-bs-caret'
-        let itm = '<div id="dpx-tb-flist">'+
-                `<button type="button" class="${bkclass} bk-bs-btn bk-bs-btn-default"`+
+        let itm = '<div id="dpx-tb-flist" class="bk bk-btn-group">'+
+                `<button type="button" class="bk bk-btn bk-btn-default"`+
                 ' id="dpx-tb-flist-btn">'+
-                    `<span class="${bkcaret}"/>`+
+                    `<span class=" bk-caret bk-down"/>`+
                 '</button>'+
                 '<div id="dpx-tb-flist-menu"><table>'
         let lst = this.model.filelist as any as string[]
         if(lst.length > 0)
             for(let j = 0; j < lst.length; ++j) {
-                itm += '<tr><td><label class="bk-bs-radio"><input'
+                itm += '<tr><td><label class="bk-input-group"><input'
                 if(j == this.model.currentfile)
                     itm += ' checked=true'
                 itm += ` type='radio' id='dpx-tb-flist-${j}' class='dpx-tb-flist-itm'/>`+
                        lst[j]+"</label></td>"+
-                    `<td><button type='button' class='${bkclass} bk-bs-btn bk-bs-btn-danger' `+
+                    `<td><button type='button' class='bk bk-btn bk-btn-danger' `+
                        `id='dpx-tb-flist-btn-${j}' class='dpx-tb-flist-itm'>`+
                        this._icon('bin')+"</button></td>"+
                        "</tr>"
@@ -126,13 +122,12 @@ export class DpxToolbarView extends WidgetView {
 
     render(): void {
         super.render()
-        const bkclass          = Bokeh.version != '1.0.4' ? ' bk ' : ''
         const mdl:  DpxToolbar = this.model
         let   quit: string     = ''
         let   docu: string     = ""
         if(this.model.hasdoc)
             docu = "<button type='button' id='dpx-tb-doc' "+
-                `class='${bkclass} bk-bs-btn bk-bs-btn-default'>?</button>`
+                `class='bk bk-btn bk-btn-default'>?</button>`
         if(this.model.hasquit)
             quit = this.make_btn('quit', 'Quit', '', '')
 
@@ -149,12 +144,12 @@ export class DpxToolbarView extends WidgetView {
                this.make_btn('save', this._icon('folder-upload'), ttips[2])+
                "<label>Bead</label>"+
                "<input id='dpx-tb-bead'"+
-               " class='dpx-freeze bk-widget-form-input'"+
+               " class='dpx-freeze bk-input'"+
                ` type='number' min=0  max=10000 step=1  value=${mdl.bead}>`+
                "<label>Discarded</label>"+
                this.make_btn('selection', '=', ttips[3])+
                "<input id='dpx-tb-discard'"+
-                   " class='dpx-freeze bk-widget-form-input'"+
+                   " class='dpx-freeze bk-input'"+
                    ` type='text' value='${mdl.discarded}'`+
                    ` placeholder='${mdl.helpmessage}'>`+
                this.make_btn('del', this._icon('bin'), ttips[4])+

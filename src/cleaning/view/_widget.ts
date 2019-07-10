@@ -17,7 +17,7 @@ export class DpxCleaningView extends WidgetView {
     mk_inp_with_extrema(name:string, maxv:number, dv:number): string {
         const disabled = this.model.frozen ? ' disabled=true' : ''
         return  `<input id='dpx-cl-${name}'`+
-            ` class='dpx-cl-freeze bk-widget-form-input'`+
+            ` class='dpx-cl-freeze bk bk-input'`+
             ` type='number' min=0 max=${maxv} step=${dv} `+
             ` value=${this.model[name]}${disabled}>`
     }
@@ -25,7 +25,7 @@ export class DpxCleaningView extends WidgetView {
     mk_txt(name:string, placeholder:string = '') : string {
         const disabled = this.model.frozen ? ' disabled=true' : ''
         return  `<input id='dpx-cl-${name}'`+
-            ` type='text' class='dpx-cl-freeze bk-widget-form-input'`+
+            ` type='text' class='dpx-cl-freeze bk bk-input'`+
             ` value='${this.model[name]}'${disabled}`+
             ` placeholder='${placeholder}'>`
     }
@@ -33,7 +33,7 @@ export class DpxCleaningView extends WidgetView {
     mk_btn(name:string, label:string, ttip: string): string {
         const disabled = this.model.frozen ? ' disabled=true' : ''
         return `<button type='button' id='dpx-cl-${name}' ${ttip} `+
-            `class='dpx-cl-freeze bk-bs-btn bk-bs-btn-default'${disabled}>`+
+            `class='dpx-cl-freeze bk bk-btn bk-btn-default'${disabled}>`+
             label+"</button>"
     }
 

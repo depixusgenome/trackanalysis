@@ -96,7 +96,7 @@ class _DefaultFitData:
 
 class FitToReferenceTask(Task, zattributes = ('fitalg', "~window")):
     "Fits a bead to a reference"
-    level                  = Level.peak
+    level   : Level        = Level.peak
     defaultdata            = None
     fitdata                = cast(Fitters, _FitDataDescriptor())
     fitalg  : ReferenceFit = ChiSquareHistogramFit()
@@ -147,7 +147,7 @@ class FitToReferenceDict( # pylint: disable=too-many-ancestors
         TaskView[FitToReferenceTask, BEADKEY]
 ):
     "iterator over peaks grouped by beads"
-    level = Level.bead
+    level: Level  = FitToReferenceTask.level
     @classmethod
     def _transform_ids(cls, sel):
         return cls._transform_to_bead_ids(sel)

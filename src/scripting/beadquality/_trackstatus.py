@@ -36,7 +36,11 @@ class TrackStatus:
                   normalize         = True) -> pd.DataFrame:
         "The dataframe used for the displays"
         beadqc = data if isinstance(data, pd.DataFrame) else beadqualitysummary(data)
-        frame  = mostcommonerror(beadqc).fillna(self.params[0]).reset_index()
+        col  = mostcommonerror(beadqc)
+        params = [i for i in self.params if i in col.unique()]
+        if len(params) and params[0] == 'ok':
+            col  = col.fillna(self.params[0])
+        frame  = col.reset_index()
         value  = self.value(normalize)
 
         disc   = pd.crosstab(frame.track, frame.mostcommonerror,
@@ -57,7 +61,7 @@ class TrackStatus:
         disc['error'] = disc['error'].astype('category')
 
         disc.set_index("error", inplace = True)
-        disc = disc.loc[list(self.params)+list(set(disc.index)-set(self.params)),:]
+        disc = disc.loc[list(params)+list(set(disc.index)-set(params)),:]
         disc.reset_index(inplace = True)
         return disc
 

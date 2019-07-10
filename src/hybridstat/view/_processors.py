@@ -13,7 +13,7 @@ from   peakcalling.processor          import (FitToReferenceTask, FitToReference
                                               FitToHairpinTask)
 from   taskcontrol.processor.taskview import TaskViewProcessor
 from   taskcontrol.modelaccess        import ReplaceProcessors
-from   taskmodel                      import RootTask
+from   taskmodel                      import RootTask, Level
 
 class GuiPeakSelectorDetails(PeakSelectorDetails):
     "gui version of PeakSelectorDetails"
@@ -130,17 +130,13 @@ def runbead(ctrl, bead, refcache):
                  GuiSingleStrandProcessor(store))
         ident = any(isinstance(i, FitToHairpinTask) for i in ctrl.model)
         with ReplaceProcessors(ctrl, *procs, copy = True) as view:
-            if view is None or bead not in view.keys():
+            if view is None or view.level.value < Level.peak.value or bead not in view.keys():
                 out = None, None
             else:
                 try:
                     tmp = view[bead]
                 except DataCleaningException as exc:
                     out = cache[bead] = exc
-                except TypeError:
-                    import pickle
-                    pickle.dump(ctrl, open(f"/tmp/x{bead}.pk", "wb"))
-                    raise
                 else:
                     out = (tmp      if ident                         else None,
                            store[0] if store and len(store[0].peaks) else None)

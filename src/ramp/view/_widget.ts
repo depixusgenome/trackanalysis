@@ -45,21 +45,19 @@ export class DpxRampView extends WidgetView {
                 <tr><td>${this.mk_inp('minhfsigma', 0.05, 0.0001)}</td>
                     <td ${ttips[2]}>≤ σ[HF] ≤</td>
                     <td>${this.mk_inp('maxhfsigma', 0.05,  0.001)}</td></tr>
-                <tr><td>${this.mk_inp('minextension', 10.0, 0.0)}</td>
+                <tr><td>${this.mk_inp('minextension', 10.0, 0.001)}</td>
                     <td ${ttips[1]}>≤ Δz ≤</td>
-                    <td>${this.mk_inp('maxextension', 10.0, 0.0)}</td></tr>
+                    <td>${this.mk_inp('maxextension', 10.0, 0.01)}</td></tr>
              </table><table><tr>
                 <td ${ttips[0]}>Fixed beads: |z(open)-z(closed)| ≤ </td>
                 <td>${this.mk_inp('fixedextension')}</td>
-             </tr></table><div class='dpx-span'>
-             <label class='bk-bs-radio' style='display: none !important;'>
-             </label>`
+             </tr></table><div class='dpx-span'>`
         )
 
         let labels: string[] = ["raw data", "Z (% strand size)", "Z (µm)"]
         let disabled: string = this.model.frozen ? ' disabled=true' : ''
         for(let j = 0; j < 3; ++j) {
-            html += `<label class='bk-bs-radio'><input ${disabled}
+            html += `<label class='bk bk-input-group'><input ${disabled}
                 ${j == this.model.displaytype ?' checked=true': ''}
                 type='radio' id='dpx-rp-displaytype-${j}'
                 class='dpx-rp-displaytype-itm dpx-rp-freeze'/>
@@ -99,10 +97,10 @@ export class DpxRampView extends WidgetView {
     }
 
     mk_inp(name: string, maxv:number = 100, dv: number = 0.1): string {
-        return `<input id='dpx-rp-${name}'
-             class='dpx-rp-freeze bk-widget-form-input'"
-             type='number' min=0 max=${maxv} step=${dv}
-             value=${this.model[name]}${this.model.frozen ? ' disabled=true' : ''}>`
+        return `<input id='dpx-rp-${name}' `                 +
+             `class='dpx-rp-freeze bk bk-input' `    +
+             `type='number' min=0 max=${maxv} step=${dv} `   +
+             `value=${this.model[name]}${this.model.frozen ? ' disabled=true' : ''}>`
     }
 
     static initClass() : void {

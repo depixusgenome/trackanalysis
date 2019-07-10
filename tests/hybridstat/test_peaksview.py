@@ -249,8 +249,8 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-
 
     assert server.selenium['.dpx-peakstatdiv'].text == (
         'Cycles\n'             '103\n'
-        'Stretch (base/µm)\n'  '1287.613\n'
-        'Bias (µm)\n'          '0.0113\n'
+        'Stretch (base/µm)\n'  '1164.062\n'
+        'Bias (µm)\n'          '0.0048\n'
         'σ[HF] (µm)\n'         '0.0018\n'
         'σ[Peaks] (µm)\n'      '0.0021 ± 0.0008\n'
         'Average Skew\n'       '-0.06 ± 0.11\n'
@@ -259,9 +259,9 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-
         'Singlestrand (µm)\n'
         'Events per Cycle\n'   '0.2 ± 0.2\n'
         'Down Time Φ₅ (s)\n'   '7.2\n'
-        'Sites found\n'        '5/8\n'
+        'Sites found\n'        '6/6\n'
         'Silhouette\n'         '1.0\n'
-        'reduced χ²\n'         '0.2'
+        'reduced χ²\n'         '1.3'
     )
 
 

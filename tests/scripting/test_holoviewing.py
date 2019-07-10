@@ -7,8 +7,9 @@
 import os
 import warnings
 from   concurrent.futures import ProcessPoolExecutor
+from   textwrap           import dedent
 import pytest
-from   tests.testutils import integrationmark
+from   tests.testutils    import integrationmark
 
 
 def _comp(txt, *itms):
@@ -286,5 +287,45 @@ def test_holoviewing_ref1d(tpe):
     "test hpin graphs"
     _run_holoviewing(_holoviewing_ref_1d, tpe)
 
+def _do_t_qc():
+    from scripting import TracksDict
+    import beadquality as bq
+    tracks = TracksDict( # type: ignore
+        "../data/100bp_4mer/*.pk",
+        match = r".*/(.*)\.pk"
+    )
+
+    dfmsg   = tracks.cleaning.messages().reset_index()
+    trackqc = bq.trackqualitysummary(tracks, dfmsg)
+    plot    = str(bq.displaystatusevolution(trackqc))
+    assert (
+        plot.replace("modification", "_").replace("cyclecount", "_") == dedent("""
+            :Overlay
+               .Points.Ok      :Points   [date,ok]   (track,error,missing,modification,cyclecount)
+               .Points.Error   :Points   [date,error]   (track,missing,ok,modification,cyclecount)
+               .Points.Missing :Points   [date,missing]   (track,error,ok,modification,cyclecount)
+               .Curve.Ok       :Curve   [date,ok]   (track,error,missing,modification,cyclecount)
+               .Curve.Error    :Curve   [date,error]   (track,missing,ok,modification,cyclecount)
+               .Curve.Missing  :Curve   [date,missing]   (track,error,ok,modification,cyclecount)
+        """).strip().replace("modification", "_").replace("cyclecount", "_")
+    )
+    assert str(bq.displaytrackstatus(trackqc)) == dedent("""
+            :Overlay
+               .HeatMap.I :HeatMap   [error,track]   (percentage,beads)
+               .Labels.I  :Labels   [error,track]   (percentage,beads)
+    """).strip()
+    assert str(bq.displaybeadandtrackstatus(trackqc)) == dedent("""
+            :HeatMap   [bead,track]   (errorid,mostcommonerror,modification)
+    """).strip()
+    assert str(bq.displaystatusflow(trackqc, ...)) == dedent("""
+            :Sankey   [From,To]   (bead,Left)
+    """).strip()
+    return tracks
+
+@integrationmark
+def test_qc():
+    "test jupyter callbacks"
+    _run_holoviewing(_do_t_qc)
+
 if __name__ == '__main__':
-    test_holoviewing_simple()
+    test_qc()

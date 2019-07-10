@@ -3,6 +3,7 @@
 # pylint: disable=redefined-outer-name
 """ Tests views """
 from   typing                   import Tuple
+from   bokeh.models             import GlyphRenderer
 import pytest
 import numpy as np
 from   numpy.testing            import assert_equal, assert_allclose
@@ -404,7 +405,13 @@ def test_undersampling(bokehaction):
     server.load('big_legacy')
     modal  = server.selenium.modal("//span[@class='icon-dpx-cog']", True)
     assert server.task(UndersamplingTask).framerate == 30.
-    src    = server.widget.get('Clean:Cycles').renderers[6].data_source
+    src    = (
+        next(
+            i
+            for i in server.widget.get('Clean:Cycles').renderers
+            if isinstance(i, GlyphRenderer)
+        ).data_source
+    )
     assert src.data['t'].shape == (10403,)
     with modal:
         modal.tab("Cleaning")

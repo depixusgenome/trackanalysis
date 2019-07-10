@@ -34,6 +34,8 @@ class DiscardedBeadsInputTheme:
         self.name          = "groupedbeads.input"
         self.discardedhelp = "Discard beads from displays"
         self.forcedhelp    = "Force beads to a hairpin"
+        self.width         = 290
+        self.height        = 70
 
 class DiscardedBeadsInput:
     "discarded beads"
@@ -47,6 +49,8 @@ class DiscardedBeadsInput:
         self.__widget = DpxDiscardedBeads(
             discardedhelp = self.__theme.discardedhelp,
             forcedhelp    = self.__theme.forcedhelp,
+            width         = self.__theme.width,
+            height        = self.__theme.height,
             name          = 'HairpinGroup:filter',
             **self.__data()
         )
@@ -95,7 +99,18 @@ class Widgets:
         mode = mainview.defaultsizingmode()
         wdg  = {i: j.addtodoc(mainview, ctrl, *_) for i, j in self._widgets}
         self.enabler = TaskWidgetEnabler(wdg)
-        out = layouts.widgetbox(sum((wdg[i] for i in self._ORDER), []), **mode)
+        out = layouts.widgetbox(
+            sum((wdg[i] for i in self._ORDER), []),
+            **mode
+        )
+
+        # pylint: disable=not-an-iterable
+        out.update(
+            width  = max(i.width  for i in out.children),
+            height = sum(i.height for i in out.children)
+        )
+        for i in out.children:
+            i.width = out.width
         return wdg, out
 
     @property
@@ -149,6 +164,8 @@ class WidthWidgetTheme:
         self.name        = "consensus.peak.width"
         self.placeholder = "Peak kernel width (base)"
         self.format      = "{:.1f}"
+        self.height      = 32
+        self.width       = 60
 
 class WidthWidget:
     "sets the width of the peaks"
@@ -163,7 +180,12 @@ class WidthWidget:
 
     def addtodoc(self, mainview, ctrl, *_):
         "sets-up the gui"
-        self._widget = TextInput(placeholder = self._theme.placeholder, **self.__data())
+        self._widget = TextInput(
+            placeholder = self._theme.placeholder,
+            width       = self._theme.width,
+            height      = self._theme.height,
+            **self.__data()
+        )
         def _on_cb(attr, old, new):
             if not mainview.isactive():
                 return
@@ -197,8 +219,8 @@ class WidthWidget:
 
 class ConsensusPlotWidgets(Widgets):
     "peaks plot widgets"
-    _MD    = ConsensusHistPlotModel
-    _ORDER = "seq", "oligos", "width"
+    _MD                              = ConsensusHistPlotModel
+    _ORDER: ClassVar[Tuple[str,...]] = ("seq", "oligos", "width", "peaks")
     def __init__(self, ctrl, mdl):
         theme         = PeakListTheme(name = "consensus.peaks", height = 400)
         get           = lambda x: [x[0]+'std', x[1].replace("(", "std ("), x[2]]
@@ -211,13 +233,7 @@ class ConsensusPlotWidgets(Widgets):
             get(theme.columns[-3])
         ]
 
-        self.seq      = PeaksSequencePathWidget(ctrl, mdl)
-        self.oligos   = OligoListWidget(ctrl)
-        self.peaks    = PeakListWidget(ctrl, mdl, theme)
-        self.width    = WidthWidget(ctrl, mdl)
-
-    def addtodoc(self, mainview, ctrl, doc, *_):
-        "creates the widget"
-        wdg, one = self._addtodoc(mainview, ctrl, doc, *_)
-        two      = layouts.widgetbox(wdg['peaks'], **mainview.defaultsizingmode())
-        return one, two
+        self.seq    = PeaksSequencePathWidget(ctrl, mdl)
+        self.oligos = OligoListWidget(ctrl)
+        self.width  = WidthWidget(ctrl, mdl)
+        self.peaks  = PeakListWidget(ctrl, mdl, theme)

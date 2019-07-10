@@ -1,2 +1,2 @@
-.dpx-ramp input { width: 80px; }
-#dpx-rp-minhfsigma { margin-bottom: 5px;}
+.dpx-ramp input[type=number] { width: 170px!important; }
+#dpx-rp-minhfsigma { margin-bottom: 5px!important;}
