@@ -296,7 +296,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
 
 class RampPlotView(PlotView[RampPlotCreator]):
     "Peaks plot view"
-    TASKS = ('datacleaning', 'extremumalignment',)
+    TASKS = 'undersampling', 'aberrant', 'datacleaning', 'extremumalignment'
     def ismain(self, ctrl):
         "Cleaning and alignment, ... are set-up by default"
         self._ismain(
