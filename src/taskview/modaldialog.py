@@ -460,8 +460,22 @@ class AdvancedWidget:
             if val == '':
                 return title, '', ''
             keys         = val[val.rfind('%(')+2:val.rfind(')')].split('.')
-            dfval, found = _default(keys)
-            curval       = _value(keys)
+            try:
+                dfval, found = _default(keys)
+            except Exception as exc: # pylint: disable=broad-except
+                LOGS.exception(exc)
+                dfval, found = None, False
+
+            try:
+                curval       = _value(keys)
+            except Exception as exc: # pylint: disable=broad-except
+                LOGS.exception(exc)
+                msg = (
+                    f"""<input type='text' placeholder="{exc}" """
+                    """disabled='true' style='width:100%'>"""
+                )
+                return (title, '', msg)
+
             if not found or dfval == curval:
                 return title, '', val
 
