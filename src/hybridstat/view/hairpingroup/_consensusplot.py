@@ -137,9 +137,6 @@ class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
         self.__resize(ctrl, out)
         return out
 
-    def _statehash(self):
-        return self._model.statehash(task = ...)
-
     def _reset(self, cache:CACHE_TYPE):
         done = 0
         try:

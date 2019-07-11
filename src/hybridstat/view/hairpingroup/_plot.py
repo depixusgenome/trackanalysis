@@ -345,9 +345,6 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
         self.__resize(ctrl, out, plots)
         return out
 
-    def _statehash(self):
-        return self._model.statehash(task = ...)
-
     def _reset(self, cache:CACHE_TYPE):
         done = 0
         try:

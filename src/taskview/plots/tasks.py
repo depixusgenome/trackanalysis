@@ -22,6 +22,9 @@ class TaskPlotCreator(PlotCreator[TModelType, PlotModelType]):
         if any(isinstance(i, TaskAccess) for i in self._model.__dict__.values()):
             ctrl.tasks.observe("updatetask", "addtask", "removetask", self. _onchangetask)
 
+    def _statehash(self):
+        return self._model.statehash(task = ...)
+
     def observe(self, ctrl, noerase = True):
         "sets-up model observers"
         super().observe(ctrl, noerase)

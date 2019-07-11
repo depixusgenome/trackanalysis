@@ -488,7 +488,6 @@ class FileListInput:
                 return
             new = min(len(lst)-1, max(0, ind+step))
             if new != ind:
-                print("qqqaa", ind, step, new)
                 _oncurrentfile_cb(None, None, new)
 
         ctrl.display.updatedefaults(
