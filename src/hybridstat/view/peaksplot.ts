@@ -23,9 +23,12 @@ on_change_bounds(fig: Plot, src: ColumnDataSource): void {
 
     dur.start = 0
     cnt.start = 0
-    if(zval.length < 2 || ix1 == ix2) {
+    if(zval.length < 2) {
         dur.end = 0
         cnt.end = 0
+    } else if(ix1 == ix2) {
+        dur.end = (src.data["duration"] as number [])[ix1]*1.05
+        cnt.end = (src.data["count"] as number [])[ix2]*1.05
     } else {
         dur.end = Math.max.apply(Math, (src.data["duration"] as number []).slice(ix1, ix2))*1.05
         cnt.end = Math.max.apply(Math, (src.data["count"] as number[]).slice(ix1, ix2))*1.05
