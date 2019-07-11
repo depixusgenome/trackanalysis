@@ -18,7 +18,7 @@ from bokeh.io             import curdoc
 from taskcontrol.taskio       import TaskIO
 from taskcontrol.beadscontrol import DataSelectionBeadController
 from utils                    import initdefaults
-from utils.gui                import parseints, leastcommonkeys, startfile
+from utils.gui                import parseints, leastcommonkeys
 from utils.logconfig          import getLogger
 from view.dialog              import FileDialog, FileDialogTheme
 from view.base                import BokehView, threadmethod, spawn
@@ -38,7 +38,6 @@ class BeadToolbarTheme:
     quitlabel    = 'Quit'
     opentitle    = 'Open a track or analysis file'
     savetitle    = 'Save an analysis file'
-    docurl       = "doc/"
     placeholder  = '1, 2, ..., bad, ... ?'
     tail         = ', ...'
     @initdefaults(frozenset(locals()))
@@ -147,7 +146,6 @@ class DpxToolbar(Widget):
     seltype     = props.Bool(True)
     message     = props.String('')
     helpmessage = props.String('')
-    docurl      = props.String("")
     hasquit     = props.Bool(False)
     hasdoc      = props.Bool(False)
     def __init__(self, **kwa):
@@ -537,24 +535,15 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
     def addtodoc(self, ctrl, doc):
         "adds items to doc"
         super().addtodoc(ctrl, doc)
-        assert doc is not None
-        path   = Path("").resolve()/self.__theme.docurl
-        if not path.exists():
-            path = Path("").resolve().parent/self.__theme.docurl
-
-        if not path.is_file():
-            path = (path/ctrl.APPNAME/ctrl.APPNAME).with_suffix(".html")
-
         tbar   = DpxToolbar(
             hasquit     = getattr(self._ctrl, 'FLEXXAPP', None) is not None,
-            hasdoc      = path.exists(),
+            hasdoc      = True,
             helpmessage = self.__theme.placeholder,
             height      = self.__theme.height,
             width       = ctrl.theme.get("theme", "appsize")[0]
         )
 
-        tbar.on_change("doc", lambda attr, old, new: startfile(str(path)))
-
+        tbar.on_change("doc", lambda attr, old, new: ctrl.display.handle('changelog', args = {}))
         def _ontasks(old = None, **_):
             if 'roottask' not in old:
                 return
