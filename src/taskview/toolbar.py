@@ -286,12 +286,18 @@ class MessagesView:
             except RuntimeError:
                 pass
 
+def _keyinit(ctrl, name:str, key:str):
+    "Sets up the controller"
+    ctrl.theme.updatedefaults(
+        'keystroke', **{f'{name}{i}': f'{key}{i.capitalize()}' for i in ('up', 'down')}
+    )
+
 class BeadInput:
     "Spinner for controlling the current bead"
     @staticmethod
     def init(ctrl):
         "Sets up the controller"
-        ctrl.theme.updatedefaults('keystroke', beadup = 'PageUp', beaddown = 'PageDown')
+        _keyinit(ctrl, 'bead', 'Page')
 
     @staticmethod
     def setup(ctrl, tbar: DpxToolbar, _):
@@ -328,9 +334,11 @@ class BeadInput:
         tbar.on_change('bead', _chg_cb)
         ctrl.display.observe("tasks", _onproject)
         ctrl.tasks  .observe("updatetask", "addtask", "removetask", _onproject)
-        ctrl.display.updatedefaults('keystroke',
-                                    beadup   = lambda: _chg_cb2(1),
-                                    beaddown = lambda: _chg_cb2(-1))
+        ctrl.display.updatedefaults(
+            'keystroke',
+            beadup   = lambda: _chg_cb2(1),
+            beaddown = lambda: _chg_cb2(-1)
+        )
 
 class RejectedBeadsInput:
     "Text dealing with rejected beads"
@@ -426,6 +434,7 @@ class FileListInput:
     def init(ctrl):
         "Sets up the controller"
         FileList(ctrl = ctrl)
+        _keyinit(ctrl, 'track', 'Shift-Page')
 
     @staticmethod
     def setup(ctrl, tbar: DpxToolbar, _):
@@ -472,6 +481,23 @@ class FileListInput:
                     ctrl.tasks.closetrack(lst[inew][1])
 
         tbar.on_change('delfile', _ondelfile_cb)
+
+        def _chg_cb2(step):
+            lst = list(FileList.get(ctrl))
+            cur = ctrl.display.get("tasks", "roottask")
+            ind = next((i for i, (_, j) in enumerate(lst) if j is cur), None)
+            if ind is None:
+                return
+            new = min(len(lst)-1, max(0, ind+step))
+            if new != ind:
+                print("qqqaa", ind, step, new)
+                _oncurrentfile_cb(None, None, new)
+
+        ctrl.display.updatedefaults(
+            'keystroke',
+            trackup   = lambda: _chg_cb2(1),
+            trackdown = lambda: _chg_cb2(-1)
+        )
 
 class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
     "Toolbar"
