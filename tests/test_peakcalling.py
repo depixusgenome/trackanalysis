@@ -20,7 +20,9 @@ from peakcalling                import cost, match, Range
 from peakcalling.tohairpin      import (PeakMatching, GaussianProductFit,
                                         ChiSquareFit, PeakGridFit, EdgePeaksGridFit,
                                         PiecesPeakGridFit)
-from peakcalling.toreference    import HistogramFit, ChiSquareHistogramFit, Pivot
+from peakcalling.toreference    import (
+    HistogramFit, ChiSquareHistogramFit, Pivot, ReferencePeaksFit
+)
 from peakcalling.processor      import (BeadsByHairpinProcessor, BeadsByHairpinTask,
                                         DistanceConstraint, FitToReferenceTask, FitToHairpinTask)
 from tests.testingcore          import DummyPool, path as utpath
@@ -62,6 +64,12 @@ def test_toref_frompeaks():
                                                       res.binwidth/1.01))
 
     assert_allclose(ret[1:], [1.01, .01], rtol = 5e-4, atol = 5e-4)
+
+    pair = create(utpath("big_selected"), EventDetectionTask(), PeakSelectorTask())
+    pks  = {i: tuple(j) for i, j in next(iter(pair.run()))}
+    res  = ReferencePeaksFit().frompeaks(next(iter(pks.values())))
+    ret  = ReferencePeaksFit().optimize(res, res/1.01+0.1)
+    assert_allclose(ret[1:], [1.01, .1], rtol = 5e-4, atol = 1e-2)
 
 def test_ref_peaksgrid():
     "tests peaks grid with a single read"
@@ -373,4 +381,4 @@ def test_hp_dataframe():
     assert pair.index.names == ['hpin', 'track', 'bead']
 
 if __name__ == '__main__':
-    test_hp_dataframe()
+    test_toref_frompeaks()

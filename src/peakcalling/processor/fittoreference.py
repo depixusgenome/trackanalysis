@@ -16,7 +16,7 @@ from   taskcontrol.processor.runner     import run as _runprocessors
 from   taskcontrol.processor.taskview   import TaskViewProcessor
 from   taskmodel                        import Task, Level
 from   utils                            import initdefaults
-from   ..toreference                    import ReferenceFit, ChiSquareHistogramFit
+from   ..toreference                    import ReferenceFit, ReferencePeaksFit
 from   ..tohairpin                      import HairpinFitter
 from   .._core                          import match as _match # pylint: disable=import-error
 
@@ -99,7 +99,7 @@ class FitToReferenceTask(Task, zattributes = ('fitalg', "~window")):
     level   : Level        = Level.peak
     defaultdata            = None
     fitdata                = cast(Fitters, _FitDataDescriptor())
-    fitalg  : ReferenceFit = ChiSquareHistogramFit()
+    fitalg  : ReferenceFit = ReferencePeaksFit()
     window  : float        = 10./StretchFactor.DNA.value
     @initdefaults(frozenset(locals()) - {'level'},
                   peaks       = lambda self, val: self.frompeaks (val),

@@ -7,7 +7,7 @@ from    typing                      import (Sequence, NamedTuple, Tuple, Union,
                                             Iterator, cast)
 from    abc                         import ABC, abstractmethod
 from    functools                   import partial
-from    copy                        import deepcopy
+from    copy                        import deepcopy, copy
 from    scipy.interpolate           import interp1d
 from    scipy.optimize              import fmin_cobyla
 import  numpy                       as     np
@@ -19,6 +19,7 @@ from    peakfinding.histogram       import Histogram, HistogramData
 from    peakfinding.probabilities   import Probability
 from    peakfinding.selector        import PeakSelectorDetails
 from    .chisquare                  import ChiSquare
+from    .tohairpin                  import HairpinFitter, GaussianProductFit
 from    ._base                      import (GriddedOptimization, CobylaParameters,
                                             Distance, Range, Symmetry, Pivot, DEFAULT_BEST)
 
@@ -122,6 +123,10 @@ class HistogramFit(GriddedOptimization, ReferenceFit):
         return fcn(stretch, bias-right.minv+left.minv/stretch)
 
     def _get(self, left) -> FitData:
+        if isinstance(left, tuple) and len(left) == 2 and not np.isscalar(left[0]):
+            # returned from self.frompeaks
+            left = left[0]
+
         hist, vals = self._to_2d(left)
 
         if self.pivot == Pivot.top:
@@ -236,9 +241,8 @@ class CorrectedHistogramFit(HistogramFit):
     1. finding the best correlation for histograms
     2. fitting a linear regression to paired peaks
     """
-    window       = 1.5e-2
-    firstregpeak = 1
-
+    window:       float = 1.5e-2
+    firstregpeak: int   = 1
     def frompeaks(self, peaks:Union[np.ndarray, PeaksDict], firstpeak = 0):
         "creates a histogram from a list of peaks with their count"
         if isinstance(peaks, PeaksDict):
@@ -336,18 +340,73 @@ class ChiSquareHistogramFit(CorrectedHistogramFit):
                          self.window, stretch, bias, self.symmetry,
                          False, True).value()[0]
 
-class HairpinFitAlg(ReferenceFit):
+class _WindowDescriptor:
+    window: float = CorrectedHistogramFit.window
+    def __get__(self, inst, tpe):
+        return inst.fitter.precision if inst else self.window
+    def __set__(self, inst, value):
+        inst.fitter.precision = value
+
+class ReferencePeaksFit(ReferenceFit):
     "adaptor for hairpin fitters"
-    def optimize(self, aleft, aright) -> Distance:
-        "find best stretch & bias to fit right against left"
-        return aleft.optimize(aright)
+    fitter: HairpinFitter = GaussianProductFit(
+        precision      = CorrectedHistogramFit.window,
+        defaultstretch = 1.,
+        stretch        = Range(1., .2, .05),
+        bias           = Range(None, .04, .01)
+    )
+    window: float      = cast(float, _WindowDescriptor())
 
     def frompeaks(self, peaks:Union[np.ndarray, PeaksDict], firstpeak = 0):
-        "returns the list of peaks"
+        "creates a histogram from a list of peaks with their count"
         if isinstance(peaks, PeaksDict):
             peaks = tuple(next(iter(peaks))[1])
-        return [i for i, _ in peaks][firstpeak:]
+        return np.asarray([i for i, _ in peaks], dtype = 'f4')[firstpeak:]
 
     def fromevents(self, evts:Events):
-        "returns the list of peaks"
+        "creates a histogram from a list of events"
         return self.frompeaks(cast(PeaksDict, evts.new(PeaksDict)))
+
+    @staticmethod
+    def _getpeaks(orig, data) -> np.ndarray:
+        if isinstance(orig, PeakSelectorDetails):
+            peaks = orig.peaks
+        elif str(getattr(orig, 'dtype', ' '))[0] == 'f' and len(orig.shape) == 2:
+            # expecting a 2D table as in hv.Curve.data
+            peaks = orig[1:-1, 0][np.logical_and(orig[2:,  1] < orig[1:-1, 1],
+                                                 orig[:-2, 1] < orig[1:-1, 1])]
+        else:
+            hist  = data[1]
+            pos   = np.logical_and(hist[2:] < hist[1:-1], hist[:-2] < hist[1:-1])
+            peaks = data[0][np.nonzero(pos)[0]]
+        return cast(np.ndarray, np.unique(peaks))
+
+    @staticmethod
+    def _get(left) -> ChiSquareData:
+        if isinstance(left, tuple):
+            return left[1]
+
+        if isinstance(left, PeakSelectorDetails):
+            return left.peaks
+
+        if str(getattr(left, 'dtype', ' '))[0] == 'f' and len(left.shape) == 2:
+            # expecting a 2D table as in hv.Curve.data
+            return left[1:-1, 0][np.logical_and(
+                left[2:,  1] < left[1:-1, 1],
+                left[:-2, 1] < left[1:-1, 1]
+            )]
+        return np.asarray(left, dtype = 'f4')
+
+    def buildfitter(self, aleft) -> Distance:
+        "find best stretch & bias to fit right against left"
+        cpy         = copy(self.fitter)
+        cpy.peaks   = self._get(aleft)
+        return cpy
+
+    def optimize(self, aleft, aright) -> Distance:
+        "find best stretch & bias to fit right against left"
+        return self.buildfitter(aleft).optimize(self._get(aright))
+
+    def value(self, aleft, aright) -> Distance:
+        "find the value to fit right against left"
+        return self.buildfitter(aleft).value(self._get(aright))
