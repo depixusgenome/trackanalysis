@@ -6,7 +6,10 @@ from pathlib                              import Path
 from copy                                 import deepcopy
 from concurrent.futures                   import ProcessPoolExecutor, ThreadPoolExecutor
 
-from cleaning.processor                   import DataCleaningTask, DataCleaningException
+from eventdetection.processor             import ExtremumAlignmentTask
+from cleaning.processor                   import (
+    DataCleaningTask, DataCleaningException, ClippingTask
+)
 from peakfinding.processor                import PeakSelectorTask
 from peakfinding.reporting.processor      import PeakFindingExcelTask
 from peakcalling.processor                import FitToHairpinTask, BeadsByHairpinTask
@@ -133,10 +136,13 @@ class ConfigXlsxIO(TaskIO):
             self.__msg(self.__theme.start)
         return ret
 
-    __TASKS = 'singlestrand', 'baselinefilter', 'fittoreference', 'identification'
+    __TASKS  = 'singlestrand', 'baselinefilter', 'fittoreference', 'identification'
+    __EXCEPT = DataCleaningTask, ExtremumAlignmentTask, ClippingTask
     def __complete_model(self, model, pksmdl):
-        ind = next((i for i, j in enumerate(model) if isinstance(j, DataCleaningTask)),
-                   None)
+        ind = max(
+            (i for i, j in enumerate(model) if isinstance(j, self.__EXCEPT)),
+            None
+        )
         if ind is not None:
             model.insert(ind+1, ExceptionCatchingTask(exceptions = [DataCleaningException]))
 
