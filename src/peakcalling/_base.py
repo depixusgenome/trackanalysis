@@ -85,10 +85,10 @@ def config(self:OptimType, **kwa) -> Dict[str, float]:
 
 class OptimizationParams:
     "Optimizing parameters"
-    defaultstretch   = StretchFactor.DNA.value
-    stretch          = Range(defaultstretch, StretchRange.DNA.value, 100.)
-    bias             = Range(None,       60./defaultstretch, 60./defaultstretch)
-    optim: OptimType = LBFGSParameters(1e-4, 1e-8, 1e-4, 1e-8, 100)
+    defaultstretch: float     = StretchFactor.DNA.value
+    stretch:        Range     = Range(defaultstretch, StretchRange.DNA.value, 100.)
+    bias:           Range     = Range(None,       60./defaultstretch, 60./defaultstretch)
+    optim:          OptimType = LBFGSParameters(1e-4, 1e-8, 1e-4, 1e-8, 100)
 
     def __delayed_init__(self, _):
         if {self.defaultstretch, self.stretch} & {'dna', 'DNA'}:

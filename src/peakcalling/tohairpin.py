@@ -18,9 +18,9 @@ from ._core         import cost as _cost, match as _match # pylint: disable=impo
 
 class HairpinFitter(OptimizationParams):
     "Class containing theoretical peaks and means for matching them to experimental ones"
-    peaks      = np.empty((0,), dtype = 'f4') # type: np.array
-    pivot      = Pivot.bottom
-    strandsize = 0
+    peaks:      np.ndarray = np.empty((0,), dtype = 'f4')
+    pivot:      Pivot      = Pivot.bottom
+    strandsize: int        = 0
 
     def __delayed_init__(self, _):
         self.peaks = np.asarray(self.peaks, dtype = "f4")
@@ -135,7 +135,7 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
 
         1 - R(X, Y)/sqrt(R(X, X) R(Y, Y))
     """
-    precision = 15.
+    precision:float = 15.
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         HairpinFitter.__init__(self, **kwa)
