@@ -3,6 +3,7 @@ suggest(
         holoviews      = '1.10.9',
         jupyter        = '1.0',
         jupyter_client = '5.2.3',
+        hvplot         = '0.4',
         panel          = '0.4.0',
         ipywidgets     = '7.4.2',
         ipyparallel    = '6.2.3',
