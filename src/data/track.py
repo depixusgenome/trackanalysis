@@ -3,8 +3,9 @@
 """
 Base track file data.
 """
-from    typing      import (Type, Optional, Union, Dict, Tuple, Any, List,
-                            Sequence, Iterator, Iterable, overload, cast)
+from    typing      import (
+    Type, Optional, Union, Dict, Tuple, Any, List, ClassVar,
+    Sequence, Iterator, Iterable, overload, cast)
 from    copy        import deepcopy
 from    enum        import Enum
 import  numpy       as     np
@@ -453,7 +454,7 @@ class Track:
     def getdata(self) -> DATA:
         "returns the dataframe with all bead info"
         self.load()
-        return self._data
+        return cast(DATA, self._data)
 
     def setdata(self, data: Optional[Dict[BEADKEY, np.ndarray]]):
         "sets the dataframe"
@@ -541,17 +542,19 @@ class Track:
         else:
             self.__dict__['_lazydata_'] = val
 
-    _framerate                   = 30.
-    _fov:         Optional[FoV]  = None
-    _instrument:  Dict[str, Any] = {"type": InstrumentType.picotwist.name,
-                                    "name": None}
-    _phases                      = np.empty((0,9), dtype = 'i4')
-    _data:        Optional[DATA] = None # type: ignore
-    _secondaries: Optional[DATA] = None
-    _rawprecisions               = {}
-    _path:        Optional[PATHTYPES] = None
-    _axis                             = Axis.Zaxis
-    _RAWPRECION_RATE                  = 10.
+    _framerate:       float                = 30.
+    _fov:             Optional[FoV]        = None
+    _instrument:      Dict[str, Any]       = {
+        "type": InstrumentType.picotwist.name,
+        "name": None
+    }
+    _phases:          np.ndarray           = np.empty((0,9), dtype = 'i4')
+    _data:            Optional[DATA]       = None # type: ignore
+    _secondaries:     Optional[DATA]       = None
+    _rawprecisions:   Dict[BEADKEY, float] = {}
+    _path:            Optional[PATHTYPES]  = None
+    _axis:            Axis                 = Axis.Zaxis
+    _RAWPRECION_RATE: ClassVar[float]      = 10.
 
     @overload
     def rawprecision(self, ibead: int) -> float:

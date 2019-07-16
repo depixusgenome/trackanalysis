@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot view for cleaning data"
-from    typing         import Dict, Tuple, List, Optional, Iterator, cast
+from    typing         import (
+    Dict, Tuple, List, Optional, Iterator, Callable, cast
+)
 from    pathlib        import Path
 import time
 
@@ -216,7 +218,7 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
                     disable = False
         finally:
             data = self.__data(track, cycles, zmag)
-            extr = lambda x: sum(
+            extr: Callable[[str], List[Tuple[float, float]]] = lambda x: sum(
                 ([np.nanmin(i[x]), np.nanmax(i[x])]  for i in data if len(i.get(x, ()))),
                 []
             )

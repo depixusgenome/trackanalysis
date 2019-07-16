@@ -14,16 +14,23 @@ PYVERS         = (
     '=3.7.0=hfd72cd7_0=conda-forge'
 )
 
-require(python = {'python': PYVERS, 'numpy': '1.14.2', 'pandas': '0.21.0'},
-        rtime  = True)
+require(
+    python = {'python': PYVERS, 'numpy': '1.14.2', 'pandas': '0.21.0'},
+    rtime  = True
+)
 
-require(python = {'pybind11'    : '2.2.1',
-                  'pylint'      : '=2.2.2',
-                  'astroid'     : '=2.1.0',
-                  'mypy'        : '=0.701',
-                  'sphinx'      : '2.1',
-                  'pandoc'      : '2.2.3'},
-        rtime  = False)
+require(
+    python = {
+        'coverage'    : '4.5.3',
+        'pybind11'    : '2.2.1',
+        'pylint'      : '=2.2.2',
+        'astroid'     : '=2.1.0',
+        'mypy'        : '=0.720',
+        'sphinx'      : '2.1',
+        'pandoc'      : '2.2.3'
+    },
+    rtime  = False
+)
 
 MODULES.addbuild(locals())
 PyTesting.make(locals())

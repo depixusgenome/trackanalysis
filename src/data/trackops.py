@@ -89,9 +89,9 @@ def selectcycles(trk:TRACKS, indexes:Union[slice, range, List[int]])-> TRACKS:
     if trk.path:
         path  = Path(str(trk.path[0] if isinstance(trk.path, (list, tuple)) else trk.path))
         start = (
-            indexes.stop  if getattr(indexes, 'stop',  None) is not None else
-            indexes.start if getattr(indexes, 'start', None) else
-            indexes[-1]   if hasattr(indexes, '__getitem__') else
+            cast(slice, indexes).stop    if getattr(indexes, 'stop',  None) is not None else
+            cast(slice, indexes).start   if getattr(indexes, 'start', None) else
+            cast(List[int], indexes)[-1] if hasattr(indexes, '__getitem__') else
             None
         )
     if start is not None:
