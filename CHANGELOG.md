@@ -1,7 +1,7 @@
 # CycleApp
 ## cycles_v6.11
 
-* 2019-07-11 09:02:39 +0200  (tag: ramp_v2.3.1, tag: cycles_v6.11.1)
+* 2019-07-17 09:20:39 +0200  (tag: ramp_v2.3.1, tag: cycles_v6.11.1)
 * 2019-07-10 10:30:59 +0000  (tag: ramp_v2.3, tag: cycles_v6.11)
 
 ### Cambridge Features
