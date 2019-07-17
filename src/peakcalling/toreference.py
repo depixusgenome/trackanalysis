@@ -357,6 +357,12 @@ class ReferencePeaksFit(ReferenceFit):
     )
     window: float      = cast(float, _WindowDescriptor())
 
+    def rescale(self, value:float) -> 'ReferencePeaksFit':
+        "rescale factors (from µm to V for example) for a given bead"
+        cpy        = copy(self)
+        cpy.fitter = cpy.fitter.rescale(value)
+        return cpy
+
     def frompeaks(self, peaks:Union[np.ndarray, PeaksDict], firstpeak = 0):
         "creates a histogram from a list of peaks with their count"
         if isinstance(peaks, PeaksDict):
