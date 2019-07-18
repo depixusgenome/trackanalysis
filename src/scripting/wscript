@@ -1,6 +1,7 @@
+require(python = dict(holoviews = '1.10.9'), rtime = False)
+
 suggest(
     python = dict(
-        holoviews      = '1.10.9',
         jupyter        = '1.0',
         jupyter_client = '5.2.3',
         hvplot         = '0.4',
