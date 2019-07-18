@@ -10,12 +10,15 @@ namespace samples
         namespace
         {
             template <typename T>
-            inline float _level(std::pair<T,float> val)
+            inline float _level(std::pair<T, float> val)
             {
-                if(val.first <= 0)
-                    return 1.;
-                bm::students_t dist(double(val.first));
-                return float(bm::cdf(dist, std::abs(val.second)));
+                // The degree-of-freedom (arg passed to boost's `dist()`) must be > 0
+                if (std::isfinite(val.first) && val.first > 0)
+                {
+                    bm::students_t dist(double(val.first));
+                    return float(bm::cdf(dist, std::abs(val.second)));
+                }
+                return 1.;
             }
 
             template <typename T>
@@ -101,8 +104,8 @@ namespace samples
 
             float  threshold(float val) { return 1.0f-val*.5f; }
 
-            float  tothresholdvalue(Input const & left, Input const & right)
             {
+            float  tothresholdvalue(Input const & left, Input const & right)
                 if(right.count == 1 || left.count == 1)
                     return 1.;
 
