@@ -104,8 +104,8 @@ namespace samples
 
             float  threshold(float val) { return 1.0f-val*.5f; }
 
-            {
             float  tothresholdvalue(Input const & left, Input const & right)
+            {
                 if(right.count == 1 || left.count == 1)
                     return 1.;
 
