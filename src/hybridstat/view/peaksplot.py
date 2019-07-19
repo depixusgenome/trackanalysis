@@ -71,12 +71,14 @@ class PeaksSequenceHover(# pylint: disable=too-many-instance-attributes,too-many
 
 class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     "Creates plots for peaks"
-    _rends:  List[Tuple]
-    _fig:    Figure
-    _theme:  PeaksPlotTheme
-    _errors: PlotError
-    _hover  : PeaksSequenceHover
-    _ticker : SequenceTicker
+    _plotmodel: PeaksPlotModel
+    _model:     PeaksPlotModelAccess
+    _rends:     List[Tuple]
+    _fig:       Figure
+    _theme:     PeaksPlotTheme
+    _errors:    PlotError
+    _hover:     PeaksSequenceHover
+    _ticker:    SequenceTicker
     def __init__(self, ctrl):
         super().__init__(ctrl, noerase = False)
         self._src: Dict[str, ColumnDataSource] = {}

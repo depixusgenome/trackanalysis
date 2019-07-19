@@ -24,6 +24,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
                                               DriftControlPlotModel]):
     "Shows temperature temporal series"
     _plotmodel: DriftControlPlotModel
+    _model:     QualityControlModelAccess
     _theme:     DriftControlPlotTheme
     _config:    DriftControlPlotConfig
     _src:       List[ColumnDataSource]

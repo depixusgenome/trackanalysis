@@ -28,12 +28,13 @@ ColumnData = Dict[str, np.ndarray]
 FigData    = Dict[str, ColumnData]
 class GBScatterCreator(TaskPlotCreator[HairpinGroupModelAccess, HairpinGroupScatterModel]):
     "Building a scatter plot of beads vs hybridization positions"
-    _model:  HairpinGroupModelAccess
-    _theme:  HairpinGroupScatterTheme
-    _src:    Dict[str, ColumnDataSource]
-    _fig:    Figure
-    _ref:    LinearAxis
-    _errors: PlotError
+    _plotmodel: HairpinGroupScatterModel
+    _model:     HairpinGroupModelAccess
+    _theme:     HairpinGroupScatterTheme
+    _src:       Dict[str, ColumnDataSource]
+    _fig:       Figure
+    _ref:       LinearAxis
+    _errors:    PlotError
     def create(self):
         "add to doc"
         self._src = {i: ColumnDataSource(data = j) for i, j in self._data(None).items()}
@@ -135,6 +136,7 @@ class GBScatterCreator(TaskPlotCreator[HairpinGroupModelAccess, HairpinGroupScat
 
 class GBHistCreator(TaskPlotCreator[HairpinGroupModelAccess, HairpinGroupHistModel]):
     "Building a histogram for a given peak characteristic"
+    _plotmodel: HairpinGroupHistModel
     _model:     HairpinGroupModelAccess
     _theme:     HairpinGroupHistTheme
     _src:       ColumnDataSource

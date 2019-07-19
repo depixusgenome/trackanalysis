@@ -7,7 +7,7 @@ from   copy                    import deepcopy
 from   typing                  import Tuple, List, Optional, Union, Callable
 
 from   data.__scripting__      import Track, TracksDict
-from   taskmodel.application   import TasksConfig, InstrumentType
+from   taskmodel.application   import TasksConfig, InstrumentType, TasksModel
 from   taskmodel.__scripting__ import Tasks, Task
 from   utils                   import initdefaults
 from   utils.decoration        import addto
@@ -82,7 +82,7 @@ def scriptingmodel(name = None, defaultmodel = False, **kwa):
     return scriptapp.scriptingmodel(name, defaultmodel, **kwa)
 
 @addto(Tasks, staticmethod)
-def tasksmodel(name = None, defaultmodel = False, **kwa):
+def tasksmodel(name = None, defaultmodel = False, **kwa) -> TasksModel:
     "returns the config accessor"
     return scriptapp.tasksmodel(name, defaultmodel, **kwa)
 

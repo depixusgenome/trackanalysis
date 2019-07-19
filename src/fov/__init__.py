@@ -232,6 +232,8 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
 class FoVPlotCreator(BaseFoVPlotCreator[QualityControlModelAccess, # type: ignore
                                         FoVPlotModel]):
     "Plots a default bead and its FoV"
+    _model:     QualityControlModelAccess
+    _plotmodel: FoVPlotModel
     def _tooltips(self):
         msgs                            = self._model.messages()
         ttips: Dict[BEADKEY, List[str]] = {}

@@ -180,11 +180,13 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
 TModelAccess = TypeVar('TModelAccess', bound = PeaksPlotModelAccess)
 class BaseHistPlotCreator(TaskPlotCreator[TModelAccess, PlotModelType]):
     "Creates a histogram of peaks"
-    _theme: HistPlotTheme
-    _fig: Figure
-    _src: Dict[str, ColumnDataSource]
-    _exp: LinearAxis
-    _ref: LinearAxis
+    _plotmodel: PlotModelType
+    _model:     TModelAccess
+    _theme:     HistPlotTheme
+    _fig:       Figure
+    _src:       Dict[str, ColumnDataSource]
+    _exp:       LinearAxis
+    _ref:       LinearAxis
     peaksdata = cast(ColumnDataSource, property(lambda self: self._src['peaks']))
     plot      = cast(Figure,           property(lambda self: self._fig))
     def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument

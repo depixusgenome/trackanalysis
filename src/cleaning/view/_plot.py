@@ -187,12 +187,13 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
 
 class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotModel]):
     "Building the graph of cycles"
-    _model:    DataCleaningModelAccess
-    _theme:    CleaningPlotTheme
-    _errors:   PlotError
-    _widgets:  CleaningWidgets
-    __source:  ColumnDataSource
-    __fig:     Figure
+    _plotmodel: CleaningPlotModel
+    _model:     DataCleaningModelAccess
+    _theme:     CleaningPlotTheme
+    _errors:    PlotError
+    _widgets:   CleaningWidgets
+    __source:   ColumnDataSource
+    __fig:      Figure
     def __init__(self,  ctrl, **kwa) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl, noerase = False)

@@ -19,7 +19,7 @@ from   data.__scripting__.track         import Track
 from   data.__scripting__.tracksdict    import TracksDict
 from   utils.decoration                 import addproperty, addto
 from   taskcontrol.processor.dataframe  import DataFrameFactory
-from   taskmodel.__scripting__          import Tasks
+from   taskmodel.__scripting__          import Tasks, Task
 from   taskmodel.__scripting__.track    import LocalTasks
 from   ..processor                      import (DataCleaningProcessor,
                                                 DataCleaningErrorMessage,
@@ -245,7 +245,7 @@ class TrackCleaningScriptData:
             cnf = task.config()
 
         elif task is None:
-            cnf         = Tasks.subtraction(beads = beads).config()
+            cnf          = cast(Task, Tasks.subtraction(beads = beads)).config()
         else:
             cnf          = task.config()
             cnf['beads'] = beads

@@ -21,7 +21,8 @@ class ConsensusHistPlotCreator(
         BaseHistPlotCreator[ConsensusModelAccess, ConsensusHistPlotModel]
 ):
     "Creates hist for a consensus bead"
-    _model: ConsensusModelAccess
+    _plotmodel: ConsensusHistPlotModel
+    _model:     ConsensusModelAccess
     def _createpeaks(self, itms, out):
         peaks, allpks, factor = self._model.consensuspeaks(itms)
         colors = [tohex(themed(self._model.themename, self._theme.pkcolors)[i])
@@ -57,10 +58,11 @@ class ConsensusScatterPlotCreator(
         TaskPlotCreator[ConsensusModelAccess, ConsensusScatterModel]
 ):
     "Creates scatter plot of rates & durations"
-    _model:  ConsensusModelAccess
-    _theme:  ConsensusScatterTheme
-    _src:    ColumnDataSource
-    _fig:    Figure
+    _plotmodel: ConsensusScatterModel
+    _model:     ConsensusModelAccess
+    _theme:     ConsensusScatterTheme
+    _src:       ColumnDataSource
+    _fig:       Figure
     def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument,no-self-use
         assert False
 

@@ -14,6 +14,8 @@ from ._model                import RampTaskPlotModelAccess, RampPlotDisplay
 class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess, # type: ignore
                                         FoVPlotModel]):
     "Plots a default bead and its FoV"
+    _plotmodel: FoVPlotModel
+    _model:     RampTaskPlotModelAccess
     _rampdisplay = Indirection()
     def observe(self, ctrl, noerase = True):
         "sets-up model observers"
@@ -33,7 +35,6 @@ class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess, # type: ignore
 
 class FoVPlotView(PlotView[FoVPlotCreator]):
     "FoV plot view"
-
 
 class RampCleaningPlotCreator(CleaningPlotCreator):
     "cleaning for ramps"

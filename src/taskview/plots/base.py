@@ -7,17 +7,13 @@ from    taskmodel.application   import TaskIOTheme
 # pylint: disable=unused-import
 from    view.plots.base         import (
     CACHE_TYPE, themed, checksizes, GroupStateDescriptor, PlotAttrsView,
-    PlotThemeView, PlotUpdater, AxisOberver, PlotCreator as _PlotCreator,
+    PlotThemeView, PlotUpdater, AxisOberver, PlotCreator,
     PlotView as _PlotView, PlotModelType, ControlModel, ControlModelType
 )
 
 ModelType = TypeVar('ModelType', bound = PlotModelAccess)
-ControlModel.register(PlotModelAccess)
-
-class PlotCreator(_PlotCreator[ControlModelType, PlotModelType]): # pylint: disable=abstract-method
-    "Base plotter class"
-
 PlotType  = TypeVar('PlotType',  bound = PlotCreator)
+ControlModel.register(PlotModelAccess)
 class PlotView(_PlotView[PlotType]):
     "plot view"
     # pylint: disable=arguments-differ

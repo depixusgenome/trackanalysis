@@ -146,11 +146,12 @@ class ConfigXlsxIO(TaskIO):
 _DataType = Tuple[Dict[str, np.ndarray], ...]
 class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
     "Building the graph of cycles"
-    _theme:         RampPlotTheme
-    _display:       RampPlotDisplay
-    _plotmodel:     RampPlotModel
-    __src:          Tuple[ColumnDataSource,...]
-    __fig:          Figure
+    _plotmodel: RampPlotModel
+    _model:     RampTaskPlotModelAccess
+    _theme:     RampPlotTheme
+    _display:   RampPlotDisplay
+    __src:      Tuple[ColumnDataSource,...]
+    __fig:      Figure
     def __init__(self,  ctrl) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl, noerase = False)
