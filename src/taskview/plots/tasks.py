@@ -9,6 +9,8 @@ from .base                   import PlotCreator, PlotModelType, CACHE_TYPE
 TModelType = TypeVar('TModelType', bound = TaskPlotModelAccess)
 class TaskPlotCreator(PlotCreator[TModelType, PlotModelType]):
     "Base plotter for tracks"
+    _plotmodel: PlotModelType
+    _model:     TModelType
     def _onchangetask(self, parent = None, task = None, calllater = None, **_):
         if self._model.impacts(parent, task):
             calllater.append(lambda: self.reset(False))

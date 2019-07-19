@@ -32,7 +32,9 @@ class QCPlotState:
 
 class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess, None]):
     "Creates plots for discard list"
-    _RESET: frozenset = frozenset()
+    _plotmodel: None
+    _model:     QualityControlModelAccess
+    _RESET:     frozenset = frozenset()
     state = cast(PlotState, _StateDescriptor())
     def __init__(self, ctrl):
         super().__init__(ctrl, addto = False)

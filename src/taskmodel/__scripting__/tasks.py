@@ -128,7 +128,7 @@ class _DOCHelper(Enum):
             return fcn
         return _wrapper
 
-class Tasks(Enum):
+class Tasks(Enum): # pylint: disable=too-many-public-methods
     """
     Most available tasks can be created using this class:
 

@@ -152,7 +152,7 @@ class TrackOperations:
         "rescales elements to the current bead"
         self._trk.load()
         trk   = shallowcopy(self._trk)
-        items = Tasks.tasksmodel().rescale(trk, bead)
+        items = getattr(Tasks.tasksmodel(), 'rescale')(trk, bead)
         instr = trk.instrument['type'].value
         if instr in items:
             names = {j: i for i, j in getattr(Tasks, '_cnv')(None).items()}

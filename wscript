@@ -23,8 +23,8 @@ require(
     python = {
         'coverage'    : '4.5.3',
         'pybind11'    : '2.2.1',
-        'pylint'      : '=2.2.2',
-        'astroid'     : '=2.1.0',
+        'pylint'      : '=2.3.1',
+        'astroid'     : '=2.2.5',
         'mypy'        : '=0.720',
         'sphinx'      : '2.1',
         'pandoc'      : '2.2.3'
