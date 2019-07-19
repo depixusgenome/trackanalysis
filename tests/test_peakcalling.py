@@ -351,6 +351,7 @@ def test_hp_task_creation():
         oligos   = "ctgc",
         fit      = ChiSquareFit(),
     )
+    assert isinstance(task.fit.pop(None), ChiSquareFit)
     assert set(task.fit) == {'015', *(f"GF{i}" for i in range(1, 5))}
     assert all(isinstance(i, ChiSquareFit) for i in task.fit.values())
     assert_equal(task.fit['GF4'].peaks, [153, 205, 407, 496, 715, 845])
@@ -361,8 +362,18 @@ def test_hp_task_creation():
         oligos   = "ctgc",
         fit      = PeakGridFit(),
     )
+    assert isinstance(task.fit.pop(None), PeakGridFit)
     assert set(task.fit) == {'015', *(f"GF{i}" for i in range(1, 5))}
     assert all(isinstance(i, PeakGridFit) for i in task.fit.values())
+
+    for i in PeakGridFit(), ChiSquareFit():
+        task = FitToHairpinTask(
+            sequence = "doesnotexist.fasta",
+            oligos   = "ctgc",
+            fit      = i
+        )
+        assert isinstance(task.fit.pop(None), type(i))
+        assert not task.fit
 
 def test_hp_dataframe():
     "test fit to hp dataframe"
@@ -372,13 +383,13 @@ def test_hp_dataframe():
         PeakSelectorTask(),
         FitToHairpinTask(
             sequence = utpath("hairpins.fasta"),
-            oligos   = "ctgc",
+            oligos   = "4mer",
             fit      = ChiSquareFit()
         ),
         DataFrameTask(merge = True),
     ).run()))
-    assert pair.shape == (102, 20)
+    assert pair.shape == (102, 21)
     assert pair.index.names == ['hpin', 'track', 'bead']
 
 if __name__ == '__main__':
-    test_toref_frompeaks()
+    test_hp_dataframe()

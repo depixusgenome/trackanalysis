@@ -107,5 +107,16 @@ def test_muwells(scriptingcleaner):
         'cleaning', 'alignment', 'eventdetection', 'peakselector'
     }
 
+@integrationmark
+def test_tracksdict_hpfit(scriptingcleaner):
+    "test that we can launch a fit to hp on a tracksdict"
+    from scripting          import TracksDict
+    from tests.testingcore  import path as utpath
+    tracks = TracksDict()
+    tracks['xxx'] = utpath("big_legacy")
+    frame = tracks.peaks.dataframe(sequence = utpath("hairpins.fasta"), oligos = '4mer')
+    assert frame.shape == (102, 21)
+    assert frame.index.names == ['hpin', 'track', 'bead']
+
 if __name__ == '__main__':
-    test_muwells(None)
+    test_tracksdict_hpfit(None)

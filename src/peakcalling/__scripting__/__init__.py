@@ -24,9 +24,9 @@ def __scripting_save__(self):
 
 def _fit(self, tpe, sequence, oligos, kwa):
     "computes hairpin fits"
-    if None not in (sequence, oligos):
-        kwa['sequence'] = sequence
-        kwa['oligos']   = oligos
+    if sequence is not None:
+        kwa['sequences'] = sequence
+        kwa['oligos']    = 'kmer' if oligos is None else oligos
 
     last  = getattr(Tasks, tpe)(**kwa)
     if not last.fit:
@@ -39,6 +39,7 @@ def fittohairpin(self, sequence = None, oligos = None, **kwa) -> FitToHairpinDic
     Computes hairpin fits.
 
     Arguments are for creating the FitToHairpinTask.
+    By default, we try to detect a kmer in the track name.
     """
     return _fit(self, 'fittohairpin', sequence, oligos, kwa)
 
@@ -56,11 +57,12 @@ def fittoreference(self, task: FitToReferenceTask = None, **kwa) -> FitToReferen
                        FitToReferenceTask(**kwa)))
 
 @addto(Track)
-def beadsbyhairpin(self, sequence, oligos, **kwa):
+def beadsbyhairpin(self, sequence, oligos = None, **kwa):
     """
     Computes hairpin fits, sorted by best hairpin.
 
     Arguments are for creating the FitToHairpinTask.
+    By default, we try to detect a kmer in the track name.
     """
     return _fit(self, 'beadsbyhairpin', sequence, oligos, kwa)
 
@@ -83,12 +85,29 @@ def detailed(self, ibead, precision: float = None) -> Union[Iterator[Detailed], 
 
 class PeaksTracksDictOperator(_PTDO, peaks = TracksDict):
     "Add dataframe method to tracksdict"
-    def dataframe(self, *tasks, transform = None, assign = None, **kwa):
+    def dataframe( # pylint: disable=arguments-differ
+            self,
+            *tasks,
+            transform = None,
+            assign    = None,
+            sequence  = None,
+            oligos    = None,
+            **kwa
+    ):
         """
         Concatenates all dataframes obtained through *track.peaks.dataframe*
 
         See documentation in *track.peaks.dataframe* for other options
         """
+        if sequence is not None:
+            tasks = (
+                Tasks.fittohairpin(
+                    sequences = sequence,
+                    oligos    = 'kmer' if oligos is None else oligos
+                ),
+                *tasks
+            )
+
         tracks = self._dictview()
         if self._reference is not None:
             if not any(Tasks(i) == Tasks.fittoreference for i in tasks):
