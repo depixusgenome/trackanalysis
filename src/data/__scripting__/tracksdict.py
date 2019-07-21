@@ -251,27 +251,33 @@ class TracksDict(_TracksDict):
             kwa.update(tmp)
             tasks = tasks[:-1]
 
-        dframe  = Tasks.dataframe(merge = True, measures = kwa, transform = transform)
-        created = [Tasks.create(i) for i in tasks]
-        procs   = register(SafeDataFrameProcessor, cache = register(), recursive = False)
-        par     = Parallel()
+        dframe   = Tasks.dataframe(merge = True, measures = kwa, transform = transform)
+        created  = [Tasks.create(i) for i in tasks]
+        procs    = register(SafeDataFrameProcessor, cache = register(), recursive = False)
+        par      = Parallel()
+        tasklist = []
         for j in self.values():
-            par.extend([j], *Tasks.defaulttasklist(j, tasks[0], j.cleaned)[:-1],
-                       *created, dframe, processors = procs)
+            tasklist.append([
+                j, *Tasks.defaulttasklist(j, tasks[0], j.cleaned)[:-1], *created, dframe
+            ])
+            par.extend(tasklist[-1][:1], *tasklist[-1][1:], processors = procs)
+
         if process:
             out  = par.process(None, 'concat')
             if 'track' not in getattr(out.index, 'names', ()):
                 return out
 
-            lst = out.tasklist
             ind = out.index.names
             out = out.reset_index()
             out = out[[i for i in out.columns if i != 'index']]
             mod = self.basedataframe()[['key', 'modification']].set_index('key')
-            cnt = (out.groupby(['bead', 'track']).peakposition.first()
-                   .reset_index()
-                   .groupby('bead').track.count()
-                   .rename('trackcount'))
+            cnt = (
+                out
+                .groupby(['bead', 'track']).first()
+                .reset_index()
+                .groupby('bead').track.count()
+                .rename('trackcount')
+            )
             out = (
                 out
                 .join(mod, on = ['track'])
@@ -280,7 +286,7 @@ class TracksDict(_TracksDict):
                 .assign(bead = out.bead.astype(int))
                 .set_index(ind)
             )
-            out.__dict__['tasklist'] = lst
+            out.__dict__['tasklist'] = tasklist
             return out
         return par
 

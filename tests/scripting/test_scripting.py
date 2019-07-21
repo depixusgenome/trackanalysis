@@ -112,10 +112,16 @@ def test_tracksdict_hpfit(scriptingcleaner):
     "test that we can launch a fit to hp on a tracksdict"
     from scripting          import TracksDict
     from tests.testingcore  import path as utpath
+    import pandas as pd
     tracks = TracksDict()
     tracks['xxx'] = utpath("big_legacy")
     frame = tracks.peaks.dataframe(sequence = utpath("hairpins.fasta"), oligos = '4mer')
-    assert frame.shape == (102, 21)
+    assert isinstance(frame, pd.DataFrame)
+    assert len(frame.tasklist) == 1
+    assert isinstance(frame.tasklist[0], list)
+    assert frame.tasklist[0][-2].oligos == ["4mer"]
+    assert list(frame.oligo.unique()) == ["ctgt"]
+    assert frame.shape == (80, 23)
     assert frame.index.names == ['hpin', 'track', 'bead']
 
 if __name__ == '__main__':
