@@ -272,7 +272,7 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
     # pylint: disable=arguments-differ
     def compute(self, aitem: Union[BEADKEY, PeakEventsTuple]) -> FitBead:
         "Action applied to the frame"
-        if getattr(self, '_resolved', None) != self.track.path:
+        if getattr(self, '_resolved', None) != getattr(self.track, 'path', None):
             self.config    = self.config.resolve(self.track.path)
             self._resolved = self.track.path
 
