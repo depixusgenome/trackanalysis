@@ -1,4 +1,14 @@
 # CycleApp
+## cycles_v6.12
+
+### Peaks
+
+One can now add 'kmer' or '3mer' or '4mer' to the list of oligos. In such a
+case the track file names is used to automatically find the oligos. The
+expected format is a track file name containing elements such as 'atcg 2nM' or
+'aaa 3pM'. The concentration must come after the oligos. It may or may not be
+separated by an underscore.
+
 ## cycles_v6.11
 
 * 2019-07-17 09:20:39 +0200  (tag: ramp_v2.3.1, tag: cycles_v6.11.1)
