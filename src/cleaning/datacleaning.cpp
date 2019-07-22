@@ -250,6 +250,21 @@ namespace cleaning
             return conv;
         }
 
+        int _test(PhaseJumpRule const &self, size_t sz, float const *data)
+        {
+            int num_jumps = 0;
+
+            for (size_t i = 1; i < sz; ++i)
+            {
+                float diff = std::abs(data[i] - data[i - 1]);
+                bool is_phase_jump = (self.phasejumpheight - self.delta) < diff &&
+                                     diff < (self.phasejumpheight + self.delta);
+                if (is_phase_jump)
+                    num_jumps++;
+            }
+            return num_jumps;
+        }
+
         template <typename T>
         DataOutput _apply(T const & self, DataInfo const & info)
         {
@@ -279,6 +294,9 @@ namespace cleaning
     {  return _apply(*this, info); }
 
     DataOutput PingPongRule::apply(DataInfo info) const
+    {  return _apply(*this, info); }
+
+    DataOutput PhaseJumpRule::apply(DataInfo info) const
     {  return _apply(*this, info); }
 
     DataOutput SaturationRule::apply(DataInfo initial, DataInfo measures) const

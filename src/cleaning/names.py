@@ -9,5 +9,6 @@ NAMES: Dict[str, str] = dict(
     hfsigma    = 'σ[HF]',
     extent     = 'Δz',
     pingpong   = '∑|dz|',
+    phasejump  = 'SDI phase-jumps',
     clipping   = 'z ∉ range(φ₁ → φ₃)',
 )

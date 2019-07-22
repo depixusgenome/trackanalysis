@@ -235,6 +235,15 @@ namespace cleaning { namespace datacleaning {
         }
 
         template <typename T>
+        typename issame<T, PhaseJumpRule>::type
+        _fromkwa(T & inst, py::dict & kwa)
+        {
+            _get(std::is_const<T>(), inst.maxv,             "maxphasejump",     kwa);
+            _get(std::is_const<T>(), inst.phasejumpheight,  "phasejumpheight",  kwa);
+            _get(std::is_const<T>(), inst.delta,            "delta",            kwa);
+        }
+
+        template <typename T>
         typename issame<T, PopulationRule>::type
         _fromkwa(T & inst, py::dict & kwa)
         { _get(std::is_const<T>(), inst.minv,    "minpopulation",  kwa); }
@@ -676,7 +685,7 @@ is estimated from phases `PHASE.initial` to `PHASE.measure`.)_";
 
         {
             auto doc = R"_(Remove cycles which play ping-pong.
-            
+
 Some cycles are corrupted by close or passing beads, with the tracker switching
 from one bead to another and back. This rules detects such situations by computing
 the integral of the absolute value of the derivative of Z, first discarding values
@@ -708,6 +717,45 @@ below a givent threshold: those that can be considered due to normal levels of n
                     { 
                         auto x = __applyrule(self, _toinput(bead, start, stop));
                         return _totuple(partial, "pingpong", x);
+                    });
+            _defaults(cls);
+        }
+        {
+            auto doc = R"_(Remove cycles containing phase jumps.
+
+Sometimes the tracking of a fringe may experience a phase-jump of 2π, usually when two fringes 
+get too close to each other. This phase-jump will show as a ~1.4µm change of z,
+often occuring as a rapid sequence of spikes.
+This rule counts the number of such phase-jumps in a given cycle by counting the the number of
+values of the absolute discrete derivative in the window (phasejumpheight ± delta).)_";
+
+            using CLS = PhaseJumpRule;
+            py::class_<CLS> cls(mod, "PhaseJumpRule", doc);
+            cls.def_readwrite("phasejumpheight",  &CLS::phasejumpheight)
+               .def_readwrite("maxphasejump",     &CLS::maxv)
+               .def_readwrite("delta",            &CLS::delta)
+               .def_static(
+                       "zscaledattributes",
+                        [] () { return py::make_tuple("phasejumpheight", "delta"); }
+               )
+               .def(
+                       "rescale",
+                       [](CLS const & self, float val)
+                       {
+                            auto cpy = self;
+                            cpy.phasejumpheight *= val;
+                            cpy.delta *= val;
+                            return cpy;
+                       }
+               )
+               .def("phasejump",
+                    [partial](CLS const & self,
+                              ndarray<float> bead,
+                              ndarray<int>   start,
+                              ndarray<int>   stop)
+                    { 
+                        auto x = __applyrule(self, _toinput(bead, start, stop));
+                        return _totuple(partial, "phasejump", x);
                     });
             _defaults(cls);
         }
