@@ -258,9 +258,12 @@ class TracksDict(_TracksDict):
         tasklist = []
         for j in self.values():
             tasklist.append([
-                j, *Tasks.defaulttasklist(j, tasks[0], j.cleaned)[:-1], *created, dframe
+                Tasks.trackreader(path = j.path, key = j.key),
+                *Tasks.defaulttasklist(j, tasks[0], j.cleaned)[:-1],
+                *created,
+                dframe
             ])
-            par.extend(tasklist[-1][:1], *tasklist[-1][1:], processors = procs)
+            par.extend([j], *tasklist[-1][1:], processors = procs)
 
         if process:
             out  = par.process(None, 'concat')

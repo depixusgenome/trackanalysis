@@ -33,7 +33,7 @@ def _fit(self, tpe, sequence, oligos, kwa):
         kwa['oligos']    = oligos
 
     last  = getattr(Tasks, tpe)(**kwa)
-    if not last.fit:
+    if not last.fit and  last.oligos not in ['3mer', 'kmer', '4mer', '5mer']:
         raise IndexError('No fit found')
     return self.apply(*Tasks.defaulttasklist(self, Tasks.peakselector), last)
 
