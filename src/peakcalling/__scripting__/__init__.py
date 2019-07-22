@@ -16,8 +16,11 @@ from   taskcontrol.processor.dataframe  import DataFrameProcessor
 from   taskmodel.__scripting__          import Tasks
 from   utils.decoration                 import addto
 from   ..toreference                    import HistogramFit, ChiSquareHistogramFit
-from   ..processor                      import (FitToHairpinDict, FitToReferenceDict,
-                                                FitToReferenceTask, FitToHairpinTask)
+from   ..processor.fittohairpin         import (
+    FitToHairpinDict, FitToHairpinTask, Oligos, Sequences
+)
+from   ..processor                      import FitToReferenceDict, FitToReferenceTask
+
 @addto(FitToReferenceTask)
 def __scripting_save__(self):
     self.fitdata.clear()
@@ -26,7 +29,8 @@ def _fit(self, tpe, sequence, oligos, kwa):
     "computes hairpin fits"
     if sequence is not None:
         kwa['sequences'] = sequence
-        kwa['oligos']    = 'kmer' if oligos is None else oligos
+    if oligos is not None:
+        kwa['oligos']    = oligos
 
     last  = getattr(Tasks, tpe)(**kwa)
     if not last.fit:
@@ -34,12 +38,28 @@ def _fit(self, tpe, sequence, oligos, kwa):
     return self.apply(*Tasks.defaulttasklist(self, Tasks.peakselector), last)
 
 @addto(Track)
-def fittohairpin(self, sequence = None, oligos = None, **kwa) -> FitToHairpinDict:
+def fittohairpin(
+        self,
+        sequence: Sequences,
+        oligos: Oligos = 'kmer',
+        **kwa
+) -> FitToHairpinDict:
     """
     Computes hairpin fits.
 
-    Arguments are for creating the FitToHairpinTask.
-    By default, we try to detect a kmer in the track name.
+    Arguments are for creating the FitToHairpinTask. By default, we try to
+    detect a kmer in the track name.
+
+    Parameters
+    ----------
+    sequence:
+        One or more sequence or the path to a fasta file
+    oligos:
+        One or more oligos or the pattern with which to parse the track file
+        names.  It can also be 'kmer', '3mer' or '4mer' in which case the track
+        files are parsed in order to find a kmer, a 3mer or a 4mer.
+    kwa:
+        values for the FitToHairpinTask attributes
     """
     return _fit(self, 'fittohairpin', sequence, oligos, kwa)
 
@@ -57,12 +77,28 @@ def fittoreference(self, task: FitToReferenceTask = None, **kwa) -> FitToReferen
                        FitToReferenceTask(**kwa)))
 
 @addto(Track)
-def beadsbyhairpin(self, sequence, oligos = None, **kwa):
+def beadsbyhairpin(
+        self,
+        sequence: Sequences,
+        oligos: Oligos = 'kmer',
+        **kwa
+):
     """
     Computes hairpin fits, sorted by best hairpin.
 
-    Arguments are for creating the FitToHairpinTask.
-    By default, we try to detect a kmer in the track name.
+    Arguments are for creating the FitToHairpinTask. By default, we try to
+    detect a kmer in the track name.
+
+    Parameters
+    ----------
+    sequence:
+        One or more sequence or the path to a fasta file
+    oligos:
+        One or more oligos or the pattern with which to parse the track file
+        names.  It can also be 'kmer', '3mer' or '4mer' in which case the track
+        files are parsed in order to find a kmer, a 3mer or a 4mer.
+    kwa:
+        values for the FitToHairpinTask attributes
     """
     return _fit(self, 'beadsbyhairpin', sequence, oligos, kwa)
 

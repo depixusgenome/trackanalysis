@@ -55,7 +55,8 @@ class SequenceModel:
 
     def setnewprobes(self, ctrl, new):
         "sets new probes"
-        ols  = splitoligos(new)
+        root = getattr(ctrl.display.get("tasks", "roottask"), "path")
+        ols  = splitoligos(new, path = root)
         hist = self.config.history
         lst  = list(i for i in hist if i != ols)[:self.config.maxlength]
         ctrl.theme.update(self.config,  history = ([ols] if len(ols) else []) + lst)

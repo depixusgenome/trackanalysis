@@ -51,20 +51,67 @@ class FitToHairpinTask(Task, zattributes = ('fit', 'constraints', 'singlestrand'
     """
     Fits a bead to all provided hairpins.
 
-    # Attributes
+    Attributes
+    ----------
+    fit:
+        A dictionnary of specific `HairpinFitter` to use for a bead. If
+        provided, the `None` keyword is used as the default value.
+        `DEFAULT_FIT` is used when it isn't. See `peakcalling.tohairpin` for
+        the various available `HairpinFitter`.
 
-    * `fit`: a dictionnary of specific `HairpinFitter` to use for a bead.
-    `DEFAULT_FIT` is used when none is provided for a given bead.
+    constraints:
+        A dictionnary of specific constraints to apply for a bead. If
+        provided, the `None` keyword is used as the default value.
+        `DEFAULT_CONSTRAINTS` is used when it isn't.
 
-    * `constraints`: a dictionnary of specific constraints to apply for a bead.
-    `DEFAULT_CONSTRAINTS` is used when none are provided for a given bead.
+    match:
+        A dictionnary of specific `PeakMatching` to use for a bead. If
+        provided, the `None` keyword is used as the default value.
+        `DEFAULT_MATCH` is used when it isn't.
 
-    * `match`: a dictionnary of specific `PeakMatching` to use for a bead.
-    `DEFAULT_MATCH` is used when none is provided for a given bead.
+    pullphaseratio:
+        If provided, is used for estimating the bead's size in bases from phase
+        3 and  discarding fit options with too different a size.
 
-    See `peakcalling.tohairpin` for the various available `HairpinFitter`.
+    singlestrand:
+        If provided, the single-strand peak is looked for. If it is  found,
+        fitting will use this rather than the baseline peak as the pivot for
+        the fits.
 
-    # Returned values:
+    baseline:
+        If provided, the baseline peak is looked for. If neither this nor the
+        single-strand peak is found, then no pivot is used for fitting.
+
+    sequences:
+        The sequences or the path to a fasta file containing them. The fasta
+        format is:
+
+        ```
+        > NAME1
+        atcgactcatcg
+        atcgactcatcg
+        > NAME2
+        atcgactcatcg
+        atcgactcatcg
+        ```
+
+    oligos:
+        The sequences or the path to a fasta file containing them. values can be:
+
+        * a list of comma separated strings. These strings can contain
+          'singlestrand' or '0' for fits using the single-strand or baseline
+          peaks.
+        * 'kmer': parses the track file names to find a kmer. The accepted
+          formats are 'xxx_atc_2nM_yyy.trk' where 'xxx_' and '_yyy' can be
+          anything. The 'nM' (or 'pM') notation must come immediatly after the kmer.
+          It can be upper or lower-case names indifferently.
+        * '3mer': same as 'kmer' but detects only 3mers
+        * '4mer': same as 'kmer' but detects only 4mers
+        * A regular expression with a group named `ol`. The latter will be used
+          as the oligos.
+
+    Returns
+    -------
 
     Values are returned per bead  in a `FitBead` object:
 
