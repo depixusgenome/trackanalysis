@@ -122,6 +122,14 @@ namespace cleaning {
         double maxpercentile = 95.;
     };
 
+    struct PhaseJumpRule
+    {
+        DataOutput apply(DataInfo info) const;
+        double maxv            = 10;
+        double phasejumpheight = 1.4;
+        double delta           = .2;
+    };
+
     struct SaturationRule
     {
         DataOutput apply(DataInfo initial, DataInfo measures) const;

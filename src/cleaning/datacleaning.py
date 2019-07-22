@@ -12,9 +12,11 @@ from    ._core                  import (constant as _cleaningcst, # pylint: disa
                                         NaNDerivateIslands as DerivateIslands,
                                         AberrantValuesRule, PingPongRule,
                                         PopulationRule, HFSigmaRule, ExtentRule,
-                                        SaturationRule, Partial)
+                                        SaturationRule, Partial, PhaseJumpRule)
 
-RULES = AberrantValuesRule, HFSigmaRule, PopulationRule, ExtentRule, PingPongRule, SaturationRule
+RULES = (AberrantValuesRule, HFSigmaRule, PopulationRule,
+         ExtentRule, PingPongRule, SaturationRule, PhaseJumpRule)
+
 class DataCleaning(
         Rescaler, # pylint: disable=too-many-ancestors
         AberrantValuesRule,
@@ -23,6 +25,7 @@ class DataCleaning(
         ExtentRule,
         PingPongRule,
         SaturationRule,
+        PhaseJumpRule,
         zattributes = sum((i.zscaledattributes() for i in RULES), ())
 ):
     """
@@ -42,6 +45,9 @@ class DataCleaning(
     {}
 
     # `pingpong`
+    {}
+
+    # `phasejump`
     {}
 
     # `saturation`
@@ -77,7 +83,9 @@ class DataCleaning(
         * endif
     * endfor
     """
-    CYCLES  = 'population', 'hfsigma', 'extent', 'pingpong'
+    PRE_CORRECTION_CYCLES  = ('phasejump',)
+    POST_CORRECTION_CYCLES = 'population', 'hfsigma', 'extent', 'pingpong'
+
     def __init__(self, **_):
         DataCleaning.__bases__[0].__init__(self)
         for base in RULES:

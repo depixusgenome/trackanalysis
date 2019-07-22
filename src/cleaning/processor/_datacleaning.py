@@ -3,16 +3,17 @@
 "cleaning the raw data after bead subraction"
 from    itertools import repeat
 from    functools import partial
-from    typing    import Optional, Dict, Any, List, Tuple, Type, cast
+from    typing    import Any, Dict, Iterator, List, Optional, Tuple, Type, cast
 
 import  numpy             as     np
 
 from    data.views              import BEADKEY
 from    taskcontrol.processor   import Processor, ProcessorException
-from    taskmodel               import Task, Level, PHASE
+from    taskmodel               import Task, Level, PHASE, InstrumentType
 from    utils                   import initdefaults
+
 from    ..names                 import NAMES
-from    ..datacleaning          import DataCleaning
+from    ..datacleaning          import DataCleaning, Partial
 
 class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
     "Task for removing incorrect points or cycles or even the whole bead"
@@ -22,6 +23,7 @@ class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
     populationphases = PHASE.initial, PHASE.measure
     extentphases     = PHASE.initial, PHASE.measure
     pingpongphases   = PHASE.initial, PHASE.measure
+    phasejumpphases  = PHASE.initial, PHASE.measure
     saturationphases = PHASE.initial, PHASE.measure
 
     @initdefaults(frozenset(locals()))
@@ -83,7 +85,8 @@ class DataCleaningErrorMessage:
                  ('hfsigma',    '> %.4f',   'max'),
                  ('extent',     '< %.2f',   'min'),
                  ('extent',     '> %.2f',   'max'),
-                 ('pingpong',   '> %.1f',   'max'))
+                 ('pingpong',   '> %.1f',   'max'),
+                 ('phasejump',  '> %.1f',   'max'))
 
         vals       = [[get1(i[0], i[-1]), i[0], i[1] % get2(i[0], i[-1])] for i in msg]
         if vals[0][0]:
@@ -132,12 +135,31 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
         msg = DataCleaningErrorMessage(val, cnf, cls.tasktype, info[0], frame.parents, ncy)
         return DataCleaningException(msg, 'warning')
 
+    @staticmethod
+    def _doesapply(rulename: str, frame) -> bool:
+        if rulename == 'phasejump':
+            return frame.track.instrument['type'] is InstrumentType.sdi
+        return True
+
     @classmethod
-    def __test(cls, frame, bead, cnf):
+    def __precorrectiontest(cls, frame, bead, cnf) -> Iterator[Partial]:
         phases = frame.track.phase.select
         sel    = cls.tasktype(**cnf)
         pha    = cycs = None
-        for name in sel.CYCLES:
+        rules = (name for name in sel.PRE_CORRECTION_CYCLES if cls._doesapply(name, frame))
+        for name in rules:
+            cur = cls.__get(name+'phases', cnf)
+            if cycs is None or pha != cur:
+                pha, cycs = cur, (phases(..., cur[0]), phases(..., cur[1]+1))
+            yield getattr(sel, name)(bead, *cycs)
+
+    @classmethod
+    def __postcorrectiontest(cls, frame, bead, cnf) -> Iterator[Partial]:
+        phases = frame.track.phase.select
+        sel    = cls.tasktype(**cnf)
+        pha    = cycs = None
+        rules = (name for name in sel.POST_CORRECTION_CYCLES if cls._doesapply(name, frame))
+        for name in rules:
             cur = cls.__get(name+'phases', cnf)
             if cycs is None or pha != cur:
                 pha, cycs = cur, (phases(..., cur[0]), phases(..., cur[1]+1))
@@ -167,9 +189,12 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
             if discard:
                 return cls.__exc(val, cnf, info, frame)
 
+        val = ()
+        if not tested:
+            val += tuple(cls.__precorrectiontest(frame, info[1], cnf))
         discard = DataCleaning(**cnf).aberrant(info[1])
         if not tested:
-            val  = tuple(cls.__test(frame, info[1], cnf))
+            val += tuple(cls.__postcorrectiontest(frame, info[1], cnf))
 
         if not discard:
             bad = cls.tasktype.badcycles(val) # type: ignore

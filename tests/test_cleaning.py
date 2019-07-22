@@ -90,6 +90,22 @@ def test_datacleaning():
     assert list(out.min) == []
     assert list(out.max) == list(range(10))
 
+def test_phasejump():
+    num_jumps = 7
+    num_cycles = 3
+    cycle1 = 10 * [0] + num_jumps * [1.4, 0] + 10 * [-0.1]
+    cycle2 = len(cycle1) * [0]
+    cycle3 = [0.5 * i for i in range(len(cycle1))]
+
+    cycle_starts = [i*len(cycle1) for i in range(num_cycles)]
+    cycle_ends = [(i+1)*len(cycle1) for i in range(num_cycles)]
+    bead = np.stack((cycle1, cycle2, cycle3)).astype('f4')
+    out = _datacleaning.PhaseJumpRule().phasejump(bead, cycle_starts, cycle_ends)
+
+    assert_equal(out.values, [2*num_jumps, 0, 0])
+    assert len(out.min) == 0
+    assert_equal(out.max, [0])
+
 def test_constantvalues():
     "test constant values"
     setseed(0)
@@ -489,10 +505,13 @@ def test_cycletable(bead: int, taskcount: int):
     )
 
     info = {i.name: i.values for i in ctrl.data.getcache(DataCleaningTask)()[bead][0]}
-    assert set(info.keys()) == {
+    applied_rules = set(info.keys())
+    assert applied_rules == {
         'population', 'hfsigma', 'extent', 'pingpong', 'saturation', 'discarded',
         'alignment', 'clipping'
     }
+    assert 'phasejump' not in applied_rules  # 'phasejump'-rule must *only* act on SDI-experiments 
+    
     assert all(len(i) == track.ncycles for i in info.values())
 
     if find(ExtremumAlignmentTask):
@@ -518,7 +537,8 @@ def test_rescaling():
         'maxabsvalue', 'maxderivate',
         'minhfsigma', 'maxhfsigma',
         'minextent', 'maxextent',
-        'mindifference', 'maxdisttozero'
+        'mindifference', 'maxdisttozero',
+        'phasejumpheight', 'delta'
     )
 
     task = DataCleaningTask()
@@ -551,6 +571,7 @@ def test_rescaling():
         if not np.isscalar(j):
             continue
         assert abs(getattr(new, i) - (j*5. if i in attrs else j)) < 1e-5
+
 
 if __name__ == '__main__':
     from tests.testingcore.bokehtesting import BokehAction
