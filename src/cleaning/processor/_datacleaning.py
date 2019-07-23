@@ -88,7 +88,8 @@ class DataCleaningErrorMessage:
                  ('pingpong',   '> %.1f',   'max'),
                  ('phasejump',  '> %.1f',   'max'))
 
-        vals       = [[get1(i[0], i[-1]), i[0], i[1] % get2(i[0], i[-1])] for i in msg]
+        vals       = [[get1(i[0], i[-1]), i[0], i[1] % get2(i[0], i[-1])] for i in msg
+                      if i[0] in stats.keys()]  # only generate messages for valis rules
         if vals[0][0]:
             cnt        = stats['saturation'].values
             cnt        = cnt[np.isfinite(cnt)]
