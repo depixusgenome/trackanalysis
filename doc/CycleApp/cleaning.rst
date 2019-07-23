@@ -146,6 +146,8 @@ Most other filters allow discarding badly behaving cycles:
   measures were not recorded (z is constant).
 * `% good`: allows discarding cycles that have too many missing values.
 * |pingpong| allows discarding cycles with values which jump up and down.
+* |phasejump|: for SDI instruments, allows discarding cycles
+  with too many phase-jumps (showing as 'spikes' on the cycles).
 
 Finally one filter is performed over all cycles:
 

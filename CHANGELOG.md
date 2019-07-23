@@ -1,6 +1,12 @@
 # CycleApp
 ## cycles_v6.12
 
+### Cleaning
+
+There is a new cleaning rule to detect *phase-jumps* from the SDI,
+showing as *z*-jumps of ~ 1.4µm, often as a rapid succession of "spikes".
+By default, a cycle is discarded if it contains >= 10 phase-jumps.
+
 ### Peaks
 
 One can now add 'kmer' or '3mer' or '4mer' to the list of oligos. In such a
