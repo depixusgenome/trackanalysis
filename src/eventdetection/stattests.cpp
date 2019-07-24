@@ -13,9 +13,10 @@ namespace samples
             inline float _level(std::pair<T, float> val)
             {
                 // The degree-of-freedom (arg passed to boost's `dist()`) must be > 0
-                if (std::isfinite(val.first) && val.first > 0)
+                auto ans = double(val.first);
+                if (std::isfinite(ans) && ans > 0)
                 {
-                    bm::students_t dist(double(val.first));
+                    bm::students_t dist(ans);
                     return float(bm::cdf(dist, std::abs(val.second)));
                 }
                 return 1.;

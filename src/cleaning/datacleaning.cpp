@@ -250,7 +250,7 @@ namespace cleaning
             return conv;
         }
 
-        int _test(PhaseJumpRule const &self, size_t sz, float const *data)
+        float _test(PhaseJumpRule const &self, size_t sz, float const *data)
         {
             int num_jumps = 0;
 
@@ -262,7 +262,7 @@ namespace cleaning
                 if (is_phase_jump)
                     num_jumps++;
             }
-            return num_jumps;
+            return float(num_jumps);
         }
 
         template <typename T>
