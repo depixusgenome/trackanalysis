@@ -9,14 +9,14 @@ import warnings
 import numpy                 as     np
 from   data                  import Cycles
 from   utils                 import initdefaults
-from   taskmodel             import Task, Level, PHASE
+from   taskmodel             import Task, Level, PhaseArg
 from   taskcontrol.processor import Processor
 from   .._core               import (# pylint: disable=import-error
     translate, medianthreshold, ExtremumAlignment, ExtremumAlignmentMode,
     PhaseEdgeAlignment, PhaseEdgeAlignmentMode
 )
 
-def _min_extension():
+def _min_extension() -> float:
     try:
         from cleaning.datacleaning import ExtentRule
     except ImportError:
@@ -79,23 +79,22 @@ class ExtremumAlignmentTask(Task, zattributes = ('delta', 'minrelax', 'pull', 'o
     * *opening:* This factor is used to determine cycles mis-aligned on *phase*.
     * *pull:* maximum absolute distance from the median `PHASE.pull` value.
     """
-    level      = Level.bead
-    window     = 15
-    edge: Optional[str]    = 'right'
-    phase: AlignmentTactic = AlignmentTactic.pull
-    percentile = 25.
-    fiveratio  = .4
-    outlier    = .9
-    pull       = .1
-    opening    = _min_extension()
-    delta      = .2
-    minrelax   = .1
-    delete     = True
+    level:      Level           = Level.bead
+    window:     int             = 15
+    edge:       Optional[str]   = 'right'
+    phase:      AlignmentTactic = AlignmentTactic.pull
+    percentile: float           = 25.
+    fiveratio:  float           = .4
+    outlier:    float           = .9
+    pull:       float           = .1
+    opening:    float           = _min_extension()
+    delta:      float           = .2
+    minrelax:   float           = .1
+    delete:     bool            = True
 
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
         super().__init__()
-
 
 class _Args(NamedTuple):
     cycles:  'ExtremumAlignment._Utils'
@@ -132,7 +131,7 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
                                            mode       = mode,
                                            percentile = percentile)
             else:
-                mode  = (ExtremumAlignmentMode.min if phase == PHASE.pull else
+                mode  = (ExtremumAlignmentMode.min if phase == self.frame.phaseindex().pull else
                          ExtremumAlignmentMode.max)
                 align = ExtremumAlignment(binsize = window, mode = mode)
             return align.compute(self.bead, self.phase(phase), self.phase(phase+1))
@@ -207,14 +206,16 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
         edge       = cls._get(kwa, 'edge')
         percentile = cls._get(kwa, 'percentile')
 
-        inits = cycles.bias(PHASE.initial, window, edge,      percentile) # ≈ min
-        pulls = cycles.bias(PHASE.pull,    window, edge, 100.-percentile) # ≈ max
+        phase = frame.phaseindex()
+        inits = cycles.bias(phase.initial, window, edge, percentile) # ≈ min
+        pulls = cycles.bias(phase.pull, window, edge, 100.-percentile) # ≈ max
+
         if meas:
             return _Args(
                 cycles,
                 inits,
                 pulls,
-                cycles.bias(PHASE.measure, window, 'right', percentile)
+                cycles.bias(phase.measure, window, 'right', percentile)
             )
 
         return _Args(cycles, inits, pulls, None)
@@ -228,7 +229,7 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
             perc = cls._get(kwa, 'percentile')
             if attr == 'pull':
                 perc = 100. - perc
-            arr  = args.cycles.bias(getattr(PHASE, attr), wind, edge, perc)
+            arr  = args.cycles.bias(args.cycles.frame.phaseindex()[attr], wind, edge, perc)
 
         deltas = arr - args.pull
         rho    = np.nanmedian(deltas)*cls._get(kwa, outlier)
@@ -243,10 +244,14 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
     def __filter_on_relax(cls, args, kwa, bias):
         minv =  cls._get(kwa, 'minrelax')
         if minv is not None:
-            medianthreshold(minv, args.cycles.bead,
-                            args.cycles.phase(PHASE.relax),
-                            args.cycles.phase(PHASE.relax+1),
-                            bias)
+            ind: int = args.cycles.frame.phaseindex()['relax']
+            medianthreshold(
+                minv,
+                args.cycles.bead,
+                args.cycles.phase(ind),
+                args.cycles.phase(ind+1),
+                bias
+            )
 
     @classmethod
     def __less(cls, array, kwa, name):
@@ -301,10 +306,10 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
 
 class MeasureEndAlignmentTask(Task):
     "align usng phase 5"
-    level                                    = Level.bead
-    biasphase:    int                        = PHASE.measure
+    level:        Level                      = Level.bead
+    biasphase:    PhaseArg                   = 'measure'
     biasrange:    int                        = -10
-    discardphase: int                        = PHASE.relax
+    discardphase: PhaseArg                   = 'relax'
     discardrange: int                        = -30
     percentiles:  Tuple[float, float, float] = (33., 50., 66.)
     distance:     Optional[float]            = 3.

@@ -40,6 +40,7 @@ class GuiExtremumAlignmentProcessor(ExtremumAlignmentProcessor):
             bias - np.nanmedian(bias),
         )
 
+        bias[np.isnan(bias)] = np.nanmedian(bias)
         return args.cycles.translate(False, bias)
 
     @classmethod
@@ -221,7 +222,10 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
             self._errors.reset(cache, exc)
         finally:
             data        = self.__data(items, nans)
-            self.setbounds(cache, self.__fig, data['t'], data['z'])
+            self.setbounds(
+                cache, self.__fig, data['t'], data['z'],
+                yinit = np.nanpercentile(data["z"], [100-self._theme.clip, self._theme.clip])
+            )
             cache[self.__source]['data'] = data
 
             if self._model.track:
@@ -294,7 +298,8 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
             extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
         )
         self.addtofig(fig, 'lines', x = 't', y = 'z', source = self.__source)
-        glyph = self.addtofig(fig, 'points', x = 't', y = 'z', source = self.__source)
+        self.addtofig(fig, 'points', x = 't', y = 'z', source = self.__source)
+        glyph = self.addtofig(fig, 'hover', x = 't', y = 'z', source = self.__source)
         hover = fig.select(DpxHoverTool)
         if hover:
             hover[0].tooltips  = self._theme.tooltips

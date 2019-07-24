@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "easy access to beads"
-from   typing import (TYPE_CHECKING, Iterator, Optional, Sequence, Tuple,
-                      Union, cast)
-from   copy   import copy as shallowcopy
-import numpy  as     np
-from   ._dict import BEADKEY, isellipsis, isint
-from   ._view import TrackView, ITrackView, Level
+from   typing import (
+    TYPE_CHECKING, Iterator, Optional, Sequence, Tuple, Union, List, cast, overload
+)
+from   copy             import copy as shallowcopy
+import numpy            as     np
+from   taskmodel.level  import PHASE, PhaseArg, Phase
+from   ._dict           import BEADKEY, isellipsis, isint
+from   ._view           import TrackView, ITrackView, Level
 
 class Beads(TrackView, ITrackView):
     """
@@ -49,6 +51,26 @@ class Beads(TrackView, ITrackView):
     def __init__(self, **kwa):
         super().__init__(self, **kwa)
         self.__withcycles(kwa.get('cycles', ...))
+
+    @overload
+    @staticmethod
+    def phaseindex() -> Phase:
+        "return the PHASE object"
+
+    @overload
+    @staticmethod
+    def phaseindex(__1:PhaseArg) -> int:
+        "return the PHASE index"
+
+    @overload
+    @staticmethod
+    def phaseindex(__1:PhaseArg, __2:PhaseArg, *args:PhaseArg) -> List[int]:
+        "return the PHASE index"
+
+    @staticmethod
+    def phaseindex(*args:PhaseArg):
+        "return the PHASE index"
+        return PHASE if not args else PHASE[args[0]] if len(args) == 1 else PHASE[args]
 
     @property
     def phases(self) -> np.ndarray:
