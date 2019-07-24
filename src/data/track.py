@@ -10,11 +10,12 @@ from    copy        import deepcopy
 from    enum        import Enum
 import  numpy       as     np
 
-from    signalfilter import nanhfsigma, PrecisionAlg
-from    taskmodel    import levelprop, Level, PHASE, InstrumentType
-from    utils        import initdefaults
-from   .views        import Beads, Cycles, BEADKEY, isellipsis, TrackView
-from   .trackio      import opentrack, PATHTYPES
+from    signalfilter    import nanhfsigma, PrecisionAlg
+from    taskmodel       import levelprop, Level, InstrumentType
+from    taskmodel.level import PHASE
+from    utils           import initdefaults
+from   .views           import Beads, Cycles, BEADKEY, isellipsis, TrackView
+from   .trackio         import opentrack, PATHTYPES
 
 IDTYPE       = Union[None, int, range] # missing Ellipsys as mypy won't accept it
 PIDTYPE      = Union[IDTYPE, slice, Sequence[int]]
@@ -293,6 +294,9 @@ class PhaseManipulator:
     def __init__(self, track):
         self._track = track
 
+    def __getitem__(self, value):
+        return PHASE[value]
+
     def cut(self, cid:PIDTYPE = None) -> Tuple[np.ndarray, np.ndarray]:
         """
         Returns a selection of phases, *reindexed* to zero, with a list of
@@ -356,13 +360,18 @@ class PhaseManipulator:
 
     def __duration(self, cid:PIDTYPE = None, pid:IDTYPE = None) -> Union[np.ndarray, int]:
         phases = self._track.phases
+        if isinstance(pid, str):
+            pid = self[pid]
 
         if isinstance(pid, int):
             pid  = range(pid, cast(int, None if pid == -1 else pid+1))
         elif isellipsis(pid):
             pid  = range(phases.shape[1])
         elif isinstance(pid, (slice, range)):
-            pid  = range(pid.start, cast(int, pid.stop))
+            pid = range(
+                None if pid.start is None else self[pid.start],
+                None if pid.stop  is None else self[pid.stop]
+            )
         else:
             raise TypeError()
 
@@ -374,6 +383,8 @@ class PhaseManipulator:
     def __select(self, cid:PIDTYPE = None, pid:PIDTYPE = None) -> Union[np.ndarray, int]:
         phases = self._track.phases
         ells   = isellipsis(cid), isellipsis(pid)
+        if not ells[1]:
+            pid = self[pid]
         if np.isscalar(pid) and pid >= self._track.nphases:
             if np.isscalar(cid):
                 return (self._track.nframes if cid >= self._track.ncycles-1 else
@@ -574,9 +585,10 @@ class Track:
             def _rp(data, first, last) -> float:
                 return max(PrecisionAlg.MINPRECISION, nanhfsigma(data, zip(first, last), rate))
 
-            first  = (self.phases[:,PHASE.initial if first is None else first]
+            phase  = self.phase[...]
+            first  = (self.phases[:,phase.initial if first is None else first]
                       - self.phases[0,0])
-            last   = (self.phases[:,PHASE.measure+1 if last is None else last]
+            last   = (self.phases[:,phase.measure+1 if last is None else last]
                       - self.phases[0,0])
             if np.isscalar(ibead):
                 self._rawprecisions[ibead] = val = _rp(self.beads[ibead], first, last)
@@ -595,10 +607,11 @@ class Track:
         """
         Return the median bead extension (phase 3 - phase 1)
         """
-        inds = [PHASE.initial, PHASE.pull+1]
-        arr  = ibead if isinstance(ibead, np.ndarray) else self.data[ibead]
-        bead = np.split(arr, self.phases[:, inds].ravel() - self.phases[0,0])[1::2]
-        vals = [np.diff(np.nanpercentile(i, rng))[0] for i in bead if np.any(np.isfinite(i))]
+        phase = self.phase[...]
+        inds  = [phase.initial, phase.pull+1]
+        arr   = ibead if isinstance(ibead, np.ndarray) else self.data[ibead]
+        bead  = np.split(arr, self.phases[:, inds].ravel() - self.phases[0,0])[1::2]
+        vals  = [np.diff(np.nanpercentile(i, rng))[0] for i in bead if np.any(np.isfinite(i))]
         return np.nanmedian(vals) if len(vals) else np.NaN
 
     def phaseposition(self, phase: int, ibead: Union[BEADKEY, np.ndarray]) -> float:

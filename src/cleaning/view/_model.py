@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "access to the model"
-from typing                         import Optional, List, Dict, cast
+from typing                         import Optional, List, Dict, Tuple, Any, cast
 import numpy as np
 
 # pylint: disable=unused-import
@@ -204,27 +204,35 @@ class CleaningPlotTheme(PlotTheme):
     """
     cleaning plot theme
     """
-    name             = "cleaning.theme"
-    lines            = PlotAttrs('~gray', '-', 1, alpha = .3)
-    points           = PlotAttrs('color', 'o', 1, alpha = .5)
-    figsize          = PlotTheme.defaultfigsize(500, 700)
-    maxfixedbeads    = 15
-    widgetwidth      = 535
-    ntitles          = 5
-    order            = ('aberrant', 'hfsigma', 'extent', 'population',
-                        'pingpong', 'alignment', 'clipping', 'saturation', 'good')
-    colors           = dict(good       = '#6baed6', # blue
-                            hfsigma    = 'gold',
-                            extent     = 'orange',
-                            population = 'hotpink',
-                            pingpong   = 'firebrick',
-                            saturation = 'chocolate',
-                            alignment  = 'darkgray',
-                            clipping   = 'darkorchid',
-                            aberrant   = 'red')
-    tooltips         = [(u'(cycle, t, z)', '(@cycle, $~x{1}, $data_y{1.1111})')]
-    toolbar          = dict(PlotTheme.toolbar)
-    toolbar['items'] = 'pan,box_zoom,ypan,ybox_zoom,ywheel_zoom,reset,save,dpxhover'
+    name:          str                  = "cleaning.theme"
+    lines:         PlotAttrs            = PlotAttrs('~gray', '-', 1, alpha                = .3)
+    points:        PlotAttrs            = PlotAttrs('color', 'o', 1, alpha                = .5)
+    hover:         PlotAttrs            = PlotAttrs('white', 'o', 4, alpha                = 0.)
+    figsize:       Tuple[int, int, str] = PlotTheme.defaultfigsize(500, 700)
+    clip:          int                  = 1
+    maxfixedbeads: int                  = 15
+    widgetwidth:   int                  = 535
+    ntitles:       int                  = 5
+    order:         Tuple[str,...]       = (
+        'aberrant', 'hfsigma', 'extent', 'population',
+        'pingpong', 'alignment', 'clipping', 'saturation', 'good'
+    )
+    colors:        Dict[str, str]       = dict(
+        good       = '#6baed6', # blue
+        hfsigma    = 'gold',
+        extent     = 'orange',
+        population = 'hotpink',
+        pingpong   = 'firebrick',
+        saturation = 'chocolate',
+        alignment  = 'darkgray',
+        clipping   = 'darkorchid',
+        aberrant   = 'red'
+    )
+    tooltips: List[Tuple[str, ...]] = [(u'(cycle, t, z)', '(@cycle, $~x{1}, $data_y{1.1111})')]
+    toolbar:  Dict[str, Any]        = dict(
+        PlotTheme.toolbar,
+        items = 'pan,box_zoom,ypan,ybox_zoom,ywheel_zoom,reset,save,dpxhover'
+    )
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)

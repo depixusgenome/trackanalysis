@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "subtracting fixed beads from other beads"
-from   typing                       import (List, Tuple, Optional, Callable,
-                                            Union, Dict, cast)
+from   dataclasses                  import dataclass
+from   typing                       import (
+    List, Tuple, Optional, Callable, Union, Dict, cast
+)
 import warnings
 
 import numpy                        as     np
@@ -11,7 +13,7 @@ import pandas                       as     pd
 from   data.views                   import Cycles, Beads, BEADKEY
 from   signalfilter                 import nanhfsigma
 from   utils                        import initdefaults
-from   taskmodel                    import PHASE
+from   taskmodel                    import PhaseArg, PhaseRange
 from   taskmodel.base               import Rescaler
 from   .datacleaning                import AberrantValuesRule, HFSigmaRule, ExtentRule
 from   ._core                       import (reducesignals, # pylint: disable=import-error
@@ -32,11 +34,12 @@ class SubtractAverageSignal:
         signals = [frame.data[i] for i in beads]
         return 0. if len(signals) == 0 else reducesignals("mean", signals)
 
+@dataclass
 class SubtractWeightedAverageSignal:
     """
     Subtracts the average signal
     """
-    phase = PHASE.measure
+    phase: PhaseArg = 'measure'
     @staticmethod
     def apply(signals, phase):
         "Aggregates signals"
@@ -65,7 +68,8 @@ class SubtractWeightedAverageSignal:
 
     def process(self, beads, frame):
         "Aggregates signals from a frame"
-        pha = frame.track.phase.select(..., (0, self.phase, self.phase+1))
+        ind = frame.phaseindex()[self.phase]
+        pha = frame.track.phase.select(..., (0, ind, ind+1))
         pha = pha[:,1:]-pha[:,:1]
         cyc = frame.new(Cycles).withdata({i: frame.data[i] for i in beads})
         itr = [self.apply([cyc[i,j] for i in beads], pha[j,:])
@@ -99,8 +103,8 @@ class SubtractMedianSignal:
         should superpose.
         3. For each frame, the median (or mean: replace 3rd) position is selected.
     """
-    phase                               = PHASE.measure
-    average                             = False
+    phase:    PhaseArg                  = 'measure'
+    average:  bool                      = False
     baseline: Optional[Tuple[int, str]] = None # PHASE.initial, "median-median-median"
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -108,7 +112,8 @@ class SubtractMedianSignal:
 
     def process(self, beads, frame):
         "Aggregates signals from a frame"
-        pha     = [frame.track.phase.select(..., i) for i in (0, self.phase, self.phase+1)]
+        ind     = frame.phaseindex()[self.phase]
+        pha     = [frame.track.phase.select(..., i) for i in (0, ind, ind+1)]
         signals = [frame.data[i] for i in beads]
         if len(signals) == 0:
             return 0.
@@ -157,17 +162,18 @@ class MeasureDropsRule(Rescaler, zattributes = ('mindzdt',)):
 
         dz/dt < -mindzdt
     """
-    phase    = PHASE.measure
-    maxdrops = 100
-    mindzdt  = 1.5e-2
+    phase:    PhaseArg = 'measure'
+    maxdrops: int      = 100
+    mindzdt:  float    = 1.5e-2
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
 
     def measure(self, track, data) -> int:
         "return the number of stairs in PHASE.measure"
-        ph1 = track.phase.select(..., self.phase)
-        ph2 = track.phase.select(..., self.phase+1)
+        ind = track.phase[self.phase]
+        ph1 = track.phase.select(..., ind)
+        ph2 = track.phase.select(..., ind+1)
         return dztotalcount(-self.mindzdt, data, ph1, ph2)
 
     def test(self, track, data) -> bool:
@@ -181,17 +187,17 @@ class FixedBeadDetection(
     """
     Finds and sorts fixed beads
     """
-    abberrant     = AberrantValuesRule()
-    drops         = MeasureDropsRule()
-    percentiles   = 5., 95.
-    threshold     = 95.
-    maxdiff       = .015
-    diffphases    = PHASE.initial, PHASE.measure
-    minhfsigma    = 1e-4
-    maxhfsigma    = .006
-    maxextent     = .035
-    minpopulation = 80.
-    extentphases  = PHASE.initial, PHASE.pull
+    abberrant:     AberrantValuesRule  = AberrantValuesRule()
+    drops:         MeasureDropsRule    = MeasureDropsRule()
+    percentiles:   Tuple[float, float] = (5., 95.)
+    threshold:     float               = 95.
+    maxdiff:       float               = .015
+    diffphases:    PhaseRange          = ('initial', 'measure')
+    minhfsigma:    float               = 1e-4
+    maxhfsigma:    float               = .006
+    maxextent:     float               = .035
+    minpopulation: float               = 80.
+    extentphases:  PhaseRange          = ('initial', 'pull')
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
@@ -200,8 +206,10 @@ class FixedBeadDetection(
         """
         computes the bead extension
         """
-        return (np.array([np.nanmax(i) for _, i in cycles.withphases(self.extentphases[1])])
-                -[np.nanmin(i) for _, i in cycles.withphases(self.extentphases[0])])
+        return (
+            np.array([np.nanmax(i) for _, i in cycles.withphases(self.extentphases[1])])
+            -[np.nanmin(i) for _, i in cycles.withphases(self.extentphases[0])]
+        )
 
     def cyclesock(self, cycles: Cycles) -> np.ndarray:
         """
@@ -327,7 +335,8 @@ class FixedBeadDetection(
         phases = beads.track.phase.select
         sigs   = HFSigmaRule(minhfsigma = self.minhfsigma,
                              maxhfsigma = self.maxhfsigma).hfsigma
-        sigph  = tuple(phases(..., i) for i in (PHASE.initial, PHASE.measure+1))
+        ind    = beads.phaseindex('initial', 'rampdown')
+        sigph  = tuple(phases(..., i) for i in ind)
         return lambda x: sigs(cast(Dict, x.data)[0], *sigph).values
 
     def __exts(self, beads: Beads) -> Tuple[Callable[[Cycles], bool],
@@ -338,10 +347,11 @@ class FixedBeadDetection(
             minextent   = 0.,
             percentiles = [100-self.threshold, self.threshold]
         ).extent
-        extph   = (phases(..., self.extentphases[0]+1),
-                   phases(..., self.extentphases[1]),
-                   phases(..., self.extentphases[0]),
-                   phases(..., self.extentphases[1]+1))
+        inds    = beads.phaseindex()[self.extentphases]
+        extph   = (phases(..., inds[0]+1),
+                   phases(..., inds[1]),
+                   phases(..., inds[0]),
+                   phases(..., inds[1]+1))
 
         def _fast(data: np.ndarray):
             return np.nanpercentile(data[extph[1]]-data[extph[0]], self.threshold)

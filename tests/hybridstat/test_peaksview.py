@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
-from typing                     import cast
-from tempfile                   import mktemp, gettempdir
-from pathlib                    import Path
+from typing    import cast
+from tempfile  import mktemp, gettempdir
+from pathlib   import Path
+from importlib import import_module
 import warnings
 import asyncio
 import numpy as np
@@ -19,18 +20,18 @@ for _msg_ in (".*html argument of XMLParser.*", ".*Using or importing the ABCs.*
     )
 
 # pylint: disable=wrong-import-position
-from bokeh.plotting             import Figure
-from bokeh.models               import Tabs, FactorRange
-from tornado.gen                import sleep
-from tornado.ioloop             import IOLoop
-from tornado.platform.asyncio   import AsyncIOMainLoop
+from bokeh.plotting           import Figure
+from bokeh.models             import Tabs, FactorRange
+from tornado.gen              import sleep
+from tornado.ioloop           import IOLoop
+from tornado.platform.asyncio import AsyncIOMainLoop
+# import openpyxl to deal with deprecation warning
+import openpyxl # pylint: disable:unused-import
 
-from tests.testutils            import integrationmark
-from tests.testingcore          import path as utfilepath
-from view.plots                 import DpxKeyedRow
-
+from tests.testutils                     import integrationmark
+from tests.testingcore                   import path as utfilepath
+from view.plots                          import DpxKeyedRow
 from peakfinding.reporting.batch         import createmodels as _pmodels
-
 from hybridstat.reporting.identification import writeparams
 from hybridstat.reporting.batch          import createmodels as _hmodels
 from hybridstat.view._io                 import ConfigXlsxIO
@@ -209,6 +210,15 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-
     server.ctrl.display.observe("hybridstat.peaks", _printrng)
     server.load('big_legacy')
 
+    out   = Path(mktemp()+"_hybridstattest40.xlsx")
+    found = []
+    bokehaction.monkeypatch.setattr(
+        import_module("hybridstat.view._io"),
+        "startfile",
+        lambda _: found.append(True)
+    )
+    server.save(str(out), waitfor = lambda: len(found) == 1)
+
     assert server.selenium['.dpx-peakstatdiv'].text == (
         'Cycles\n'              '103\n'
         'Stretch (base/µm)\n'   '1136.364\n'
@@ -247,6 +257,9 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-
 
     _t_e_s_t_peaks(server, bokehaction)
 
+    server.save(str(out), waitfor = lambda: len(found) == 2)
+    assert len(found) == 2
+
     assert server.selenium['.dpx-peakstatdiv'].text == (
         'Cycles\n'             '103\n'
         'Stretch (base/µm)\n'  '1164.062\n'
@@ -263,6 +276,7 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-
         'Silhouette\n'         '1.0\n'
         'reduced χ²\n'         '1.3'
     )
+
 
 
 @integrationmark

@@ -114,7 +114,7 @@ Track dependant Oligos
 The oligos can be parsed from the track file names:
 
 * 'kmer': parses the track file names to find a kmer, *i.e* a sequence of `a`,
-  `t`, `c` or `g`. The accepted formats are 'xxx_atc_2nM_yyy.trk' where 'xxx_'
+  `t`, `c` or `g`. The accepted formats are 'xxx_atc_2nM_yyy.trk' where 'xxx\_'
   and '_yyy' can be anything. The 'nM' (or 'pM') notation must come immediatly
   after the kmer. It can be upper or lower-case names indifferently.
 * '3mer': same as 'kmer' but detects only 3mers

@@ -141,7 +141,7 @@ class ConfigXlsxIO(TaskIO):
     def __complete_model(self, model, pksmdl):
         ind = max(
             (i for i, j in enumerate(model) if isinstance(j, self.__EXCEPT)),
-            None
+            default = None
         )
         if ind is not None:
             model.insert(ind+1, ExceptionCatchingTask(exceptions = [DataCleaningException]))

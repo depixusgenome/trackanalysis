@@ -3,9 +3,11 @@
 u"""
 Classes defining a level of data treatment.
 """
-from enum   import Enum, unique
-from utils  import initdefaults
+from dataclasses import dataclass
+from enum        import Enum, unique
+from typing      import Union, Tuple, Iterable, Iterator, Set, List, overload, cast
 
+@unique
 class InstrumentType(Enum):
     "The type of instrument"
     picotwist = "picotwist"
@@ -31,6 +33,10 @@ class Level(Enum):
     peak    = 4
     none    = None # type: ignore
 
+PhaseArg   = Union[str, int]
+PhaseRange = Tuple[PhaseArg, PhaseArg]
+
+@dataclass
 class Phase:
     """
     Phase names in a cycle. Labeled phases are characterized by a stable magnet
@@ -47,15 +53,33 @@ class Phase:
     * `relax`: phase 7 is used to remove probes from the hairpin.  The magnet
     is then at its farthest point (5 pN of force).
     """
-    initial  = 1
-    pull     = 3
-    rampdown = 4
-    measure  = 5
-    relax    = 7
-    count    = 8
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
+    initial:  int = 1
+    pull:     int = 3
+    rampdown: int = 4
+    measure:  int = 5
+    relax:    int = 7
+    count:    int = 8
+
+    @overload
+    def __getitem__(self, value:PhaseArg) -> int:
         pass
+    @overload
+    def __getitem__(self, value:None) -> 'Phase':
+        pass
+    @overload
+    def __getitem__(
+            self,
+            value:Union[List[PhaseArg], Tuple[PhaseArg], Set[PhaseArg], Iterator[PhaseArg]]
+    ) -> List[int]:
+        pass
+    def __getitem__(self, value):
+        return (
+            self                     if value is Ellipsis  or value is None else
+            getattr(self, value)     if isinstance(value, str)              else
+            [self[i] for i in value] if isinstance(value, Iterable)         else
+            cast(int, value)
+        )
+
 PHASE = Phase()
 
 def levelprop(val):

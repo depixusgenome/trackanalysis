@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "easy access to cycles"
-from   typing import (Iterator, Callable, Optional, Tuple, Dict, Iterable, Union,
-                      Any, cast)
+from   typing import (
+    Iterator, Callable, Optional, Tuple, Dict, Iterable, Union, List, Any,
+    overload, cast
+)
 from   copy   import copy as shallowcopy
 import numpy  as     np
 
-from   utils  import initdefaults, isfunction
-from   ._dict import BEADKEY, CYCLEKEY, isellipsis
-from   ._view import TrackView, ITrackView, Level
+from   taskmodel.level import PHASE, PhaseArg, Phase
+from   utils           import initdefaults, isfunction
+from   ._dict          import BEADKEY, CYCLEKEY, isellipsis
+from   ._view          import TrackView, ITrackView, Level
 
 _none  = type('_none', (), {})
 
@@ -198,21 +201,17 @@ class Cycles(TrackView, ITrackView):
             yield from self.__iterfrombeads(sel)
 
     def withphases(self,
-                   first:Union[int,Tuple[int,int],None],
+                   first:Union[PhaseArg,Tuple[PhaseArg,PhaseArg],None],
                    last:Union[int,None,type] = _none) -> 'Cycles':
         "specifies the phase to extract: None or ... for all"
         if isinstance(first, tuple):
-            self.first, self.last = first
+            first, last = first
         elif last is _none:
-            self.first = first
-            self.last  = first
-        else:
-            self.first = first
-            self.last  = cast(Optional[int], last)
-        if self.first is Ellipsis:
-            self.first = None
-        if self.last is Ellipsis:
-            self.last = None
+            last        = first
+
+        phase      = self.phaseindex()
+        self.first = None if first is Ellipsis else cast(int, phase[first])
+        self.last  = None if last  is Ellipsis else cast(int, phase[last])
         return self
 
     def withfirst(self, first:Optional[int]) -> 'Cycles':
@@ -225,16 +224,41 @@ class Cycles(TrackView, ITrackView):
         self.last = last
         return self
 
-    def phase(self, cid:Optional[int] = None, pid:Optional[int] = None):
+    @overload
+    @staticmethod
+    def phaseindex() -> Phase:
+        "return the PHASE object"
+
+    @overload
+    @staticmethod
+    def phaseindex(__1:PhaseArg) -> int:
+        "return the PHASE index"
+
+    @overload
+    @staticmethod
+    def phaseindex(__1:PhaseArg, __2:PhaseArg, *args:PhaseArg) -> List[int]:
+        "return the PHASE index"
+
+    @staticmethod
+    def phaseindex(*args:PhaseArg):
+        "return the PHASE index"
+        return PHASE if not args else PHASE[args[0]] if len(args) == 1 else PHASE[args]
+
+    def phase(self, cid:Optional[int] = None, pid:Optional[PhaseArg] = None):
         "returns phase ids for the given cycle"
-        vect = self.track.phases
-        if isellipsis(cid) and isellipsis(pid):
-            return vect         - vect[:,0]
-        if isellipsis(cid):
-            return vect[:,pid]  - vect[:,0]
-        if isellipsis(pid):
-            return vect[cid,:]  - vect[cid,0]
-        return vect[cid,pid]- vect[cid,0]
+        if pid is None and isinstance(cid, str):
+            pid, cid = cid, None
+        isel  = isellipsis(cid), isellipsis(pid)
+        if not isel[1]:
+            pid = self.phaseindex()[pid]
+
+        vect  = self.track.phases
+        return (
+            vect          - vect[:,0]   if all(isel) else
+            vect[:,pid]   - vect[:,0]   if isel[0]   else
+            vect[cid,:]   - vect[cid,0] if isel[1]   else
+            vect[cid,pid] - vect[cid,0]
+        )
 
     def maxsize(self):
         "returns the max size of cycles"

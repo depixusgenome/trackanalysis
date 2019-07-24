@@ -1,6 +1,8 @@
 # CycleApp
 ## cycles_v6.12
 
+* 2019-07-24 14:18:39 +0200  (tag: cycles_v6.12)
+
 ### Cleaning
 
 There is a new cleaning rule to detect *phase-jumps* from the SDI,
@@ -17,7 +19,7 @@ separated by an underscore.
 
 ## cycles_v6.11
 
-* 2019-07-17 09:20:39 +0200  (tag: ramp_v2.3.1, tag: cycles_v6.11.1)
+* 2019-07-17 09:14:41 +0200  (tag: ramp_v2.3.1, tag: cycles_v6.11.1)
 * 2019-07-10 10:30:59 +0000  (tag: ramp_v2.3, tag: cycles_v6.11)
 
 ### Cambridge Features
@@ -1082,3 +1084,6 @@ discarded (as in pias)
 * generates a ramp_discard.csv file for pias
 * added a third graph to display the estimated size of each hairpin in the trk files
 
+---
+title: "Changelog"
+---
