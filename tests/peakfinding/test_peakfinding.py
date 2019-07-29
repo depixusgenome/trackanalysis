@@ -242,9 +242,7 @@ def test_reporting():
                                               cast(str, utfilepath("CTGT_selection"))),
                                   reporting= out))
 
-    itms = next(tasks)
-    assert not Path(out).exists()
-    tuple(itms)
+    _ = next(tasks)
     assert Path(out).exists()
 
 def test_precision():

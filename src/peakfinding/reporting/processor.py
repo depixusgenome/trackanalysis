@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"PeakFinding excel reporting processor"
-from   typing               import Optional
+from   typing               import Optional, Iterator
 from   pathlib              import Path
 import pickle
 
-from data.views                   import TrackView
 from excelreports.creation        import fileobj
 
 from eventdetection               import EventDetectionConfig
@@ -66,15 +65,15 @@ class PeakFindingExcelProcessor(Processor[PeakFindingExcelTask]):
         cnf  = list(data.model)
 
         def _save(frame):
-            if pool is None:
-                beads = frame.withaction(lambda _, i: (i[0], tuple(i[1])))
-            else:
-                beads = pooledinput(pool, pick, frame).items()
+            beads = {}
+            for i, j in pooledinput(pool, pick, frame, safe = True).items():
+                try:
+                    beads[i] = tuple(j) if isinstance(j, Iterator) else j
+                except Exception as exc: # pylint: disable=broad-except
+                    beads[i] = exc
             run(path, cnf, track = frame.track, beads = beads, **kwa)
-            return frame
 
-        fcn = lambda frame: frame.new(TrackView).withdata(_save)
-        return fcn if toframe is None else fcn(toframe)
+        return _save if toframe is None else _save(toframe)
 
     def run(self, args):
         "updates frames"
@@ -91,6 +90,7 @@ def run(path:str, config = '', **kwa):
             summ = SummarySheet(book, self)
 
             summ.info(config)
-            summ.table ()
+            summ.table()
+            summ.footer()
 
             PeaksSheet(book, self).table()

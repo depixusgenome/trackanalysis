@@ -17,7 +17,7 @@ import  pandas         as     pd
 from    data.views             import Beads
 from    taskview.plots         import PlotView, CACHE_TYPE, TaskPlotCreator
 from    taskcontrol.taskio     import TaskIO
-from    view.base              import spawn, ThreadPoolExecutor, threadmethod
+from    view.base              import spawn, ThreadPoolExecutor, threadmethod, stretchout
 from    view.colors            import tohex
 from    utils.logconfig        import getLogger
 from    utils.gui              import startfile
@@ -192,12 +192,12 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
         out  = self._keyedlayout(ctrl, fig)
         out.width  = fig.plot_width
         out.height = fig.plot_height
-        return layouts.row(
+        return stretchout(layouts.row(
             [left, Spacer(width = 20, height = left.height), out],
             width  = left.width+out.width+20,
             height = max(left.height, out.height),
             **self.defaultsizingmode()
-        )
+        ))
 
     def _reset(self, cache: CACHE_TYPE):
         cycles, zmag, disable = None, None, True

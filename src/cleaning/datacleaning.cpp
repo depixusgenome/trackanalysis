@@ -166,11 +166,13 @@ namespace cleaning
             if(std::isfinite(data[i]))
                 med(data[i]);
 
-        // remove values outside an absolute range and derivatives outside an absolute range
-        derivative.apply(sz, data, clip, compute(med));
-        // remove stretches of constant values
         if(!clip)
+        {
+            // remove values outside an absolute range and derivatives outside an absolute range
+            derivative.apply(sz, data, false, compute(med));
+            // remove stretches of constant values
             constants.apply(sz, data);
+        }
         // remove NaN features
         localnans.apply(sz, data);
         islands.apply(sz, data);

@@ -6,7 +6,6 @@ from   pathlib               import Path
 from   typing                import Sequence, Dict, Optional
 import pickle
 
-from   data.views            import TrackView, BEADKEY
 from   eventdetection        import EventDetectionConfig
 from   excelreports.creation import fileobj
 from   peakcalling.processor import FitToHairpinTask
@@ -22,10 +21,10 @@ class HybridstatExcelTask(Task):
     "Reporter for Hybridstat"
     level       = Level.peak
     path        = ""
-    oligos      : Sequence[str]               = []
-    sequences   : Dict[str,str]               = {}
-    knownbeads  : Optional[Sequence[BEADKEY]] = None
-    minduration : Optional[int]               = None
+    oligos      : Sequence[str]           = []
+    sequences   : Dict[str,str]           = {}
+    knownbeads  : Optional[Sequence[int]] = None
+    minduration : Optional[int]           = None
 
     @initdefaults(frozenset(locals()) - {'level'},
                   model = lambda self, i: self.frommodel(i))
@@ -69,16 +68,12 @@ class HybridstatExcelProcessor(Processor[HybridstatExcelTask]):
         return frame
 
     @classmethod
-    def _apply(cls, path, cnf, kwa, frame):
-        return frame.new(TrackView).withdata(partial(cls._save, path, cnf, kwa))
-
-    @classmethod
     def apply(cls, toframe = None, model = None, **kwa):
         "applies the task to a frame or returns a function that does so"
         path = kwa.pop('path')
         cnf  = '' if model is None else list(model)
-        return (partial(cls._apply, path, cnf, kwa) if toframe is None else
-                cls._apply(path, cnf, kwa, toframe))
+        fcn  = partial(cls._save, path, cnf, kwa)
+        return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
         "updates frames"
@@ -95,6 +90,7 @@ def run(path:str, config = '', **kwa):
             summ = SummarySheet(book, self)
 
             summ.info(config)
-            summ.table ()
+            summ.table()
+            summ.footer()
 
             PeaksSheet(book, self).table()

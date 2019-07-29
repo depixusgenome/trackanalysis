@@ -154,7 +154,7 @@ class PositionInRef(HasLengthPeak):
         self._hpins   = peaks.config.hairpins
         self._isxlsx  = peaks.isxlsx()
         self._peakrow = 1+peaks.tablerow()
-        self._beadrow = 1+summ.tablerow()
+        self._beadrow = summ.refrow()
         self._oldbead: Optional[Tuple[Group, Bead]] = None
 
         def _cell(name):

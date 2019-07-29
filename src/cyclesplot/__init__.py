@@ -6,6 +6,7 @@ from    bokeh                import layouts
 
 from    taskcontrol.taskio   import ConfigTrackIO, GrFilesIO
 from    taskview.plots       import PlotView, CACHE_TYPE, TaskPlotCreator
+from    view.base            import stretchout
 from   ._bokehext            import DpxHoverModel
 from   ._model               import CyclesModelAccess, CyclesPlotModel
 from   ._raw                 import RawMixin
@@ -54,9 +55,8 @@ class CyclesPlotCreator( # pylint: disable=too-many-ancestors
             plot_height = parent.height - ctrl.theme.get("theme", "figtbheight")
         )
         self._hist.plot_height = self._raw.height
-        return layouts.column(
-            [parent, widgets] if 'fixed' in mode.values() else [widgets, parent],
-            ** mode, **sizes
+        return stretchout(
+            layouts.column([parent, widgets], ** mode, **sizes), strategy = 0
         )
 
     def _reset(self, cache: CACHE_TYPE):

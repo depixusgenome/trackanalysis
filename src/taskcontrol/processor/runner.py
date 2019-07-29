@@ -236,30 +236,47 @@ def _m_multi(cnf, safe, iproc) -> dict:
     return {i: tuple(j) if isinstance(j, Iterator) else j for i, j in res}
 
 pooldump = pickle.dumps  # pylint: disable=invalid-name
-def pooledinput(pool, pickled, frame, safe = False) -> dict:
+def pooledinput(
+        pool: Optional[ProcessPoolExecutor],
+        pickled,
+        frame,
+        safe: bool = False
+) -> dict:
     "returns a dictionary with all input"
     data = pickle.loads(pickled) if isinstance(pickled, bytes) else pickled
-    if pool is None or not any(i.isslow() for i in data):
+    if not any(i.isslow() for i in data):
+        pool = None
+    if pool is None and not safe:
         return dict(frame)
 
-    tmp                = (i for i, j in enumerate(data) if j.canpool())
-    ind: Optional[int] = max(tmp, default = None) # type: ignore
-    if ind is None:
-        cnf  = dict(data = data)
+    res: dict = {}
+    if pool is None:
+        for i in frame.keys():
+            try:
+                res[i] = frame[i]
+            except Exception as exc: # pylint: disable=broad-except
+                res[i] = exc
     else:
-        ind  = cast(int, ind)+1
-        args = Runner(data = data[:ind], pool = pool)
-        for proc in args.data:
-            if not proc.task.disabled:
-                proc.run(args)
-        gen  = tuple(i.freeze() for i in cast(Iterator[TrackView], args.gen)
-                     if i.parents == frame.parents[:len(cast(tuple, i.parents))])
-        cnf  = dict(gen = gen, level = args.level, data = list(data[ind:]))
+        tmp                = (i for i, j in enumerate(data) if j.canpool())
+        ind: Optional[int] = max(tmp, default = None) # type: ignore
+        if ind is None:
+            cnf  = dict(data = data)
+        else:
+            ind  = cast(int, ind)+1
+            args = Runner(data = data[:ind], pool = pool)
+            for proc in args.data:
+                if not proc.task.disabled:
+                    proc.run(args)
+            gen  = tuple(
+                i.freeze()
+                for i in cast(Iterator[TrackView], args.gen)
+                if i.parents == frame.parents[:len(cast(tuple, i.parents))]
+            )
+            cnf  = dict(gen = gen, level = args.level, data = list(data[ind:]))
 
-    cnf.update(nproc = pool.nworkers, parents = frame.parents) # type: ignore
-    res   = {} # type: dict
-    for val in pool.map(partial(_m_multi, cnf, safe), range(cnf['nproc'])):
-        res.update(val)
+        cnf.update(nproc = getattr(pool, 'nworkers', 1), parents = frame.parents) # type: ignore
+        for val in  getattr(pool, 'map', map)(partial(_m_multi, cnf, safe), range(cnf['nproc'])):
+            res.update(val)
     return res
 
 def run(data:  DataType, # pylint: disable=too-many-arguments

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Matching experimental peaks to hairpins: tasks and processors"
-from typing                       import Sequence, NamedTuple, Iterator, cast
+from typing                       import Sequence, NamedTuple, Iterator, Dict, Union, cast
 from functools                    import partial
 from data.views                   import BEADKEY, TrackView
 from taskcontrol.processor        import Processor
@@ -26,7 +26,7 @@ class ByHairpinBead(NamedTuple):
 
 class ByHairpinGroup(NamedTuple):
     key   : str
-    beads : Sequence[ByHairpinBead]
+    beads : Union[Sequence[ByHairpinBead], Dict[int, Exception]]
 
 class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
     "Groups beads per hairpin"
@@ -55,24 +55,31 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
         args.apply(self.apply(**args.poolkwargs(self.task), **self.config()))
 
     @classmethod
-    def compute(cls,
-                frame       : Input,
-                fit         : Fitters     = None,
-                constraints : Constraints = None,
-                match       : Matchers    = None
-               ) -> Iterator[ByHairpinGroup]:
+    def compute(
+            cls,
+            frame       : Input,
+            fit         : Fitters     = None,
+            constraints : Constraints = None,
+            match       : Matchers    = None
+    ) -> Iterator[ByHairpinGroup]:
         "Regroups the beads from a frame by hairpin"
         cnf = cls.CHILD.keywords(dict(fit         = fit,
                                       constraints = constraints,
                                       match       = match))
-        fcn = partial(cls.CHILD.compute, **cnf)
+        def _fcn(bead):
+            try:
+                return cls.CHILD.compute(bead, **cnf)
+            except Exception as exc: # pylint: disable=broad-except
+                return (bead, exc)
+
         itr = cast(Iterator[PeakEventsTuple], frame)
-        yield from cls.__output(dict(fcn(i) for i in itr), cnf.get('constraints', {}))
+        yield from cls.__output(dict(_fcn(i) for i in itr), cnf.get('constraints', {}))
 
     @classmethod
     def __output(cls, out, cstrs) -> Iterator[ByHairpinGroup]:
         dflt = BeadsByHairpinTask.DEFAULT_FIT().defaultparameters()
         one  = lambda i, j: ByHairpinBead(i[0], i[1], i[2].get(j, dflt), i[3], i[4])
+        errs = {i: j for i, j in out.items() if isinstance(j, Exception)}
         out  = {i: j for i, j in out.items() if not isinstance(j, Exception)}
         best = {itm.key: min(itm.distances, key = itm.distances.__getitem__, default = '✗')
                 for itm in out.values()}
@@ -82,10 +89,13 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
                 continue
             if out[i].distances[j][0] == DEFAULT_BEST :
                 best[i] = '✗'
+
         for hpname in sorted(set(best.values()), key = lambda x: x or chr(255)):
             vals = [one(val, hpname) for key, val in out.items() if best[key] == hpname]
             vals = sorted(vals, key = lambda i: i.silhouette, reverse = True)
             yield ByHairpinGroup(hpname, vals)
+        if errs:
+            yield ByHairpinGroup('Exceptions', errs)
 
     @classmethod
     def _unpooled(cls, cnf, frame):

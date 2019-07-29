@@ -3,21 +3,23 @@
 """
 Creates peaks sheet
 """
-from typing                     import Tuple, Iterator, Optional, Dict
+from typing                     import Tuple, Iterator, Optional, Dict, TYPE_CHECKING
 
 from excelreports.creation      import column_method, sheet_class
 from ..probabilities            import Probability
-from ._base                     import Reporter, BEADKEY, PeakOutput
+from ._base                     import Reporter
+if TYPE_CHECKING:
+    from ..peaksarray       import Output as PeakOutput
 
 class Probabilities:
     "Computes and caches probabilities"
     def __init__(self, base:Reporter) -> None:
         self._proba  = Probability(framerate   = base.config.track.framerate,
                                    minduration = base.config.minduration)
-        self._values: Dict[Tuple[BEADKEY,int], Probability] = dict()
+        self._values: Dict[Tuple[int,int], Probability] = dict()
         self._ends   = base.config.track.durations
 
-    def __cache(self, bead:BEADKEY, ipk:int, peak:PeakOutput) -> Probability:
+    def __cache(self, bead:int, ipk:int, peak:'PeakOutput') -> Probability:
         key = bead, ipk
         val = self._values.get(key, None)
         if val is not None:
@@ -26,7 +28,7 @@ class Probabilities:
         self._values[key] = val = self._proba(peak[1], self._ends)
         return val
 
-    def __call__(self, name:str, bead:BEADKEY, ipk:int, peak:PeakOutput):
+    def __call__(self, name:str, bead:int, ipk:int, peak:'PeakOutput'):
         "returns a probability value for a bead"
         return getattr(self.__cache(bead, ipk, peak), name)
 
@@ -45,19 +47,19 @@ class PeaksSheet(Reporter):
         "Returns the chart height"
         return min(cls._MINCHARTHEIGHT, npeaks)
 
-    def iterate(self) -> Iterator[Tuple[BEADKEY, int, PeakOutput]]:
+    def iterate(self) -> Iterator[Tuple[int, int, 'PeakOutput']]:
         "Iterates through peaks of each bead"
         for bead, outp in self.config.beads:
             yield from ((bead, i, peak) for i, peak in enumerate(outp))
 
     @staticmethod
     @column_method("Peak Position")
-    def _peakpos(_1, _2, peak:PeakOutput) -> float:
+    def _peakpos(_1, _2, peak:'PeakOutput') -> float:
         "Peak position as measured (µm)"
         return peak[0]
 
     @column_method("σ[Peaks]", median = True, units = 'µm')
-    def _peakresolution(self, _1, _2, peak:PeakOutput) -> Optional[float]:
+    def _peakresolution(self, _1, _2, peak:'PeakOutput') -> Optional[float]:
         "Standard deviation of event positions (µm)"
         if self._nevt(_1, _2, peak) == 0:
             return None

@@ -26,10 +26,13 @@ from   taskcontrol.processor.dataframe import DataFrameFactory, DataFrameTask
 from   utils                       import (
     StreamUnion, initdefaults, updatecopy, asobjarray, DefaultValue, isint
 )
+from   utils.logconfig             import getLogger
 from   ..tohairpin                 import (
     HairpinFitter, PeakGridFit, Distance, PeakMatching, Pivot, PEAKS_TYPE
 )
 from   .._base                     import Range
+
+LOGS = getLogger(__name__)
 
 class DistanceConstraint(NamedTuple):
     hairpin     : Optional[str]
@@ -422,34 +425,39 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
     from 0 to 6 rows in the dataframe. Zero would imply that none of the beads
     had a size consistent with any of the hairpins.
 
-    # Default Indexes
+    Default Indexes
+    ---------------
 
     * track: the track from which is issued a given bead
     * bead: the bead id in the track
 
-    # Default Columns
+    Default Columns
+    ---------------
 
     * hpin:           the hairpin name.
-    * cost:           the cost value for fitting the bead to that hairpin. This
-    value may vary depending on which cost function was selected and its
-    configuration.
+    * cost:           the cost value for fitting the bead to that hairpin.
+      This value may vary depending on which cost function was selected and its
+      configuration.
+    * oligo:          the oligos used for fitting, if known.
     * stretch:        the stretch value from fitting to that hairpin.
     * bias:           the bias value from fitting to that hairpin.
     * nbindings:      the number of expected bindings on the hairpin.
     * nblockages:     the number of blockage positions detected on the bead.
     * hfsigma:        the high frequency noise for that bead.
     * considering blockage positions versus expected bindings:
-        * expfalsepos:   the number of formers not assigned to any of the latters.
-        * expfalseneg:   the number of latters without assignees.
-        * exptruepos:    the number of assigned formers.
-        * expresiduals:  the mean distance from a former to its assigned latter.
-        * expduplicates: the number of assigned formers less the number of assigned latters.
+        * expnonaffected: the number of formers not assigned to any of the latters.
+        * expaffected:    the number of assigned formers including duplicated formers.
+        * expfalseneg:    the number of peak(s) which not appear experimently but
+          assigned theoretically.
+        * exptruepos:     the number of assigned formers.
+        * expresiduals:   the mean distance from a former to its assigned latter.
+        * expduplicates:  the number of assigned formers less the number of assigned latters.
     * considering expected bindings versus blockage positions:
-        * hpinfalsepos:   the number of formers not assigned to any of the latters.
-        * hpinfalseneg:   the number of latters without assignees.
-        * hpintruepos:    the number of assigned formers.
-        * hpinresiduals:  the mean distance from a former to its assigned latter.
-        * hpinduplicates: the number of assigned formers less the number of assigned latters.
+        * hpinnonaffected : the number of formers not assigned to any of thelatters.
+        * hpinfalseneg:     the number of latters without assignees. => ignore, No SENSE.
+        * hpinaffected :    the number of assigned formers.
+        * hpinresiduals:    the mean distance from a former to its assigned latter.
+        * hpinduplicates:   the number of assigned formers less the number of assigned latters.
     * For identified blockage positions:
         * tpaverageduration:   the average event duration
         * tphybridisationrate: the average event rate
@@ -459,7 +467,8 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
         * fphybridisationrate: the average event rate
         * fpeventcount:        the average event count
 
-    # Configuration
+    Configuration
+    -------------
 
     The following can be provided to the `measures` dictionnary of the task
 
@@ -467,7 +476,7 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
         the aggregator to use, `np.nanmedian` by default.
     * distances: Dict[str, float]
         A dictionnary containing:
-        ```
+        ```python
         {
             'bead': max distance from blockage positions to an expected binding,
             'hpin': max distance from expected bindings to a blockage position.
@@ -530,11 +539,15 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
         out   = self.__basic(frame, bead, res, fits)
         out.update(self.__complex(frame, res, fits))
         out.update({i: j(frame, bead, res) for i, j in self.__optionals.items()})
+
         out['oligo'] = np.empty(len(next(iter(out.values()))), dtype = f'<U{self.OSZ}')
         if isinstance(frame.config.oligos, (str, Pattern)):
             out['oligo'][:] = str(frame.config.oligos)[:self.OSZ]
         elif frame.config.oligos is not None:
             out['oligo'][:] = ','.join(str(i) for i in frame.config.oligos)[:self.OSZ]
+
+        if fits:
+            out['expfalseneg']  = out['nbindings']  - out['exptruepos']
         return out
 
     @staticmethod
@@ -626,10 +639,11 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
 
         if tpe == "bead":
             tpe = "exp"
-        out.setdefault(tpe+'truepos',    []).append(good.sum())
-        out.setdefault(tpe+'falsepos',   []).append(good.size - good.sum())
-        out.setdefault(tpe+'duplicates', []).append(good.size - np.unique(ids).size)
-        out.setdefault(tpe+'residuals',  []).append(
+        out.setdefault(tpe+'affected',    []).append(np.array(good.sum(), dtype = 'i4'))
+        out.setdefault(tpe+'nonaffected', []).append(good.size - good.sum())
+        out.setdefault(tpe+'duplicates',  []).append(good.size - np.unique(ids).size)
+        out.setdefault(tpe+'truepos',     []).append(np.unique(ids).size)
+        out.setdefault(tpe+'residuals',   []).append(
             self.__aggregator(
                 np.abs(arrs[tpe == 'exp'][ids]-arrs[tpe != 'exp'][good])
                 **2

@@ -3,15 +3,18 @@
 """
 Creates the summary sheet
 """
-from   typing                import Tuple
+from   typing                import Tuple, TYPE_CHECKING
 import numpy                 as     np
 from   xlsxwriter.utility    import xl_col_to_name
 
 import version
 from   taskstore             import dumps
 from   excelreports.creation import column_method, sheet_class
+from   cleaning.processor    import DataCleaningException
 from ..probabilities         import Probability
-from ._base                  import BEADKEY, PeakOutput, Reporter
+from ._base                  import Reporter
+if TYPE_CHECKING:
+    from ..peaksarray       import Output as PeakOutput
 
 class SigmaPeaks:
     "Creates the formula for σ[Peaks]"
@@ -33,6 +36,40 @@ class SigmaPeaks:
         self._row += npeaks
         return self._formula.format(row, self._row)
 
+def footer(self):
+    "create footer with errors"
+    @column_method("Bead")
+    def bead(ibead, _) -> int:
+        "The bead number"
+        return ibead
+
+    @column_method("Errors")
+    def errors(_, err) -> str:
+        "The error encountered"
+        return err.shortmessage() if hasattr(err, 'shortmessage') else f'{type(err)}("{err}")'
+
+    @column_method("Bug?")
+    def bug(_, err) ->str:
+        """
+        If marked as ✗, then there was a bug during processing. Please take the
+        time and report this to your favorite data-scientist.
+        """
+        return '' if isinstance(err, DataCleaningException)  else '✗'
+    cols  = [bead, bug, errors]
+    lines =  [
+        *sorted(
+            (i for i in self.config.errs if isinstance(i, DataCleaningException)),
+            key = lambda i: i[0]
+        ),
+        *sorted(
+            (i for i in self.config.errs if not isinstance(i, DataCleaningException)),
+            key = lambda i: i[0]
+        )
+    ]
+    if len(lines) == 0:
+        return
+    self.table(cols, lines)
+
 @sheet_class("Summary")
 class SummarySheet(Reporter):
     "creates the summary sheet"
@@ -46,7 +83,7 @@ class SummarySheet(Reporter):
         return 1
 
     @column_method("σ[HF]", units = 'µm', fmt = '0.0000')
-    def _uncert(self, bead:BEADKEY, _) -> float:
+    def _uncert(self, bead:int, _) -> float:
         """
         High-frequency noise.
 
@@ -58,7 +95,7 @@ class SummarySheet(Reporter):
                    units   = 'µm',
                    fmt     = '0.0000',
                    exclude = lambda x: not x.isxlsx())
-    def _sigmapeaks(self, _, outp:Tuple[PeakOutput]) -> float:
+    def _sigmapeaks(self, _, outp:Tuple['PeakOutput']) -> float:
         """
         Median uncertainty on peak positions.
         """
@@ -66,12 +103,12 @@ class SummarySheet(Reporter):
 
     @staticmethod
     @column_method("Peak Count")
-    def _npeaks(_, outp:Tuple[PeakOutput]) -> int:
+    def _npeaks(_, outp:Tuple['PeakOutput']) -> int:
         "Number of peaks detected for a given bead."
         return len(outp)
 
     @column_method("Valid Cycles")
-    def _ncycles(self, _, outp:Tuple[PeakOutput]) -> int:
+    def _ncycles(self, _, outp:Tuple['PeakOutput']) -> int:
         "Number of valid cycles for a given bead."
         ncyc = self.config.track.ncycles
         if len(outp) > 0:
@@ -79,7 +116,7 @@ class SummarySheet(Reporter):
         return ncyc
 
     @column_method("Events per Cycle")
-    def _evts(self, _, outp:Tuple[PeakOutput]) -> float:
+    def _evts(self, _, outp:Tuple['PeakOutput']) -> float:
         "Average number of events per cycle"
         cnt = sum(1 for _, i in outp[1:] for j in i if j is not None) # type: ignore
         if cnt == 0:
@@ -88,7 +125,7 @@ class SummarySheet(Reporter):
         return 0. if ncy == 0 else (cnt / ncy)
 
     @column_method('Down Time Φ₅ (s)')
-    def _downtime(self, _, outp:Tuple[PeakOutput]) -> float:
+    def _downtime(self, _, outp:Tuple['PeakOutput']) -> float:
         "Average time in phase 5 a bead is fully zipped"
         if len(outp) == 0:
             return 0.
@@ -98,7 +135,7 @@ class SummarySheet(Reporter):
         return prob.averageduration
 
     @column_method("", exclude = lambda x: not x.isxlsx())
-    def _chart(self, _, outp:Tuple[PeakOutput]):
+    def _chart(self, _, outp:Tuple['PeakOutput']):
         return self.charting(outp)
 
     def iterate(self):
@@ -126,7 +163,7 @@ class SummarySheet(Reporter):
 
         # pylint: disable=no-member
         return ([("Cycle Count:", self.config.track.ncycles),
-                 ("Bead Count",   nbeads),
+                 ("Bead Count",   f"{nbeads} / {nbeads+len(self.config.errs)}"),
                  ("Subtracted",   sub)],
                 [("σ[HF] (µm):",       _avg(self._uncert)),
                  ("Events per Cycle:", _avg(self._evts)),
@@ -145,3 +182,7 @@ class SummarySheet(Reporter):
                 lst.extend((('', ''),)*(maxlen-len(lst)))
 
         self.header([i+('',)+j+(('',)*2)+k for i, j, k in zip(*items)])
+
+    def footer(self):
+        "creates a table of exceptions"
+        return footer(self)

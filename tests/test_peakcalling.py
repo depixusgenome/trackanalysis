@@ -388,7 +388,7 @@ def test_hp_dataframe():
         ),
         DataFrameTask(merge = True),
     ).run()))
-    assert pair.shape == (102, 21)
+    assert pair.shape == (102, 24)
     assert pair.index.names == ['hpin', 'track', 'bead']
 
 if __name__ == '__main__':

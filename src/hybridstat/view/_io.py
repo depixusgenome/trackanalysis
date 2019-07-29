@@ -6,16 +6,12 @@ from pathlib                              import Path
 from copy                                 import deepcopy
 from concurrent.futures                   import ProcessPoolExecutor, ThreadPoolExecutor
 
-from eventdetection.processor             import ExtremumAlignmentTask
-from cleaning.processor                   import (
-    DataCleaningTask, DataCleaningException, ClippingTask
-)
+from cleaning.processor                   import DataCleaningException
 from peakfinding.processor                import PeakSelectorTask
 from peakfinding.reporting.processor      import PeakFindingExcelTask
 from peakcalling.processor                import FitToHairpinTask, BeadsByHairpinTask
 from peakcalling.processor.fittoreference import (FitToReferenceTask, FitToReferenceDict,
                                                   TaskViewProcessor, BEADKEY)
-from taskcontrol.processor.utils          import ExceptionCatchingTask
 from taskcontrol.taskcontrol              import create as _createdata
 from taskcontrol.taskio                   import (
     ConfigTrackIO, ConfigGrFilesIO, ConfigMuWellsFilesIO, TaskIO
@@ -137,15 +133,7 @@ class ConfigXlsxIO(TaskIO):
         return ret
 
     __TASKS  = 'singlestrand', 'baselinefilter', 'fittoreference', 'identification'
-    __EXCEPT = DataCleaningTask, ExtremumAlignmentTask, ClippingTask
     def __complete_model(self, model, pksmdl):
-        ind = max(
-            (i for i, j in enumerate(model) if isinstance(j, self.__EXCEPT)),
-            default = None
-        )
-        if ind is not None:
-            model.insert(ind+1, ExceptionCatchingTask(exceptions = [DataCleaningException]))
-
         if not any(isinstance(i, pksmdl.identification.tasktype) for i in model):
             # If this methods gets called prior to the user using the peaks tab, some
             # tasks - irrelevant to the visited tabs - may have never been appended.
@@ -194,8 +182,7 @@ class ConfigXlsxIO(TaskIO):
         def _process():
             try:
                 with cls.POOLTYPE() as pool:
-                    for itm in cache.run(pool = pool):
-                        tuple(itm)
+                    tuple(cache.run(pool = pool))
             except Exception as exc:
                 error[0] = exc
                 raise
