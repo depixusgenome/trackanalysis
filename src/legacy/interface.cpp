@@ -8,10 +8,14 @@ namespace legacy
 {
     namespace
     {
+        namespace py = pybind11;
+        template <typename T>
+        using ndarray = py::array_t<T, py::array::c_style>;
+
         template <typename T, typename K>
         pybind11::object _toimage(K & shape, T const * ptr)
         {
-            auto out = pybind11::array_t<T>(shape, {long(shape[1]*sizeof(T)), long(sizeof(T))});
+            auto out = ndarray<T>(shape, {long(shape[1]*sizeof(T)), long(sizeof(T))});
             std::copy(ptr, ptr+shape[1]*shape[0], out.mutable_data());
             return std::move(out);
         }
@@ -19,7 +23,7 @@ namespace legacy
         template <typename T>
         pybind11::object _toarray(size_t sz, T const *ptr)
         {
-            auto out = pybind11::array_t<T>(sz);
+            auto out = ndarray<T>(sz);
             std::copy(ptr, ptr+sz, out.mutable_data());
             return std::move(out);
         }

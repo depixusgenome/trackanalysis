@@ -13,6 +13,7 @@ from bokeh.transform        import jitter
 
 from tasksequences.modelaccess import SequenceAnaIO
 from taskview.plots            import TaskPlotCreator, PlotError
+from view.base                 import stretchout
 from view.colors               import tohex
 from view.plots                import PlotView, GroupStateDescriptor, themed, CACHE_TYPE
 from .._model                  import resetrefaxis, PeaksPlotTheme, PoolComputationsDisplay
@@ -345,7 +346,7 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
             **mode
         )
         self.__resize(ctrl, out, plots)
-        return out
+        return stretchout(out)
 
     def _reset(self, cache:CACHE_TYPE):
         done = 0

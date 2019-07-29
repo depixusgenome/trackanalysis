@@ -3,14 +3,13 @@
 """
 Defines basic hybridstat related report objects and functions
 """
-from typing                 import Optional, Sequence, Dict, Iterator
+from typing                 import Optional, Sequence, Dict, List, Tuple, Iterator
 from abc                    import abstractmethod
 
 import numpy as np
 
 from excelreports.creation  import Reporter as _Reporter, column_method, FILEOBJ
-from data.track             import Track, BEADKEY
-from signalfilter           import rawprecision
+from data.track             import Track
 from sequences              import read as readsequence
 from peakcalling.tohairpin  import HairpinFitter
 from peakcalling.processor  import ByHairpinGroup as Group, ByHairpinBead as Bead
@@ -113,29 +112,30 @@ class TrackInfo:
     All info in Track which is relevant to Reporter.
     This allows pickling ReporterInfo and producing reports later.
     """
-    path                                 = ''
-    framerate                            = 0.
-    ncycles                              = 0
-    uncertainties:   Dict[BEADKEY,float] = {}
-    durations:       Sequence[int]       = []
+    path                             = ''
+    framerate                        = 0.
+    ncycles                          = 0
+    uncertainties:   Dict[int,float] = {}
+    durations:       Sequence[int]   = []
     def __init__(self, track: Optional[Track]) -> None:
         if track is not None:
             self.path          = str(track.path)
             self.framerate     = track.framerate
             self.ncycles       = track.ncycles
             self.durations     = track.phase.duration(..., PHASE.measure)
-            self.uncertainties = dict(rawprecision(track, ...))
+            self.uncertainties = dict(track.rawprecision(...))
 
 class ReporterInfo(HasLengthPeak):
     "All info relevant to the current analysis report"
-    groups:     Sequence[Group]          = []
-    hairpins:   Dict[str, HairpinFitter] = {}
-    sequences:  Dict[str, str]           = {}
-    oligos:     Sequence[str]            = []
-    knownbeads: Sequence[BEADKEY]        = []
-    minduration                          = 1
-    haslengthpeak                        = False
-    track                                = TrackInfo(None)
+    groups:     Sequence[Group]             = []
+    errs:       List[Tuple[int, Exception]] = []
+    hairpins:   Dict[str, HairpinFitter]    = {}
+    sequences:  Dict[str, str]              = {}
+    oligos:     Sequence[str]               = []
+    knownbeads: Sequence[int]               = []
+    minduration                             = 1
+    haslengthpeak                           = False
+    track                                   = TrackInfo(None)
     @initdefaults(frozenset(locals()))
     def __init__(self, *args:dict, **_) -> None:
         kwa = args[0] # initdefaults will have set args to [kwargs]
@@ -156,7 +156,12 @@ class ReporterInfo(HasLengthPeak):
         if kwa.get('knownbeads', None) is None:
             kwa.pop('knownbeads')
 
-        kwa['track'] = TrackInfo(kwa['track'])
+        kwa['track']  = TrackInfo(kwa['track'])
+        kwa['errs']   = list(
+            next((i.beads for i in kwa['groups'] if isinstance(i.beads, dict)), {})
+            .items()
+        )
+        kwa['groups'] = [i for i in kwa['groups'] if not isinstance(i.beads, dict)]
         super().__init__(self)
 
     @staticmethod

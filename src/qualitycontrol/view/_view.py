@@ -6,6 +6,7 @@ from    bokeh                import layouts
 from    model.plots          import PlotState
 from    taskview.plots       import PlotView, CACHE_TYPE, TaskPlotCreator
 from    utils                import initdefaults
+from    view.base            import stretchout
 from    ._widgets            import QualityControlWidgets
 from    ._plots              import QualityControlPlots
 from    ._model              import QualityControlModelAccess
@@ -56,7 +57,7 @@ class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess, None]
         grid    = self._plots.addtodoc(self._ctrl, doc, mode)
         out     = layouts.row(grid, widgets, **mode)
         self.__resize(ctrl, out)
-        return out
+        return stretchout(out)
 
     def _reset(self, cache:CACHE_TYPE):
         self._widgets.reset(cache)

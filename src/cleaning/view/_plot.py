@@ -14,6 +14,7 @@ from    taskmodel                   import PHASE, Task
 from    taskcontrol.modelaccess     import ReplaceProcessors, ProcessorController
 from    utils.array                 import repeat
 from    utils.logconfig             import getLogger
+from    view.base                   import stretchout
 from    view.colors                 import tohex
 from    taskview.plots              import (
     PlotError, PlotView, DpxHoverTool, CACHE_TYPE, TaskPlotCreator
@@ -167,8 +168,7 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
                 disc.values[np.isnan(cache.values)] = 1.
 
         disc.values[disc.values == 0.] = np.NaN
-        val       = ctx.taskcache(tasks['cleaning'])
-        val[bead] = (val[bead][0]+(disc,), val[bead][1])
+        ctx.taskcache(tasks['cleaning'])[bead].errors += (disc,)
 
     @classmethod
     def __add(cls, ctx, track:Track, bead: int, tasks: Dict[str, Optional[Task]], name: str):
@@ -183,8 +183,7 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
             clipping = ctx.taskcache(tasks[name]).pop(name, None)
 
         if clipping:
-            val       = ctx.taskcache(tasks['cleaning'])
-            val[bead] = (val[bead][0]+(clipping,), val[bead][1])
+            ctx.taskcache(tasks['cleaning'])[bead].errors += (clipping,)
 
 class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotModel]):
     "Building the graph of cycles"
@@ -221,10 +220,12 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         else:
             self._errors.reset(cache, exc)
         finally:
-            data        = self.__data(items, nans)
+            data   = self.__data(items, nans)
+            yinit  = np.nanpercentile(data["z"], [100-self._theme.clip, self._theme.clip])
+            yinit += (abs(np.diff(yinit)[0])*self._theme.clipovershoot*1e-2)*np.array([1., -1.])
             self.setbounds(
                 cache, self.__fig, data['t'], data['z'],
-                yinit = np.nanpercentile(data["z"], [100-self._theme.clip, self._theme.clip])
+                yinit = yinit
             )
             cache[self.__source]['data'] = data
 
@@ -323,7 +324,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
 
     def __resize(self, ctrl, sizer):
         mode = self.defaulttabsize(ctrl)
-        sizer.update(**mode)
+        sizer.update(**dict(mode, sizing_mode = 'stretch_both'))
 
         # pylint: disable=unsubscriptable-object
         borders = ctrl.theme.get("theme", "borders")
@@ -331,7 +332,8 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         sizer.children[0].width += borders
         sizer.children[1].update(
             width  = mode['width']- sizer.children[0].width,
-            height = sizer.children[0].height
+            height = sizer.children[0].height,
+            sizing_mode = 'stretch_both'
         )
         self.__fig.update(
             plot_width  = sizer.children[1].width  - borders,
@@ -346,7 +348,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
             sizer.children[0].height - ctrl.theme.get("theme", "figtbheight")
             - sum(i.height for i in sizer.children[0].children if i is not table)
         )
-        return sizer
+        return stretchout(sizer)
 
 class CleaningView(PlotView[CleaningPlotCreator]):
     "Peaks plot view"

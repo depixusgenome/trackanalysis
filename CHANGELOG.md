@@ -1,4 +1,12 @@
 # CycleApp
+## cycles_v6.13
+
+* 2019-07-29 21:18:39 +0200  (tag: cycles_v6.13)
+
+### Reports
+
+Xlsx reports now include a list of incorrect beads and the reason why.
+
 ## cycles_v6.12
 
 * 2019-07-24 14:18:39 +0200  (tag: cycles_v6.12)

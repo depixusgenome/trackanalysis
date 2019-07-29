@@ -19,6 +19,7 @@ from taskview.plots            import (
 )
 from taskmodel                 import PHASE
 from tasksequences.modelaccess import SequenceAnaIO
+from view.base                 import stretchout
 from utils                     import initdefaults
 from ._model                   import (PeaksPlotModelAccess, PeaksPlotTheme,
                                        createpeaks, resetrefaxis)
@@ -436,7 +437,7 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
         bottom = self._widgets.addtodoc(self, ctrl, doc)
         out    = self._keyedlayout(ctrl, *self.plotfigures, bottom = bottom)
         self.__resize(ctrl, out, self.plotfigures, bottom)
-        return out
+        return stretchout(out)
 
     def advanced(self):
         "triggers the advanced dialog"

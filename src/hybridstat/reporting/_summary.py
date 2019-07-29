@@ -10,6 +10,7 @@ from   xlsxwriter.utility         import xl_col_to_name
 import version
 from   taskstore                  import dumps
 from   peakfinding.probabilities  import Probability
+from   peakfinding.reporting      import footer
 from   excelreports.creation      import column_method, sheet_class
 from   ._base                     import Bead, Reporter, Group
 
@@ -228,7 +229,8 @@ class SummarySheet(Reporter):
             yield (group, None)
             yield from ((group, bead) for bead in group.beads)
 
-    def tablerow(self):
+    def refrow(self):
+        "return the 1st row containing a valid bead"
         return len(self.__info('', True))+2
 
     def info(self, cnf = ''):
@@ -259,7 +261,7 @@ class SummarySheet(Reporter):
         # pylint: disable=no-member
         items = ([("Oligos:",      ', '.join(self.config.oligos)),
                   ("Cycle Count:", self.config.track.ncycles),
-                  ("Bead Count",   nbeads),
+                  ("Bead Count",   f"{nbeads} / {nbeads+len(self.config.errs)}"),
                   ("Subtracted",   sub)],
                  [("σ[HF] (µm):",       _avg(self._uncert)),
                   ("Events per Cycle:", _avg(self._evts)),
@@ -275,3 +277,7 @@ class SummarySheet(Reporter):
                 lst.extend((('', ''),)*(maxlen-len(lst)))
 
         return [i+('',)+j+(('',)*2)+k for i, j, k in zip(*items)]
+
+    def footer(self):
+        "creates a table of exceptions"
+        return footer(self)

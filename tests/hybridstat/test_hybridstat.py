@@ -201,10 +201,7 @@ def test_processor():
 
     pair = create((task,))
     assert not Path(out).exists()
-    gen  = pair.run()
-    assert not Path(out).exists()
-    items = tuple(i for i in gen)
-    items = tuple(tuple(i) for i in items)
+    pair.run()
     assert Path(out).exists()
 
 def test_reporting():
@@ -218,9 +215,7 @@ def test_reporting():
                                   reporting= out,
                                   sequence = utfilepath("hairpins.fasta")))
 
-    itms = next(tasks)
-    assert not Path(out).exists()
-    tuple(itms)
+    _ = next(tasks)
     assert Path(out).exists()
 
 if __name__ == '__main__':

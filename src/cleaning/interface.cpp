@@ -338,7 +338,7 @@ namespace cleaning { namespace datacleaning {
         }
 
         template <typename T>
-        void constant(py::object self, ndarray<T> & pydata)
+        void constant(py::object self, ndarray<T> pydata)
         {
             if(py::hasattr(self, "constants"))
                 self = self.attr("constants");
@@ -350,7 +350,7 @@ namespace cleaning { namespace datacleaning {
         }
 
         template <typename T>
-        void clip(py::object self, bool doclip, float azero, ndarray<T> & pydata)
+        void clip(py::object self, bool doclip, float azero, ndarray<T> pydata)
         {
             if(py::hasattr(self, "derivative"))
                 self = self.attr("constants");
@@ -426,7 +426,7 @@ namespace cleaning { namespace datacleaning {
                         }
                )
                .def("apply",
-                    [](CLS const & self, ndarray<float> & arr)
+                    [](CLS const & self, ndarray<float> arr)
                     { self.apply(arr.size(), arr.mutable_data()); });
             _defaults(cls);
         }
@@ -469,7 +469,7 @@ returns: *True* if the number of remaining values is too low)_";
                         }
                )
                .def("apply",
-                    [](CLS const & self, ndarray<float> & arr, bool clip, float zero)
+                    [](CLS const & self, ndarray<float> arr, bool clip, float zero)
                     { self.apply(arr.size(), arr.mutable_data(), clip, zero); });
             _defaults(cls);
         }
@@ -481,7 +481,7 @@ returns: *True* if the number of remaining values is too low)_";
             cls.def_readwrite("window", &CLS::window)
                .def_readwrite("ratio",  &CLS::ratio)
                .def("apply",
-                    [](CLS const & self, ndarray<float> & arr)
+                    [](CLS const & self, ndarray<float> arr)
                     { self.apply(arr.size(), arr.mutable_data()); });
             _defaults(cls);
         }
@@ -511,7 +511,7 @@ returns: *True* if the number of remaining values is too low)_";
                             return cpy;
                         }
                )
-               .def("apply", [](CLS const & self, ndarray<float> & arr)
+               .def("apply", [](CLS const & self, ndarray<float> arr)
                     { self.apply(arr.size(), arr.mutable_data()); });
             _defaults(cls);
         }
@@ -554,7 +554,7 @@ A value at position *n* is aberrant if any:
                         }
                )
                .def("aberrant",
-                    [](CLS const & self, ndarray<float> & arr, bool clip)
+                    [](CLS const & self, ndarray<float> arr, bool clip)
                     { self.apply(arr.size(), arr.mutable_data(), clip); },
                     py::arg("beaddata"), py::arg("clip") = false);
             _defaults(cls);

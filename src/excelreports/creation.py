@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Creates excel of csv files for reporting any type of data"
 from typing                 import (Sequence, Iterator, Union, TypeVar,
-                                    Callable, Optional, cast, IO)
+                                    Callable, Iterable, Optional, cast, IO)
 from pathlib                import Path
 from contextlib             import closing, contextmanager
 from abc                    import ABCMeta, abstractmethod
@@ -122,7 +122,12 @@ class _BaseReporter(metaclass=ABCMeta):
         "creates the header"
 
     @abstractmethod
-    def table(self):
+    def table(
+            self,
+            columns : Optional[Iterable] = None,
+            rows    : Optional[Iterable] = None,
+            start   : Optional[int]      = None
+    ):
         "creates the table"
 
 class CsvReporter(_BaseReporter):
@@ -136,10 +141,10 @@ class CsvReporter(_BaseReporter):
     sheet: Union[Worksheet,str]
     def __init__(self, filename):
         if not hasattr(self, 'sheet_name'):
-            self.sheet_name = None                     # type: Optional[str]
+            self.sheet_name: Optional[str] = None
         if isinstance(filename, CsvReporter):
-            self.book      = filename.book
-            self._tablerow = getattr(filename, '_tablerow', 0)  # type: int
+            self.book           = filename.book
+            self._tablerow: int = getattr(filename, '_tablerow', 0)
         else:
             self.book      = filename
             self._tablerow = 0
@@ -162,7 +167,12 @@ class CsvReporter(_BaseReporter):
             self._printtext(*line)
         self._printtext()
 
-    def table(self):
+    def table(
+            self,
+            columns : Optional[Iterable] = None,
+            rows    : Optional[Iterable] = None,
+            start   : Optional[int]      = None
+    ):
         "creates the table"
         def _title(fcn):
             return getattr(fcn, _CNAME, '')
@@ -174,13 +184,13 @@ class CsvReporter(_BaseReporter):
             comment = comment.strip(' \n')
             return comment.replace('\n', '\n'+self._TEXT_HEADER+'\t\t\t')
 
-        txt     = self.columns()
+        txt     = list(self.columns() if columns is None else columns)
         header  = [('TABLE: ', self.sheet)]
         header += [(_title(fcn)+":", _doc(fcn)) for fcn in txt]
         self.header(header)
         self._printline(*(_title(fcn) for fcn in txt))
 
-        for line in self.iterate():
+        for line in self.iterate() if rows is None else rows:
             values = tuple(fcn(*line) for fcn in txt)
             self._printline(*values)
         self._printline()
@@ -226,85 +236,78 @@ class XlsReporter(_BaseReporter):
 
     def header(self, data:Sequence):
         "creates the header"
+        irow = 0
         for irow, line in enumerate(data):
             for icol, cell in enumerate(line):
                 cast(Worksheet, self.sheet).write(irow, icol, cell)
+        self._tablerow += irow+2
 
     def _getfmt(self, mark:bool, fmt):
         return fmt if not mark else self.fmt[getattr(fmt, 'num_format', 'marked')]
 
-    def table(self):
+    def table(
+            self,
+            columns : Optional[Iterable] = None,
+            rows    : Optional[Iterable] = None,
+            start   : Optional[int]      = None
+    ):
         "creates the table"
-        def _write_titles():
-            for i, fcn in enumerate(self.columns()):
-                comment = self.comments(fcn)
-                if comment is not None:
-                    self.sheet.write_comment(self.tablerow(), i, comment.strip(),
-                                             dict(visible = False))
+        istart = self.tablerow() if start is None else start
+        cols:  Callable = self.columns
+        lines: Callable = self.iterate
+        if columns is not None:
+            columns = list(columns)
+            cols    = lambda: iter(cast(Iterable, columns))
+        if rows is not None:
+            rows  = list(rows)
+            lines = lambda: iter(cast(Iterable, rows))
 
-                result = getattr(fcn, _CNAME, None)
-                if result is not None:
-                    self.sheet.write(self.tablerow(), i, result)
+        self.__write_titles(istart, cols())
+        irow = self.__write_data(istart, cols(), lines())
+        self.__write_cond(istart, cols(), irow)
+        self._tablerow = irow+2
 
-        def _write_data():
-            def _get(fcn):
-                fmt = getattr(fcn, _CFMT, None)
-                if callable(fmt) and not isinstance(fmt, type):
-                    fmt = fmt(self)
+    def __write_titles(self, start: int, columns):
+        sheet = cast(Worksheet, self.sheet)
+        for i, fcn in enumerate(columns):
+            comment = self.comments(fcn)
+            if comment is not None:
+                sheet.write_comment(start, i, comment.strip(), dict(visible = False))
 
-                if isinstance(fmt, str):
-                    res = self.fmt.get('s'+fmt, None)
-                    if res is None:
-                        self.fmt['s'+fmt] = self.book.add_format()
-                        self.fmt[fmt]     = self.book.add_format(self._MARKED)
-                        self.fmt['s'+fmt].set_num_format(fmt)
-                        self.fmt[fmt]    .set_num_format(fmt)
-                        return self.fmt['s'+fmt]
-                    return res
+            result = getattr(fcn, _CNAME, None)
+            if result is not None:
+                sheet.write(start, i, result)
 
-                if fmt is None:
-                    ret = fcn.__annotations__.get('return')
-                elif isinstance(fmt, type):
-                    ret = fmt
+    def __write_data(self, start: int, columns, lines):
+        fcns  = tuple((*i, self.__format(i[1])) for i in enumerate(columns))
+        sheet = cast(Worksheet, self.sheet)
+        irow  = 1
+        for i, line in enumerate(lines):
+            irow = start + i + 1
+            mark = self.linemark(line)
+            for j, fcn, fmt in fcns:
+                result = fcn(*line)
 
-                if ret is float or ret == Union[float, ret]:
-                    return self.fmt['real']
-                if ret is int or ret == Union[int, ret]:
-                    return self.fmt['int']
-                return fmt
+                if isinstance(result, Chart):
+                    sheet.insert_chart(irow, j, result)
+                else:
+                    sheet.write(irow, j, result, self._getfmt(mark, fmt))
 
-            fcns = tuple((*i, _get(i[1])) for i in enumerate(self.columns()))
+        return irow
 
-            irow = 1
-            for i, line in enumerate(self.iterate()):
-                irow = self.tablerow() + i + 1
-                mark = self.linemark(line)
-                for j, fcn, fmt in fcns:
-                    result = fcn(*line)
+    def __write_cond(self, start:int, columns, irow: int):
+        sheet = cast(Worksheet, self.sheet)
+        for i, fcn in enumerate(columns):
+            cond = getattr(fcn, _CCOND, None)
+            if cond is None:
+                continue
+            if callable(cond):
+                cond = cond(self)
+            if isinstance(cond, dict):
+                cond = (cond,)
+            for one in cond:
+                sheet.conditional_format(start+1, i, irow, i, one)
 
-                    if isinstance(result, Chart):
-                        self.sheet.insert_chart(irow, j, result)
-                    else:
-                        self.sheet.write(irow, j, result, self._getfmt(mark, fmt))
-
-            return irow
-
-
-        def _write_cond(irow: int):
-            for i, fcn in enumerate(self.columns()):
-                cond = getattr(fcn, _CCOND, None)
-                if cond is None:
-                    continue
-                if callable(cond):
-                    cond = cond(self)
-                if isinstance(cond, dict):
-                    cond = (cond,)
-                for one in cond:
-                    self.sheet.conditional_format(self.tablerow()+1, i, irow, i, one)
-
-        _write_titles()
-        irow = _write_data()
-        _write_cond(irow)
 
     def tablerow(self):
         "start row of the table"
@@ -318,6 +321,33 @@ class XlsReporter(_BaseReporter):
     def linemark(_) -> bool:
         "returns a function returning an optional line format"
         return False
+
+    def __format(self, fcn):
+        fmt = getattr(fcn, _CFMT, None)
+        if callable(fmt) and not isinstance(fmt, type):
+            fmt = fmt(self)
+
+        if isinstance(fmt, str):
+            res = self.fmt.get('s'+fmt, None)
+            if res is None:
+                self.fmt['s'+fmt] = self.book.add_format()
+                self.fmt[fmt]     = self.book.add_format(self._MARKED)
+                self.fmt['s'+fmt].set_num_format(fmt)
+                self.fmt[fmt]    .set_num_format(fmt)
+                return self.fmt['s'+fmt]
+            return res
+
+        if fmt is None:
+            ret = fcn.__annotations__.get('return')
+        elif isinstance(fmt, type):
+            ret = fmt
+
+        if ret is float or ret == Union[float, ret]:
+            return self.fmt['real']
+        if ret is int or ret == Union[int, ret]:
+            return self.fmt['int']
+        return fmt
+
 
 class Reporter(XlsReporter, CsvReporter):
     "Model independant class"
@@ -337,14 +367,18 @@ class Reporter(XlsReporter, CsvReporter):
             XlsReporter.header(self, data)
         else:
             CsvReporter.header(self, data)
-        self._tablerow += len(data)+1
 
-    def table(self):
+    def table(
+            self,
+            columns : Optional[Iterable] = None,
+            rows    : Optional[Iterable] = None,
+            start   : Optional[int]      = None
+    ):
         "creates table"
         if self.isxlsx():
-            XlsReporter.table(self)
+            XlsReporter.table(self, columns, rows, start)
         else:
-            CsvReporter.table(self)
+            CsvReporter.table(self, columns, rows)
 
     @abstractmethod
     def iterate(self):

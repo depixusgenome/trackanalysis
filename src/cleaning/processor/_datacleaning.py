@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "cleaning the raw data after bead subraction"
-from    itertools import repeat
-from    functools import partial
-from    typing    import Any, Dict, Iterator, List, Optional, Tuple, Type, cast
+from    dataclasses  import dataclass
+from    itertools    import repeat
+from    functools    import partial
+from    typing       import Any, Dict, Iterator, List, Optional, Tuple, Type, cast
 
 import  numpy             as     np
 
@@ -13,7 +14,8 @@ from    taskmodel               import Task, Level, PHASE, InstrumentType
 from    utils                   import initdefaults
 
 from    ..names                 import NAMES
-from    ..datacleaning          import DataCleaning, Partial
+from    ..datacleaning          import Partial, DataCleaning
+from    .._core                 import AberrantValuesRule # pylint: disable=import-error
 
 class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
     "Task for removing incorrect points or cycles or even the whole bead"
@@ -122,6 +124,31 @@ class DataCleaningException(ProcessorException):
         args = self.args[0] # pylint: disable=unsubscriptable-object
         return f"{args.parents}: {args.beadid}\n{args}"
 
+    def shortmessage(self):
+        "return the shorter message"
+        return str(self.args[0]) # pylint: disable=unsubscriptable-object
+
+@dataclass
+class CleaningCacheData:
+    "the data saved from call to call for each bead"
+    errors:  Tuple[Partial,...]
+    discard: bool
+    mask:    np.ndarray
+    def __iter__(self):
+        return iter((self.errors, self.discard, self.mask))
+
+    def __getitem__(self, val: int):
+        return (self.errors, self.discard, self.mask)[val]
+
+    def apply(self, cnf, frame, info):
+        "reapply the previous work"
+        if self.discard:
+            val = tuple(i for i in self.errors if hasattr(DataCleaningProcessor.tasktype, i.name))
+            return DataCleaningProcessor.exc(val, cnf, info, frame)
+
+        info[1][self.mask] = np.NaN
+        return None
+
 class DataCleaningProcessor(Processor[DataCleaningTask]):
     "Processor for cleaning the data"
     __DFLT = DataCleaningTask()
@@ -130,7 +157,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
         return cnf.get(name, getattr(cls.__DFLT, name))
 
     @classmethod
-    def __exc(cls, val, cnf, info, frame):
+    def exc(cls, val, cnf, info, frame):
         "creates the exception"
         ncy = getattr(frame.track, 'ncycles', 0)
         msg = DataCleaningErrorMessage(val, cnf, cls.tasktype, info[0], frame.parents, ncy)
@@ -181,21 +208,14 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf) -> Optional[DataCleaningException]:
         "returns the result of the beadselection"
-        tested = False
         if cache is not None:
-            val, discard = cache.get(info[0], ('', False))
-            tested       = val != ''
-            if tested:
-                val = tuple(i for i in val if hasattr(cls.tasktype, i.name))
-            if discard:
-                return cls.__exc(val, cnf, info, frame)
+            cur = cache.get(info[0], None)
+            if cur:
+                return cur.apply(cnf, frame, info)
 
-        val = ()
-        if not tested:
-            val += tuple(cls.__precorrectiontest(frame, info[1], cnf))
-        discard = DataCleaning(**cnf).aberrant(info[1])
-        if not tested:
-            val += tuple(cls.__postcorrectiontest(frame, info[1], cnf))
+        val     = tuple(cls.__precorrectiontest(frame, info[1], cnf))
+        discard = AberrantValuesRule(**cnf).aberrant(info[1])
+        val    += tuple(cls.__postcorrectiontest(frame, info[1], cnf))
 
         if not discard:
             bad = cls.tasktype.badcycles(val) # type: ignore
@@ -205,15 +225,13 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
                                                selected = zip(repeat(info[0]), bad)):
                     cyc[:] = np.NaN
 
-                if not tested:
-                    minpop  = 1.-cls.__get('minpopulation', cnf)*1e-2
-                    discard = np.isnan(info[1]).sum() > len(info[1]) * minpop
+                minpop  = 1.-cls.__get('minpopulation', cnf)*1e-2
+                discard = np.isnan(info[1]).sum() > len(info[1]) * minpop
 
-        if not (tested or cache is None):
-            cache[info[0]] = val, discard
-        if discard:
-            return cls.__exc(val, cnf, info, frame)
-        return None
+        if cache is not None:
+            cache[info[0]] = CleaningCacheData(val, discard, np.isnan(info[1]))
+
+        return cls.exc(val, cnf, info, frame) if discard else None
 
     @classmethod
     def apply(cls, toframe = None, **cnf):

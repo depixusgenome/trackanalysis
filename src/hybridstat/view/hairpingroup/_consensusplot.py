@@ -7,6 +7,7 @@ from bokeh.plotting   import Figure
 from bokeh.models     import Range1d, ColumnDataSource, HoverTool
 
 from taskview.plots   import TaskPlotCreator
+from view.base        import stretchout
 from view.colors      import tohex
 from view.plots       import PlotView, GroupStateDescriptor, themed, CACHE_TYPE
 from .._io            import setupio
@@ -137,7 +138,7 @@ class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
             **mode
         )
         self.__resize(ctrl, out)
-        return out
+        return stretchout(out)
 
     def _reset(self, cache:CACHE_TYPE):
         done = 0

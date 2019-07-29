@@ -121,7 +121,7 @@ def test_tracksdict_hpfit(scriptingcleaner):
     assert isinstance(frame.tasklist[0], list)
     assert frame.tasklist[0][-2].oligos == "4mer"
     assert list(frame.oligo.unique()) == ["ctgt"]
-    assert frame.shape == (80, 23)
+    assert frame.shape == (80, 26)
     assert frame.index.names == ['hpin', 'track', 'bead']
 
 if __name__ == '__main__':
