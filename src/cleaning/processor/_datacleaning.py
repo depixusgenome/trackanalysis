@@ -198,6 +198,21 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
         yield sel.saturation(bead, *tmp)
 
     @classmethod
+    def __removebadcycles(cls, frame, cnf, val, arr):
+        bad = cls.tasktype.badcycles(val) # type: ignore
+        if len(bad):
+            for _, cyc in frame.track.view(
+                    "cycles",
+                    data     = {0: arr},
+                    selected = zip(repeat(0), bad)
+            ):
+                cyc[:] = np.NaN
+
+            minpop  = 1.-cls.__get('minpopulation', cnf)*1e-2
+            return np.isnan(arr).sum() > len(arr) * minpop
+        return False
+
+    @classmethod
     def _compute(cls, cnf, frame, info):
         info = info[0], np.copy(info[1])
         res  = cls.compute(frame, info, **cnf)
@@ -208,28 +223,22 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf) -> Optional[DataCleaningException]:
         "returns the result of the beadselection"
+        bead, arr = info
         if cache is not None:
-            cur = cache.get(info[0], None)
+            cur = cache.get(bead, None)
             if cur:
                 return cur.apply(cnf, frame, info)
 
-        val     = tuple(cls.__precorrectiontest(frame, info[1], cnf))
-        discard = AberrantValuesRule(**cnf).aberrant(info[1])
-        val    += tuple(cls.__postcorrectiontest(frame, info[1], cnf))
+        val       = tuple(cls.__precorrectiontest(frame, arr, cnf))
+        tmp       = AberrantValuesRule(**cnf)
+        discard   = tmp.aberrant(arr, False)
+        val      += tuple(cls.__postcorrectiontest(frame, arr, cnf))
 
         if not discard:
-            bad = cls.tasktype.badcycles(val) # type: ignore
-            if len(bad):
-                for _, cyc in frame.track.view("cycles",
-                                               data     = {info[0]: info[1]},
-                                               selected = zip(repeat(info[0]), bad)):
-                    cyc[:] = np.NaN
-
-                minpop  = 1.-cls.__get('minpopulation', cnf)*1e-2
-                discard = np.isnan(info[1]).sum() > len(info[1]) * minpop
+            discard = cls.__removebadcycles(frame, cnf, val, arr)
 
         if cache is not None:
-            cache[info[0]] = CleaningCacheData(val, discard, np.isnan(info[1]))
+            cache[bead] = CleaningCacheData(val, discard, np.isnan(arr))
 
         return cls.exc(val, cnf, info, frame) if discard else None
 
