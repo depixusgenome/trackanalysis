@@ -8,8 +8,9 @@ import numpy as np
 
 from bokeh                     import layouts
 from bokeh.plotting            import Figure
-from bokeh.models              import (ColumnDataSource, Range1d, LinearAxis,
-                                       NumeralTickFormatter, HoverTool)
+from bokeh.models              import (
+    ColumnDataSource, Range1d, LinearAxis, NumeralTickFormatter, HoverTool, LayoutDOM
+)
 from cleaning.view             import GuiDataCleaningProcessor
 from model.plots               import (PlotTheme, PlotDisplay, PlotModel, PlotAttrs,
                                        PlotState)
@@ -31,7 +32,7 @@ HistData  = Dict[str, CurveData]
 class CyclePlotTheme(PlotTheme):
     "cycles & peaks plot theme: cycles"
     name      = "cyclehist.plot.cycle"
-    figsize   = PlotTheme.defaultfigsize(660, 660)
+    figsize   = (660, 660, 'scale_height')
     phasezoom = PHASE.measure, 20
     fiterror  = PeaksPlotTheme.fiterror
     xlabel    = PlotTheme.xtoplabel
@@ -421,7 +422,7 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
         for i in self._plots:
             i.addto(ctrl, noerase=noerase)
 
-    def _addtodoc(self, ctrl, doc, *_):
+    def _addtodoc(self, ctrl, doc, *_) -> LayoutDOM:
         "returns the figure"
         for i in self._plots:
             getattr(i, '_addtodoc')(ctrl, doc)
@@ -437,7 +438,7 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
         bottom = self._widgets.addtodoc(self, ctrl, doc)
         out    = self._keyedlayout(ctrl, *self.plotfigures, bottom = bottom)
         self.__resize(ctrl, out, self.plotfigures, bottom)
-        return stretchout(out)
+        return out
 
     def advanced(self):
         "triggers the advanced dialog"
@@ -465,19 +466,24 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
         sizer.update(**self.defaulttabsize(ctrl))
         width = sum(i.plot_width for i in plots)
         for fig in plots:
+            height = (
+                sizer.height - ctrl.theme.get('theme', 'figtbheight') - bottom.height
+            )
+            width  = int((fig.plot_width/width)*sizer.width)
+
             fig.update(
-                plot_width  = int((fig.plot_width/width)*sizer.width),
-                plot_height = (
-                    sizer.height
-                    - ctrl.theme.get('theme', 'figtbheight')
-                    - bottom.height
-                )
+                sizing_mode  = 'scale_height',
+                aspect_ratio = width/height,
+                plot_width   = width,
+                plot_height  = height
             )
         for i in (sizer.children[0], sizer.children[0].children[0]):
             i.update(
                 width  = sizer.width,
                 height = sizer.height - bottom.height
             )
+        stretchout(sizer)
+
 
 class CycleHistPlotView(PlotView[CycleHistPlotCreator]):
     "Peaks plot view"
