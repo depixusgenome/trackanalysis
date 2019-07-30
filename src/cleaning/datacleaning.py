@@ -151,8 +151,7 @@ class DataCleaning(
 
     def aberrant(self, bead:np.ndarray, clip = False) -> bool:
         "remove abberant values"
-        super().aberrant(bead, clip)
-        return np.isfinite(bead).sum() <= len(bead) * self.minpopulation * 1e-2
+        return super().aberrant(bead, clip, self.minpopulation*1e-2)
 
 # pybind11 bug
 AberrantValuesRule.__base__.__setstate__ = lambda self, vals: self.configure(vals)

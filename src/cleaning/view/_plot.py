@@ -92,7 +92,8 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
         "returns the result of the beadselection"
         curr = np.copy(info[1])
         exc  = super().compute(frame, (info[0], curr), cache = cache, **cnf)
-        DataCleaning(**cnf).aberrant(info[1], clip = True)
+        tmp  = DataCleaning(**cnf)
+        tmp.aberrant(info[1], True)
         cache['gui'] = np.isnan(curr)
         cache['exc'] = exc
 

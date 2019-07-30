@@ -231,7 +231,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
 
         val       = tuple(cls.__precorrectiontest(frame, arr, cnf))
         tmp       = AberrantValuesRule(**cnf)
-        discard   = tmp.aberrant(arr, False)
+        discard   = tmp.aberrant(arr, False, cls.__get('minpopulation', cnf)*1e-2)
         val      += tuple(cls.__postcorrectiontest(frame, arr, cnf))
 
         if not discard:

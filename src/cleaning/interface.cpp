@@ -554,9 +554,22 @@ A value at position *n* is aberrant if any:
                         }
                )
                .def("aberrant",
-                    [](CLS const & self, ndarray<float> arr, bool clip)
-                    { self.apply(arr.size(), arr.mutable_data(), clip); },
-                    py::arg("beaddata"), py::arg("clip") = false);
+                    [](CLS const & self, ndarray<float> arr, bool clip, float ratio)
+                    { 
+                        float * data = arr.mutable_data();
+                        size_t  sz   = arr.size();
+                        size_t  cnt  = sz;
+                        {
+                            py::gil_scoped_release _;
+                            self.apply(sz, data, clip);
+                            for(size_t i = 0u; i < sz; ++i)
+                                if(!std::isfinite(data[i]))
+                                    --cnt;
+                        }
+                        return cnt < size_t(sz*ratio);
+                    },
+                    py::arg("beaddata"), py::arg("clip") = false, py::arg("ratio") = .8
+                );
             _defaults(cls);
         }
 
