@@ -137,4 +137,16 @@ namespace cleaning {
         double  maxdisttozero = .015;
         size_t  satwindow     = 10;
     };
+
+
+    struct DataCleaning
+    {
+        PhaseJumpRule      phasejump;
+        AberrantValuesRule aberrant;
+        HFSigmaRule        hfsigma;
+        PopulationRule     population;
+        ExtentRule         extent;
+        PingPongRule       pingpong;
+        SaturationRule     saturation;
+    };
 }
