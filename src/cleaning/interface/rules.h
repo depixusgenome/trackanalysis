@@ -1,5 +1,5 @@
 #pragma once
-#include "cleaning/interface/interface.h"
+#include "cleaning/interface/aberrant.h"
 namespace cleaning::datacleaning { namespace { // fromkwa specializations
     template <typename T>
     inline typename issame<T, SaturationRule>::type
@@ -49,5 +49,17 @@ namespace cleaning::datacleaning { namespace { // fromkwa specializations
         _get(std::is_const<T>(), inst.maxv,    "maxextent",  kwa);
         _get(std::is_const<T>(), inst.minpercentile, inst.maxpercentile, "percentiles", kwa);
     }
+
+    template <typename T>
+    inline typename issame<T, DataCleaning>::type
+    _fromkwa(T & inst, py::dict & kwa)
+    {
+        _fromkwa(inst.phasejump  , kwa);
+        _fromkwa(inst.aberrant   , kwa);
+        _fromkwa(inst.hfsigma    , kwa);
+        _fromkwa(inst.population , kwa);
+        _fromkwa(inst.extent     , kwa);
+        _fromkwa(inst.pingpong   , kwa);
+        _fromkwa(inst.saturation , kwa);
+    }
 }}
-#include "cleaning/interface/datacleaning.h"

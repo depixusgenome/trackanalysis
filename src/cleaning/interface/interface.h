@@ -13,8 +13,9 @@ namespace cleaning { // generic meta functions
     template <typename T>
     inline void _get(std::false_type, T & inst, char const * name, py::dict & kwa)
     {
-        if(kwa.contains(name))
-            inst = kwa[name].cast<T>();
+        py::str _ = name;
+        if(kwa.contains(_))
+            inst = kwa[_].cast<T>();
     }
 
     template <typename T>

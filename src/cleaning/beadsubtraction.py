@@ -15,9 +15,10 @@ from   signalfilter                 import nanhfsigma
 from   utils                        import initdefaults
 from   taskmodel                    import PhaseArg, PhaseRange
 from   taskmodel.base               import Rescaler
-from   .datacleaning                import AberrantValuesRule, HFSigmaRule, ExtentRule
-from   ._core                       import (reducesignals, # pylint: disable=import-error
-                                            phasebaseline, dztotalcount)
+from   ._core                       import ( # pylint: disable=import-error
+    reducesignals, phasebaseline, dztotalcount,
+    AberrantValuesRule, HFSigmaRule, ExtentRule
+)
 
 class SubtractAverageSignal:
     """

@@ -17,13 +17,13 @@ from   .._core               import (# pylint: disable=import-error
 )
 
 def _min_extension() -> float:
+    from importlib import import_module
     try:
-        from cleaning.datacleaning import ExtentRule
+        return import_module("cleaning._core").ExtentRule().minextent # type: ignore
     except ImportError:
         from utils.logconfig import getLogger
         getLogger(__name__).warning("Could not obtain min extension from the cleaning module")
         return .25
-    return ExtentRule().minextent
 
 class AlignmentTactic(Enum):
     "possible alignments"

@@ -1,58 +1,97 @@
+#include <string>
+#include "cleaning/interface/aberrant.h"
 #include "cleaning/interface/rules.h"
+#include "cleaning/interface/rules_doc.h"
+#include "cleaning/interface/datacleaning.h"
 
-namespace cleaning::datacleaning::rules { namespace {
-    static constexpr auto HF_DOC = R"_(Remove cycles with too low or too high a variability.
+namespace {
+    static std::string alldoc()
+    {
+        std::string doc =  R"_(Remove specific points, cycles or even the whole
+bead depending on a number of criteria implemented in aptly named methods:
 
-The variability is measured as the median of the absolute value of the
-pointwise derivate of the signal. The median itself is estimated using the
-P² quantile estimator algorithm.
+PhaseJump
+---------
+)_";
+        doc += PHJUMP_DOC;
+        doc += R"_(
 
-Too low a variability is a sign that the tracking algorithm has failed to
-compute a new value and resorted to using a previous one.
+Aberrant
+--------
+)_";
+        doc += ABB_DOC;
+        doc += R"_(
 
-Too high a variability is likely due to high brownian motion amplified by a
-rocking motion of a bead due to the combination of 2 factors:
+HFSigma
+-------
+)_";
+        doc += HF_DOC;
+        doc += R"_(
 
-1. The bead has a prefered magnetisation axis. This creates a prefered
-horisontal plane and thus a prefered vertical axis.
-2. The hairpin is attached off-center from the vertical axis of the bead.)_";
+Population
+----------
+)_";
+        doc += POP_DOC;
+        doc += R"_(
 
-    static constexpr auto POP_DOC = R"_(Remove cycles with too few good points.
+Extent
+------
+)_";
+        doc += EXTENT_DOC;
+        doc += R"_(
 
-Good points are ones which have not been declared aberrant and which have
-a finite value.)_";
+Pingpong
+--------
+)_";
+        doc += PP_DOC;
+        doc += R"_(
 
-    static constexpr auto EXTENT_DOC = R"_(Remove cycles with too great a dynamic range.
+Saturation
+----------
+)_";
+        doc += SAT_DOC;
+        doc += R"_(
 
-The range of Z values is estimated using percentiles robustness purposes. It
-is estimated from phases `PHASE.initial` to `PHASE.measure`.)_";
+Pseudo-code
+-----------
 
-    static constexpr auto PP_DOC = R"_(Remove cycles which play ping-pong.
+Define:
+* Beads(trk) = set of all beads of the track trk
+* Cycles(bd) = set of all cycles in bead bd
+* Points(cy) = set of all points in cycle cy
 
-Some cycles are corrupted by close or passing beads, with the tracker switching
-from one bead to another and back. This rules detects such situations by computing
-the integral of the absolute value of the derivative of Z, first discarding values
-below a givent threshold: those that can be considered due to normal levels of noise.)_";
-
-    static constexpr auto PHJUMP_DOC = R"_(Remove cycles containing phase jumps.
-
-Sometimes the tracking of a fringe may experience a phase-jump of 2π, usually when two fringes 
-get too close to each other. This phase-jump will show as a ~1.4µm change of z,
-often occuring as a rapid sequence of spikes.
-This rule counts the number of such phase-jumps in a given cycle by counting the the number of
-values of the absolute discrete derivative in the window (phasejumpheight ± delta).)_";
-
-    static constexpr auto SAT_DOC = R"_(Remove beads which don't have enough cycles ending at zero.
-
-When too many cycles (> 90%) never reach 0 before the end of phase 5, the bead is
-discarded. Such a case arises when:
-
-* the hairpin never closes: the force is too high,
-* a hairpin structure keeps the hairpin from closing. Such structures should be
-detectable in ramp files.
-* an oligo is blocking the loop.)_";
-}}
-
+For a track trk, cleaning proceeds as follows:
+* for bd in Beads(trk):
+    * for cy in Cycles(bd):
+        * evaluate criteria for cy:
+            0. phase jump
+    * endfor
+    * remove aberrant values
+    * for cy in Cycles(bd):
+        * evaluate criteria for cy:
+            1. population (not aberrant Points(cy)/Points(cy)) > 80%
+            2. 0.25 < extent < 2.
+            3. hfsigma < 0.0001
+            4. hfsigma > 0.01
+            5. the series doesn't bounce between 2 values
+        * if 0., 1. or 2. or 3. or 4. or 5. are FALSE:
+            * remove cy from Cycles(bd)
+        * else:
+            * keep cy in Cycles(bd)
+    * endfor
+    * evaluate criteria for bd:
+        5. population (Cycles(bd)/initial Cycles(bd)) > 80%
+        6. saturation (Cycles(bd)) < 90%
+    * if 5. or 6. are FALSE:
+        * bd is bad
+    * else:
+        * bd is good
+    * endif
+* endfor
+)_";
+        return doc;
+    }
+}
 
 namespace cleaning::datacleaning::rules { namespace {
     void hfsigmarule(py::module &mod, py::object &partial)
@@ -255,6 +294,169 @@ namespace cleaning::datacleaning::rules { namespace {
                 });
         _defaults(cls);
     }
+
+    void allrule(py::module & mod, py::object & partial)
+    {
+        std::string doc =  alldoc();
+
+        using CLS = DataCleaning;
+
+        py::class_<CLS> cls(mod, "DataCleaning", doc.c_str());
+
+#       define DPX_ALL_PROP(parent, name)                             \
+            cls.def_property(                               \
+                 #name,                                               \
+                [](CLS const & self) { return self.parent.name; },    \
+                [](CLS & self, decltype(CLS().parent.name) const & val) \
+                { self.parent.name = val; } \
+            );
+
+#       define DPX_ALL_PROP2(parent, name, attr)                      \
+            cls.def_property(                               \
+                 #name,                                               \
+                [](CLS const & self) { return self.parent.attr; },    \
+                [](CLS & self, decltype(CLS().parent.attr) const & val) \
+                { self.parent.attr = val; } \
+            );
+        DPX_ALL_PROP(aberrant, constants)
+        DPX_ALL_PROP(aberrant, derivative)
+        DPX_ALL_PROP(aberrant, localnans)
+        DPX_ALL_PROP(aberrant, islands)
+        DPX_ALL_PROP(aberrant.derivative, maxabsvalue)
+        DPX_ALL_PROP(aberrant.derivative, maxderivate)
+        DPX_ALL_PROP(aberrant.constants, mindeltavalue)
+        DPX_ALL_PROP2(aberrant.islands, cstmaxderivate, maxderivate)
+
+        cls.def_static(
+            "zscaledattributes",
+            [] {
+               return py::make_tuple(
+                    "mindeltavalue", "maxabsvalue", "maxderivate", "cstmaxderivate",
+                    "phasejumpheight", "delta",
+                    "minhfsigma", "maxhfsigma",
+                    "minextent", "maxextent",
+                    "mindifference",
+                    "maxdisttozero"
+            );}
+        );
+
+        cls.def(
+            "rescale",
+            [](CLS const & self, float val)
+            {
+                auto cpy = self;
+                cpy.aberrant.constants.mindeltavalue *= val;
+                cpy.aberrant.derivative.maxabsvalue  *= val;
+                cpy.aberrant.derivative.maxderivate  *= val;
+                cpy.aberrant.islands.maxderivate     *= val;
+                cpy.phasejump.phasejumpheight  *= val;
+                cpy.phasejump.delta            *= val;
+                cpy.hfsigma.minv                     *= val;
+                cpy.hfsigma.maxv                     *= val;
+                cpy.extent.minv                      *= val;
+                cpy.extent.maxv                      *= val;
+                cpy.pingpong.mindifference           *= val;
+                cpy.saturation.maxdisttozero         *= val;
+                return cpy;
+            }
+        );
+
+        cls.def("aberrant",
+            [](CLS const & self, ndarray<float> arr, bool clip)
+            { 
+                float * data = arr.mutable_data();
+                size_t  sz   = arr.size();
+                size_t  cnt  = sz;
+                {
+                    py::gil_scoped_release _;
+                    self.aberrant.apply(sz, data, clip);
+                    for(size_t i = 0u; i < sz; ++i)
+                        if(!std::isfinite(data[i]))
+                            --cnt;
+                }
+                return cnt < size_t(sz*(self.population.minv*1e-2));
+            },
+            py::arg("beaddata"), py::arg("clip") = false
+        );
+
+        DPX_ALL_PROP(phasejump, phasejumpheight)
+        DPX_ALL_PROP2(phasejump, maxphasejump, maxv)
+        DPX_ALL_PROP(phasejump, delta)
+        cls.def("phasejump",
+                [partial](CLS const & self,
+                          ndarray<float> bead,
+                          ndarray<int>   start,
+                          ndarray<int>   stop)
+                { 
+                    auto x = __applyrule(self.phasejump, _toinput(bead, start, stop));
+                    return _totuple(partial, "phasejump", x);
+                });
+    
+        DPX_ALL_PROP2(hfsigma, minhfsigma, minv)
+        DPX_ALL_PROP2(hfsigma, maxhfsigma, maxv)
+        cls.def("hfsigma",
+            [partial](CLS const & self,
+                      ndarray<float> bead,
+                      ndarray<int>   start,
+                      ndarray<int>   stop)
+            { 
+                auto x = __applyrule(self.hfsigma, _toinput(bead, start, stop));
+                return _totuple(partial, "hfsigma", x);
+            });
+
+        DPX_ALL_PROP2(population, minpopulation, minv)
+        cls.def("population",
+                [partial](CLS const & self,
+                          ndarray<float> bead,
+                          ndarray<int>   start,
+                          ndarray<int>   stop)
+                { 
+                    auto x = __applyrule(self.population, _toinput(bead, start, stop));
+                    return _totuple(partial, "population", x);
+                });
+
+        DPX_ALL_PROP2(extent, minextent, minv)
+        DPX_ALL_PROP2(extent, maxextent, maxv)
+        cls.def("extent",
+            [partial](CLS const & self,
+                      ndarray<float> bead,
+                      ndarray<int>   start,
+                      ndarray<int>   stop)
+            { 
+                auto x = __applyrule(self.extent, _toinput(bead, start, stop));
+                return _totuple(partial, "extent", x);
+            });
+
+        DPX_ALL_PROP2(pingpong, maxpingpong, maxv)
+        DPX_ALL_PROP(pingpong, mindifference)
+        cls.def("pingpong",
+                [partial](CLS const & self,
+                          ndarray<float> bead,
+                          ndarray<int>   start,
+                          ndarray<int>   stop)
+                { 
+                    auto x = __applyrule(self.pingpong, _toinput(bead, start, stop));
+                    return _totuple(partial, "pingpong", x);
+                });
+
+        DPX_ALL_PROP2(saturation, maxsaturation, maxv)
+        DPX_ALL_PROP(saturation, maxdisttozero)
+        DPX_ALL_PROP(saturation, satwindow)
+        cls.def("saturation",
+                [partial](CLS const & self,
+                          ndarray<float> bead,
+                          ndarray<int>   initstart,
+                          ndarray<int>   initstop,
+                          ndarray<int>   measstart,
+                          ndarray<int>   measstop)
+                { 
+                    auto x = __applyrule(self.saturation,
+                                         _toinput(bead, initstart, initstop),
+                                         _toinput(bead, measstart, measstop));
+                    return _totuple(partial, "saturation", x);
+                });
+        _defaults(cls);
+    }
 }}
 
 namespace cleaning::datacleaning::rules {
@@ -272,5 +474,6 @@ namespace cleaning::datacleaning::rules {
         pingpongrule (mod, partial);
         phasejumprule(mod, partial);
         satrule      (mod, partial);
+        allrule      (mod, partial);
     }
 }

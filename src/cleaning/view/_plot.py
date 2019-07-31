@@ -24,7 +24,8 @@ from    eventdetection.processor    import ExtremumAlignmentProcessor
 from    ._model                     import (DataCleaningModelAccess, CleaningPlotModel,
                                             CleaningPlotTheme)
 from    ._widget                    import CleaningWidgets
-from    ..datacleaning              import DataCleaning, Partial
+from    ..datacleaning              import DataCleaning
+from    .._core                     import Partial # pylint: disable=import-error
 from    ..processor                 import (DataCleaningProcessor,
                                             ClippingProcessor, ClippingTask)
 LOGS = getLogger(__name__)

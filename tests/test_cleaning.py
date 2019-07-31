@@ -14,9 +14,7 @@ from   tests.testingcore        import path as utpath
 from   cleaning.processor       import (DataCleaningTask, DataCleaningException,
                                         DataCleaningProcessor, BeadSubtractionTask,
                                         BeadSubtractionProcessor, ClippingTask)
-import cleaning.datacleaning    as     _datacleaning
-from   cleaning.datacleaning    import (DataCleaning, LocalNaNPopulation,
-                                        DerivateIslands)
+from   cleaning.datacleaning    import DataCleaning
 from   cleaning.beadsubtraction import (SubtractAverageSignal, SubtractMedianSignal,
                                         FixedBeadDetection)
 import cleaning._core           as     cleaningcore # pylint:disable=no-name-in-module,import-error
@@ -31,7 +29,7 @@ def test_datacleaning():
     bead = np.concatenate([np.random.normal(.1, 3e-3, 200),
                            np.random.normal(.1, 3e-5, 200),
                            np.random.normal(.1, 3e-2, 200)]).astype('f4')
-    out = _datacleaning.HFSigmaRule().hfsigma(bead, [0,200, 400], [200, 400, 600])
+    out = cleaningcore.HFSigmaRule().hfsigma(bead, [0,200, 400], [200, 400, 600])
     assert out.name == "hfsigma"
     assert list(out.min) == [1]
     assert list(out.max) == [2]
@@ -40,7 +38,7 @@ def test_datacleaning():
                            np.random.normal(.5, 3e-3,  100), np.random.normal(.6, 3e-3,  100),
                            np.random.normal(-2., 3e-3, 100), np.random.normal(.6, 3e-3,  100)]
                          ).astype('f4')
-    out = _datacleaning.ExtentRule().extent(bead, [0,200, 400], [200, 400, 600])
+    out = cleaningcore.ExtentRule().extent(bead, [0,200, 400], [200, 400, 600])
     assert out.name == "extent"
     assert list(out.min) == [1]
     assert list(out.max) == [2]
@@ -48,7 +46,7 @@ def test_datacleaning():
     bead = np.ones(600, dtype = 'f4')
     bead[200:400:2] = np.NaN
     bead[400:600:6] = np.NaN
-    out = _datacleaning.PopulationRule().population(bead, [0,200, 400], [200, 400, 600])
+    out = cleaningcore.PopulationRule().population(bead, [0,200, 400], [200, 400, 600])
     assert out.name == "population"
     assert list(out.min) == [1]
     assert list(out.max) == []
@@ -61,7 +59,7 @@ def test_datacleaning():
     bead[370:380] += 1
     bead[450:500] += 1
     bead[570:580] += .1
-    out = _datacleaning.PingPongRule().pingpong(bead, [0,200, 400], [200, 400, 600])
+    out = cleaningcore.PingPongRule().pingpong(bead, [0,200, 400], [200, 400, 600])
     assert out.name == "pingpong"
     assert list(out.min) == []
     assert list(out.max) == [1]
@@ -70,7 +68,7 @@ def test_datacleaning():
     bead = np.random.normal(.1, 3e-3, 1000).astype('f4')
     for i in range(70,1000,100):
         bead[i:i+10] += .02
-    out = _datacleaning.SaturationRule().saturation(bead,
+    out = cleaningcore.SaturationRule().saturation(bead,
                                                     list(range(0,1000,100)),
                                                     list(range(30,1000,100)),
                                                     list(range(50,1000,100)),
@@ -81,7 +79,7 @@ def test_datacleaning():
 
     for i in range(80,800,100):
         bead[i:i+10] += .02
-    out = _datacleaning.SaturationRule().saturation(bead,
+    out = cleaningcore.SaturationRule().saturation(bead,
                                                     list(range(0,1000,100)),
                                                     list(range(30,1000,100)),
                                                     list(range(50,1000,100)),
@@ -100,7 +98,7 @@ def test_phasejump():
     cycle_starts = [i*len(cycle1) for i in range(num_cycles)]
     cycle_ends = [(i+1)*len(cycle1) for i in range(num_cycles)]
     bead = np.stack((cycle1, cycle2, cycle3)).astype('f4')
-    out = _datacleaning.PhaseJumpRule().phasejump(bead, cycle_starts, cycle_ends)
+    out = cleaningcore.PhaseJumpRule().phasejump(bead, cycle_starts, cycle_ends)
 
     assert_equal(out.values, [2*num_jumps, 0, 0])
     assert len(out.min) == 0
@@ -141,12 +139,12 @@ def test_cleaning_localpop():
     setseed(0)
     cycs = np.ones(100, dtype = 'f4')
     cycs[[7, 10, 19, 21]] = np.NaN
-    LocalNaNPopulation(window = 1, ratio = 50).apply(cycs)
+    cleaningcore.LocalNaNPopulation(window = 1, ratio = 50).apply(cycs)
     assert set(np.nonzero(np.isnan(cycs))[0]) == {7, 10, 19, 20, 21}
 
     cycs = np.ones(100, dtype = 'f4')
     cycs[[7, 10, 19, 21, 30, 48, 49, 51,52]] = np.NaN
-    LocalNaNPopulation(window = 3, ratio = 50).apply(cycs)
+    cleaningcore.LocalNaNPopulation(window = 3, ratio = 50).apply(cycs)
     assert set(np.nonzero(np.isnan(cycs))[0]) == {7, 10, 19, 21, 30, 48, 49, 50, 51, 52}
 
     cycs = np.ones(100, dtype = 'f4')
@@ -156,7 +154,7 @@ def test_cleaning_localpop():
     cycs[55:65] = np.NaN
     cycs[70:85] = np.NaN
 
-    DerivateIslands().apply(cycs)
+    cleaningcore.NaNDerivateIslands().apply(cycs)
     assert np.all(np.isnan(cycs[5:35]))
     assert np.all(np.isfinite(cycs[65:70]))
 

@@ -9,7 +9,7 @@ from   taskmodel                import Level, PHASE, Task
 from   taskcontrol.processor    import Processor
 from   utils                    import initdefaults
 from   ._datacleaning           import DataCleaningErrorMessage, DataCleaningException
-from   ..datacleaning           import Partial
+from   .._core                  import Partial # pylint: disable=import-error
 
 class ClippingTask(Task):
     "Task discarding phase 5 data below phase 1 or above phase 3"

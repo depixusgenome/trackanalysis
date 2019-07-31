@@ -14,8 +14,8 @@ from    taskmodel               import Task, Level, PHASE, InstrumentType
 from    utils                   import initdefaults
 
 from    ..names                 import NAMES
-from    ..datacleaning          import Partial, DataCleaning
-from    .._core                 import AberrantValuesRule # pylint: disable=import-error
+from    ..datacleaning          import DataCleaning
+from    .._core                 import Partial, AberrantValuesRule # pylint: disable=import-error
 
 class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
     "Task for removing incorrect points or cycles or even the whole bead"
@@ -45,6 +45,14 @@ class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
         state = super().__getstate__()
         state.update(self.__dict__)
         return state
+
+    def __setstate__(self, info: dict):
+        other = dict(self.__dict__)
+        other.update(type(self)().__dict__)
+        other.update({i for i in info.items() if i[0] in other})
+
+        DataCleaning.__setstate__(self, info)
+        self.__dict__.update(other)
 
 class DataCleaningErrorMessage:
     "creates the error message upon request"

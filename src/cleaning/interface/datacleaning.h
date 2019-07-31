@@ -2,11 +2,11 @@
 #include "cleaning/interface/interface.h"
 namespace cleaning::datacleaning { namespace  {
     template <typename T>
-    inline std::unique_ptr<T> _toptr(py::dict kwa)
+    inline T _toptr(py::dict kwa)
     {
-        std::unique_ptr<T> ptr(new T());
-        _fromkwa<T>(*ptr, kwa);
-        return ptr;
+        T itm;
+        _fromkwa<T>(itm, kwa);
+        return itm;
     }
 
 
@@ -49,5 +49,7 @@ namespace cleaning::datacleaning { namespace  {
                     return std::memcmp(a.cast<T*>(), b.cast<T*>(), sizeof(T)) == 0;
                 })
            .def(py::pickle(&_getkwa<T>, &_toptr<T>));
+        // pybind11 bug?
+        setattr(cls, "__setstate__", getattr(cls, "configure"));
     }
 }}

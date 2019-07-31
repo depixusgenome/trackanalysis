@@ -1,40 +1,6 @@
 #include "cleaning/interface/aberrant.h"
-
-namespace cleaning::datacleaning::aberrant { namespace {
-    static constexpr auto CONSTANT_DOC = R"_(Removes constant values.
-* |z[I-mindeltarange+1] - z[I-mindeltarange+2] | < mindeltavalue
-*  & ...
-*  & |z[I-mindeltarange+1] - z[I]|              < mindeltavalue
-*  & n ∈ [I-mindeltarange+2, I])_";
-
-    static constexpr auto DERIVATIVE_DOC = R"_(Removes aberrant values
-
-A value at position *n* is aberrant if either or both:
-* |z[n] - median(z)| > maxabsvalue
-* |(z[n+1]-z[n-1])/2-z[n]| > maxderivate
-
-Aberrant values are replaced by:
-* *NaN* if *clip* is true,
-* *maxabsvalue ± median*, whichever is closest, if *clip* is false.
-
-returns: *True* if the number of remaining values is too low)_";
-
-    static constexpr auto NANISLANDS_DOC = R"_(Removes frame intervals with the following characteristics:
-* there are *islandwidth* or less good values in a row,
-* with a derivate of at least *maxderivate*
-* surrounded by *riverwidth* or more NaN values in a row on both sides)_";
-
-    static constexpr auto ABB_DOC = R"_(Removes aberrant values.
-A value at position *n* is aberrant if any:
-
-* |z[n] - median(z)| > maxabsvalue
-* |(z[n+1]-z[n-1])/2-z[n]| > maxderivate
-* |z[I-mindeltarange+1] - z[I-mindeltarange+2] | < mindeltavalue
-&& ...
-&& |z[I-mindeltarange+1] - z[I]|               < mindeltavalue
-&& n ∈ [I-mindeltarange+2, I]
-* #{z[I-nanwindow//2:I+nanwindow//2] is nan} < nanratio*nanwindow)_";
-}}
+#include "cleaning/interface/rules_doc.h"
+#include "cleaning/interface/datacleaning.h"
 
 namespace cleaning::datacleaning::aberrant { namespace { // fromkwa specializations
     using namespace cleaning::datacleaning;
