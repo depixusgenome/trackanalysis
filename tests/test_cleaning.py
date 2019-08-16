@@ -431,9 +431,13 @@ def test_undersampling(bokehaction):
         modal.tab("Cleaning")
         modal.input("Target frame rate (Hz)", 10)
     server.wait()
-    assert src.data['t'].shape == (3605,)
-
     assert server.task(UndersamplingTask).framerate == 10.
+
+    # for some reason, the update gets lost in testmode only
+    # we force an update with a bead change
+    tbar = server.widget.get('Main:toolbar')
+    server.change(tbar, 'bead', tbar.bead+1, rendered = True)
+    assert src.data['t'].shape == (3605,)
 
 def test_fixedbeadsorting():
     "test fixed bead detection"
