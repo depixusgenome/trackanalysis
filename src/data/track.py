@@ -17,7 +17,7 @@ from    utils           import initdefaults
 from   .views           import Beads, Cycles, BEADKEY, isellipsis, TrackView
 from   .trackio         import opentrack, PATHTYPES
 
-IDTYPE       = Union[None, int, range] # missing Ellipsys as mypy won't accept it
+IDTYPE       = Union[None, int, range]  # missing Ellipsys as mypy won't accept it
 PIDTYPE      = Union[IDTYPE, slice, Sequence[int]]
 
 DATA         = Dict[BEADKEY, np.ndarray]
@@ -25,11 +25,13 @@ BEADS        = Dict[BEADKEY, 'Bead']
 DIMENSIONS   = Tuple[Tuple[float, float], Tuple[float, float]]
 _PRECISIONS  = Dict[BEADKEY, float]
 
+
 def _doc(tpe):
     if tpe.__doc__:
         doc = cast(str, tpe.__doc__).strip()
         return doc[0].lower()+doc[1:].replace('\n', '\n    ')+"\n"
     return None
+
 
 class Axis(Enum):
     "which axis to look at"
@@ -44,6 +46,7 @@ class Axis(Enum):
             name += 'axis'
         return cls(name)
 
+
 class Bead:
     """
     Characteristics of a bead:
@@ -53,6 +56,7 @@ class Bead:
     """
     position: Tuple[float, float, float] = (0., 0., 0.)
     image:    np.ndarray                 = np.zeros(0, dtype = np.uint8)
+
     @initdefaults(locals())
     def __init__(self, **_):
         pass
@@ -60,8 +64,9 @@ class Bead:
     def thumbnail(self, size, fov):
         "extracts a thumbnail around the bead position"
         pos  = fov.topixel(np.array(list(self.position[:2])))
-        ind  = np.int32(np.round(pos))-size//2 # type: ignore
+        ind  = np.int32(np.round(pos))-size//2  # type: ignore
         return fov.image[ind[1]:ind[1]+size,ind[0]:ind[0]+size]
+
 
 class FoV:
     """
@@ -78,6 +83,7 @@ class FoV:
     image                       = np.empty((0,0), dtype = np.uint8)
     beads:         BEADS        = {}
     dim:           DIMENSIONS   = ((1., 0.), (1., 0.))
+
     @initdefaults(locals())
     def __init__(self, **kwa):
         pass
@@ -85,7 +91,7 @@ class FoV:
     def bounds(self, pixel = False):
         "image bounds in nm (*pixel == False*) or pixels"
         rng = self.image.shape[1], self.image.shape[0]
-        return (0, 0) + rng if pixel else self.tonm((0,0))+ self.tonm(rng)
+        return (0, 0) + rng if pixel else self.tonm((0,0)) + self.tonm(rng)
 
     def size(self, pixel = False):
         "image size in nm (*pixel == False*) or pixels"
@@ -128,7 +134,8 @@ class FoV:
             return tuple(i*k+j for (i, j), k in zip(dim, arr))
 
         tpe = iter if hasattr(arr, '__next__') else type(arr)
-        return tpe([(sl1*i+int1, sl2*j+int2) for i, j in arr]) # type: ignore
+        return tpe([(sl1*i+int1, sl2*j+int2) for i, j in arr])  # type: ignore
+
 
 class Secondaries:
     """
@@ -156,9 +163,13 @@ class Secondaries:
                                         doc = "the magnet position: vcap"))
     frames  = cast(np.ndarray, property(lambda self: self.__track._secondaries["t"],
                                         doc = "the time axis (frame count)"))
-    seconds = cast(np.ndarray, property(lambda self: (self.__track._secondaries["t"]
-                                                      /self.__track.framerate),
-                                        doc = "the time axis (s)"))
+    seconds = cast(
+        np.ndarray,
+        property(
+            lambda self: (self.__track._secondaries["t"] / self.__track.framerate),
+            doc = "the time axis (s)"
+        )
+    )
     zmag    = cast(np.ndarray, property(lambda self: self.__track._secondaries["zmag"],
                                         doc = "the magnet altitude sampled at frame rate"))
 
@@ -207,7 +218,6 @@ class Secondaries:
             i: getattr(self, i) for i in ('cid', 'zmag', 'phase')
         })
 
-
     def keys(self):
         "return the available secondaries"
         return set(self.data.keys()) | {"tservo", "tsample", "tsink", "vcap", "seconds", "zmag"}
@@ -229,9 +239,11 @@ class Secondaries:
         arr           = arr[arr['index'] < self.__track.nframes]
         return arr
 
+
 class LazyProperty:
     "Checks whether the file was opened prior to returning a value"
     LIST: List[str] = []
+
     def __init__(self, name: str = '', tpe: type = None) -> None:
         self._name = ''
         self._type = tpe
@@ -256,6 +268,7 @@ class LazyProperty:
         setattr(obj, self._name, val)
         return getattr(obj, self._name)
 
+
 class ResettingProperty:
     "Resets all if this attribute is changed"
     def __init__(self):
@@ -272,10 +285,12 @@ class ResettingProperty:
         obj.unload()
         return getattr(obj, self._name)
 
+
 class ViewDescriptor:
     "Access to views"
-    tpe : Optional[type] = None
+    tpe:  Optional[type] = None
     args: Dict[str, Any] = dict()
+
     def __get__(self, instance, owner):
         return self if instance is None else instance.view(self.tpe, **self.args)
 
@@ -284,8 +299,10 @@ class ViewDescriptor:
         self.args = dict(copy = False)
         setattr(self, '__doc__', getattr(self.tpe, '__doc__', None))
 
+
 def _lazies():
     return ('_data', '_rawprecisions') + tuple(LazyProperty.LIST)
+
 
 class PhaseManipulator:
     """
@@ -318,7 +335,7 @@ class PhaseManipulator:
         phases = trk.phases[cycs]
         first  = phases[:,0]
         if isinstance(cycs, slice):
-            last = trk.phases[cycs.start+1:cycs.stop+1:cycs.step,0] # type: ignore
+            last = trk.phases[cycs.start+1:cycs.stop+1:cycs.step,0]  # type: ignore
         else:
             tmp  = cycs+1
             last = trk.phases[tmp[tmp < len(trk.phases)],0]
@@ -398,6 +415,7 @@ class PhaseManipulator:
                 phases[cid,:] if ells[1]   else
                 phases[cid,pid]) - phases[0,0]
 
+
 @levelprop(Level.project)
 class Track:
     """
@@ -440,7 +458,7 @@ class Track:
     * `fov` {fov}
     """
     if __doc__:
-        __doc__= __doc__.format(secondaries = _doc(Secondaries), fov = _doc(FoV))
+        __doc__ = __doc__.format(secondaries = _doc(Secondaries), fov = _doc(FoV))
     key: Optional[str] = None
     instrument         = cast(Dict[str, Any],      LazyProperty())
     phases             = cast(np.ndarray,          LazyProperty())
@@ -507,7 +525,7 @@ class Track:
     def __getstate__(self):
         keys = set(_lazies()+('_path', '_axis'))
 
-        test = dict.fromkeys(keys, lambda i, j: j != getattr(type(self), i)) # type: ignore
+        test = dict.fromkeys(keys, lambda i, j: j != getattr(type(self), i))  # type: ignore
         test.update(_phases = lambda _, i: len(i),
                     key     = lambda _, i: i is not None)
 
@@ -560,47 +578,86 @@ class Track:
         "name": None
     }
     _phases:          np.ndarray           = np.empty((0,9), dtype = 'i4')
-    _data:            Optional[DATA]       = None # type: ignore
+    _data:            Optional[DATA]       = None  # type: ignore
     _secondaries:     Optional[DATA]       = None
     _rawprecisions:   Dict[BEADKEY, float] = {}
     _path:            Optional[PATHTYPES]  = None
     _axis:            Axis                 = Axis.Zaxis
     _RAWPRECION_RATE: ClassVar[float]      = 10.
 
-    @overload
-    def rawprecision(self, ibead: int) -> float:
+    @overload   # noqa: F811
+    def rawprecision(
+            self,
+            ibead:  int,
+            first:  Optional[int] = None,
+            second: Optional[int] = None
+    ) -> float:
         "Obtain the raw precision for a given bead"
-        return 0.
 
-    @overload
-    def rawprecision(self, ibead: Optional[Iterable[int]]) -> Iterator[Tuple[int,float]]:
+    @overload   # noqa: F811
+    def rawprecision(
+            self,
+            ibead:  Optional[Iterable[int]],
+            first:  Optional[int] = None,
+            second: Optional[int] = None
+    ) -> Iterator[Tuple[int,float]]:
         "Obtain the raw precision for a number of beads"
 
-    def rawprecision(self, ibead, first = None, last = None):
-        "Obtain the raw precision for a given bead"
-        val   = self._rawprecisions.get(ibead, None)
+    def rawprecision(self, ibead, first = None, last = None):  # noqa: F811
+        """
+        Obtain the raw precision for a given bead
+
+        Parameters
+        ----------
+        ibead:
+            An integer, sequence of integers or Ellipsis indicating for which bead
+            to return results.
+        first:
+            The first phase to consider for computing the precision. This is 1 by default.
+        last:
+            The last phase (not included) to consider for computing the precision.
+            to return results. This is 6 by default.
+
+        Returns
+        -------
+        The raw precision for the bead(s).
+        """
+        val = (
+            self._rawprecisions.get(ibead, None) if first is None and last is None else
+            None
+        )
 
         if val is None:
-            rate = max(1, int(self.framerate/self._RAWPRECION_RATE+.5))
-            def _rp(data, first, last) -> float:
-                return max(PrecisionAlg.MINPRECISION, nanhfsigma(data, zip(first, last), rate))
+            phase    = self.phase[...]
+            rate     = max(1, int(self.framerate/self._RAWPRECION_RATE+.5))
+            phfirst  = (
+                self.phases[:,phase.initial if first is None else first] - self.phases[0,0]
+            )
+            phlast   = (
+                self.phases[:,phase.measure+1 if last is None else last] - self.phases[0,0]
+            )
+            beads    = self.beads
 
-            phase  = self.phase[...]
-            first  = (self.phases[:,phase.initial if first is None else first]
-                      - self.phases[0,0])
-            last   = (self.phases[:,phase.measure+1 if last is None else last]
-                      - self.phases[0,0])
+            def _rp(data) -> float:
+                return max(
+                    PrecisionAlg.MINPRECISION,
+                    nanhfsigma(beads[data], zip(phfirst, phlast), rate)
+                )
+
             if np.isscalar(ibead):
-                self._rawprecisions[ibead] = val = _rp(self.beads[ibead], first, last)
+                val = _rp(ibead)
+                if first is None and last is None:
+                    self._rawprecisions[ibead] = val
             else:
-                beads = self.beads
                 ibead = set(beads.keys()) if ibead is None or ibead is Ellipsis else set(ibead)
-                if len(ibead-set(self._rawprecisions)) > 0:
-                    self._rawprecisions.update(
-                        (i, _rp(beads[i], first, last)) for i in ibead-set(self._rawprecisions)
-                    )
+                if first is None and last is None:
+                    if len(ibead-set(self._rawprecisions)) > 0:
+                        self._rawprecisions.update(
+                            (i, _rp(i)) for i in ibead-set(self._rawprecisions)
+                        )
+                    return iter((i, self._rawprecisions[i]) for i in ibead)
+                return ((i, _rp(i)) for i in ibead)
 
-                val = iter((i, self._rawprecisions[i]) for i in ibead)
         return val
 
     def beadextension(self, ibead: Union[BEADKEY, np.ndarray], rng = (5., 95.)) -> float:
