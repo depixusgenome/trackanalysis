@@ -68,27 +68,32 @@ def test_datacleaning():
     bead = np.random.normal(.1, 3e-3, 1000).astype('f4')
     for i in range(70,1000,100):
         bead[i:i+10] += .02
-    out = cleaningcore.SaturationRule().saturation(bead,
-                                                    list(range(0,1000,100)),
-                                                    list(range(30,1000,100)),
-                                                    list(range(50,1000,100)),
-                                                    list(range(90,1000,100)))
+    out = cleaningcore.SaturationRule().saturation(
+        bead,
+        list(range(0,1000,100)),
+        list(range(30,1000,100)),
+        list(range(50,1000,100)),
+        list(range(90,1000,100))
+    )
     assert out.name == "saturation"
     assert list(out.min) == []
     assert list(out.max) == []
 
     for i in range(80,800,100):
         bead[i:i+10] += .02
-    out = cleaningcore.SaturationRule().saturation(bead,
-                                                    list(range(0,1000,100)),
-                                                    list(range(30,1000,100)),
-                                                    list(range(50,1000,100)),
-                                                    list(range(90,1000,100)))
+    out = cleaningcore.SaturationRule().saturation(
+        bead,
+        list(range(0,1000,100)),
+        list(range(30,1000,100)),
+        list(range(50,1000,100)),
+        list(range(90,1000,100))
+    )
     assert out.name == "saturation"
     assert list(out.min) == []
     assert list(out.max) == list(range(10))
 
 def test_phasejump():
+    "test phase jumps"
     num_jumps = 7
     num_cycles = 3
     cycle1 = 10 * [0] + num_jumps * [1.4, 0] + 10 * [-0.1]
@@ -419,6 +424,7 @@ def test_undersampling(bokehaction):
     server.load('big_legacy')
     modal  = server.selenium.modal("//span[@class='icon-dpx-cog']", True)
     assert server.task(UndersamplingTask).framerate == 30.
+    assert server.task(UndersamplingTask).cycles.start == 0
     src    = (
         next(
             i
@@ -428,16 +434,25 @@ def test_undersampling(bokehaction):
     )
     assert src.data['t'].shape == (10403,)
     with modal:
-        modal.tab("Cleaning")
+        modal.tab("Track Undersampling")
         modal.input("Target frame rate (Hz)", 10)
     server.wait()
     assert server.task(UndersamplingTask).framerate == 10.
+    assert server.task(UndersamplingTask).cycles.start == 0
 
     # for some reason, the update gets lost in testmode only
     # we force an update with a bead change
     tbar = server.widget.get('Main:toolbar')
     server.change(tbar, 'bead', tbar.bead+1, rendered = True)
     assert src.data['t'].shape == (3605,)
+
+    with modal:
+        modal.tab("Track Undersampling")
+        modal.input("First cycle", 10)
+    server.wait()
+    assert server.task(UndersamplingTask).cycles.start == 10
+    server.change(tbar, 'bead', tbar.bead-1, rendered = True)
+    assert src.data['t'].shape == (3255,)
 
 def test_fixedbeadsorting():
     "test fixed bead detection"
@@ -512,8 +527,8 @@ def test_cycletable(bead: int, taskcount: int):
         'population', 'hfsigma', 'extent', 'pingpong', 'saturation', 'discarded',
         'alignment', 'clipping'
     }
-    assert 'phasejump' not in applied_rules  # 'phasejump'-rule must *only* act on SDI-experiments 
-    
+    assert 'phasejump' not in applied_rules  # 'phasejump'-rule must *only* act on SDI-experiments
+
     assert all(len(i) == track.ncycles for i in info.values())
 
     if find(ExtremumAlignmentTask):

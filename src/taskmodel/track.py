@@ -6,7 +6,7 @@ Classes defining a type of data treatment.
 **Warning** Those definitions must remain data-independant.
 """
 from pathlib import Path
-from typing  import Sequence, Dict, Tuple, Union, List, Optional
+from typing  import Sequence, Dict, Tuple, Union, List, Optional, cast
 
 from utils   import initdefaults
 from .level  import Level
@@ -66,9 +66,41 @@ class UndersamplingTask(Task):
     level:       Level = Level.bead
     framerate:   float = 30.
     aggregation: str   = 'mean'
+    cycles:      range = range(0, 200)
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
+
+    cyclestart = cast(
+        int,
+        property(
+            lambda self: self.cycles.start,
+            lambda self, val: setattr(
+                self, 'cycles', range(val, self.cycles.stop, self.cycles.step)
+            )
+        )
+    )
+
+    cyclestop = cast(
+        int,
+        property(
+            lambda self: self.cycles.stop,
+            lambda self, val: setattr(
+                self, 'cycles', range(self.cycles.start, val, self.cycles.step)
+            )
+        )
+    )
+
+    cyclestep = cast(
+        int,
+        property(
+            lambda self: self.cycles.step,
+            lambda self, val: setattr(
+                self, 'cycles', range(self.cycles.start, self.cycles.stop, val)
+            )
+        )
+    )
 
 class CycleCreatorTask(Task):
     "Iterate over cycles and beads"
@@ -76,6 +108,7 @@ class CycleCreatorTask(Task):
     levelou              = Level.cycle
     first: Optional[int] = None
     last:  Optional[int] = None
+
     @initdefaults(('first', 'last'))
     def __init__(self, **_) -> None:
         super().__init__()

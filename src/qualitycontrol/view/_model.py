@@ -2,25 +2,29 @@
 # -*- coding: utf-8 -*-
 "View module showing all messages concerning discarded beads"
 from   functools                import partial
-from   typing                   import List, Dict, Set, Tuple, Iterator
+from   typing                   import List, Dict, Set, Tuple, Iterator, Any
 
 from   data                     import BEADKEY
 from   control.decentralized    import Indirection
 from   cleaning.view            import DataCleaningModelAccess
-from   cleaning.processor       import (DataCleaningProcessor, ClippingProcessor,
-                                        ClippingTask)
+from   cleaning.processor       import (
+    DataCleaningProcessor, ClippingProcessor, ClippingTask
+)
+from   eventdetection.processor.alignment import ExtremumAlignmentProcessor
 from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from   taskmodel                import PHASE
 from   taskcontrol.beadscontrol import DataSelectionBeadController
 from   utils                    import initdefaults
 
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
-from   cleaning.processor.__config__ import DataCleaningTask
+from   cleaning.processor.__config__ import DataCleaningTask  # noqa:F401
+
 
 def _extend(cache, info, exc):
     if exc:
-        lst = [(info[0],)+ i for i in exc.args[0].data()]
+        lst = [(info[0],) + i for i in exc.args[0].data()]
         cache.setdefault('messages', []).extend(lst)
+
 
 class GuiClippingProcessor(ClippingProcessor):
     "gui data cleaning processor"
@@ -44,12 +48,32 @@ class GuiClippingProcessor(ClippingProcessor):
         cache = args.data.setcachedefault(self, dict())
         return args.apply(partial(self.apply, cache = cache, **self.config()))
 
+
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf):
         "returns the result of the beadselection"
         _extend(cache, info, super().compute(frame, info, cache = cache, **cnf))
+
+
+class GuiExtremumAlignmentProcessor(ExtremumAlignmentProcessor):
+    "gui extremum alignment cleaning processor"
+    @classmethod
+    def _apply_method(cls, kwa, method, frame, info):
+        cache      = kwa["cache"]
+        bias, args = method(kwa, frame, info)
+        out        = args.cycles.translate(cls._get(kwa, 'delete'), bias)
+        exc        = cls.test(cls.tasktype(**kwa), frame, (info[0], bias))
+        if exc is not None:
+            _extend(cache, info, exc)
+        return out
+
+    def run(self, args):
+        "updates the frames"
+        cache = args.data.setcachedefault(self, dict())
+        return args.apply(partial(self.apply, cache = cache, **self.config()))
+
 
 class MissinBeadDetectionConfig:
     "filters on messages to reinterpret these as missing beads"
@@ -66,16 +90,19 @@ class MissinBeadDetectionConfig:
         return (i for i, j, k in zip(msgs["bead"], msgs["type"], msgs["cycles"])
                 if k is None or (vals.get(j, ncycles+1) <= k))
 
+
 class QualityControlDisplay:
     "QualityControlDisplay"
     def __init__(self):
         self.name:     str             = "qc"
         self.messages: Dict[str, list] = {}
 
+
 class QualityControlModelAccess(DataCleaningModelAccess):
     "access to data cleaning"
     __missing = Indirection()
     __display = Indirection()
+
     def __init__(self, ctrl) -> None:
         super().__init__(ctrl)
         self.__missing = MissinBeadDetectionConfig()
@@ -88,38 +115,13 @@ class QualityControlModelAccess(DataCleaningModelAccess):
 
     def buildmessages(self):
         "creates beads and warnings where applicable"
-        default: Dict[str, List] = {i: [] for i in ('type', 'message', 'bead', 'cycles')}
-        if self.track is not None:
-            tasks = self.cleaning.task, self.clipping.task
-            ncy   = self.track.ncycles
-            if any(i is not None for i in tasks):
-                ctx = self.runcontext(GuiDataCleaningProcessor, GuiClippingProcessor)
-                with ctx as view:
-                    if view is not None:
-                        for _ in view:
-                            pass
-
-                    for tsk in tasks:
-                        if tsk is None:
-                            continue
-
-                        mem = ctx.taskcache(tsk).pop('messages', ())
-                        # pylint: disable=unsupported-membership-test
-                        mem = [i for i in mem if i[0] not in default['bead']]
-                        if not mem:
-                            pass
-
-                        default['bead']    += [i[0] for i in mem]
-                        default['cycles']  += [ncy if i[1] is None else i[1] for i in mem]
-                        default['type']    += [i[2] for i in mem]
-                        default['message'] += [i[3] for i in mem]
-        self._ctrl.display.update(self.__display, messages = default)
+        self._ctrl.display.update(self.__display, messages = self.__buildmessages())
 
     def badbeads(self) -> Set[BEADKEY]:
         "returns bead ids with messages"
         if self.track is None:
             return set()
-        return set(self.messages()['bead']) # pylint: disable=unsubscriptable-object
+        return set(self.messages()['bead'])  # pylint: disable=unsubscriptable-object
 
     def messages(self) -> Dict[str, List]:
         "returns beads and warnings where applicable"
@@ -134,7 +136,7 @@ class QualityControlModelAccess(DataCleaningModelAccess):
             return {i: set() for i in ('bad', 'ok', 'fixed', 'missing')}
 
         msg  = self.messages()
-        data = {'bad':       set(msg["bead"]), # pylint: disable=unsubscriptable-object
+        data = {'bad':       set(msg["bead"]),  # pylint: disable=unsubscriptable-object
                 'fixed':     set(i[-1] for i in self.availablefixedbeads),
                 'ok':        set(self.track.beads.keys()),
                 'missing':   set(self.__missing.filter(self.track.ncycles, msg)),
@@ -156,6 +158,41 @@ class QualityControlModelAccess(DataCleaningModelAccess):
     def _ontask(self, parent = None, task = None, **_):
         if self.impacts(parent, task):
             self.clear()
+
+    def __buildmessages(self) -> Dict[str, List[Any]]:
+        default: Dict[str, List] = {i: [] for i in ('type', 'message', 'bead', 'cycles')}
+        if self.track is None:
+            return default
+
+        tasks = self.cleaning.task, self.clipping.task, self.alignment.task
+        ncy   = self.track.ncycles
+        if not any(i is not None for i in tasks):
+            return default
+
+        ctx = self.runcontext(
+            GuiDataCleaningProcessor, GuiExtremumAlignmentProcessor, GuiClippingProcessor
+        )
+        with ctx as view:
+            if view is not None:
+                for _ in view:
+                    pass
+
+            for tsk in tasks:
+                if tsk is None:
+                    continue
+
+                mem = ctx.taskcache(tsk).pop('messages', ())
+                # pylint: disable=unsupported-membership-test
+                mem = [i for i in mem if i[0] not in default['bead']]
+                if not mem:
+                    pass
+
+                default['bead']    += [i[0] for i in mem]
+                default['cycles']  += [ncy if i[1] is None else i[1] for i in mem]
+                default['type']    += [i[2] for i in mem]
+                default['message'] += [i[3] for i in mem]
+        return default
+
 
 class DriftControlPlotTheme(PlotTheme):
     "drift control plot theme"
@@ -185,14 +222,16 @@ class DriftControlPlotTheme(PlotTheme):
     def __init__(self, **_):
         super().__init__(**_)
 
+
 class DriftControlPlotConfig:
     "allows configuring the drift control plots"
     def __init__(self):
-        self.name             : str                     = "qc.driftcontrol"
-        self.percentiles      : List[int]               = [10, 50, 90]
-        self.yspan            : Tuple[List[int], float] = ([5, 95], 0.3)
-        self.phases           : Tuple[int, int]         = (PHASE.initial, PHASE.pull)
-        self.warningthreshold : float                   = 0.3
+        self.name:             str                     = "qc.driftcontrol"
+        self.percentiles:      List[int]               = [10, 50, 90]
+        self.yspan:            Tuple[List[int], float] = ([5, 95], 0.3)
+        self.phases:           Tuple[int, int]         = (PHASE.initial, PHASE.pull)
+        self.warningthreshold: float                   = 0.3
+
 
 class DriftControlPlotModel(PlotModel):
     "qc plot model"
@@ -204,13 +243,15 @@ class DriftControlPlotModel(PlotModel):
     def __init__(self, **_):
         super().__init__()
 
+
 class ExtensionPlotConfig(DriftControlPlotConfig):
     "allows configuring the drift control plots"
     def __init__(self):
         super().__init__()
-        self.name             : str       = "qc.extension"
-        self.ybarspercentiles : List[int] = [25, 75]
-        self.warningthreshold : float     = 1.5e-2
+        self.name:             str       = "qc.extension"
+        self.ybarspercentiles: List[int] = [25, 75]
+        self.warningthreshold: float     = 1.5e-2
+
 
 class ExtensionPlotTheme(DriftControlPlotTheme):
     "drift control plot theme"

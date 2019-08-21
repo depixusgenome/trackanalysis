@@ -11,6 +11,7 @@ from   data                  import Cycles
 from   utils                 import initdefaults
 from   taskmodel             import Task, Level, PhaseArg
 from   taskcontrol.processor import Processor
+from   cleaning.processor    import DataCleaningErrorMessage, DataCleaningException
 from   .._core               import (# pylint: disable=import-error
     translate, medianthreshold, ExtremumAlignment, ExtremumAlignmentMode,
     PhaseEdgeAlignment, PhaseEdgeAlignmentMode
@@ -32,6 +33,21 @@ class AlignmentTactic(Enum):
     measure     = 'measure'
     initial     = 'initial'
     pull        = 'pull'
+
+class AlignmentErrorMessage(DataCleaningErrorMessage):
+    "an alignment exception message"
+    def getmessage(self, percentage = False):
+        "returns the message"
+        data = self.data()[0][-1][1:].strip()
+        return 'has fewer than %s %% cycles aligned' % data
+
+    def data(self):
+        "returns a message if the test is invalid"
+        pop  = self.config.get('minpopulation', self.tasktype().minpopulation)
+        return [(None, 'alignment', '< %d' % pop)]
+
+class AlignmentException(DataCleaningException):
+    "an alignment exception"
 
 class ExtremumAlignmentTask(Task, zattributes = ('delta', 'minrelax', 'pull', 'opening')):
     """
@@ -56,7 +72,8 @@ class ExtremumAlignmentTask(Task, zattributes = ('delta', 'minrelax', 'pull', 'o
         * |`PHASE.pull`    - `PHASE.initial`| < 'outlier' x median
         * |`PHASE.initial` - `PHASE.measure`| < 'delta'
 
-    After alignment, cycles with |phase 7| < median + 'minrelax' are discarded.
+    After alignment, cycles with |phase 7| < median -|phase 7 spread| - 'minrelax'
+    are discarded.
 
     * *phase* = 'measure': alignment is performed on `PHASE.measure`. If outliers
     are found on `PHASE.measure`:
@@ -91,6 +108,7 @@ class ExtremumAlignmentTask(Task, zattributes = ('delta', 'minrelax', 'pull', 'o
     delta:      float           = .2
     minrelax:   float           = .1
     delete:     bool            = True
+    minpopulation: float        = 80
 
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
@@ -282,7 +300,22 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
     @classmethod
     def _apply_method(cls, kwa, method, frame, info):
         bias, args = method(kwa, frame, info)
-        return args.cycles.translate(cls._get(kwa, 'delete'), bias)
+        out        = args.cycles.translate(cls._get(kwa, 'delete'), bias)
+        exc        = cls.test(cls.tasktype(**kwa), frame, (info[0], bias))
+        if exc is None:
+            return out
+        raise exc # pylint: disable=raising-bad-type
+
+    @staticmethod
+    def test(task, frame, info)-> Optional[AlignmentException]:
+        "test how much remaining pop"
+        if np.isfinite(info[1]).sum() <= len(info[1]) * task.minpopulation * 1e-2:
+            ncy = getattr(frame.track, 'ncycles', 0)
+            msg = AlignmentErrorMessage(
+                None, task.config(), type(task), info[0], frame.parents, ncy
+            )
+            return AlignmentException(msg, 'warning')
+        return None
 
     @classmethod
     def apply(cls, toframe = None, **kwa):

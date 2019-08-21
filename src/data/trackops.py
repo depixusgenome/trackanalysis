@@ -5,7 +5,7 @@ Operations on tracks
 """
 from    copy        import copy as shallowcopy, deepcopy
 from    functools   import partial
-from    typing      import Union, Tuple, List, TypeVar, Optional, cast
+from    typing      import Union, Tuple, List, TypeVar, Any, Dict, Optional, cast
 from    pathlib     import Path
 
 import  numpy       as     np
@@ -64,30 +64,61 @@ def selectbeads(trk:TRACKS, *beads:BEADKEY) -> TRACKS:
         beads = tuple(beads[0])
     return dropbeads(trk, *(set(trk.beads.keys()) - set(beads)))
 
-def selectcycles(trk:TRACKS, indexes:Union[slice, range, List[int]])-> TRACKS:
+def selectcycles(trk:Union[TRACKS, Beads], indexes:Union[slice, range, List[int]])-> TRACKS:
     """
-    Returns a track with only a limited number of cycles
+    Returns a copy of a Track or TracksDict instance with only a limited number
+    of its cycles.
+
+    Parameters
+    ----------
+    trk:
+        the Beads, Track or TracksDict instance to clip
+    indexes:
+        the cycles to select
+
+    Returns
+    -------
+    Either a Track or a TracksDict instance, depending on whether one or the
+    other was used as the first argument.
     """
     if isinstance(trk, TracksDict):
         return _applytodict(selectcycles, trk, indexes, {})
 
-    inds, phases = trk.phase.cut(indexes)
-    vals         = np.zeros(trk.nframes, dtype = 'bool')
+    root: Track  = trk if isinstance(trk, Track) else trk.track
+    if isinstance(indexes, (range, slice)):
+        # if no changes required: send back the track unchanged
+        rng: range = cast(range, indexes)
+        if (
+                not rng.start
+                and rng.stop and rng.stop >= root.ncycles
+                and rng.step == 1
+        ):
+            return trk
+    root.load()
+
+    inds, phases = root.phase.cut(indexes)
+    vals         = np.zeros(root.nframes, dtype = 'bool')
     vals[inds]   = True
 
-    track        = trk.__getstate__()
-    track.update(data   = {i: j[vals] for i, j in trk.beads},
-                 phases = phases.astype('i4'))
+    track: Dict[str, Any] = root.__getstate__()
+    track.update(
+        phases = phases.astype('i4'),
+        data   = (
+            trk.withaction(lambda _, info: (info[0], info[1][vals]))
+            if isinstance(trk, Beads) else
+            {i: j[vals] for i, j in root.beads}
+        )
+    )
 
-    track['secondaries'] = secs = {i: trk.secondaries.data[i][inds] for i in ('t', 'zmag')}
-    for i, j in trk.secondaries.data.items():
+    track['secondaries'] = secs = {i: root.secondaries.data[i][inds] for i in ('t', 'zmag')}
+    for i, j in root.secondaries.data.items():
         if i not in secs:
-            inds = np.clip(np.int32(j['index']-trk.phases[0,0]), 0, len(vals)-1)
+            inds = np.clip(np.int32(j['index']-root.phases[0,0]), 0, len(vals)-1)
             secs[i] = j[vals[inds]]
 
-    start = None
-    if trk.path:
-        path  = Path(str(trk.path[0] if isinstance(trk.path, (list, tuple)) else trk.path))
+    start: Optional[int] = None
+    if root.path:
+        path  = Path(str(root.path[0] if isinstance(root.path, (list, tuple)) else root.path))
         start = (
             cast(slice, indexes).stop    if getattr(indexes, 'stop',  None) is not None else
             cast(slice, indexes).start   if getattr(indexes, 'start', None) else
@@ -96,17 +127,17 @@ def selectcycles(trk:TRACKS, indexes:Union[slice, range, List[int]])-> TRACKS:
         )
     if start is not None:
         track['_modificationdate'] = (
-            path.stat().st_ctime + trk.nframes/trk.framerate
-            if start >= trk.phases.shape[0] else
-            path.stat().st_ctime + trk.phases[start,0]/trk.framerate
+            path.stat().st_ctime + root.nframes/root.framerate
+            if start >= root.phases.shape[0] else
+            path.stat().st_ctime + root.phases[start,0]/root.framerate
         )
 
-    trk = Track(**track)
+    out: Track = Track(**track)
     if start:
-        setattr(trk, '_modificationdate', track['_modificationdate'])
-    setattr(trk, '_lazydata_', False)
+        setattr(out, '_modificationdate', track['_modificationdate'])
+    setattr(out, '_lazydata_', False)
 
-    return trk
+    return out
 
 def concatenatetracks(trk:TRACKS, *tracks:TRACKS)-> TRACKS:
     """
@@ -188,19 +219,48 @@ def _undersample_agg(fcn, cnt, _, info):
     arr = info[1]
     return (info[0], fcn(arr[:(len(arr)//cnt)*cnt].reshape((-1, cnt)), axis = 1))
 
-def undersample(itm: Union[Track, Beads], cnt: int, agg: Optional[str] = None) -> Track:
-    "undersample the track"
-    track: Track = getattr(itm, 'track', itm)
-    if cnt <= 1:
-        return track
+def undersample(
+        itm:    Union[Track, Beads],
+        cnt:    int,
+        agg:    Optional[str]   = None,
+        cycles: Optional[range] = None
+) -> Track:
+    """
+    Returns a copy of a Track or TracksDict instance with only a fraction of
+    the number of frames. Each new frame is a measure on `cnt` frames, the
+    latter being defined by `agg`.
 
-    track.load()
-    # pylint: disable=protected-access
-    cpy            = shallowcopy(track)
-    cpy._phases    = np.copy(cpy.phases)//cnt
-    if cpy.key is None:
-        cpy.key   = str(track.path)
-        cpy._path = None
+    It's also possible to reduce the number of cycles using `cycles`
+
+    Parameters
+    ----------
+    itm:
+        The Track or Beads instance to clip
+    cnt:
+        The fraction of frames to keep
+    agg:
+        The name of the function to use for reducing each consecutive `cnt` frames.
+    cycles:
+        If not `None`, the cycles to keep, see `selectcycles`
+    """
+    if cycles is not None:
+        root: Track = selectcycles(itm, cycles)
+        if cnt <= 1:
+            return getattr(root, 'track', root)
+    elif cnt <= 1:
+        return getattr(itm, 'track', itm)
+    else:
+        root = itm if isinstance(itm, Track) else itm.track
+
+    # already loaded in selectcycles
+    root.load()
+
+    track: Dict[str, Any] = root.__getstate__()
+    track['_lazydata_']   = False
+    track['phases']       = np.copy(track['phases'])//cnt
+    if track.get('key', None) is None:
+        track['key']  = root.path
+        track['path'] = None
 
     if agg in {None, 'none'}:
         fcn    = partial(_undersample_first, cnt)
@@ -217,21 +277,26 @@ def undersample(itm: Union[Track, Beads], cnt: int, agg: Optional[str] = None) -
             return np.concatenate([vals[:1], vals[1:][diff]])
         return vals
 
-    cpy._data = (
-        dict(fcn(None, i) for i in track._data.items())
-        if isinstance(itm, Track) else
-        itm.withaction(fcn)
+    track['data'] = (
+        itm.withaction(fcn)                    if isinstance(itm, Beads) else
+        getattr(root, '_data').withaction(fcn) if isinstance(getattr(root, '_data'), Beads) else
+        dict(fcn(None, i) for i in getattr(root, "_data").items())
     )
 
-    cpy._secondaries    = dict(
+    track['secondaries'] = dict(
         fcn(None, (i, j)) if i in ('t', 'zmag') else (i, _temp(j))
-        for i, j in track._secondaries. items()
+        for i, j in getattr(root, '_secondaries'). items()
     )
 
-    cpy.fov             = track.fov
-    cpy.framerate       = track.framerate/cnt
-    cpy._rawprecisions  = {}
-    return cpy
+    track['fov']            = root.fov
+    track['framerate']      = root.framerate/cnt
+
+    out = Track(**track)
+    if '_modificationdate' in track:
+        setattr(out, '_modificationdate', track['_modificationdate'])
+    setattr(out, '_rawprecisions',  {})
+    setattr(out, '_lazydata_',      False)
+    return out
 
 def dataframe(track:Track) -> pd.DataFrame:
     "create a dataframe of the track"

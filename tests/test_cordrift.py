@@ -306,7 +306,7 @@ def test_cycleprocess_withalignment():
     def _do(pool, drift = True):
         tasks = (utpath("big_all"),
                  DataSelectionTask(cycles = slice(2)),
-                 ExtremumAlignmentTask(phase = 'onlyinitial'),
+                 ExtremumAlignmentTask(phase = 'onlyinitial', minpopulation = 0.),
                  DriftTask(onbeads = False))
         pair = create(tasks[:4 if drift else 3])
         ret  = dict(next(i for i in pair.run(pool = pool))[0,...].withphases(5))
@@ -338,10 +338,10 @@ def test_cycleprocess_withalignment():
 def test_cycleprocess_emptycycles():
     "tests drift removal on cycles"
     tasks = (utpath("big_all"),
-             ExtremumAlignmentTask(phase = 'pull'),
+             ExtremumAlignmentTask(phase = 'pull', minpopulation = 0.),
              DriftTask(onbeads = False))
     ret = dict(next(i for i in create(tasks).run()))
     assert ret is not None # check that computations don't crash
 
 if __name__ == '__main__':
-    test_cycleprocess_withalignment()
+    test_cycleprocess_emptycycles()

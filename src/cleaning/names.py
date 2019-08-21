@@ -11,4 +11,5 @@ NAMES: Dict[str, str] = dict(
     pingpong   = '∑|dz|',
     phasejump  = 'SDI phase-jumps',
     clipping   = 'z ∉ range(φ₁ → φ₃)',
+    alignment  = 'alignment',
 )

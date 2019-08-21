@@ -82,12 +82,12 @@ class UndersamplingProcessor(Processor[_tasks.UndersamplingTask]):
     def apply(cls, task: _tasks.UndersamplingTask, itm: Beads) -> Beads:
         "create a new track"
         width = cls.binwidth(task, itm)
-        return itm if width <= 1 else undersample(itm, width, task.aggregation).beads
+        return undersample(itm, width, task.aggregation, task.cycles).beads
 
     def track(self, itm: Track) -> Track:
         "create a new track"
         width = self.binwidth(self.task, itm)
-        return itm if width <= 1 else undersample(itm, width, self.task.aggregation)
+        return undersample(itm, width, self.task.aggregation, self.task.cycles)
 
     def run(self, args):
         "updates frames"
@@ -95,7 +95,7 @@ class UndersamplingProcessor(Processor[_tasks.UndersamplingTask]):
 
     @classmethod
     def _apply(cls, kwa: Dict[str, Any], beads:Beads):
-        return cls.apply(_tasks.UndersamplingTask(**kwa), beads)
+        return cls.apply(_tasks.UndersamplingTask(**kwa), beads.track)
 
 class CycleCreatorProcessor(Processor[_tasks.CycleCreatorTask]):
     "Generates output from a _tasks.CycleCreatorTask"

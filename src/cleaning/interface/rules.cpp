@@ -303,21 +303,41 @@ namespace cleaning::datacleaning::rules { namespace {
 
         py::class_<CLS> cls(mod, "DataCleaning", doc.c_str());
 
-#       define DPX_ALL_PROP(parent, name)                             \
-            cls.def_property(                               \
-                 #name,                                               \
-                [](CLS const & self) { return self.parent.name; },    \
+#       define DPX_ALL_PROP(parent, name)                               \
+            cls.def_property(                                           \
+                 #name,                                                 \
+                [](CLS const & self) { return self.parent.name; },      \
                 [](CLS & self, decltype(CLS().parent.name) const & val) \
-                { self.parent.name = val; } \
+                { self.parent.name = val; }                             \
             );
 
-#       define DPX_ALL_PROP2(parent, name, attr)                      \
-            cls.def_property(                               \
-                 #name,                                               \
-                [](CLS const & self) { return self.parent.attr; },    \
+#       define DPX_ALL_PROP2(parent, name, attr)                        \
+            cls.def_property(                                           \
+                 #name,                                                 \
+                [](CLS const & self) { return self.parent.attr; },      \
                 [](CLS & self, decltype(CLS().parent.attr) const & val) \
-                { self.parent.attr = val; } \
+                { self.parent.attr = val; }                             \
             );
+
+#       define DPX_ALL_PROP_PP(parent)                                              \
+            cls.def_property(                                                       \
+                 #parent"percentiles",                                              \
+                [](CLS const & self) {                                              \
+                    return py::make_tuple(                                          \
+                            self.parent.minpercentile,                              \
+                            self.parent.maxpercentile); },                          \
+                [](CLS & self, py::object val)                                      \
+                {                                                                   \
+                    if(val.is_none())                                               \
+                    {                                                               \
+                        self.parent.minpercentile = 0.;                             \
+                        self.parent.maxpercentile = 100.;                           \
+                    } else {                                                        \
+                        self.parent.minpercentile = val[py::int_(0)].cast<float>(); \
+                        self.parent.maxpercentile = val[py::int_(1)].cast<float>(); \
+                    };                                                              \
+                });
+
         DPX_ALL_PROP(aberrant, constants)
         DPX_ALL_PROP(aberrant, derivative)
         DPX_ALL_PROP(aberrant, localnans)
@@ -417,6 +437,7 @@ namespace cleaning::datacleaning::rules { namespace {
 
         DPX_ALL_PROP2(extent, minextent, minv)
         DPX_ALL_PROP2(extent, maxextent, maxv)
+        DPX_ALL_PROP_PP(extent)
         cls.def("extent",
             [partial](CLS const & self,
                       ndarray<float> bead,
@@ -429,6 +450,7 @@ namespace cleaning::datacleaning::rules { namespace {
 
         DPX_ALL_PROP2(pingpong, maxpingpong, maxv)
         DPX_ALL_PROP(pingpong, mindifference)
+        DPX_ALL_PROP_PP(pingpong)
         cls.def("pingpong",
                 [partial](CLS const & self,
                           ndarray<float> bead,

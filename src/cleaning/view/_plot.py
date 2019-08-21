@@ -42,7 +42,12 @@ class GuiExtremumAlignmentProcessor(ExtremumAlignmentProcessor):
             bias - np.nanmedian(bias),
         )
 
+        task = cls.tasktype(**kwa)
+        if task.minpopulation > 0.:
+            cache['exc'] = cls.test(task, frame, (info[0], bias))
+
         bias[np.isnan(bias)] = np.nanmedian(bias)
+
         return args.cycles.translate(False, bias)
 
     @classmethod
@@ -62,15 +67,20 @@ class GuiClippingProcessor(ClippingProcessor):
     "gui processor clipping"
     @classmethod
     def _cache_action(cls, cache, task, frame, info):
-        cpy = np.copy(info[1])
+        cpy    = np.copy(info[1])
+        cycles = frame[...,...].withdata({0: cpy})
+        for i in cache[1].get('alignment', (None, None, ()))[2]:
+            cycles[0, i][:] = np.NaN
+
         raw = np.copy(cpy)
         task(frame.track, info[0], cpy)
         if task.minpopulation > 0.:
-            cache['exc'] = cls.test(task, frame, (info[0], cpy))
-        cache['gui'] = np.isnan(cpy) & ~np.isnan(raw)
-        if np.any(cache['gui']):
-            cache['clipping'] = task.partial(frame.track, info[0], raw)
-            cache['clipping'].values[cache['clipping'].values == 0.] = np.NaN
+            cache[0]['exc'] = cls.test(task, frame, (info[0], cpy))
+
+        cache[0]['gui'] = np.isnan(cpy) & ~np.isnan(raw)
+        if np.any(cache[0]['gui']):
+            cache[0]['clipping'] = task.partial(frame.track, info[0], raw)
+            cache[0]['clipping'].values[cache[0]['clipping'].values == 0.] = np.NaN
         return info
 
     @classmethod
@@ -84,7 +94,11 @@ class GuiClippingProcessor(ClippingProcessor):
     def run(self, args):
         "updates the frames"
         cache = args.data.setcachedefault(self, dict())
-        return args.apply(partial(self.apply, cache = cache, **self.config()))
+        try:
+            align = args.data.getcache(ExtremumAlignmentProcessor.tasktype)()
+        except IndexError:
+            align = {}
+        return args.apply(partial(self.apply, cache = (cache, align), **self.config()))
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
@@ -122,11 +136,17 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
             if cycles is not None:
                 items = list(cycles[bead, ...])
 
-                for name, tskname in (('aberrant', 'cleaning'), ('clipping', 'clipping')):
+                for name, tskname in (
+                        ('aberrant',  'cleaning'),
+                        ('alignment', 'alignment'),
+                        ('clipping',  'clipping'),
+                ):
                     if tasks.get(tskname, None):
                         tsk        = tasks[tskname]
                         exc        = ctx.taskcache(tsk).pop('exc', None) if exc is None else exc
-                        nans[name] = ctx.taskcache(tsk).pop('gui', None)
+                        tmp        = ctx.taskcache(tsk).pop('gui', None)
+                        if tmp is not None:
+                            nans[name] = tmp
 
                 if tasks.get('cleaning', None):
                     cls.__discarded(ctx, track, bead, tasks, nans)
@@ -222,9 +242,18 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         else:
             self._errors.reset(cache, exc)
         finally:
-            data   = self.__data(items, nans)
-            yinit  = np.nanpercentile(data["z"], [100-self._theme.clip, self._theme.clip])
-            yinit += (abs(np.diff(yinit)[0])*self._theme.clipovershoot*1e-2)*np.array([1., -1.])
+            data  = self.__data(items, nans)
+            yinit = None
+            if np.any(np.isfinite(data['z'])):
+                yinit  = np.nanpercentile(data["z"], [100-self._theme.clip, self._theme.clip])
+                if np.any(np.isnan(yinit)):
+                    yinit = None
+                else:
+                    yinit += (
+                        (abs(np.diff(yinit)[0])*self._theme.clipovershoot*1e-2)
+                        *np.array([1., -1.])
+                    )
+
             self.setbounds(
                 cache, self.__fig, data['t'], data['z'],
                 yinit = yinit
