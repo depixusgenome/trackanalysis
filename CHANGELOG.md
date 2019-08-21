@@ -1,7 +1,27 @@
 # CycleApp
+## cycles_v6.14
+
+* 2019-08-21 16:08:39 +0200  (tag: cycles_v6.14)
+
+### General
+
+New executables "CycleApp\_RESET.bat" and 'RampApp\_RESET.bat' will run one or
+the other application after resetting all parameters to factory settings. This
+is the same as removing the C:/Users/XXX/AppData/Local/depixus file.
+
+### Cleaning
+
+A range of cycles can now be selected using the cleaning tab's advanced menu.
+By default only the first 200 cycles (or less) are selected.
+
+The alignment algorithm has been updated: prior to this version, cycles which
+did not align in phase 7 were discarded. The alignment conditions were relaxed
+by taking into account the spread phase 7 average values and not only their
+mean.
+
 ## cycles_v6.13
 
-* 2019-07-31 14:18:39 +0200  (tag: cycles_v6.13.1)
+* 2019-07-31 14:16:57 +0200  (tag: cycles_v6.13.1)
 * 2019-07-29 19:11:10 +0000  (tag: cycles_v6.13)
 
 ### Reports

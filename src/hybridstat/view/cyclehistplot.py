@@ -20,7 +20,6 @@ from taskview.plots            import (
 )
 from taskmodel                 import PHASE
 from tasksequences.modelaccess import SequenceAnaIO
-from view.base                 import stretchout
 from utils                     import initdefaults
 from ._model                   import (PeaksPlotModelAccess, PeaksPlotTheme,
                                        createpeaks, resetrefaxis)
@@ -32,7 +31,7 @@ HistData  = Dict[str, CurveData]
 class CyclePlotTheme(PlotTheme):
     "cycles & peaks plot theme: cycles"
     name      = "cyclehist.plot.cycle"
-    figsize   = (660, 660, 'scale_height')
+    figsize   = (600, 597, 'fixed')
     phasezoom = PHASE.measure, 20
     fiterror  = PeaksPlotTheme.fiterror
     xlabel    = PlotTheme.xtoplabel
@@ -58,7 +57,7 @@ class CyclePlotModel(PlotModel):
 class HistPlotTheme(PlotTheme):
     "cycles & peaks plot theme: histogram"
     name     = "cyclehist.plot.hist"
-    figsize          = (1100-CyclePlotTheme.figsize[0],)+CyclePlotTheme.figsize[1:]
+    figsize          = (1200-CyclePlotTheme.figsize[0],)+CyclePlotTheme.figsize[1:]
     xlabel           = PeaksPlotTheme.xlabel
     ylabel           = CyclePlotTheme.ylabel
     explabel         = 'Hybridisations'
@@ -100,7 +99,7 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
     _src:    ColumnDataSource
     _fig:    Figure
     _errors: PlotError
-    plot = cast(Figure,           property(lambda self: self._fig))
+    plot  = cast(Figure,           property(lambda self: self._fig))
     def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument
         self._src  = ColumnDataSource(data = self._data(None))
         self._fig  = self.figure(y_range = Range1d, x_range = Range1d)
@@ -292,7 +291,6 @@ class HistPlotCreator(BaseHistPlotCreator[PeaksPlotModelAccess, # type: ignore
                                           HistPlotModel]):
     "Creates a histogram of peaks"
 
-
 class _StateDescriptor:
     def __get__(self, inst, owner):
         if inst is None:
@@ -397,26 +395,6 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
                 if root is not None and {'hpins'} == set(old):
                     self.calllater(lambda: self.reset(False))
 
-        @ctrl.theme.observe(getattr(self._cycle, '_theme').name)
-        def _onchangefiguresize(old = None, **_):
-            if 'figsize' not in old:
-                return
-            figs    = [(getattr(i, '_fig'), getattr(i, '_theme'))
-                       for i in (self._cycle, self._hist)]
-
-            width   = old['figsize'][0] + figs[1][1].figsize[0]-figs[0][1].figsize[0]
-            figsize = (width, figs[0][1].figsize[1], figs[1][1].figsize[-1])
-            ctrl.theme.update(figs[1][1], figsize = figsize)
-
-            doc     = self._doc
-            def _cb(action = 0):
-                fig, theme                      = figs[action//2]
-                fig.plot_width, fig.plot_height = theme.figsize[:2]
-                fig.trigger("sizing_mode", theme.figsize[-1], theme.figsize[-1])
-                if action < 1:
-                    doc.add_next_tick_callback(lambda: _cb(action+1))
-            doc.add_next_tick_callback(_cb)
-
     def addto(self, ctrl, noerase = True):
         "adds the models to the controller"
         for i in self._plots:
@@ -430,14 +408,26 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
         self._hist.plot.yaxis[0].update(axis_label = "", major_label_text_font_size = '0pt')
         self._cycle.plot.yaxis[1].major_label_text_font_size = '0pt'
 
-        # add a grid to the advanced menu because some themes are missing
-        # a grid_line_alpha attribute
-        attr = getattr(type(self._widgets.advanced), 'theme1')
-        attr.items.append(self._cycle.plot.grid[0])
-
         bottom = self._widgets.addtodoc(self, ctrl, doc)
         out    = self._keyedlayout(ctrl, *self.plotfigures, bottom = bottom)
-        self.__resize(ctrl, out, self.plotfigures, bottom)
+        self.__resize(ctrl, out, bottom, True)
+
+        theme = getattr(self._cycle, '_theme')
+        sizes = (
+            self._cycle.plot.plot_width,
+            self._cycle.plot.plot_height,
+            self._cycle.plot.sizing_mode
+        )
+        ctrl.theme.update(theme, figsize = sizes)
+
+        @ctrl.theme.observe(getattr(self._cycle, '_theme').name)
+        def _onchangefiguresize(old = None, model = None, **_):
+            if 'figsize' not in old:
+                return
+            self._cycle.plot.plot_width = model.figsize[0]
+            self._hist.plot.plot_width  = out.width-model.figsize[0]
+            out.height = bottom.height+model.figsize[1]+ctrl.theme.get('theme', 'figtbheight')
+            self.__resize(ctrl, out, bottom, False)
         return out
 
     def advanced(self):
@@ -460,30 +450,26 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
             finally:
                 self._widgets.reset(cache, done != 2)
 
-    def __resize(self, ctrl, sizer, plots, bottom):
-        borders = ctrl.theme.get('theme', "borders")
-        self._widgets.resize(bottom, borders, self.defaulttabsize(ctrl)['width'])
-        sizer.update(**self.defaulttabsize(ctrl))
-        width = sum(i.plot_width for i in plots)
-        for fig in plots:
+    def __resize(self, ctrl, sizer, bottom, doresize):
+        borders            = ctrl.theme.get('theme', "borders")
+        tsz                = self.defaulttabsize(ctrl)
+        tsz['sizing_mode'] = self._cycle.plot.sizing_mode
+
+        self._widgets.resize(bottom, borders, tsz['width'])
+        if doresize:
+            sizer.update(**tsz)
+        for fig in self.plotfigures:
             height = (
                 sizer.height - ctrl.theme.get('theme', 'figtbheight') - bottom.height
             )
-            width  = int((fig.plot_width/width)*sizer.width)
 
-            fig.update(
-                sizing_mode  = 'scale_height',
-                aspect_ratio = width/height,
-                plot_width   = width,
-                plot_height  = height
-            )
+            fig.update(plot_height  = height)
+        self._hist.plot.update(plot_width = sizer.width - self._cycle.plot.plot_width)
         for i in (sizer.children[0], sizer.children[0].children[0]):
             i.update(
                 width  = sizer.width,
                 height = sizer.height - bottom.height
             )
-        stretchout(sizer)
-
 
 class CycleHistPlotView(PlotView[CycleHistPlotCreator]):
     "Peaks plot view"

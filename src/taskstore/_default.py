@@ -5,7 +5,7 @@ Default patches for tasks and configs
 """
 from itertools    import product
 from anastore     import Patches, modifyclasses, RESET, DELETE, TPE
-from anastore.api import PATCHES
+from anastore.api import PATCHES, modifykeys, CNT
 
 def _v0task(data:dict) -> dict:
     modifyclasses(data,
@@ -84,5 +84,11 @@ def _v0cnf(data:dict) -> dict:
     data = _v0task(data)
     data.get('config', {}).pop('precision.max', None)
     return data
-__CONFIGS__       = Patches(_v0cnf, _v1, _v2, _v3, _v5, _v6, _v7, _v8)
+
+def _v9cnf(data:dict) -> dict:
+    modifykeys(data, "theme.cyclehist.plot.cycle",  "figsize",  CNT, lambda _: [600, 597, 'fixed'])
+    modifykeys(data, "theme.cyclehist.plot.hist",   "figsize",  CNT, lambda _: [600, 597, 'fixed'])
+    return data
+
+__CONFIGS__       = Patches(_v0cnf, _v1, _v2, _v3, _v5, _v6, _v7, _v8, _v9cnf)
 PATCHES['config'] = __CONFIGS__

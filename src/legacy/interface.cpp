@@ -120,9 +120,9 @@ namespace legacy
                         [](auto a) { return a <= 0; }))
             {
                 remlast = 1;
-                last    = cycles[rec.ncycles()*je-2*je]+meds;
+                last    = std::min(last, decltype(last)(cycles[rec.ncycles()*je-2*je]+meds));
             } else
-                last    = cycles[rec.ncycles()*je-je]+meds;
+                last    = std::min(last, decltype(last)(cycles[rec.ncycles()*je-je]+meds));
         }
         auto sz      = last-first;
 

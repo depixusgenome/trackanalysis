@@ -155,8 +155,11 @@ class CyclesListWidget:
 class DownSamplingTheme:
     "stuff for downsampling"
     name:     str = "cleaning.downsampling"
-    title:    str = "Downsampling"
-    tooltips: str = "Display only 1 out of every few gata points"
+    title:    str = "Plot display dowsampling"
+    tooltips: str = (
+        "In order to increase the application's response time, "
+        "only 1 out of every few data points is displayed"
+    )
     policy:   str = "mouseup"
     width:    int = len(CyclesListTheme.columns)*CyclesListTheme.width
     height:   int = 20
@@ -336,11 +339,18 @@ class CleaningWidgets:
             drops: number < cycles ∙                %({fix}:drops.maxdrops)D
             %(BeadSubtractionModalDescriptor:)
 
-            ## Cleaning
+            ## Track Undersampling
 
-            ### Undersampling
+            ### Reduce the number of frames accross all cycles
             Target frame rate (Hz)                  %(undersampling.framerate)D
             Aggregation                             %(undersampling.aggregation)|mean:mean|none:none|
+
+            ### Reduce the number of cycles
+            First cycle                             %(undersampling.cyclestart)D
+            Last cycle                              %(undersampling.cyclestop)D
+            Cycle increment                         %(undersampling.cyclestep)D
+
+            ## Cleaning
 
             ### Data cleaning
             |z| <                                   %(cleaning.maxabsvalue).1F

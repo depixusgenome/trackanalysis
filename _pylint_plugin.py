@@ -97,3 +97,6 @@ def transform(cls):
         cls.bases = [cls.bases[0].value]+ cls.bases[1:]
 
 MANAGER.register_transform(astroid.ClassDef, transform)
+MANAGER.extension_package_whitelist.update(
+    i.parent.name for i in (Path(__file__).parent/"build").glob("*/_core.cpython*.so")
+)

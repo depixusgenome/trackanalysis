@@ -16,15 +16,21 @@ from    utils.gui                import intlistsummary
 from    view.plots               import DpxNumberFormatter
 from    ._model                  import QualityControlModelAccess
 
+
 def addtodoc(ctrl, theme, data) -> Tuple[Any, ColumnDataSource, DataTable]:
     "creates the widget"
     theme  = ctrl.theme.add(theme, False)
     src    = ColumnDataSource(data)
-    fmt    = lambda x: (StringFormatter() if x == "" else
-                        DpxNumberFormatter(format = x, text_align = 'right'))
-    cols   = [TableColumn(field = i[0], title = i[1], width = i[2],
-                          formatter = fmt(i[3]))
-              for i in theme.columns]
+    cols   = [
+        TableColumn(
+            field = i[0], title = i[1], width = i[2],
+            formatter = (
+                StringFormatter() if i[3] == "" else
+                DpxNumberFormatter(format = i[3], text_align = 'right')
+            )
+        )
+        for i in theme.columns
+    ]
     widget = DataTable(source         = src,
                        columns        = cols,
                        editable       = False,
@@ -33,6 +39,7 @@ def addtodoc(ctrl, theme, data) -> Tuple[Any, ColumnDataSource, DataTable]:
                        height         = theme.tableheight,
                        header_row     = theme.headers)
     return theme, src, widget
+
 
 @dataclass
 class QCBeadStatusTheme:
@@ -45,25 +52,28 @@ class QCBeadStatusTheme:
                                     ["count",   "Count",  40, "0"],
                                     ["percent", "(%)",    40, ""],
                                     ["beads",   "Beads",  180, ""]])
+
     @property
     def width(self) -> int:
         "return the full width"
-        return sum(i[2] for i in self.columns) # pylint: disable=not-an-iterable
+        return sum(i[2] for i in self.columns)  # pylint: disable=not-an-iterable
 
     def __post_init__(self):
-        cols = self.columns[2] # pylint: disable=unsubscriptable-object
+        cols = self.columns[2]  # pylint: disable=unsubscriptable-object
         if not self.headers:
             cols[-1] = ""
         elif cols[-1] == "":
             cols[-1] = "0"
 
+
 class QCBeadStatusWidget:
     "Table containing beads per status"
     __widget: DataTable
-    __src   : ColumnDataSource
+    __src:    ColumnDataSource
+
     def __init__(self, ctrl, model, **args) -> None:
         self._model = model
-        self.__theme = ctrl.theme.add(QCBeadStatusTheme(**args), False) # type: ignore
+        self.__theme = ctrl.theme.add(QCBeadStatusTheme(**args), False)  # type: ignore
         if ctrl.theme.model("toolbar"):
             ctrl.theme.updatedefaults("toolbar", placeholder = '1, 2, ...? bad ?')
 
@@ -125,6 +135,7 @@ class QCBeadStatusWidget:
     def _data(self):
         return self._model.status()
 
+
 @dataclass
 class QCSummaryTheme:
     "qc summary theme"
@@ -141,9 +152,11 @@ class QCSummaryTheme:
     height: int = 30
     width:  int = QCBeadStatusTheme().width
 
+
 class SummaryWidget:
     "summary info on the track"
     __widget: Div
+
     def __init__(self, ctrl, model:QualityControlModelAccess) -> None:
         self.__model = model
         self.__theme = ctrl.theme.add(QCSummaryTheme(), False)
@@ -170,6 +183,7 @@ class SummaryWidget:
         return self.__theme.text.format(ncycles = track.ncycles,
                                         nbeads  = sum(1 for i in track.beads.keys()))
 
+
 @dataclass
 class QCHairpinSizeTheme:
     "RampBeadStatusTheme"
@@ -191,7 +205,7 @@ class QCHairpinSizeTheme:
     @property
     def width(self) -> int:
         "return the full width"
-        return sum(i[2] for i in self.columns) # pylint: disable=not-an-iterable
+        return sum(i[2] for i in self.columns)  # pylint: disable=not-an-iterable
 
     def __post_init__(self):
         # pylint: disable=unsubscriptable-object
@@ -204,11 +218,13 @@ class QCHairpinSizeTheme:
             if cols[0][-1] == "":
                 cols[2][-1] = "0.00"
 
+
 class QCHairpinSizeWidget:
     "Table containing discrete bead extensions"
-    __table : DataTable
+    __table:  DataTable
     __slider: Slider
-    __src   : ColumnDataSource
+    __src:    ColumnDataSource
+
     def __init__(self, ctrl, model):
         self._model = model
         self._theme = ctrl.theme.add(QCHairpinSizeTheme(), False)
@@ -247,7 +263,7 @@ class QCHairpinSizeWidget:
         resets[self.__slider].update(**self.__sliderdata())
 
     def _sliderdata(self) -> Dict[str, float]:
-        return {'start': self._theme.binstart, "end"  : self._theme.binend}
+        return {'start': self._theme.binstart, "end": self._theme.binend}
 
     def _tabledata(self) -> Iterable[Tuple[int, float]]:
         track = self._model.track
@@ -274,7 +290,7 @@ class QCHairpinSizeWidget:
             cnt = np.array([np.sum(inds == i) for i in izval])
             out.update(z       = [data["extent"][inds == i].mean() for i in izval],
                        count   = cnt,
-                       percent = cnt* 100./cnt.sum(),
+                       percent = cnt*100./cnt.sum(),
                        beads   = [intlistsummary(data["bead"][inds == i])
                                   for i in izval])
         if not self._theme.headers:
@@ -282,40 +298,45 @@ class QCHairpinSizeWidget:
             out["z"]       = [f"{i:.2f} µm" for i in out["z"]]
         return out
 
+
 @dataclass
 class MessagesListWidgetTheme:
     "MessagesListWidgetTheme"
-    name    : str = "qc.messages"
-    height  : int = 150
-    labels  : Dict[str, str] = dflt(NAMES)
-    columns : List[List]     = dflt([
+    name:    str = "qc.messages"
+    height:  int = 150
+    labels:  Dict[str, str] = dflt(NAMES)
+    columns: List[List]     = dflt([
         ['bead',    u'Bead',    '0', 65],
         ['type',    u'Type',    '',  (320-65)//3],
         ['cycles',  u'Cycles',  '0', (320-65)//3],
         ['message', u'Message', '',  (320-65)//3]
     ])
+
     @property
     def width(self) -> int:
         "return the full width"
-        return sum([i[-1] for i in self.columns]) # pylint: disable=not-an-iterable
+        return sum([i[-1] for i in self.columns])  # pylint: disable=not-an-iterable
+
 
 class MessagesListWidget:
     "Table containing stats per peaks"
     __widget: DataTable
-    __theme : MessagesListWidgetTheme
+    __theme:  MessagesListWidgetTheme
+
     def __init__(self, ctrl, model:QualityControlModelAccess) -> None:
         self.__model = model
         self.__theme = ctrl.theme.add(MessagesListWidgetTheme())
 
     def addtodoc(self, *_) -> List[Widget]:
         "creates the widget"
-        fmt   = lambda i: (StringFormatter() if i == '' else
-                           DpxNumberFormatter(format = i, text_align = 'right'))
         cols  = [
             TableColumn(
                 field      = i[0],
                 title      = i[1],
-                formatter  = fmt(i[2]),
+                formatter  = (
+                    StringFormatter() if i[2] == '' else
+                    DpxNumberFormatter(format = i[2], text_align = 'right')
+                ),
                 width      = i[3]
             )
             for i in self.__theme.columns
@@ -350,9 +371,11 @@ class MessagesListWidget:
             msgs['type']   = [trans.get(i, i)           for i in msgs['type']]
         return {i: list(j) for i, j in msgs.items()}
 
+
 class QualityControlWidgets:
     "All widgets"
-    __objects : TaskWidgetEnabler
+    __objects: TaskWidgetEnabler
+
     def __init__(self, ctrl, mdl):
         self.summary  = SummaryWidget(ctrl, mdl)
         self.status   = QCBeadStatusWidget(ctrl, mdl)
@@ -374,8 +397,13 @@ class QualityControlWidgets:
 
     def addtodoc(self, mainview, ctrl, mode):
         "returns all created widgets"
-        get      = lambda i: getattr(self, i).addtodoc(mainview, ctrl)
-        children = sum((get(i) for i in ("summary", "status", "extent", "messages")), [])
+        children = sum(
+            (
+                getattr(self, i).addtodoc(mainview, ctrl)
+                for i in ("summary", "status", "extent", "messages")
+            ),
+            [])
+
         widgets  = layouts.widgetbox(
             children,
             width  = max(i.width  for i in children),

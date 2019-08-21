@@ -34,7 +34,7 @@ class AdvancedTab:
         "return the html version of the title"
         fcn  = "Bokeh.DpxModal.prototype.clicktab"
         head = "cur" if ind else ""
-        return ("<button type='button' class='bk bk-btn bk-btn-default "
+        return ("<button type='button' tabvalue=\"-\" class='bk bk-btn bk-btn-default "
                 +f"bbm-dpx-{head}btn' id='bbm-dpx-btn-{self.ind}'"
                 +f'onclick="{fcn}({self.ind})">'
                 +self.title +"</button>")

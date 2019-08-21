@@ -26,6 +26,7 @@ MODULES  = globalmake(
     cmds        = (
         (r'taskapp/cmdline.pyc --port random -g app ',      False),
         (r'taskapp/cmdline.pyc --port random -g browser ',  True),
+        (r'taskapp/cmdline.pyc --port random -g browser -c clear',  'RESET'),
     ),
     modules     = ('taskview.toolbar', 'undo'),
     jspaths     = ('core/app', 'core/view'),

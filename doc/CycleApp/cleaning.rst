@@ -253,19 +253,33 @@ Fixed Beads
   profile 90% of values must sit for a bead to be considered fixed.
 * |SUBTRACTION|
 
+Undersampling
+-------------
+
+Undersampling can be done per frame or per cycles.
+
+The first two elements allow undersampling a track file per frame. By default
+track files are undersampled so as to reach a sampling rate of about 30Hz. The
+sampling is integral: for an initial rate of 100Hz, the values will be
+undersampled by a factor 3 - not 3.333 - reaching a final sampling rate of 33Hz
+rather than exactly 30Hz. The sampling can be done by averaging the frames or
+by picking the first one. If a low-pass filter with a cut-off below 30 Hz was
+applied to the initial data, the latter is preferable. With a cut-off above
+30Hz, the former is preferable.
+
+The last 3 elements allow discarding cycles by defining:
+
+1. the first cycle to take into account, starting at zero (i.e setting 1
+   discards the first cycle).
+2. The last cycle to take into account (i.e. setting 100 disards the
+   101st cycle and all the later ones).
+3. The increment: an increment of 1 takes all cycles into account, an increment of 2
+   discards every other cycle, etc...
+
 Cleaning
 --------
 
-The first two elements allow undersampling a track file. By default track files
-are undersampled so as to reach a sampling rate of about 30Hz. The sampling is
-integral: for an initial rate of 100Hz, the values will be undersampled by a
-factor 3 - not 3.333 - reaching a final sampling rate of 33Hz rather than
-exactly 30Hz. The sampling can be done by averaging the frames or by picking
-the first one. If a low-pass filter with a cut-off below 30 Hz was applied to
-the initial data, the latter is preferable. With a cut-off above 30Hz, the
-former is preferable.
-
-The following 8 elements are repeats of inputs available in the main window. The
+The first 8 elements are repeats of inputs available in the main window. The
 advantage of having them here is simply to have their default value indicated
 again. The following are additionnal:
 

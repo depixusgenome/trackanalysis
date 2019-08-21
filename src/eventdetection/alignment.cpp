@@ -110,21 +110,44 @@ void translate(DataInfo const && data, bool del, float * ptr)
 
 void medianthreshold(DataInfo const && data, float minv, float * bias)
 {
-    using signalfilter::stats::nanmedian;
+    using signalfilter::stats::median;
     auto ptr(data.data);
 
     std::vector<float> values;
+    std::vector<float> meds;
+    std::vector<float> spread;
+    std::vector<float> tmp;
     for(size_t i = 0u, e = data.ncycles; i < e; ++i)
-        values.push_back(nanmedian(std::vector<float>(ptr+data.first[i], ptr+data.last[i]))
-                         +bias[i]);
+    {
+        tmp.resize(0);
+        for(auto xval = ptr+data.first[i], eval = ptr+data.last[i]; xval != eval; ++xval)
+            if(std::isfinite(*xval))
+                tmp.push_back(*xval);
 
-    auto med = nanmedian(std::vector<float>(values))-minv;
+        if(tmp.size() < 2)
+            values.push_back(std::numeric_limits<float>::quiet_NaN());
+        else
+        {
+            auto med = median(tmp);
+            for(auto & xval: tmp)
+                xval = std::abs(xval-med);
+
+            meds.push_back(med+bias[i]);
+            values.push_back(med+bias[i]);
+            spread.push_back(median(tmp));
+        }
+    }
+
+    if(meds.size() < 2)
+        return;
+
+    auto med = median(meds) - median(spread) - minv;
     if(!std::isfinite(med))
         return;
 
 
     for(size_t i = 0u, e = data.ncycles; i < e; ++i)
-        if(values[i] < med)
+        if(std::isfinite(values[i]) && values[i] < med)
             bias[i] = std::numeric_limits<float>::quiet_NaN();
 }
 }}

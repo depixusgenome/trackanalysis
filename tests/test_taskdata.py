@@ -500,5 +500,36 @@ def test_resampling():
     under = undersample(beads, 3)
     assert_equal(under.beads[0], track.beads[0][::3]*2)
 
+    beads = track.beads.withaction(lambda _, i: (i[0], i[1]*2))
+    under = undersample(beads, 3, cycles = range(0,1))
+    phases = track.phases-track.phases[0,0]
+    #assert_equal(under.beads[0], track.beads[0][:phases[1,0]:3]*2)
+
+    beads = track.beads.withaction(lambda _, i: (i[0], i[1]*2))
+    under = undersample(beads, 3, cycles = range(10, 200))
+    assert_equal(under.beads[0], track.beads[0][phases[10,0]::3]*2)
+
+def test_phasemanipulator():
+    "test phase manipulator"
+    track = Track(path = utpath("big_legacy"))
+    pma   = track.phase
+    assert pma['pull'] == 3
+    assert pma['measure'] == 5
+
+    inds, phases = pma.cut(range(1))
+    assert_equal(phases, track.phases[:1,:]-track.phases[0,0])
+    assert np.all(np.diff(inds) == 1)
+    assert inds[0]  == 0
+    assert inds[-1] == track.phases[1,0]-track.phases[0,0]-1
+
+    inds, phases = pma.cut(range(track.ncycles-1, track.ncycles+10))
+    assert_equal(phases, track.phases[-1:,:]-track.phases[-1,0])
+    assert np.all(np.diff(inds) == 1)
+    assert inds[0]  == track.phases[-1,0]-track.phases[0,0]
+    assert inds[-1] == track.nframes-1
+
+    assert_equal(pma.duration(..., 3), track.phases[:,4]-track.phases[:,3])
+    assert_equal(pma.duration(..., range(3)), track.phases[:,3]-track.phases[:,0])
+
 if __name__ == '__main__':
     test_resampling()

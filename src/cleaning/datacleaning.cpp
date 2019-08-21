@@ -1,5 +1,6 @@
 #include <vector>
 #include <limits>
+#include <algorithm>
 #include "cleaning/datacleaning.h"
 #include "signalfilter/accumulators.hpp"
 
@@ -225,10 +226,16 @@ namespace cleaning
                 return float(maxv-minv);
             }
 
-            std::vector<float> cpy(data, data+sz);
-            auto dt   = cpy.data();
-            auto maxv = signalfilter::stats::nanpercentile(dt, dt+sz, (float) self.maxpercentile);
-            auto minv = signalfilter::stats::nanpercentile(dt, dt+sz, (float) self.minpercentile);
+            std::vector<float> cpy;
+            cpy.reserve(sz);
+            for(auto ptr = data, e = data+sz; ptr != e; ++ptr)
+                if(std::isfinite(*ptr))
+                    cpy.push_back(*ptr);
+
+            auto dt1  = cpy.data();
+            auto dt2  = cpy.data()+sz;
+            auto maxv = signalfilter::stats::percentile(dt1, dt2, (float) self.maxpercentile);
+            auto minv = signalfilter::stats::percentile(dt1, dt2, (float) self.minpercentile);
             return float(maxv-minv);
         }
         float _test(ExtentRule const & self, size_t sz, float const *data)

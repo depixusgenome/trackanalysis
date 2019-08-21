@@ -51,11 +51,19 @@ contents of such a file. Formats are:
   created some time ago might not be compatible anymore with up-to-date
   versions of the software. 
 
+
 .. caution::
 
     Not all ``.trk`` files can be opened properly. In particular, there must be
     *cycles* and  *phases* registered within the track file. In other words,
     all but those track files created outside the normal way will not open.
+
+    Furthermore the number of cycles is limited to the first 200. Another range
+    can be defined by the user through the advanced menu in the cleaning tab.
+
+    Finally, the expected frame frequency is 30Hz. In case of higher
+    frequencies, the frames will be undersampled by an integer value. The user
+    can set another frequency going to the advanced menu in the cleaning tab.
 
 .. warning::
 

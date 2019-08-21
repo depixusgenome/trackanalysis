@@ -77,14 +77,16 @@ class ClippingTask(Task):
         itms   = [(i[np.isfinite(i)], len(i)) for i in np.split(data, pha)[1::2]]
 
         maxarr = (
-            np.array([(i>maxv).sum() for i, _ in itms], dtype = 'i4')  if maxv is not None else
+            np.array([(i>maxv).sum() if j else 0 for i, j in itms], dtype = 'i4')
+            if maxv is not None else
             np.zeros(len(itms), dtype = 'i4')
         )
         minarr = (
-            np.array([(i<minv).sum() for i, _ in itms], dtype = 'i4')  if minv is not None else
+            np.array([(i<minv).sum() if j else 0 for i, j in itms], dtype = 'i4')
+            if minv is not None else
             np.zeros(len(itms), dtype = 'i4')
         )
-        sizes = np.array([i for _, i in itms], dtype = 'i4')
+        sizes = np.array([i if i else 1 for _, i in itms], dtype = 'i4')
         return Partial(
             "clipping",
             np.empty(0, dtype = 'i4'),
@@ -97,7 +99,7 @@ class ClippingErrorMessage(DataCleaningErrorMessage):
     def getmessage(self, percentage = False):
         "returns the message"
         data = self.data()[0][-1][1:].strip()
-        return 'has less than %s %% points with the range of phases 1 and 3' % data
+        return f'has fewer than {data}% points in the range z(φ₁) to z(φ₅)'
 
     def data(self):
         "returns a message if the test is invalid"
