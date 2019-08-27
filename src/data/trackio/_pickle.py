@@ -59,6 +59,10 @@ class PickleIO(TrackIO):
                 with open(path, 'rb') as stream:
                     out = pickle.load(stream)
 
+            for i in ('secondaries', 'data', 'fov'):
+                if out.get(i, None) is None:
+                    out.pop(i, None)
+
         finally:
             if hasattr(import_module("cleaning.beadsubtraction"), "BeadSubtractionTask"):
                 delattr(import_module("cleaning.beadsubtraction"), "BeadSubtractionTask")
