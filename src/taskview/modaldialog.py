@@ -24,8 +24,9 @@ EMPHASIS  = "** "
 class AdvancedTab:
     "a tab in the widget"
     __inds = 0
-    def __init__(self, title:str, *items: Tuple[str, ...], body : str = "") -> None:
-        self.body : Union[str, Tuple[Tuple[str,...],...]] = items if len(items) else body
+
+    def __init__(self, title:str, *items: Tuple[str, ...], body: str = "") -> None:
+        self.body: Union[str, Tuple[Tuple[str,...],...]] = items if len(items) else body
         self.title = title
         self.ind   = type(self).__inds
         type(self).__inds += 1
@@ -35,9 +36,9 @@ class AdvancedTab:
         fcn  = "Bokeh.DpxModal.prototype.clicktab"
         head = "cur" if ind else ""
         return ("<button type='button' tabvalue=\"-\" class='bk bk-btn bk-btn-default "
-                +f"bbm-dpx-{head}btn' id='bbm-dpx-btn-{self.ind}'"
-                +f'onclick="{fcn}({self.ind})">'
-                +self.title +"</button>")
+                + f"bbm-dpx-{head}btn' id='bbm-dpx-btn-{self.ind}'"
+                + f'onclick="{fcn}({self.ind})">'
+                + self.title + "</button>")
 
     def htmlbody(self, ind) -> str:
         "return the html version of the body"
@@ -60,8 +61,9 @@ class AdvancedTab:
     def tohtml(tabs: List['AdvancedTab']):
         "return html"
         return ("<div class='dpx-span'>"
-                +"".join(j.htmltitle(i == 0) for i, j in enumerate(tabs))+"</div>"
-                +"".join(j.htmlbody(i == 0)  for i, j in enumerate(tabs)))
+                + "".join(j.htmltitle(i == 0) for i, j in enumerate(tabs))+"</div>"
+                + "".join(j.htmlbody(i == 0)  for i, j in enumerate(tabs)))
+
 
 AdvancedWidgetBody = Union[Tuple[Tuple[str, ...],...], Tuple[AdvancedTab,...]]
 
@@ -81,10 +83,11 @@ class TaskDescriptor:
     "Access to a task"
     _LABEL = '%({self.attrname}){self.fmt}'
     __NONE = type('_None', (), {})
-    label: str       = ""
-    fmt  : str       = ""
-    keys : List[str] = dflt([])
-    attrname : str   = ""
+    label:    str       = ""
+    fmt:      str       = ""
+    keys:     List[str] = dflt([])
+    attrname: str   = ""
+
     def __post_init__(self):
         if not self.fmt:
             ix1, ix2   = self.label.rfind("%("), self.label.rfind(")")
@@ -145,7 +148,10 @@ class TaskDescriptor:
         return self.get(obj)
 
     def __get__(self, obj, tpe):
-        return self if obj is None else self.get(obj, 'model')
+        if obj is None:
+            return self
+
+        return self.get(obj, 'config' if self.__model(obj).task is None else 'model')
 
     def __set__(self, obj, val):
         outp = getattr(obj, '_get_output')()
@@ -188,6 +194,7 @@ class AdvancedDescriptor:
     ctrlname: str = ""
     attrname: str = ""
     ctrlgroup:str = "theme"
+
     def __post_init__(self):
         if isinstance(self.cnf, type):
             grpname  = self.cnf.__name__
@@ -232,6 +239,7 @@ class AdvancedDescriptor:
         ctrl  = getattr(inst, '_ctrl')
         out   = getattr(ctrl, self.ctrlgroup).model(self.cnf, defaultmodel)
         first = defaultmodel
+
         def _resc(out):
             mdl   = ctrl.theme.model("tasks")
             track = ctrl.display.get("tasks", "roottask")
@@ -279,12 +287,13 @@ class AdvancedDescriptor:
 class FigureSizeDescriptor(AdvancedDescriptor):
     "defines the figure height"
     isheight      = cast(bool, property(lambda self: 'height' in self.attrname))
+
     def __init__(self, cnf):
         super().__init__(cnf, 'Plot height', "d", "figsize", "", "theme")
 
     def __set_name__(self, _, name):
         super().__set_name__(_, name)
-        self.label = 'Plot '+ ("height" if self.isheight else "width")
+        self.label = 'Plot ' + ("height" if self.isheight else "width")
 
     def __get__(self, inst, _):
         return self if inst is None else super().__get__(inst, _)[self.isheight]
@@ -316,6 +325,7 @@ class FigureSizeDescriptor(AdvancedDescriptor):
 class YAxisRangeDescriptor(AdvancedDescriptor):
     "defines the figure height"
     isheight      = cast(bool, property(lambda self: 'max' in self.attrname))
+
     def __init__(self, cnf):
         letter = type(self).__name__[0]
         super().__init__(cnf, letter+'-axis max', ".4of", letter.lower()+"bounds",
@@ -348,14 +358,16 @@ class XAxisRangeDescriptor(YAxisRangeDescriptor):
 @dataclass
 class ThemeNameDescriptor(AdvancedDescriptor):
     "defines the theme to use"
-    fmt:      str = ('|basic:basic'
-                     +'|dark:dark'
-                     +'|light_minimal:bokehlight'
-                     +'|dark_minimal:bokehdark'
-                     +'|caliber:caliber'
-                     +'|customdark:customdark'
-                     +'|customlight:customlight'
-                     +'|')
+    fmt:      str = (
+        '|basic:basic'
+        + '|dark:dark'
+        + '|light_minimal:bokehlight'
+        + '|dark_minimal:bokehdark'
+        + '|caliber:caliber'
+        + '|customdark:customdark'
+        + '|customlight:customlight'
+        + '|'
+    )
     label:    str = "Plot color theme"
     cnf:      str = "main"
     ctrlname: str = "themename"
@@ -363,11 +375,11 @@ class ThemeNameDescriptor(AdvancedDescriptor):
 class ThemeAttributesDescriptor:
     "Allow setting a theme attribute"
     def __init__(self, label):
-        self.name  : str = label[label.rfind('%(theme.')+len('%(theme.'):label.rfind(')')]
-        self.label : str = label[:label.rfind('%(')]
-        self.fmt   : str = label[label.rfind(')')+1:]
-        self.items : list= []
-        self._attr : str = ""
+        self.name:  str  = label[label.rfind('%(theme.')+len('%(theme.'):label.rfind(')')]
+        self.label: str  = label[:label.rfind('%(')]
+        self.fmt:   str  = label[label.rfind(')')+1:]
+        self.items: list = []
+        self._attr: str  = ""
 
     def __set_name__(self, _, name):
         self._attr = name
@@ -397,6 +409,7 @@ class AdvancedWidget:
     __widget: Button
     doc:      Document
     __action: type
+
     def __init__(self, ctrl, mdl = None):
         ctrl.theme.updatedefaults('keystroke', advanced = 'Alt-a')
         self._theme = ctrl.theme.add(AdvancedWidgetTheme(), False)
@@ -417,6 +430,7 @@ class AdvancedWidget:
 
     def _args(self, **kwa) -> Dict[str, Any]:
         model = kwa.get('model', self)
+
         def _default(keys):
             desc = getattr(model.__class__, keys[0].split('|')[0], None)
             if hasattr(desc, 'getdefault'):
@@ -432,7 +446,7 @@ class AdvancedWidget:
                 mdl = getattr(mdl, key.split('|')[0])
             return mdl
 
-        def _format(label, val): # pylint: disable=too-many-return-statements
+        def _format(label, val):  # pylint: disable=too-many-return-statements
             if isinstance(val, bool):
                 return '▢✓'[val]
             if val is None:
@@ -462,13 +476,13 @@ class AdvancedWidget:
             keys         = val[val.rfind('%(')+2:val.rfind(')')].split('.')
             try:
                 dfval, found = _default(keys)
-            except Exception as exc: # pylint: disable=broad-except
+            except Exception as exc:  # pylint: disable=broad-except
                 LOGS.exception(exc)
                 dfval, found = None, False
 
             try:
                 curval       = _value(keys)
-            except Exception as exc: # pylint: disable=broad-except
+            except Exception as exc:  # pylint: disable=broad-except
                 LOGS.exception(exc)
                 msg = (
                     f"""<input type='text' placeholder="{exc}" """
@@ -493,10 +507,9 @@ class AdvancedWidget:
         bdy  = self._body()
         if len(bdy) and isinstance(bdy[0], AdvancedTab):
             for k in bdy:
-                k.body = tuple(_add(i, j)  for i, j in k.body) # type: ignore
+                k.body = tuple(_add(i, j)  for i, j in k.body)  # type: ignore
         else:
-            bdy = tuple(_add(i, j)  for i, j in bdy) # type: ignore
-
+            bdy = tuple(_add(i, j)  for i, j in bdy)  # type: ignore
 
         args = dict(title   = self._title(),
                     context = lambda title: self,
@@ -510,7 +523,7 @@ class AdvancedWidget:
         if not self.__widget.disabled:
             try:
                 dialog(self.doc, **self._args())
-            except Exception as exc: # pylint: disable=broad-except
+            except Exception as exc:  # pylint: disable=broad-except
                 # make it easier to debug with bokeh
                 LOGS.exception(exc)
                 self._ctrl.display.update("message", message = exc)
@@ -578,6 +591,7 @@ class TabCreator:
               **kwa):
         "adds descriptors to a class or returns an advanced tab"
         title, args, inds = cls.__splitargs(args)
+
         def _create(elems):
             first     = next((i for i in elems if isinstance(i, bool)), True)
             tit, itms = cls.__parseargs(title, accessors, elems)
@@ -625,9 +639,9 @@ class TabCreator:
         args += list(kwa.items())
         return cls.parse("Theme", *text, **dict(args))
 
-    taskattr  : type = TaskDescriptor
-    line      : type = AdvancedDescriptor
-    widget    : type = AdvancedWidget
+    taskattr:   type = TaskDescriptor
+    line:       type = AdvancedDescriptor
+    widget:     type = AdvancedWidget
     taskwidget: type = AdvancedTaskWidget
 
     @staticmethod
@@ -648,8 +662,13 @@ class TabCreator:
 
             args  = args[1:]
 
-        fcn  = lambda i: list(i.strip().split('\n')) if isinstance(i, str) else [i]
-        args = sum((fcn(i) for i in args), [])
+        args = sum(
+            (
+                list(i.strip().split('\n')) if isinstance(i, str) else [i]
+                for i in args
+            ),
+            []
+        )
         args = [i.strip() if isinstance(i, str) else i
                 for i in args
                 if not (isinstance(i, str) and len(i.strip()) == 0)]
@@ -708,16 +727,16 @@ class TabCreator:
     def __bold(line):
         return (
             '<b>'
-            +line[2:-1 if line.endswith(BOLD[::-1]) else None].strip()
-            +'</b>'
+            + line[2:-1 if line.endswith(BOLD[::-1]) else None].strip()
+            + '</b>'
         )
 
     @staticmethod
     def __emphasis(line):
         return (
             '<i>'
-            +line[3:-2 if line.endswith(EMPHASIS[::-1]) else None].strip()
-            +'</i>'
+            + line[3:-2 if line.endswith(EMPHASIS[::-1]) else None].strip()
+            + '</i>'
         )
 
     @staticmethod
@@ -736,6 +755,7 @@ class TabCreator:
                     j.__set_name__(cls, i)
 
             old = getattr(cls, '_body')
+
             def _body(self) -> AdvancedWidgetBody:
                 cur   = old(self)
                 lines = [i.line() if hasattr(i, 'line') else (i, '') for _, i in lst]
@@ -766,4 +786,5 @@ class TabCreator:
                 return [cls.title(i[1:].strip())]
         return []
 
-tab = TabCreator() # pylint: disable=invalid-name
+
+tab = TabCreator()  # pylint: disable=invalid-name

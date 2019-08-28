@@ -167,11 +167,14 @@ The following tabs are provided:
    global bead behaviour. This is a good tab to check that an experiment went
    as expected. If a quality control is particularly outside its normal range
    of values, its plot is circled in red.
-#. The |Cleaning|: provides means for automatically discarding some beads and
-   cleaning the signal from others. This is the starting tab. It's the only one
-   to display the *raw* data. This tab allows specifying what a *fixed* and
-   *bad* bead are. Such beads will not display in the tabs to the right of the
-   |Cleaning|.
+#. The |Beads|: is the exact same as the |Cleaning| but for its plot which shows
+   all cycles side by side. It provides means for automatically discarding some
+   beads and cleaning the signal from others. This is the starting tab. It's
+   the only one to display the *raw* data. This tab allows specifying what a
+   *fixed* and *bad* bead are. Such beads will not display in the tabs to the
+   right of the |Cleaning|.
+#. The |Cleaning|: is the exact same as the |Beads| but for the plot has all
+   cycles super-imposed.
 #. The |Cycles|: displays the cleaned data for a single bead and allows *manually*
    comparing experimental positions versus hairpin sequences. Only beads
    detected as neither *fixed* nor *bad* will display.
@@ -189,7 +192,7 @@ Some tabs contain *advanced menus*. These allow configuring options specific to
 different projects. For example, the *microrna* project uses very small
 hairpins. Their size is consistent with that of a *fixed* bead in a different
 project. As such, analyzing its data might require navigating to the *advanced*
-menu in the *Cleaning* tab and adjusting the *fixed* bead's maximum height.
+menu in the |Cleaning| and adjusting the *fixed* bead's maximum height.
 
 Should a user move a setting away from the default value, then the latter is
 stored on disk. It will automatically be reloaded the next time the software is

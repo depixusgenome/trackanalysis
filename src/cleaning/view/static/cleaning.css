@@ -8,3 +8,7 @@
     padding: 0px!important;
 }
 #dpx-cl-minhfsigma { margin-bottom: 5px;}
+
+.bk-root .bk-toolbar-button-custom-action {
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4gEMEg4UexUIzAAAAIRJREFUWMNjXLhs5X+GAQRMDAMMWJDYjGhyf7CoIQf8x2H+f0KGM9M7BBio5FNcITo408CoA0YdQM1cwEhtB/ylgqMkCJmFLwrOQguj/xTg50hmkeyARAYGhlNUCIXjDAwM0eREwTUGBgbz0Ww46oBRB4w6YNQBow4YdcCIahP+H5EhAAAH2R8hH3Rg0QAAAABJRU5ErkJggg==") !important;
+}

@@ -4,6 +4,7 @@
 from typing import Dict
 
 NAMES: Dict[str, str] = dict(
+    aberrant   = 'outlier',
     saturation = 'non-closing',
     population = '% good',
     hfsigma    = 'σ[HF]',

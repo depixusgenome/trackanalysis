@@ -1,6 +1,25 @@
 # CycleApp
+## cycles_v6.15
+
+* 2019-08-28 16:08:39 +0200  (tag: cycles_v6.14)
+
+### Beads
+
+This is a new tab, the exact same as the *Cleaning* tab but for the plot which
+shows all cycles side by side rather than one on top of the other.
+
+### Cycles & Peaks
+
+When a bead is correct, only correct cycles are displayed on the left plot.
+This used to be all even if they were discarded when constructing peaks.
+
+If a bead is incorrect, the same behaviour as before is preserved: all cycles
+are shown.
+
+
 ## cycles_v6.14
 
+* 2019-08-27 13:48:51 +0200  (tag: cycles_v6.14.1)
 * 2019-08-21 16:08:39 +0200  (tag: cycles_v6.14)
 
 ### General
