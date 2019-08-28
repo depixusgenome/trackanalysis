@@ -2,17 +2,17 @@
 # -*- coding: utf-8 -*-
 "Provides plots for temperatures and bead extensions"
 import warnings
+from   functools             import partial
 from   typing                import Dict, Union, Tuple, List, Any, cast
 
 from   bokeh                 import layouts
-from   bokeh.models          import (
-    ColumnDataSource, Range1d, ToolbarBox, CustomAction, CustomJS, Div
-)
+from   bokeh.models          import ColumnDataSource, Range1d, ToolbarBox
 from   bokeh.plotting        import Figure
 import numpy                 as     np
 
 from   data                 import Beads, Track
 from   taskview.plots       import TaskPlotCreator, CACHE_TYPE
+from   utils.gui            import downloadjs
 
 from   ..computations        import extensions
 from   ._model               import (
@@ -30,12 +30,13 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
     _src:       List[ColumnDataSource]
     _rends:     List[Tuple[str, Any]]
     _fig:       Figure
+
     def __init__(self, ctrl, **kwa) -> None:
         name         = "qc."+type(self).__name__.lower().replace("plotcreator", "")
         kwa.setdefault('config',  DriftControlPlotConfig()).name   = name
         kwa.setdefault('display', PlotDisplay())           .name   = name
 
-        theme        = kwa.setdefault('theme',   DriftControlPlotTheme ())
+        theme        = kwa.setdefault('theme',   DriftControlPlotTheme())
         theme.name   = name+'.plot'
         theme.ylabel = f'T {name[3:].lower()} (°C)'
         super().__init__(ctrl, addto = True, noerase = False, **kwa)
@@ -43,7 +44,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
         assert self._plotmodel.display in ctrl.display
         assert self._plotmodel.config in ctrl.theme
 
-    def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument
+    def _addtodoc(self, ctrl, doc, *_):  # pylint: disable=unused-argument
         "returns the figure"
         self._fig = self.figure(y_range = Range1d(start = 0., end = 20.),
                                 x_range = Range1d(start = 0., end = 1e2),
@@ -90,7 +91,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
 
     @staticmethod
     def _defaults() -> Tuple[Dict[str, np.ndarray], ...]:
-        empty = lambda: np.empty(0, dtype = 'f4')
+        empty = partial(np.empty, 0, dtype = 'f4')
         return (dict(measures = empty(), cycles = empty()),
                 dict(cycles   = empty(),
                      pop10    = empty(),
@@ -114,8 +115,9 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
                      pop90    = np.full(2, pops[2], dtype = 'f4')))
 
     @classmethod
-    def _measures(cls, track: Track
-                 ) -> Union[Tuple[np.ndarray, np.ndarray], Tuple[None, None]]:
+    def _measures(
+            cls, track: Track
+    ) -> Union[Tuple[np.ndarray, np.ndarray], Tuple[None, None]]:
         name  = cls.__name__.replace('PlotCreator', '').lower()
         vals  = getattr(track.secondaries, name, None)
         if vals is None or not len(vals):
@@ -141,6 +143,7 @@ class TServoPlotCreator(DriftControlPlotCreator):
 class ExtensionPlotCreator(DriftControlPlotCreator):
     "Shows bead extension temporal series"
     _theme: ExtensionPlotTheme
+
     def __init__(self, ctrl, **kwa) -> None:
         super().__init__(ctrl,
                          theme  = ExtensionPlotTheme(),
@@ -161,7 +164,7 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
 
     @classmethod
     def _defaults(cls) -> Tuple[Dict[str, np.ndarray], ...]:
-        empty = lambda: np.empty(0, dtype = 'f4')
+        empty = partial(np.empty, 0, dtype = 'f4')
         data  = super()._defaults()
         return data + (dict(cycles = empty(),
                             median = empty(),
@@ -182,8 +185,9 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
                     bottom = bars[0,:])
         return data + (new,)
 
-    def _measures(self, track: Track # type: ignore
-                 ) -> Union[Tuple[np.ndarray, np.ndarray], Tuple[None, None]]:
+    def _measures(  # type: ignore
+            self, track: Track
+    ) -> Union[Tuple[np.ndarray, np.ndarray], Tuple[None, None]]:
         beads = self._model.runbead()
         if beads is not None:
             cyc, cnt = extensions(cast(Beads, beads), *self._config.phases)
@@ -240,46 +244,27 @@ class QualityControlPlots:
     @staticmethod
     def __add_csvaction(plots):
         srcs = sum((i[0].select(tags = 'csvtemperatures') for i in plots), [])
-        plots[0][0].tools = plots[0][0].tools + [CustomAction(
-            action_tooltip = "Save temperatures to CSV",
-            callback       = CustomJS(
-                code = """
-                    var csvFile = 'cycle;value;sensor;\\n';
-                    var ind     = 0;
-                    for(ind = 0; ind < data.length; ++ind)
+        div  = downloadjs(
+            plots[0][0],
+            fname = "temperatures.csv",
+            code  = """
+                var csvFile = 'cycle;value;sensor;\\n';
+                var ind     = 0;
+                for(ind = 0; ind < data.length; ++ind)
+                {
+                    var sensor = ',"'+names[ind]+'"\\n';
+                    var src    = data[ind].data;
+                    var j      = 0;
+                    var je     = src['cycles'].length;
+                    for(j = 0; j < je; ++j)
                     {
-                        var sensor = ',"'+names[ind]+'"\\n';
-                        var src    = data[ind].data;
-                        var j      = 0;
-                        var je     = src['cycles'].length;
-                        for(j = 0; j < je; ++j)
-                        {
-                            csvFile += src["cycles"][j].toString()+',';
-                            csvFile += src["measures"][j].toString()+sensor;
-                        }
+                        csvFile += src["cycles"][j].toString()+',';
+                        csvFile += src["measures"][j].toString()+sensor;
                     }
-
-                    var blob = new Blob([csvFile], { type: 'text/csv;charset=utf-8;' });
-                    if (navigator.msSaveBlob) { // IE 10+
-                        navigator.msSaveBlob(blob, "temperatures.csv");
-                    } else {
-                        var link = document.createElement("a");
-                        if (link.download !== undefined) { // feature detection
-                            // Browsers that support HTML5 download attribute
-                            var url = URL.createObjectURL(blob);
-                            link.setAttribute("href", url);
-                            link.setAttribute("download", "temperatures.csv");
-                            link.style.visibility = 'hidden';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                        }
-                    }
-                """,
-                args = {'data':  srcs, 'names': [i.tags[1] for i in srcs]}
-            )
-        )]
-        text = "<link rel='stylesheet' type='text/css' href='view/qualitycontrol.css'>"
-        return layouts.widgetbox(
-            Div(text = text, width = 0, height = 0), width = 0, height = 0
+                }
+             """,
+            tooltip = "Save temperatures to CSV",
+            data    = srcs,
+            names   = [i.tags[1] for i in srcs]
         )
+        return layouts.widgetbox(div, width = 0, height = 0)

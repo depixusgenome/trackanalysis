@@ -25,7 +25,8 @@ from    ._model                     import (DataCleaningModelAccess, CleaningPlo
                                             CleaningPlotTheme)
 from    ._widget                    import CleaningWidgets
 from    ..datacleaning              import DataCleaning
-from    .._core                     import Partial # pylint: disable=import-error
+from    .._core                     import Partial  # pylint: disable=import-error
+from    ..names                     import NAMES
 from    ..processor                 import (DataCleaningProcessor,
                                             ClippingProcessor, ClippingTask)
 LOGS = getLogger(__name__)
@@ -216,19 +217,28 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
     _widgets:   CleaningWidgets
     __source:   ColumnDataSource
     __fig:      Figure
-    def __init__(self,  ctrl, **kwa) -> None:
+
+    def __init__(self,  ctrl, plotmodel = None, **kwa) -> None:
         "sets up this plotter's info"
-        super().__init__(ctrl, noerase = False)
-        self._widgets = CleaningWidgets(ctrl, self._model, **kwa)
+        super().__init__(ctrl, noerase = False, plotmodel = plotmodel)
+        self._widgets = CleaningWidgets(ctrl, self._model, self._plotmodel, **kwa)
 
     def observe(self, ctrl, noerase = True):
         "sets-up model observers"
         super().observe(ctrl, noerase)
         self._widgets.observe(self, ctrl)
 
+    def getfigure(self) -> Figure:
+        "return the figure"
+        return self.__fig
+
+    def getdata(self) -> ColumnDataSource:
+        "return the figure"
+        return self.__source
+
     def _addtodoc(self, ctrl, doc, *_):
         self.__create()
-        return self.__resize(ctrl,  self.__layout(ctrl, doc))
+        return self._resize(ctrl,  self._layout(ctrl, doc))
 
     def _reset(self, cache: CACHE_TYPE):
         items   = nans = exc = None
@@ -236,13 +246,13 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         try:
             items, nans, exc = GuiDataCleaningProcessor.runbead(self._model)
             disable          = False
-        except Exception as err: # pylint: disable=broad-except
+        except Exception as err:  # pylint: disable=broad-except
             LOGS.exception(err)
             self._errors.reset(cache, err)
         else:
             self._errors.reset(cache, exc)
         finally:
-            data  = self.__data(items, nans)
+            data  = self._data(items, nans)
             yinit = None
             if np.any(np.isfinite(data['z'])):
                 yinit  = np.nanpercentile(data["z"], [100-self._theme.clip, self._theme.clip])
@@ -251,7 +261,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
                 else:
                     yinit += (
                         (abs(np.diff(yinit)[0])*self._theme.clipovershoot*1e-2)
-                        *np.array([1., -1.])
+                        * np.array([1., -1.])
                     )
 
             self.setbounds(
@@ -267,9 +277,9 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
 
             self._widgets.reset(cache, disable)
 
-    def __data(self, items, nans) -> Dict[str, np.ndarray]:
+    def _data(self, items, nans) -> Dict[str, np.ndarray]:
         if items is None or len(items) == 0 or not any(len(i) for _, i in items):
-            return {i: [] for i in ("t", "z", "cycle", "color")}
+            return {i: [] for i in ("t", "z", "cycle", "color", 'status')}
 
         dsampl = self._ctrl.theme.get('cleaning.downsampling', 'value', 0)
         order  = self._model.cleaning.sorted(self._theme.order)
@@ -281,10 +291,13 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         for (_, i), j in items:
             val[order[i],:len(j)] = j
 
-        res = dict(t     = repeat(range(val.shape[1]), val.shape[0], 0),
-                   z     = val.ravel(),
-                   cycle = repeat([i[-1] for i, _ in items], val.shape[1], 1),
-                   color = self.__color(order, nans, val))
+        res = dict(
+            t      = repeat(range(val.shape[1]), val.shape[0], 0),
+            z      = val.ravel(),
+            cycle  = repeat([i[-1] for i, _ in items], val.shape[1], 1),
+            color  = self.__color(order, nans, val, tohex(self._theme.colors)),
+            status = self.__color(order, nans, val, dict(good = '', **NAMES))
+        )
         assert all(len(i) == val.size for  i in res.values())
 
         if dsampl > 1:
@@ -296,9 +309,11 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
             res   = {i: j[inds] for i, j in res.items()}
         return res
 
-    def __color(self, order, nancache, items) -> np.ndarray:
-        hexes  = tohex(self._theme.colors)
-        tmp    = np.full(items.shape, hexes['good'], dtype = '<U7')
+    def __color(self, order, nancache, items, hexes) -> np.ndarray:
+        tmp    = np.full(
+            items.shape, hexes['good'],
+            dtype = np.array(list(hexes.values())).dtype
+        )
         cache  = self._model.cleaning.cache
         for name in self._theme.order:
             if name in nancache:
@@ -321,7 +336,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         return tmp.ravel()
 
     def __create(self):
-        self.__source = ColumnDataSource(data = self.__data(None, None))
+        self.__source = ColumnDataSource(data = self._data(None, None))
 
         self.__fig = fig = self.figure(
             y_range        = Range1d,
@@ -343,17 +358,18 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         self._errors = PlotError(self.__fig, self._theme)
         self.linkmodeltoaxes(fig)
 
-    __ORDER = 'cleaning', 'align', 'advanced', 'table', 'sampling'
-    def __layout(self, ctrl, doc):
+    _ORDER = 'cleaning', 'align', 'advanced', 'table', 'sampling'
+
+    def _layout(self, ctrl, doc):
         widgets = self._widgets.addtodoc(self, ctrl, doc, self.__fig)
         mode    = self.defaultsizingmode(
-            width  = max(widgets[i][0].width  for i in self.__ORDER if widgets[i][0].width),
-            height = sum(widgets[i][0].height for i in self.__ORDER)
+            width  = max(widgets[i][0].width  for i in self._ORDER if widgets[i][0].width),
+            height = sum(widgets[i][0].height for i in self._ORDER)
         )
-        left = layouts.widgetbox(sum((widgets[i] for i in self.__ORDER), []), **mode)
+        left = layouts.widgetbox(sum((widgets[i] for i in self._ORDER), []), **mode)
         return self._keyedlayout(ctrl, self.__fig, left = left)
 
-    def __resize(self, ctrl, sizer):
+    def _resize(self, ctrl, sizer):
         mode = self.defaulttabsize(ctrl)
         sizer.update(**dict(mode, sizing_mode = 'stretch_both'))
 
@@ -362,7 +378,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         sizer.children[0].height = mode['height'] - borders
         sizer.children[0].width += borders
         sizer.children[1].update(
-            width  = mode['width']- sizer.children[0].width,
+            width  = mode['width'] - sizer.children[0].width,
             height = sizer.children[0].height,
             sizing_mode = 'stretch_both'
         )
@@ -384,6 +400,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
 class CleaningView(PlotView[CleaningPlotCreator]):
     "Peaks plot view"
     TASKS = 'undersampling', 'aberrant', 'datacleaning', 'extremumalignment'
+
     def ismain(self, ctrl):
         "Cleaning and alignment, ... are set-up by default"
         self._ismain(ctrl, tasks  = self.TASKS)

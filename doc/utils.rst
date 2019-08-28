@@ -6,6 +6,7 @@
 .. |FoV| replace:: *FoV* tab
 .. |QC| replace:: *QC* tab
 .. |Cleaning| replace:: *Cleaning* tab
+.. |Beads| replace:: *Beads* tab
 .. |Cycles| replace:: *Cycles* tab
 .. |Peaks| replace:: *Peaks* tab
 .. |CPeaks| replace:: *Cycles & Peaks* tab

@@ -12,6 +12,7 @@ from bokeh.models              import (
     ColumnDataSource, Range1d, LinearAxis, NumeralTickFormatter, HoverTool, LayoutDOM
 )
 from cleaning.view             import GuiDataCleaningProcessor
+from cleaning.processor        import DataCleaningException
 from model.plots               import (PlotTheme, PlotDisplay, PlotModel, PlotAttrs,
                                        PlotState)
 from peakfinding.histogram     import interpolator
@@ -26,8 +27,12 @@ from ._model                   import (PeaksPlotModelAccess, PeaksPlotTheme,
 from ._widget                  import PeaksPlotWidgets, PeakListTheme
 from ._io                      import setupio
 
-CurveData = Dict[str, np.ndarray]
-HistData  = Dict[str, CurveData]
+
+CurveData    = Dict[str, np.ndarray]
+HistData     = Dict[str, CurveData]
+TModelAccess = TypeVar('TModelAccess', bound = PeaksPlotModelAccess)
+
+
 class CyclePlotTheme(PlotTheme):
     "cycles & peaks plot theme: cycles"
     name      = "cyclehist.plot.cycle"
@@ -42,17 +47,21 @@ class CyclePlotTheme(PlotTheme):
     points    = PlotAttrs(deepcopy(PeaksPlotTheme.count.color), 'o', 1, alpha=.5)
     toolbar   = dict(PlotTheme.toolbar)
     toolbar['items'] = 'pan,box_zoom,wheel_zoom,reset,save'
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
+
 
 class CyclePlotModel(PlotModel):
     "cycles & peaks plot model: cycles"
     theme   = CyclePlotTheme()
     display = PlotDisplay(name = "cyclehist.plot.cycle")
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
+
 
 class HistPlotTheme(PlotTheme):
     "cycles & peaks plot theme: histogram"
@@ -84,13 +93,16 @@ class HistPlotTheme(PlotTheme):
     def __init__(self, **_):
         super().__init__(**_)
 
+
 class HistPlotModel(PlotModel):
     "cycles & peaks plot plot model: histogram"
     theme   = HistPlotTheme()
     display = PlotDisplay(name = "cyclehist.plot.hist")
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
+
 
 class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
     "Building the graph of cycles"
@@ -100,7 +112,8 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
     _fig:    Figure
     _errors: PlotError
     plot  = cast(Figure,           property(lambda self: self._fig))
-    def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument
+
+    def _addtodoc(self, ctrl, doc, *_):  # pylint: disable=unused-argument
         self._src  = ColumnDataSource(data = self._data(None))
         self._fig  = self.figure(y_range = Range1d, x_range = Range1d)
         self.addtofig(self._fig, 'frames', x = 't', y = 'z', source = self._src)
@@ -122,8 +135,11 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
             if evts is not None:
                 procs = procs.keepupto(evts, False)
 
-            itms, _, exc = GuiDataCleaningProcessor.runbead(self._model, ctrl = procs)
-            return [i for _, i in itms], exc
+            try:
+                return list(next(procs.run())[self._model.bead, ...].values()), None
+            except DataCleaningException:
+                itms, _, exc = GuiDataCleaningProcessor.runbead(self._model, ctrl = procs)
+                return [i for _, i in itms], exc
 
         def _display(items: Optional[Tuple[List[np.ndarray], Optional[Exception]]]):
             data = self._data(items[0] if items else None)
@@ -178,7 +194,7 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
         zval = (zval - self._model.bias)*self._model.stretch
         return dict(t = tval, z = zval)
 
-TModelAccess = TypeVar('TModelAccess', bound = PeaksPlotModelAccess)
+
 class BaseHistPlotCreator(TaskPlotCreator[TModelAccess, PlotModelType]):
     "Creates a histogram of peaks"
     _plotmodel: PlotModelType
@@ -190,7 +206,8 @@ class BaseHistPlotCreator(TaskPlotCreator[TModelAccess, PlotModelType]):
     _ref:       LinearAxis
     peaksdata = cast(ColumnDataSource, property(lambda self: self._src['peaks']))
     plot      = cast(Figure,           property(lambda self: self._fig))
-    def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument
+
+    def _addtodoc(self, ctrl, doc, *_):  # pylint: disable=unused-argument
         "returns the figure"
         self._fig = self.figure(y_range = Range1d, x_range = Range1d)
         self._exp = LinearAxis(axis_label    = self._theme.explabel)
@@ -287,9 +304,11 @@ class BaseHistPlotCreator(TaskPlotCreator[TModelAccess, PlotModelType]):
     def _tobases(self, arr):
         return (arr-self._model.bias)*self._model.stretch
 
-class HistPlotCreator(BaseHistPlotCreator[PeaksPlotModelAccess, # type: ignore
+
+class HistPlotCreator(BaseHistPlotCreator[PeaksPlotModelAccess,  # type: ignore
                                           HistPlotModel]):
     "Creates a histogram of peaks"
+
 
 class _StateDescriptor:
     def __get__(self, inst, owner):
@@ -311,22 +330,22 @@ class _StateDescriptor:
         fcn("cyclehist.plot.hist",  state = state)
         fcn("cyclehist.plot.cycle", state = state)
 
+
 class CycleHistPlotWidgets(PeaksPlotWidgets):
     "PeaksPlotWidgets with a different layout"
     @staticmethod
-    def resize(sizer, borders:int, width:int): # pylint: disable=arguments-differ
+    def resize(sizer, borders:int, width:int):  # pylint: disable=arguments-differ
         "resize elements in the sizer"
-        wbox    = lambda x: x.update(
-            width  = max(i.width  for i in x.children),
-            height = sum(i.height for i in x.children)
-        )
-
         stats = sizer.children[1].children[0]
         pks   = sizer.children[2].children[0]
         for i in sizer.children[0].children:
             i.width = width - pks.width - stats.width - borders
         for i in sizer.children:
-            wbox(i)
+            i.update(
+                width  = max(j.width  for j in i.children),
+                height = sum(j.height for j in i.children)
+            )
+
         sizer.children[0].width += borders
         sizer.update(
             width  = sum(i.width  for i in sizer.children),
@@ -342,9 +361,11 @@ class CycleHistPlotWidgets(PeaksPlotWidgets):
             **mode
         )
 
+
 class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
     "Creates plots for peaks & cycles"
     state = cast(PlotState, _StateDescriptor())
+
     def __init__(self, ctrl):
         super().__init__(ctrl, addto = False)
         self._cycle   = CyclePlotCreator(ctrl,  noerase = False, model = self._model)
@@ -366,7 +387,6 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
 
         self._widgets = CycleHistPlotWidgets(ctrl, self._model, **args)
         self.addto(ctrl)
-
 
     _plots      = cast(
         Tuple[CyclePlotCreator, HistPlotCreator],
@@ -471,11 +491,13 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
                 height = sizer.height - bottom.height
             )
 
+
 class CycleHistPlotView(PlotView[CycleHistPlotCreator]):
     "Peaks plot view"
     PANEL_NAME = 'Cycles & Peaks'
     TASKS      = ('extremumalignment', 'clipping', 'eventdetection', 'peakselector',
                   'singlestrand')
+
     def advanced(self):
         "triggers the advanced dialog"
         self._plotter.advanced()

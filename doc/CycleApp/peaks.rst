@@ -17,7 +17,14 @@ Peaks
 .. hint::
 
     The |CPeaks| has additional options for configuring the aspect of is plots.
-    These are available throught the advanced options.
+    These are available through the advanced options.
+
+.. warning::
+
+    The |CPeaks|'s left plot shows only *correct* cycles and frames. This is
+    unless the bead is declared *bad*. It is hoped such a behaviour provides
+    with clean plots in one case and better grasp of the problems with the
+    other.
 
 This tab provides automated extraction of hyridization positions and their
 characteristics.  It also allows automatically identifying a bead with a

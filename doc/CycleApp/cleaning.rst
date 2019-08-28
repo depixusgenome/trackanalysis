@@ -11,6 +11,12 @@ Data Cleaning
     given bead. The color blue is used for accepted frames, other colors
     indicate that the frame or even the whole cycle has been discarded.
 
+.. hint::
+
+    This tab and the |Beads| have exactly the same controls and the same
+    information. Simply one shows all cycles super-imposed and the other all
+    cycles side-by-side.
+
 The goal of this tab is to:
 
 #. define the setting allowing an automated cleaning of all signals. Beads
@@ -149,7 +155,15 @@ Most other filters allow discarding badly behaving cycles:
 * |phasejump|: for SDI instruments, allows discarding cycles
   with too many phase-jumps (showing as 'spikes' on the cycles).
 
-Finally one filter is performed over all cycles:
+Finally two filters are performed over all cycles:
+
+* `% good`: the whole bead is discarded unless a given percentage of frames
+  still exist after cleaning. This is the same percentage as for discarding
+  cycles. This filter is actually applied three times:
+  
+    * after all filters above,
+    * after aligning cycles and discarding those which could not be aligned.
+    * after post-alignment cleaning (|clipping|).
 
 * `% non-closing`: requires that a minimum number of cycles close entirely
   before reaching the end of phase 5. This will not always happen either
@@ -283,11 +297,15 @@ The first 8 elements are repeats of inputs available in the main window. The
 advantage of having them here is simply to have their default value indicated
 again. The following are additionnal:
 
+* `% aligned cycles`: defines the minimum percentage of successfully aligned
+  cycles for a bead to be correct.
 * |pingpong|  discarding cycles with values which jump up and down.
 * `Cycles are closed if |z(φ1)-z(φ5)| <`: the maximum distance from phase 1
   that the last values in phase 5 may sit for the cycle to be considered as
   *closed*.
 * |CLIPPING| 
+* `% good frames`: defines the minimum percentage of remaining frames after
+  cleaning and post-alignment cleaning.
 
 Theme
 -----

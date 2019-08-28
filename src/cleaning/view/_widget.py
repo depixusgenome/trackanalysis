@@ -11,12 +11,12 @@ from    bokeh.models    import (ColumnDataSource, DataTable, TableColumn,
 
 import  numpy       as     np
 
-from    eventdetection.view      import (AlignmentWidget, # pylint: disable=unused-import
-                                         AlignmentModalDescriptor)
+from    eventdetection.view      import AlignmentWidget, AlignmentModalDescriptor
 from    taskview.modaldialog     import tab
 from    taskcontrol.beadscontrol import TaskWidgetEnabler
 from    utils                    import initdefaults
-from    utils.gui                import parseints, intlistsummary
+from    utils.inspection         import parametercount
+from    utils.gui                import parseints, intlistsummary, downloadjs
 from    view.static              import route
 from    view.plots               import DpxNumberFormatter, CACHE_TYPE
 from    ..names                  import NAMES
@@ -90,10 +90,11 @@ class CyclesListTheme:
 class CyclesListWidget:
     "Table containing stats per peaks"
     __widget: DataTable
-    __model : CyclesListTheme
+    __model:  CyclesListTheme
+
     def __init__(self, ctrl, task) -> None:
         self.__task   = task
-        self.__model  = ctrl.theme.add(CyclesListTheme())
+        self.__model  = ctrl.theme.add(CyclesListTheme(), False)
         self.__colors = ctrl.theme.model(self.__model.colors)
 
     def addtodoc(self, _, ctrl) -> List[Widget]:
@@ -122,20 +123,25 @@ class CyclesListWidget:
         dim   = track.instrument['dimension'] if track else 'µm'
 
         clrs  = self.__colors.colors
-        dot   = lambda i, j: self.__model.dot.format(clrs[i], j) if i in clrs else j
-        fmt   = lambda i, j: (
-            StringFormatter(**self.__model.text)
-            if i == '' else
-            (
-                (NumberFormatter if j else DpxNumberFormatter)
-                (format = i, **self.__model.number)
+
+        def _dot(i, j):
+            return self.__model.dot.format(clrs[i], j) if i in clrs else j
+
+        def _fmt(i, j):
+            return (
+                StringFormatter(**self.__model.text)
+                if i == '' else
+                (
+                    (NumberFormatter if j else DpxNumberFormatter)
+                    (format = i, **self.__model.number)
+                )
             )
-        )
+
         return [
             TableColumn(
                 field      = i[0],
-                title      = dot(i[0], i[1].replace('µm', dim)),
-                formatter  = fmt(i[2], i[0] == 'alignment')
+                title      = _dot(i[0], i[1].replace('µm', dim)),
+                formatter  = _fmt(i[2], i[0] == 'alignment')
             ) for i in self.__model.columns
         ]
 
@@ -174,9 +180,10 @@ class DownSamplingTheme:
 class DownsamplingWidget:
     "allows downsampling the graph for greater speed"
     __widget: Slider
-    __model : DownSamplingTheme
+    __model:  DownSamplingTheme
+
     def __init__(self, ctrl):
-        self.__model = ctrl.theme.add(DownSamplingTheme())
+        self.__model = ctrl.theme.add(DownSamplingTheme(), False)
 
     def addtodoc(self, mainview, ctrl) -> List[Widget]:
         "creates the widget"
@@ -232,6 +239,7 @@ class CleaningFilterTheme:
         minextent     = 2, maxextent     = 2,
         maxhfsigma    = 4, maxsaturation = 0
     )
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -240,9 +248,10 @@ class CleaningFilterWidget:
     "All inputs for cleaning"
     __widget: DpxCleaning
     __theme:  CleaningFilterTheme
+
     def __init__(self, ctrl, model:DataCleaningModelAccess) -> None:
         self.__model = model
-        self.__theme = ctrl.theme.add(CleaningFilterTheme())
+        self.__theme = ctrl.theme.add(CleaningFilterTheme(), False)
 
     def addtodoc(self, mainview, ctrl) -> List[Widget]:
         "creates the widget"
@@ -253,6 +262,12 @@ class CleaningFilterWidget:
         @mainview.actionifactive(ctrl)
         def _on_cb(attr, old, new):
             self.__model.cleaning.update(**{attr: new})
+            if attr == 'minpopulation':
+                if self.__model.alignment.task is None:
+                    self.__model.alignment.configtask = {attr: new}
+                else:
+                    self.__model.alignment.update(**{attr: new})
+                self.__model.clipping.update(**{attr: new})
 
         for name in ('maxabsvalue', 'maxderivate', 'minpopulation',
                      'minhfsigma',  'maxhfsigma',  'minextent',
@@ -277,11 +292,11 @@ class CleaningFilterWidget:
         lst  = [i[-1] for i in self.__model.availablefixedbeads]
         return intlistsummary(lst, False, maxi)
 
-    def observe(self, ctrl):
+    def observe(self, mainview, ctrl):
         "observe the controller"
         @ctrl.display.observe
         def _onfixedbeads(**_):
-            if ctrl.display.model("cleaning").isactive():
+            if mainview.isactive():
                 self.__widget.fixedbeads = self.__fixedbeads
 
     def reset(self, resets:CACHE_TYPE):
@@ -308,21 +323,51 @@ class CleaningFilterWidget:
             args = dict(mdl = self.__widget)
         )
 
+
+class CSVExporter:
+    "exports all to csv"
+    @staticmethod
+    def addtodoc(mainview, _) -> List[Widget]:
+        "creates the widget"
+        return [downloadjs(
+            mainview.getfigure(),
+            fname   = "bead.csv",
+            tooltip = "Save bead data to CSV",
+            code    = """
+                var csvFile = 't;z;cycle;status;\\n';
+                var ind     = 0;
+                var ie      = src.data['t'].length;
+                for(ind = 0; ind < ie; ++ind)
+                {
+                    csvFile += src.data["t"][ind].toString()+',';
+                    csvFile += src.data["z"][ind].toString()+',';
+                    csvFile += src.data["cycle"][ind].toString()+',';
+                    csvFile += src.data["status"][ind].toString()+'\\n';
+                }
+            """,
+            src = mainview.getdata()
+        )]
+
+    def reset(self, *_):
+        "reset all"
+
 class CleaningWidgets:
     "Everything dealing with changing the config"
-    __objects : TaskWidgetEnabler
-    def __init__(self, ctrl, model, text = None):
+    __objects: TaskWidgetEnabler
+
+    def __init__(self, ctrl, model, plotmodel, text = None):
         advanced = tab(
             self.text(text),
             accessors = globals(),
-            figure    = (CleaningPlotModel,),
+            figure    = plotmodel,
             base      = tab.taskwidget
         )
-        self.__widgets = dict(table    = CyclesListWidget(ctrl, model.cleaning),
-                              align    = AlignmentWidget(ctrl, model.alignment),
-                              cleaning = CleaningFilterWidget(ctrl, model),
-                              sampling = DownsamplingWidget(ctrl),
-                              advanced = advanced(ctrl, model))
+        self.__widgets = dict(table     = CyclesListWidget(ctrl, model.cleaning),
+                              align     = AlignmentWidget(ctrl, model.alignment),
+                              cleaning  = CleaningFilterWidget(ctrl, model),
+                              sampling  = DownsamplingWidget(ctrl),
+                              advanced  = advanced(ctrl, model),
+                              csvexport = CSVExporter())
 
     @staticmethod
     def text(text: Optional[str]) -> str:
@@ -330,6 +375,7 @@ class CleaningWidgets:
         if text:
             return text
         fix      = FixedBeadDetectionConfig.__name__
+        agg      = '%(undersampling.aggregation)|mean:mean|none:none|'
         return f"""
             ## Fixed Beads
             {NAMES['extent']}  <                    %({fix}:maxextent).3F
@@ -343,7 +389,7 @@ class CleaningWidgets:
 
             ### Reduce the number of frames accross all cycles
             Target frame rate (Hz)                  %(undersampling.framerate)D
-            Aggregation                             %(undersampling.aggregation)|mean:mean|none:none|
+            Aggregation                             {agg}
 
             ### Reduce the number of cycles
             First cycle                             %(undersampling.cyclestart)D
@@ -367,15 +413,20 @@ class CleaningWidgets:
             % non-closing cycles <                  %(cleaning.maxsaturation)D
 
             ### Alignment & post-alignment
-            %(AlignmentModalDescriptor:)
+            %({AlignmentModalDescriptor.__name__}:)
+            % aligned cycles >                      %(alignment.minpopulation)D
             Discard z(∈ φ₅) < z(φ₁)-σ[HF]⋅α, α =    %(clipping.lowfactor).1oF
+            % good frames >                         %(clipping.minpopulation)D
         """
 
     def observe(self, mainview, ctrl):
         "observe the controller"
         for widget in self.__widgets.values():
-            if hasattr(widget, 'observe'):
+            pcount: int = parametercount(getattr(widget, 'observe', lambda: None))
+            if pcount == 1:
                 widget.observe(ctrl)
+            elif pcount == 1:
+                widget.observe(mainview, ctrl)
 
         def _ondownsampling(old = None, **_):
             if 'value' in old:

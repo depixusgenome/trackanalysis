@@ -146,6 +146,7 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
     "Access to cleaning tasks"
     _fixedbeadsconfig = Indirection()
     _fixedbeadsstore  = Indirection()
+
     def __init__(self, ctrl, **_):
         super().__init__(ctrl)
         self.undersampling     = UndersamplingTaskAccess(self)
@@ -219,7 +220,7 @@ class CleaningPlotTheme(PlotTheme):
         'pingpong', 'alignment', 'clipping', 'saturation', 'good'
     )
     colors:        Dict[str, str]       = dict(
-        good       = '#6baed6', # blue
+        good       = '#6baed6',  # blue
         hfsigma    = 'gold',
         extent     = 'orange',
         population = 'hotpink',
@@ -229,7 +230,9 @@ class CleaningPlotTheme(PlotTheme):
         clipping   = 'darkorchid',
         aberrant   = 'red'
     )
-    tooltips: List[Tuple[str, ...]] = [(u'(cycle, t, z)', '(@cycle, $~x{1}, $data_y{1.1111})')]
+    tooltips: List[Tuple[str, ...]] = [
+        ('(cycle, t, z, status)', '(@cycle, $~x{1}, $data_y{1.1111}, @status)')
+    ]
     toolbar:  Dict[str, Any]        = dict(
         PlotTheme.toolbar,
         items = 'pan,box_zoom,ypan,ybox_zoom,ywheel_zoom,reset,save,dpxhover'
