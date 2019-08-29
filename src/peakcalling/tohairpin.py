@@ -163,9 +163,9 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
                 args.update(min_stretch = vals[0] - self.stretch.step,
                             stretch     = vals[0],
                             max_stretch = vals[0] + self.stretch.step,
-                            min_bias    = vals[0]*(vals[1]+bias) - vals[0]*self.bias.step,
-                            bias        = vals[0]*(vals[1]+bias),
-                            max_bias    = vals[0]*(vals[1]+bias) + vals[0]*self.bias.step)
+                            min_bias    = -vals[0]*(vals[1]+bias) - vals[0]*self.bias.step,
+                            bias        = -vals[0]*(vals[1]+bias),
+                            max_bias    = -vals[0]*(vals[1]+bias) + vals[0]*self.bias.step)
 
                 try:
                     out = self._optimize(hpin, peaks, args)
