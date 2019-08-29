@@ -13,6 +13,7 @@ from bokeh.models              import (
 )
 from cleaning.view             import GuiDataCleaningProcessor
 from cleaning.processor        import DataCleaningException
+from model.maintheme           import AppTheme
 from model.plots               import (PlotTheme, PlotDisplay, PlotModel, PlotAttrs,
                                        PlotState)
 from peakfinding.histogram     import interpolator
@@ -36,7 +37,7 @@ TModelAccess = TypeVar('TModelAccess', bound = PeaksPlotModelAccess)
 class CyclePlotTheme(PlotTheme):
     "cycles & peaks plot theme: cycles"
     name      = "cyclehist.plot.cycle"
-    figsize   = (600, 597, 'fixed')
+    figsize   = (300, 497, 'fixed')
     phasezoom = PHASE.measure, 20
     fiterror  = PeaksPlotTheme.fiterror
     xlabel    = PlotTheme.xtoplabel
@@ -66,7 +67,10 @@ class CyclePlotModel(PlotModel):
 class HistPlotTheme(PlotTheme):
     "cycles & peaks plot theme: histogram"
     name     = "cyclehist.plot.hist"
-    figsize          = (1200-CyclePlotTheme.figsize[0],)+CyclePlotTheme.figsize[1:]
+    figsize          = (
+        AppTheme().appsize[0]-CyclePlotTheme.figsize[0],  # pylint: disable=unsubscriptable-object
+        * CyclePlotTheme.figsize[1:]
+    )
     xlabel           = PeaksPlotTheme.xlabel
     ylabel           = CyclePlotTheme.ylabel
     explabel         = 'Hybridisations'
@@ -357,7 +361,7 @@ class CycleHistPlotWidgets(PeaksPlotWidgets):
         # pylint: disable=unsubscriptable-object
         out  = super()._assemble(mode, wdg)
         return layouts.row(
-            [ *out.children[0].children, out.children[1]],
+            [*out.children[0].children, out.children[1]],
             **mode
         )
 

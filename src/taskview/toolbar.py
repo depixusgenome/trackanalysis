@@ -539,7 +539,10 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
             hasdoc      = True,
             helpmessage = self.__theme.placeholder,
             height      = self.__theme.height,
-            width       = ctrl.theme.get("theme", "appsize")[0]
+            width       = (
+                ctrl.theme.get("theme", "appsize")[0]
+                - ctrl.theme.get("theme", "borders")
+            )
         )
 
         tbar.on_change("doc", lambda attr, old, new: ctrl.display.handle('changelog', args = {}))

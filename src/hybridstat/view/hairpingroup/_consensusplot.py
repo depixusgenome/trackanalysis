@@ -162,9 +162,10 @@ class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
         hist           = sizer.children[0].children[0]
         scatter, widg  = sizer.children[1].children
 
+        pheight = sizer.height - sum(i.height+2*borders for i in widg.children)
         scatter.update(
-            plot_width  = widg.width,
-            plot_height = widg.width
+            plot_width  = min(widg.width, pheight),
+            plot_height = min(widg.width, pheight)
         )
         widg.children[-1].height = (
             sizer.height

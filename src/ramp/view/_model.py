@@ -95,7 +95,7 @@ class RampPlotTheme(PlotTheme):
     phaserange       = (..., ...)
     ylabelnormalized = "Z (% strand size)"
     xlabel           = 'Z magnet (mm)'
-    figsize          = PlotTheme.defaultfigsize(500, 700)
+    figsize          = PlotTheme.defaultfigsize(300, 500)
     widgetwidth      = 500
     dataformat       = "raw"
     clip             = 99., .1

@@ -50,7 +50,7 @@ class PeaksPlotTheme(PlotTheme):
     peaks plot theme
     """
     name            = "hybridstat.peaks.plot"
-    figsize         = PlotTheme.defaultfigsize(500, 700)
+    figsize         = PlotTheme.defaultfigsize(300, 500)
     xtoplabel       = 'Duration (s)'
     xlabel          = 'Rate (%)'
     fiterror        = "Fit unsuccessful!"

@@ -209,7 +209,7 @@ class CleaningPlotTheme(PlotTheme):
     lines:         PlotAttrs            = PlotAttrs('~gray', '-', 1, alpha                = .3)
     points:        PlotAttrs            = PlotAttrs('color', 'o', 1, alpha                = .5)
     hover:         PlotAttrs            = PlotAttrs('white', 'o', 4, alpha                = 0.)
-    figsize:       Tuple[int, int, str] = PlotTheme.defaultfigsize(500, 700)
+    figsize:       Tuple[int, int, str] = PlotTheme.defaultfigsize(300, 500)
     clip:          int                  = 3
     clipovershoot: float                = 10
     maxfixedbeads: int                  = 15
