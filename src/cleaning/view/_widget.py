@@ -323,7 +323,6 @@ class CleaningFilterWidget:
             args = dict(mdl = self.__widget)
         )
 
-
 class CSVExporter:
     "exports all to csv"
     @staticmethod
@@ -333,19 +332,7 @@ class CSVExporter:
             mainview.getfigure(),
             fname   = "bead.csv",
             tooltip = "Save bead data to CSV",
-            code    = """
-                var csvFile = 't;z;cycle;status;\\n';
-                var ind     = 0;
-                var ie      = src.data['t'].length;
-                for(ind = 0; ind < ie; ++ind)
-                {
-                    csvFile += src.data["t"][ind].toString()+',';
-                    csvFile += src.data["z"][ind].toString()+',';
-                    csvFile += src.data["cycle"][ind].toString()+',';
-                    csvFile += src.data["status"][ind].toString()+'\\n';
-                }
-            """,
-            src = mainview.getdata()
+            src     = mainview.getdata()
         )]
 
     def reset(self, *_):
