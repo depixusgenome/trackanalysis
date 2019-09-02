@@ -378,6 +378,22 @@ def test_trktopk():
     assert new['i'].path == (Path(fname)/"i").with_suffix(".pk")
     assert (Path(fname)/"i").with_suffix(".pk").exists()
 
+def test_tracksdict_creation():
+    "find all tracks with kmers"
+
+    path = str(Path(utpath("big_legacy")).parent)
+    assert sum(1 for i in TracksDict(path).values()) > 2
+    assert {Path(i.path).stem for i in TracksDict(path, match = "kmer").values()} == {
+        'test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec',
+        'test035_5HPs_mix_GATG_5nM_25C_8sec_with_ramp'
+    }
+    assert len({Path(i.path).stem for i in TracksDict(path, match = "3mer").values()}) == 0
+    assert {Path(i.path).stem for i in TracksDict(path, match = "4mer").values()} == {
+        'test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec',
+        'test035_5HPs_mix_GATG_5nM_25C_8sec_with_ramp'
+    }
+
+
 def test_io_recognition():
     "tests that the right IO class recognizes its paths"
     get   = lambda i: str(utpath(i))

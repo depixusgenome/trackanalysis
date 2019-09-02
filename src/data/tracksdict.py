@@ -108,6 +108,7 @@ class TracksDict(dict):
     _SCAN_OPTS  = ('cgrdir', 'allleaves')
     _NTHREADS   = None
     _TRACK_TYPE = Track
+
     def __init__(self,          # pylint: disable=too-many-arguments
                  tracks  = None,
                  grs     = None,
@@ -170,11 +171,11 @@ class TracksDict(dict):
     scangrs = staticmethod(LegacyGRFilesIO.scangrs)
     scantrk = staticmethod(LegacyGRFilesIO.scantrk)
 
-    def scan(self, # pylint: disable=too-many-arguments,too-many-locals
-             tracks  : Union[str, Sequence[str]],
-             grs     : Union[None, str, Sequence[str]] = None,
-             cgrdir  : Union[str, Sequence[str]]       = "cgr_dir",
-             match   : Union[Pattern, str]             = None,
+    def scan(self,  # pylint: disable=too-many-arguments,too-many-locals
+             tracks: Union[str, Sequence[str]],
+             grs:    Union[None, str, Sequence[str]] = None,
+             cgrdir: Union[str, Sequence[str]]       = "cgr_dir",
+             match:  Union[Pattern, str]             = None,
              allaxes   = False,
              allleaves = False,
              **opts) -> KeysView[str]:
@@ -184,6 +185,16 @@ class TracksDict(dict):
         ## Scanning for tracks only
 
         Simply disregard the `grs`, `cgrdir` and `allleaves` keywords.
+
+        ## Scanning for others than ramps
+
+        One can select kmers using:
+
+        ```python
+        >>> tracks = TracksDict().scan("/data/sirius/**/*.trk", match = "kmer")
+        ```
+
+        The same goes for 3mers, 4mers and 5mers.
 
         ## Matching tracks and gr files using cgr names
 
@@ -267,20 +278,41 @@ class TracksDict(dict):
         """
         opts['cgrdir']    = cgrdir
         opts['allleaves'] = allleaves
-        if isinstance(match, str) or hasattr(match, 'match'):
-            grp = True
-            tmp = re.compile(match) if isinstance(match, str) else cast(Pattern, match)
-            fcn: Callable = lambda i: tmp.match(str(i if isinstance(i, (str, Path)) else i[0]))
+        if isinstance(match, str) and len(match) == 4 and match[1:] == 'mer':
+            from sequences.translator import splitoligos
+            grp  = False
+            itr  = cast(
+                Iterator[Tuple[Any, PATHTYPES]],
+                (
+                    (Path(i).stem, i)
+                    for i in LegacyTrackIO.scan(tracks)
+                    if splitoligos(match, i)
+                )
+            )
         else:
-            grp = False
-            fcn = lambda i: (Path(str(i if isinstance(i, (str, Path)) else i[0])).stem
-                             if match is None else match)
+            if isinstance(match, str) or hasattr(match, 'match'):
+                grp = True
+                tmp = re.compile(match) if isinstance(match, str) else cast(Pattern, match)
 
-        if not grs:
-            itr = cast(Iterator[Tuple[Any, PATHTYPES]],
-                       ((fcn((i,)), i) for i in LegacyTrackIO.scan(tracks)))
-        else:
-            itr = ((fcn(i), i) for i in LegacyGRFilesIO.scan(tracks, grs, **opts)[0])
+                def _fcn(path):
+                    return tmp.match(str(path if isinstance(path, (str, Path)) else path[0]))
+                fcn: Callable = _fcn
+            else:
+                grp = False
+
+                def _fcn(path):
+                    return (
+                        Path(str(path if isinstance(path, (str, Path)) else path[0])).stem
+                        if match is None else
+                        match
+                    )
+                fcn = _fcn
+
+            if not grs:
+                itr = cast(Iterator[Tuple[Any, PATHTYPES]],
+                           ((fcn((i,)), i) for i in LegacyTrackIO.scan(tracks)))
+            else:
+                itr = ((fcn(i), i) for i in LegacyGRFilesIO.scan(tracks, grs, **opts)[0])
 
         if grp:
             info = dict((i.group(1), j) for i, j in itr if i)
@@ -292,10 +324,10 @@ class TracksDict(dict):
         return info.keys()
 
     def update(self, *args,
-               tracks  : Union[None, str, Sequence[str]] = None,
-               grs     : Union[None, str, Sequence[str]] = None,
-               cgrdir  : Union[None, str, Sequence[str]] = "cgr_dir",
-               match   : Union[Pattern, str]             = None,
+               tracks: Union[None, str, Sequence[str]] = None,
+               grs:    Union[None, str, Sequence[str]] = None,
+               cgrdir: Union[None, str, Sequence[str]] = "cgr_dir",
+               match:  Union[Pattern, str]             = None,
                allleaves = False,
                allaxes   = False,
                **kwargs):
@@ -313,26 +345,26 @@ class TracksDict(dict):
             if i in kwargs:
                 scan[i] = kwargs.pop(i)
 
-        info = {} # type: ignore
+        info = {}  # type: ignore
         info.update(*args, **kwargs)
         for i, j in info.items():
             self._set(i, j, allaxes)
 
         if tracks is not None:
             assert sum(i is None for i in (tracks, grs)) in (0, 1, 2)
-            self.scan(tracks, grs, # type: ignore
+            self.scan(tracks, grs,  # type: ignore
                       match = match, allaxes = allaxes, **scan)
     if getattr(update, '__doc__', None):
         # pylint: disable=no-member
         update.__doc__ = (cast(str, update.__doc__)
-                          +cast(str, scan.__doc__)[cast(str, scan.__doc__).find('#')-5:])
+                          + cast(str, scan.__doc__)[cast(str, scan.__doc__).find('#')-5:])
 
     def commonbeads(self, *keys) -> List[BEADKEY]:
         "returns the intersection of all beads in requested tracks (all by default)"
         if len(keys) == 0:
             keys = tuple(self.keys())
 
-        fcn = lambda key: set(cast(Track, self[key]).beads.keys())
+        fcn = lambda key: set(cast(Track, self[key]).beads.keys())  # noqa
         beads: Optional[Set[BEADKEY]] = None
         with ThreadPoolExecutor(self._NTHREADS) as pool:
             for cur in pool.map(fcn, keys):
@@ -345,8 +377,8 @@ class TracksDict(dict):
         if len(keys) == 0:
             keys = tuple(self.keys())
 
-        fcn   = lambda key: set(cast(Track, self[key]).beads.keys())
-        beads = set() # type: Set[BEADKEY]
+        fcn = lambda key: set(cast(Track, self[key]).beads.keys())  # noqa
+        beads: Set[BEADKEY] = set()
         with ThreadPoolExecutor(self._NTHREADS) as pool:
             for cur in pool.map(fcn, keys):
                 beads.update(cur)
@@ -358,8 +390,10 @@ class TracksDict(dict):
             return sorted(super().keys())
 
         beads = set(abeads)
-        fcn   = lambda key: (key, len(beads - set(cast(Track, self[key]).beads.keys())))
-        keys  = [] # type: list
+        fcn   = lambda key: (  # noqa
+            key, len(beads - set(cast(Track, self[key]).beads.keys()))
+        )
+        keys: list = []
         with ThreadPoolExecutor(self._NTHREADS) as pool:
             for key, cur in pool.map(fcn, tuple(super().keys())):
                 if cur == 0:
@@ -370,6 +404,7 @@ class TracksDict(dict):
     def load(self, *args, **kwa) -> 'TracksDict':
         "Loads all the data. Args and kwargs are passed to a local patch mechanism."
         unloaded = [i for i in self.values() if not i.isloaded]
+
         def _run():
             with ThreadPoolExecutor(self._NTHREADS) as pool:
                 for _ in pool.map(Track.load, unloaded):
