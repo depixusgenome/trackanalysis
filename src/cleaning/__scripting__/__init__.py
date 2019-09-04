@@ -6,7 +6,7 @@ Monkey patches the Track class.
 
 Adds a method for discarding beads with Cleaning warnings
 """
-from   copy                             import deepcopy, copy as shallowcopy
+from   copy                             import copy as shallowcopy
 from   concurrent.futures               import ProcessPoolExecutor
 from   typing                           import (Dict, Optional, Iterator, List, Any,
                                                 Set, Union, Tuple, Sequence, cast)
@@ -36,8 +36,9 @@ class BeadSubtractionDescriptor:
     NAME    = Tasks(BeadSubtractionTask).name
     __doc__ = BeadSubtractionTask.__doc__
 
-    def __get__(self, inst, owner
-               ) -> Union['BeadSubtractionDescriptor', Optional[BeadSubtractionTask]]:
+    def __get__(
+            self, inst, owner
+    ) -> Union['BeadSubtractionDescriptor', Optional[BeadSubtractionTask]]:
         return self if inst is None else inst.tasks.get(self.NAME, None)
 
     def __delete__(self, inst):
@@ -61,7 +62,8 @@ class BeadSubtractionDescriptor:
         else:
             inst.tasks.setdefault(self.NAME, BeadSubtractionTask()).beads = list(lst)
 
-LocalTasks.subtraction = BeadSubtractionDescriptor() # type: ignore
+
+LocalTasks.subtraction = BeadSubtractionDescriptor()  # type: ignore
 
 @addproperty(Track, 'cleaning')
 class TrackCleaningScript:
@@ -83,10 +85,10 @@ class TrackCleaningScript:
                 beads: Sequence[BEADKEY] = None,
                 **kwa) -> Dict[BEADKEY, Optional[DataCleaningErrorMessage]]:
         "returns a dictionnary of cleaning results"
-        get  = lambda x: x if x is None else x.args[0]
+        get  = lambda x: x if x is None else x.args[0]  # noqa
 
         itms = self.track.beads
-        sub  = self.track.tasks.subtraction # type: ignore
+        sub  = self.track.tasks.subtraction  # type: ignore
         if sub is not None:
             cache: dict = {}
             itms        = BeadSubtractionProcessor.apply(itms, cache = cache, **sub.config())
@@ -128,12 +130,12 @@ class TrackCleaningScript:
                  forceclean               = False,
                  **kwa) -> pd.DataFrame:
         "returns beads and warnings where applicable"
-        ids  : List[int] = []
+        ids:   List[int] = []
         types: List[str] = []
-        cycs : List[int] = []
-        msgs : List[str] = []
+        cycs:  List[int] = []
+        msgs:  List[str] = []
 
-        if forceclean or self.track.cleaned is False: # type: ignore
+        if forceclean or self.track.cleaned is False:  # type: ignore
             if beads:
                 good = set(self.track.beads.keys())
                 cur: Optional[List[int]] = [i for i in beads if i in good]
@@ -152,7 +154,7 @@ class TrackCleaningScript:
         miss = list(set(beads)-set(self.track.beads.keys())) if beads else []
         cycs .extend([self.track.ncycles]*len(miss))
         types.extend(['missing']*len(miss))
-        msgs .extend([''] *len(miss))
+        msgs .extend([''] * len(miss))
         ids.extend(cast(List[int], miss))
 
         name = np.full(len(ids), DataFrameFactory.trackname(self.track))
@@ -189,13 +191,13 @@ class TrackCleaningScript:
             for stat in vals:
                 info[stat.name].append(stat.values)
 
-        frame  =  pd.DataFrame({i: np.concatenate(j) for i, j in info.items()})
+        frame  = pd.DataFrame({i: np.concatenate(j) for i, j in info.items()})
         frame['modification'] = getattr(self.track, 'pathinfo').modification
         return frame
 
     def dropbad(self, **kwa) -> Track:
         "removes bad beads *forever*"
-        return dropbeads(self.track, *self.bad(**kwa)) # type: ignore
+        return dropbeads(self.track, *self.bad(**kwa))  # type: ignore
 
 @addproperty(TrackCleaningScript, 'data')
 class TrackCleaningScriptData:
@@ -253,26 +255,27 @@ class TrackCleaningScriptData:
 
         proc     = Tasks.subtraction.processor(**cnf)
         data     = {i: self.track.data[i] for i in beads}
-        data[-1] = proc.signal(self.track.beads) # type: ignore
+        data[-1] = proc.signal(self.track.beads)  # type: ignore
         return self.track.apply(Tasks.alignment).withdata(data)
+
 
 if isinstance(TrackCleaningScript.__doc__, str):
     TrackCleaningScript.__doc__ = (
         TrackCleaningScript.__doc__[:-5]
-        +"""
+        + """
         * `track.cleaning.data` p"""
-        +TrackCleaningScriptData.__doc__.split('\n')[1].strip()[1:]+"\n" # type: ignore
-        +'\n   '
-        .join(TrackCleaningScriptData.__doc__.split('\n')[2:]) # type: ignore
+        + TrackCleaningScriptData.__doc__.split('\n')[1].strip()[1:] + "\n"  # type: ignore
+        + '\n   '
+        .join(TrackCleaningScriptData.__doc__.split('\n')[2:])  # type: ignore
         .replace('\n', '\n    ')
-        )
-    Track.__doc__ += ( # type: ignore
+    )
+    Track.__doc__ += (  # type: ignore
         """
         * `cleaning` p"""
-        +TrackCleaningScript.__doc__.split('\n')[1].strip()[1:]+"\n"
-        +TrackCleaningScript.__doc__.split('\n')[2]+"\n"
-        +'\n'.join(TrackCleaningScript.__doc__.split('\n')[3:]).replace('\n', '\n    ')
-        )
+        + TrackCleaningScript.__doc__.split('\n')[1].strip()[1:]+"\n"
+        + TrackCleaningScript.__doc__.split('\n')[2]+"\n"
+        + '\n'.join(TrackCleaningScript.__doc__.split('\n')[3:]).replace('\n', '\n    ')
+    )
 
 @addproperty(getattr(TracksDict, '__base__'), 'cleaning')
 class TracksDictCleaningScript:
@@ -294,7 +297,7 @@ class TracksDictCleaningScript:
                 **kwa) -> Tuple[Set[BEADKEY], Set[BEADKEY]]:
         "returns beads without warnings"
         good: Set[BEADKEY] = set(self.tracks.commonbeads())
-        bad : Set[BEADKEY] = (set(self.tracks.availablebeads()) - good)
+        bad:  Set[BEADKEY] = (set(self.tracks.availablebeads()) - good)
         cur:  Set[BEADKEY] = (bad | good) if beads is None else set(beads)
         for track in self.tracks.values():
             tmp = (set(track.beads.keys())-bad) & cur
@@ -373,26 +376,50 @@ class TracksDictCleaningScript:
             itms[i].tasks.subtraction = [j[-1] for j in beads]
         return itms
 
+
 if isinstance(TracksDict.__doc__, str):
     TracksDict.__doc__ += (
         """
         ## Cleaning
 
-        """+TracksDictCleaningScript.__doc__) # type: ignore
-    TracksDict.__base__.__doc__ = TracksDict.__doc__ # type: ignore
+        """
+        + str(TracksDictCleaningScript.__doc__)
+    )
+    TracksDict.__base__.__doc__ = str(TracksDict.__doc__)
 
-@addto(TracksDict.__base__)                      # type: ignore
-def basedataframe(self,
-                  loadall = False,
-                  __old__ = TracksDict.basedataframe
-                 ) -> pd.DataFrame:
+@addto(TracksDict)                      # type: ignore
+def basedataframe(
+        self,
+        loadall  = False,
+        cleaning = None,
+        fixed    = None,
+        __old__  = TracksDict.basedataframe
+) -> pd.DataFrame:
     "Returns a table with some data on the track files"
     frame = __old__(self, loadall)
-    if loadall:
-        fcn = lambda attr, i: getattr(self[i].cleaning, attr)()
-    else:
-        fcn = lambda attr, i: (getattr(self[i].cleaning, attr)()
-                               if self[i].isloaded else np.NaN)
-    return frame.assign(good = frame.key.apply(lambda i: fcn('good', i)),
-                        bad  = frame.key.apply(lambda i: fcn('bad',  i)))
-__all__ : Tuple[str, ...] = ()
+    info  = dict(
+        {i: np.full(frame.shape[0], None, dtype = 'O') for i in ('good', 'bad', 'fixed')},
+        key = np.array(list(self.keys()), dtype = frame['key'].values.dtype)
+    )
+
+    for ind, track in enumerate(self.values()):
+        if track.isloaded or loadall:
+            script = TrackCleaningScript(track)
+            out    = script.process(**(
+                {}       if cleaning is None           else
+                cleaning if isinstance(cleaning, dict) else
+                cleaning.config()
+            ))
+            if out:
+                info['good'][ind] = [i for i,j in out.items() if j is None]
+                info['bad'][ind]  = [i for i,j in out.items() if j is not None]
+            info['fixed'][ind] = script.fixed(**(
+                {}       if fixed is None           else
+                fixed if isinstance(fixed, dict) else
+                fixed.config()
+            ))
+
+    return frame.join(pd.DataFrame(info).set_index('key'), on = 'key')
+
+
+__all__: Tuple[str, ...] = ()

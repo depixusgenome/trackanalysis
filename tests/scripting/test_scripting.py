@@ -124,5 +124,19 @@ def test_tracksdict_hpfit(scriptingcleaner):
     assert frame.shape == (80, 26)
     assert frame.index.names == ['hpin', 'track', 'bead']
 
+
+@integrationmark
+def test_tracksdict_cleaning_df(scriptingcleaner):
+    "test TracksDict.basedataframe"
+    from scripting          import TracksDict
+    from tests.testingcore  import path as utpath
+    tracks = TracksDict(utpath("100bp_4mer")+"/*.pk")
+    dframe = tracks.dataframe(loadall = True)
+    assert 'good' in dframe.columns
+    assert 'fixed' in dframe.columns
+    assert not all(i is None for i in dframe['good'])
+    assert not all(i is None for i in dframe['fixed'])
+
+
 if __name__ == '__main__':
-    test_tracksdict_hpfit(None)
+    test_tracksdict_cleaning_df(None)
