@@ -5,7 +5,8 @@
 from   typing                   import Tuple
 from   bokeh.models             import GlyphRenderer
 import pytest
-import numpy as np
+import numpy  as np
+import pandas as pd
 from   numpy.testing            import assert_equal, assert_allclose
 
 from   tests.testutils          import integrationmark
@@ -19,6 +20,7 @@ from   cleaning.beadsubtraction import (SubtractAverageSignal, SubtractMedianSig
                                         FixedBeadDetection)
 import cleaning._core           as     cleaningcore  # pylint:disable=no-name-in-module,import-error
 from   data                       import Beads, Track
+from   taskmodel.dataframe        import DataFrameTask
 from   taskcontrol.taskcontrol    import create
 from   taskmodel.track            import TrackReaderTask, Task, UndersamplingTask
 from   simulator                  import randtrack, setseed
@@ -393,6 +395,57 @@ def test_message_creation():
     else:
         assert False
 
+def test_cleaning_dataframe():
+    "test cleanin creation"
+    proc  = create(
+        TrackReaderTask(path = utpath("big_legacy")),
+        DataCleaningTask(),
+        DataFrameTask(merge = True)
+    )
+    data = next(iter(proc.run())).reset_index(0)
+    assert list(data.loc[5].bad.unique()) == [True]
+    assert list(data.loc[0].bad.unique()) == [False]
+
+def test_subtraction_dataframe():
+    "test cleanin creation"
+    proc  = create(
+        TrackReaderTask(path = utpath("fixedbeads.pk")),
+        DataFrameTask(merge = True, measures = {'status': True})
+    )
+    data = next(iter(proc.run()))
+    assert list(data[data.fixed].reset_index().bead) == [4]
+    assert 'status' in data.columns
+    assert isinstance(data.status.values[0], pd.DataFrame)
+    assert data[data.fixed].reset_index().status[0].shape[0] == 0
+
+    proc  = create(
+        TrackReaderTask(path = utpath("fixedbeads.pk")),
+        DataCleaningTask(),
+        DataFrameTask(merge = True, measures = {'status': True})
+    )
+    data = next(iter(proc.run()))
+    assert list(data[data.fixed].reset_index().bead) == [4]
+    assert 'status' in data.columns
+    assert isinstance(data.status.values[0], pd.DataFrame)
+    assert data[data.fixed].reset_index().status[0].shape[0] != 0
+
+    proc  = create(
+        TrackReaderTask(path = utpath("fixedbeads.pk")),
+        DataFrameTask(merge = True, measures = {'fixed': True})
+    )
+    data = next(iter(proc.run()))
+    assert list(data[data.fixed].reset_index().bead) == [4]
+    assert 'status' not in data.columns
+
+    proc  = create(
+        TrackReaderTask(path = utpath("fixedbeads.pk")),
+        DataCleaningTask(),
+        DataFrameTask(merge = True, measures = {'fixed': True})
+    )
+    data = next(iter(proc.run()))
+    assert list(data[data.fixed].reset_index().bead) == [4]
+    assert 'status' not in data.columns
+
 @integrationmark
 @pytest.mark.parametrize("view", ['Bead', ''])
 def test_cleaningview(view, bokehaction):
@@ -593,6 +646,7 @@ def test_rescaling():
 
 
 if __name__ == '__main__':
-    from tests.testingcore.bokehtesting import BokehAction
-    with BokehAction(None) as bka:
-        test_undersampling("Bead", bka)
+    test_subtraction_dataframe()
+    # from tests.testingcore.bokehtesting import BokehAction
+    # with BokehAction(None) as bka:
+    #     test_undersampling("Bead", bka)

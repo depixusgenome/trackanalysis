@@ -5,3 +5,4 @@ from ._clipping         import ClippingTask, ClippingProcessor
 from ._datacleaning     import (DataCleaningTask, DataCleaningException,
                                 DataCleaningProcessor, DataCleaningErrorMessage)
 from ._beadsubtraction  import BeadSubtractionTask, BeadSubtractionProcessor
+from ._dataframe        import CleaningDataFrameFactory

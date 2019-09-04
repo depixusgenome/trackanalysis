@@ -37,7 +37,7 @@ class DataFrameFactory(Generic[Frame]):
         return newcls
 
     @classmethod
-    def frametype(cls)-> Type[Frame]:
+    def frametype(cls) -> Type[Frame]:
         "returns the frame type"
         return getattr(cls, '__orig_bases__')[0].__args__[0]
 
@@ -100,6 +100,10 @@ class DataFrameFactory(Generic[Frame]):
     def _run(self, frame, key, values) -> Dict[str, np.ndarray]:
         raise NotImplementedError()
 
+    @classmethod
+    def _proc_apply(cls, task, _, frame):
+        return frame.withaction(cls(task, frame).dataframe)
+
 class SafeDataFrameProcessor(Processor[DataFrameTask]):
     """
     Generates pd.DataFrames
@@ -108,19 +112,19 @@ class SafeDataFrameProcessor(Processor[DataFrameTask]):
     discarded.
     """
     @classmethod
-    def apply(cls, toframe = None, **cnf):
+    def apply(cls, toframe = None, buffers = None, **cnf):
         "applies the task to a frame or returns a function that does so"
-        task = cast(DataFrameTask, cls.tasktype(**cnf)) # pylint: disable=not-callable
-        fcn  = partial(cls._merge if task.merge else cls._apply, task)
+        task = cast(DataFrameTask, cls.tasktype(**cnf))  # pylint: disable=not-callable
+        fcn  = partial(cls._merge if task.merge else cls._apply, task, buffers)
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
         "updates the frames"
-        args.apply(self.apply(**self.config()))
+        args.apply(self.apply(**self.config(), buffers = args.data))
 
     @classmethod
-    def _merge(cls, task, frame):
-        frame = cls._apply(task, frame)
+    def _merge(cls, task, buffers, frame):
+        frame = cls._apply(task, buffers, frame)
         lst   = []
         for i in frame.keys():
             try:
@@ -148,10 +152,13 @@ class SafeDataFrameProcessor(Processor[DataFrameTask]):
                      if frame is cast(Any, i).frametype()), None)
 
     @classmethod
-    def _apply(cls, task, frame):
-        sub = cls.factory(frame)
-        if sub is not None:
-            return frame.withaction(sub(task, frame).dataframe)
+    def _apply(cls, task, buffers, frame):
+        frametype = type(frame)
+        for sub in cls.__iter_subclasses():
+            if frametype is cast(Any, sub).frametype():
+                out = getattr(sub, '_proc_apply')(task, buffers, frame)
+                if out is not None:
+                    return out
         raise RuntimeError(f'Could not process {type(frame)} into a pd.DataFrame')
 
 class DataFrameProcessor(SafeDataFrameProcessor):
@@ -161,5 +168,5 @@ class DataFrameProcessor(SafeDataFrameProcessor):
     Exceptions are *not* silently ignored.
     """
     @classmethod
-    def _merge(cls, task, frame):
-        return pd.concat([i for _, i in cls._apply(task, frame)], sort = False)
+    def _merge(cls, task, buffers, frame):
+        return pd.concat([i for _, i in cls._apply(task, buffers, frame)], sort = False)

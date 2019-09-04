@@ -96,7 +96,7 @@ class TrackCleaningScript:
 
         dfltask = self.track.tasks.cleaning  # type: ignore
         if dfltask is None:
-            dfltask = Tasks.cleaning()
+            dfltask = Tasks.cleaning(instrument = self.track.instrument['type'])
 
         # use the default settings for this track
         dflt = dfltask.config()
