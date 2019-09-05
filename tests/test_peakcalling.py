@@ -389,7 +389,7 @@ def test_hp_dataframe():
         ),
         DataFrameTask(merge = True, measures = dict(peaks = True)),
     ).run()))
-    assert pair.shape == (102, 25)
+    assert pair.shape == (102, 26)
     assert pair.index.names == ['hpin', 'track', 'bead']
     assert isinstance(pair.peaks.values[0], pd.DataFrame)
 
@@ -404,7 +404,7 @@ def test_hp_dataframe():
         ),
         DataFrameTask(merge = True),
     ).run()))
-    assert pair.shape == (102, 24)
+    assert pair.shape == (102, 25)
     assert pair.index.names == ['hpin', 'track', 'bead']
 
 

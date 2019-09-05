@@ -447,6 +447,7 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
     * oligo:          the oligos used for fitting, if known.
     * stretch:        the stretch value from fitting to that hairpin.
     * bias:           the bias value from fitting to that hairpin.
+    * strandsize:     the sequence length
     * nbindings:      the number of expected bindings on the hairpin.
     * nblockages:     the number of blockage positions detected on the bead.
     * hfsigma:        the high frequency noise for that bead.
@@ -610,6 +611,7 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
             'stretch':    np.array([i[1] for i in res.distances.values()], dtype = 'f4'),
             'bias':       np.array([i[2] for i in res.distances.values()], dtype = 'f4'),
             'nbindings':  np.array([i.peaks.size for i in fits.values()],  dtype = 'i4'),
+            'strandsize': np.array([i.strandsize for i in fits.values()],  dtype = 'i4'),
             'nblockages': np.full(size, len(res.events),                   dtype = 'i4'),
             'hfsigma':    np.full(size, frame.track.rawprecision(bead),    dtype = 'f4')
         }
