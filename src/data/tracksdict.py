@@ -115,6 +115,7 @@ class TracksDict(dict):
     _SCAN_OPTS  = ('cgrdir', 'allleaves')
     _NTHREADS   = None
     _TRACK_TYPE = Track
+    _OSPLITS    = re.compile("([k345]mer)|([atgc]+)", re.IGNORECASE)
 
     def __init__(self,          # pylint: disable=too-many-arguments
                  tracks  = None,
@@ -285,15 +286,20 @@ class TracksDict(dict):
         """
         opts['cgrdir']    = cgrdir
         opts['allleaves'] = allleaves
-        if isinstance(match, str) and len(match) == 4 and match[1:] == 'mer':
+        if isinstance(match, str) and self._OSPLITS.match(match):
             from sequences.translator import splitoligos
-            grp  = False
-            itr  = cast(
+            grp   = False
+            match = match.lower()
+            ismer = match[1:] == 'mer'
+            itr   = cast(
                 Iterator[Tuple[Any, PATHTYPES]],
                 (
                     (Path(i).stem, i)
                     for i in LegacyTrackIO.scan(tracks)
-                    if splitoligos(match, i)
+                    if (
+                        (ismer and splitoligos(match, i))
+                        or (not ismer and match in splitoligos('kmer', i))
+                    )
                 )
             )
         else:
