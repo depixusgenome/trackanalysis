@@ -121,7 +121,7 @@ def test_tracksdict_hpfit(scriptingcleaner):
     assert isinstance(frame.tasklist[0], list)
     assert frame.tasklist[0][-2].oligos == "4mer"
     assert list(frame.oligo.unique()) == ["ctgt"]
-    assert frame.shape == (80, 26)
+    assert frame.shape == (80, 27)
     assert frame.index.names == ['hpin', 'track', 'bead']
 
 
@@ -137,6 +137,28 @@ def test_tracksdict_cleaning_df(scriptingcleaner):
     assert not all(i is None for i in dframe['good'])
     assert not all(i is None for i in dframe['fixed'])
 
+@integrationmark
+def test_viewer(scriptingcleaner):
+    "test TracksDict.basedataframe"
+    from scripting import displaytrack, displaytracksdict
+    from textwrap import dedent
+    vals  = (str(displaytrack())+'\n'+str(displaytracksdict())).strip()
+    truth = dedent("""
+    Column
+        [0] Row
+            [0] TextInput(name='Path', value='./**/*.trk', width=600)
+            [1] TextInput(name='Match', width=200)
+        [1] Select(name='Track', width=850)
+        [2] HoloViews(Div)
+    Column
+        [0] Row
+            [0] TextInput(name='Path', value='./**/*.trk', width=600)
+            [1] TextInput(name='Match', width=200)
+        [1] CrossSelector(name='Track', width=850)
+        [2] HoloViews(Div)
+    """).strip()
+    assert vals == truth
+
 
 if __name__ == '__main__':
-    test_tracksdict_cleaning_df(None)
+    test_viewer(None)
