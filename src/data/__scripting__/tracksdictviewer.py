@@ -29,7 +29,6 @@ class _BasePathSelector(Generic[Item, Selector]):
         self.paths    = pnw.TextInput(name = "Path",  value = defaultpath, width = 600)
         self.match    = pnw.TextInput(name = "Match", width = 200)
         self.selector = templateattribute(self, 1)(name = "Track", width = 850)
-        self.pane     = pn.Pane(hv.Div(""), width = 850)
 
         self.paths.param.watch(self._on_update, "value")
         self.match.param.watch(self._on_update, "value")
@@ -37,7 +36,7 @@ class _BasePathSelector(Generic[Item, Selector]):
 
     def display(self) -> pn.Column:
         "create the view"
-        self._col = pn.Column(pn.Row(self.paths, self.match), self.selector, self.pane)
+        self._col = pn.Column(pn.Row(self.paths, self.match), self.selector, pn.Pane(hv.Div("")))
         self._on_update()
         return self._col
 
@@ -72,7 +71,9 @@ class _BasePathSelector(Generic[Item, Selector]):
             self._col[-1] = pn.Pane(hv.Div("No tracks selected"))
             return
 
-        self._col[-1] = self._new_display()
+        obj = self._new_display()
+        if obj is not None:
+            self._col[-1] = obj
 
     @abstractmethod
     def _new_display(self):
@@ -89,7 +90,7 @@ class TrackSelector(_BasePathSelector[Track, pnw.Select]):
         track = self.track
         beads = list(track.beads.keys())
         if not beads:
-            return hv.Div("No beads in this track")
+            return pn.Pane("No beads in this track")
 
         sel  = pnw.Select(
             name    = "Plot",
@@ -116,11 +117,10 @@ class TracksDictSelector(_BasePathSelector[TracksDict, pnw.CrossSelector]):
         "Return the current tracksdict"
         return TracksDict.leastcommonkeys([self._root/i for i in self.selector.value])
 
-    def _new_display(self):
+    def _on_newtracks(self, *_):
         "update the values"
-        return pn.Pane(
-            hv.Table(self.tracksdict.dataframe().assign(path = lambda x: x.path.apply(str)))
-        )
+        dframe = hv.Table(self.tracksdict.dataframe().assign(path = lambda x: x.path.apply(str)))
+        self._col[-1].object = dframe
 
 def displaytrack(fcn = None) -> TrackSelector:
     "creates a new TrackSelector child class, changing the _on_newtracks method"
