@@ -5,8 +5,8 @@
 from   typing                   import Tuple
 from   bokeh.models             import GlyphRenderer
 import pytest
-import numpy  as np
 import pandas as pd
+import numpy  as np
 from   numpy.testing            import assert_equal, assert_allclose
 
 from   tests.testutils          import integrationmark
@@ -15,13 +15,12 @@ from   tests.testingcore        import path as utpath
 from   cleaning.processor       import (DataCleaningTask, DataCleaningException,
                                         DataCleaningProcessor, BeadSubtractionTask,
                                         BeadSubtractionProcessor, ClippingTask)
-from   cleaning.datacleaning    import DataCleaning
 from   cleaning.beadsubtraction import (SubtractAverageSignal, SubtractMedianSignal,
                                         FixedBeadDetection)
 import cleaning._core           as     cleaningcore  # pylint:disable=no-name-in-module,import-error
 from   data                       import Beads, Track
-from   taskmodel.dataframe        import DataFrameTask
 from   taskcontrol.taskcontrol    import create
+from   taskmodel.dataframe        import DataFrameTask
 from   taskmodel.track            import TrackReaderTask, Task, UndersamplingTask
 from   simulator                  import randtrack, setseed
 from   simulator.bindings         import Experiment
@@ -127,7 +126,7 @@ def test_constantvalues():
     fin[[0,10,20,40,41,-3]] = False
 
     # pylint: disable=c-extension-no-member
-    cleaningcore.constant(DataCleaning(), bead)
+    cleaningcore.constant(DataCleaningTask().core, bead)
 
     assert_equal(np.isnan(bead), fin)
 
@@ -137,7 +136,7 @@ def test_constantvalues():
     bead[40:42] = 100.
     bead[-3:]   = 100.
 
-    cleaningcore.constant(DataCleaning(mindeltarange=5), bead)
+    cleaningcore.constant(DataCleaningTask(mindeltarange=5).core, bead)
     fin[:] = False
     fin[21:30] = True
     assert_equal(np.isnan(bead), fin)
@@ -318,7 +317,7 @@ def test_cleaning_localpop():
                     -0.8487556,  -0.85013884, -0.84805053, -0.84800196, -0.85113859,
                     -0.85277474, -0.8499831,  -0.85259891], dtype='f4')
 
-    DataCleaningTask().aberrant(arr)
+    DataCleaningTask().core.aberrant(arr)
     assert np.all(np.isnan(arr[401:624]))
 
 def test_subtract(monkeypatch):
@@ -615,9 +614,9 @@ def test_rescaling():
 
     task = DataCleaningTask()
     new  = task.rescale(5.)
-    resc = new.__getstate__()
+    resc = dict(new.__dict__)
     assert task is not new
-    for i, j in task.__getstate__().items():
+    for i, j in task.__dict__.items():
         assert abs(resc[i]-j*5) < 1e-6 if i in attrs else resc[i] == j
 
     for cls in (ClippingTask, BeadSubtractionTask):

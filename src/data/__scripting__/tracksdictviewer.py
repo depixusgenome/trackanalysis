@@ -4,9 +4,10 @@
 A simple GUI for accessing files
 """
 from   abc      import abstractmethod
-from   typing   import TypeVar, Generic, Type
+from   typing   import TypeVar, Generic, Optional, Callable
 from   pathlib  import Path
 
+import pandas        as pd
 import holoviews     as hv
 import panel         as pn
 import panel.widgets as pnw
@@ -117,21 +118,24 @@ class TracksDictSelector(_BasePathSelector[TracksDict, pnw.CrossSelector]):
         "Return the current tracksdict"
         return TracksDict.leastcommonkeys([self._root/i for i in self.selector.value])
 
-    def _on_newtracks(self, *_):
-        "update the values"
-        dframe = hv.Table(self.tracksdict.dataframe().assign(path = lambda x: x.path.apply(str)))
-        self._col[-1].object = dframe
+    @property
+    def dftracksdict(self) -> pd.DataFrame:
+        "return a dataframe representation of the tracksdict"
+        return self.tracksdict.dataframe().assign(path = lambda x: x.path.apply(str))
 
-def displaytrack(fcn = None) -> TrackSelector:
-    "creates a new TrackSelector child class, changing the _on_newtracks method"
-    cls: Type[TrackSelector] = TrackSelector
-    if fcn is not None:
-        cls = type(f'New{cls.__name__}', (cls,), {'_new_display': fcn})
-    return cls().display()
+    def _new_display(self):
+        self._col[-1].object = hv.Table(self.dftracksdict)
 
-def displaytracksdict(fcn = None) -> TracksDictSelector:
+def displaytrack(fcn: Optional[Callable] = None, **kwa) -> pn.Column:
     "creates a new TrackSelector child class, changing the _on_newtracks method"
-    cls: Type[TracksDictSelector] = TracksDictSelector
-    if fcn is not None:
-        cls = type(f'New{cls.__name__}', (cls,), {'_new_display': fcn})
-    return cls().display()
+    cls = TrackSelector
+    return (
+        cls if fcn is None else type(f'New{cls.__name__}', (cls,), {'_new_display': fcn})
+    )(**kwa).display()
+
+def displaytracksdict(fcn: Optional[Callable] = None, **kwa) -> pn.Column:
+    "creates a new TrackSelector child class, changing the _on_newtracks method"
+    cls = TracksDictSelector
+    return (
+        cls if fcn is None else type(f'New{cls.__name__}', (cls,), {'_new_display': fcn})
+    )(**kwa).display()

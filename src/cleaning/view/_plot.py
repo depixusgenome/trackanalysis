@@ -24,8 +24,7 @@ from    eventdetection.processor    import ExtremumAlignmentProcessor
 from    ._model                     import (DataCleaningModelAccess, CleaningPlotModel,
                                             CleaningPlotTheme)
 from    ._widget                    import CleaningWidgets
-from    ..datacleaning              import DataCleaning
-from    .._core                     import Partial  # pylint: disable=import-error
+from    .._core                     import Partial, DataCleaning  # pylint: disable=import-error
 from    ..names                     import NAMES
 from    ..processor                 import (DataCleaningProcessor,
                                             ClippingProcessor, ClippingTask)
@@ -108,7 +107,8 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
         "returns the result of the beadselection"
         curr = np.copy(info[1])
         exc  = super().compute(frame, (info[0], curr), cache = cache, **cnf)
-        tmp  = DataCleaning(**cnf)
+        tmp  = DataCleaning()
+        tmp.configure(cnf)
         tmp.aberrant(info[1], True)
         cache['gui'] = np.isnan(curr)
         cache['exc'] = exc
