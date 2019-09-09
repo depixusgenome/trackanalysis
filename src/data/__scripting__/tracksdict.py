@@ -301,7 +301,7 @@ class TracksDict(_TracksDict):
                   process   = True,
                   **kwa):
         "Returns either `basedataframe` or `trackdataframe`"
-        if len(tasks) == 0:
+        if len(tasks) == 0 and not kwa and not assign and not transform:
             return self.basedataframe(loadall)
         kwa.update(transform = transform, assign = assign, process = process)
         return self.trackdataframe(*tasks, **kwa)
