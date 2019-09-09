@@ -234,6 +234,8 @@ class TracksDict(_TracksDict):
         **Warning:** the first task should be either event detection or peak
         selection.
         """
+        if not tasks:
+            tasks = (Tasks.alignment,)
         try:
             Tasks(tasks[0])
         except (IndexError, ValueError) as _:
