@@ -68,13 +68,22 @@ class _BasePathSelector(Generic[Item, Selector]):
 
     def _on_newtracks(self, *_):
         "update the values"
-        if not self.selector.value:
-            self._col[-1] = pn.Pane(hv.Div("No tracks selected"))
+        old = self._col.objects[:-1]
+        obj = hv.Div("No tracks selected") if not self.selector.value else self._new_display()
+        if obj is None:
             return
 
-        obj = self._new_display()
-        if obj is not None:
-            self._col[-1] = obj
+        try:
+            self._col.pop(-1)
+            self._col.append(pn.Pane(obj))
+        except KeyError:  # panel bug
+            for _ in range(5):
+                try:
+                    self._col.clear()
+                    self._col.extend(old + [pn.Pane(obj)])
+                    break
+                except KeyError:  # panel bug
+                    pass
 
     @abstractmethod
     def _new_display(self):
@@ -124,7 +133,7 @@ class TracksDictSelector(_BasePathSelector[TracksDict, pnw.CrossSelector]):
         return self.tracksdict.dataframe().assign(path = lambda x: x.path.apply(str))
 
     def _new_display(self):
-        self._col[-1].object = hv.Table(self.dftracksdict)
+        return hv.Table(self.dftracksdict)
 
 def displaytrack(fcn: Optional[Callable] = None, **kwa) -> pn.Column:
     "creates a new TrackSelector child class, changing the _on_newtracks method"

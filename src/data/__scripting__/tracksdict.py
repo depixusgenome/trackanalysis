@@ -66,6 +66,7 @@ class TracksDict(_TracksDict):
     if __doc__:
         __doc__ = _TracksDict.__doc__ + __doc__
     _TRACK_TYPE = Track
+
     def __init__(self,          # pylint: disable=too-many-arguments
                  tracks  = None,
                  grs     = None,
