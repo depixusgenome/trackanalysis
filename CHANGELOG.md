@@ -1,7 +1,17 @@
 # CycleApp
+## cycles_v6.16
+
+* 2019-09-10 10:30:20 +0000  (tag: cycles_v6.16)
+
+Fixed beads are now subtracted automatically. The oligos are also detected
+automatically using the file name. The expected format is a track file name
+containing elements such as 'atcg 2nM' or 'aaa 3pM'. The concentration must
+come after the oligos. It may or may not be separated by an underscore or a
+minus sign.
+
 ## cycles_v6.15
 
-* 2019-08-29 10:30:20 +0000  (tag: cycles_v6.15.1)
+* 2019-08-30 10:06:28 +0200  (tag: cycles_v6.15.1)
 * 2019-08-28 13:30:20 +0000  (tag: cycles_v6.15)
 
 ### Beads

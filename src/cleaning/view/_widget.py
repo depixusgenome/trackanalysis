@@ -363,6 +363,7 @@ class CleaningWidgets:
         agg      = '%(undersampling.aggregation)|mean:mean|none:none|'
         return f"""
             ## Fixed Beads
+            Automatically subtract fixed beads      %({fix}:automate)b
             {NAMES['extent']}  <                    %({fix}:maxextent).3F
             {NAMES['hfsigma']} <                    %({fix}:maxhfsigma).3F
             φ₅ repeatability: max(|z-mean(z)|) <    %({fix}:maxdiff).2F

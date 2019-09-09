@@ -15,11 +15,11 @@ from .                       import (read as _readsequence, peaks as _sequencepe
 @dataclass
 class SequenceConfig:
     "data for a DNA sequence"
-    name     : str                             = "sequence"
-    path     : Optional[str]                   = None
+    name:      str                             = "sequence"
+    path:      Optional[str]                   = None
     sequences: Dict[str, str]                  = field(default_factory = dict)
-    probes   : List[str]                       = field(default_factory = list)
-    history  : List[Union[str, Sequence[str]]] = field(default_factory = list)
+    probes:    List[str]                       = field(default_factory = list)
+    history:   List[Union[str, Sequence[str]]] = field(default_factory = list)
     maxlength: int                             = 10
 
 @dataclass
@@ -27,21 +27,31 @@ class SequenceDisplay:
     """
     configuration for probrs
     """
-    name  : str                              = "sequence"
-    hpins : Dict[int, str]                   = field(default_factory = dict)
+    name:   str                              = "sequence"
+    hpins:  Dict[int, str]                   = field(default_factory = dict)
     probes: Dict[Any, Union[str, List[str]]] = field(default_factory = dict)
 
 @dataclass
 class SequenceModel:
     "everything sequence"
-    config  : SequenceConfig  = field(default_factory = SequenceConfig)
-    display : SequenceDisplay = field(default_factory = SequenceDisplay)
-    tasks   : TasksDisplay    = field(default_factory = TasksDisplay)
+    config:  SequenceConfig  = field(default_factory = SequenceConfig)
+    display: SequenceDisplay = field(default_factory = SequenceDisplay)
+    tasks:   TasksDisplay    = field(default_factory = TasksDisplay)
+
     def addto(self, ctrl, noerase = False):
         "add to the controller"
+        first = self.config.name not in ctrl.theme
         self.config  = ctrl.theme.  add(self.config,  noerase)
         self.display = ctrl.display.add(self.display, noerase)
         self.tasks   = ctrl.display.add(self.tasks,   noerase)
+        if first:
+            @ctrl.tasks.observe
+            def _onopentrack(calllater = None, **_):
+                @calllater.append
+                def _addoligo():
+                    if not self.currentprobes:
+                        self.setnewprobes(ctrl, "kmer")
+
         return self
 
     def setnewkey(self, ctrl, new):
@@ -148,6 +158,7 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
     "access to the sequence path and the oligo"
     _seqconfig  = Indirection()
     _seqdisplay = Indirection()
+
     def __init__(self, ctrl) -> None:
         SequenceModel().addto(ctrl, noerase = False)
         super().__init__(ctrl)
