@@ -88,7 +88,7 @@ class DataCleaningErrorMessage:
     def data(self) -> List[Tuple[Optional[int], str, str]]:
         "returns a message if the test is invalid"
         dflt = self.tasktype()
-        if self.stats is None:
+        if not self.stats:
             pop = self.config.get('minpopulation', dflt.minpopulation)
             return [(None, 'population', '< %d' % pop)]
 
