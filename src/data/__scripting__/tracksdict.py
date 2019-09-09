@@ -129,7 +129,7 @@ class TracksDict(_TracksDict):
         return super().__getitem__([i for i in self if fcn(i.lower())])
 
     def __getitem__(self, key): # pylint: disable=too-many-return-statements
-        if isinstance(key, list) and all(isinstance(i, int) for i in key):
+        if isinstance(key, list) and key and all(isinstance(i, int) for i in key):
             tracks = self.clone()
             sel    = Tasks.selection(selected = list(key))
             for i in tracks.values():

@@ -337,6 +337,30 @@ class TracksDict(dict):
         return info.keys()
 
     @classmethod
+    def stemkeys(cls, *tracks):
+        """
+        creates a new TracksDict keyed using path stems as keys
+        """
+        def _iter():
+            rem = list(tracks)
+            while len(rem):
+                i = rem.pop()
+                if isinstance(i, (Path, str)):
+                    yield (Path(str(i)).stem, str(i))
+                elif isinstance(i, Track) and isinstance(i.path, (str, Path)):
+                    yield (Path(str(i.path)).stem, i)
+                elif isinstance(i, Track):
+                    yield (Path(str(i.path[0])).stem, i)
+                elif callable(getattr(i, 'values', None)):
+                    rem.extend(i.values())
+                else:
+                    rem.extend(i)
+
+        self = cls()
+        self.update(_iter())
+        return self
+
+    @classmethod
     def leastcommonkeys(cls, *tracks):
         """
         creates a new TracksDict keyed using least common keys

@@ -116,7 +116,7 @@ class TracksDictSelector(_BasePathSelector[TracksDict, pnw.CrossSelector]):
     @property
     def tracksdict(self) -> TracksDict:
         "Return the current tracksdict"
-        return TracksDict.leastcommonkeys([self._root/i for i in self.selector.value])
+        return TracksDict.stemkeys([self._root/i for i in self.selector.value])
 
     @property
     def dftracksdict(self) -> pd.DataFrame:
