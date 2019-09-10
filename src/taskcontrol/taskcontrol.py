@@ -299,6 +299,7 @@ class BaseTaskController(Controller):
         if task is None:
             task = cast(RootTask, tasks[0])
 
+        isarchive = False
         if not isinstance(task, RootTask):
             isarchive = (
                 (
@@ -317,7 +318,6 @@ class BaseTaskController(Controller):
 
         elif len(tasks) == 0:
             tasks     = (task,)
-            isarchive = False
 
         elif tasks[0] is not task:
             raise ValueError("model[0] ≠ root")
