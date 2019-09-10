@@ -300,6 +300,15 @@ class BaseTaskController(Controller):
             task = cast(RootTask, tasks[0])
 
         if not isinstance(task, RootTask):
+            isarchive = (
+                (
+                    isinstance(task, (Path, str))
+                    and any(str(task).endswith(i) for i in ('.xlsx', '.ana'))
+                ) or (
+                    isinstance(task, (tuple, list))
+                    and any(str(j).endswith(i) for i in ('.xlsx', '.ana') for j in task)
+                )
+            )
             lst = openmodels(self._openers, task, tasks)
             for elem in lst[:-1]:
                 ctrl = create(elem, processors = self.__processors)
@@ -307,14 +316,15 @@ class BaseTaskController(Controller):
             task, tasks  = lst[-1][0], lst[-1]
 
         elif len(tasks) == 0:
-            tasks = (task,)
+            tasks     = (task,)
+            isarchive = False
 
         elif tasks[0] is not task:
             raise ValueError("model[0] ≠ root")
 
         ctrl = create(*tasks, processors = self.__processors)
         self._items[cast(RootTask, task)] = ctrl
-        return dict(controller = self, model = tasks)
+        return dict(controller = self, model = tasks, isarchive = isarchive)
 
     @Controller.emit
     def closetrack(self, task:RootTask) -> dict:

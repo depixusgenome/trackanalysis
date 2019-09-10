@@ -174,10 +174,8 @@ class DataCleaningModelAccess(TaskPlotModelAccess):  # pylint: disable=too-many-
                 self._fixedbeadsstore = {'data': info}
 
         @ctrl.tasks.observe
-        def _onopentrack(model = None, calllater = None, **_):
-            if not self._fixedbeadsconfig.automate:
-                return
-            if any(isinstance(i, BeadSubtractionTask) for i in model):
+        def _onopentrack(calllater = None, isarchive = False, **_):
+            if not self._fixedbeadsconfig.automate or isarchive:
                 return
 
             @calllater.append
