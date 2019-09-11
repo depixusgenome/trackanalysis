@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a dataframe"
-from   typing                      import Dict, List, Tuple, Callable, cast
-from   functools                   import partial
-import numpy                       as     np
+from   typing     import Dict, List, Tuple, Callable, Iterable, cast
+from   functools  import partial
+import pandas     as     pd
+import numpy      as     np
 
 from   taskcontrol.processor.dataframe import DataFrameFactory
 from   .probabilities                  import Probability, peakprobability
@@ -61,6 +62,9 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
     ```python
     >>> DataFrameTask(measures = dict(events = dict(eventstd = 'std')))
     ```
+
+    Should one use `dfevents` as a keyword instead, then all events related data
+    will be stored in dataframes inside an *events* column.
     """
     def __init__(self, task, frame, **kwa):
         super().__init__(task, frame)
@@ -68,7 +72,8 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
         self.__prob   = peakprobability(frame)
         meas          = dict(task.measures)
         meas.update(kwa)
-        self.__events = meas.pop('events', None)
+        self.__events   = meas.pop('events', meas.get('dfevents', None))
+        self.__dfevents = meas.pop('dfevents', False) and self.__events
         if self.__events is True:
             self.__events = dict()
 
@@ -76,19 +81,39 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
             self.__events        = {i: self.getfunction(j) for i, j in self.__events.items()}
             self.__events['avg'] = np.nanmean
 
-        add    = lambda verif: [(i, meas.pop(i)) for i in tuple(meas) if verif(meas[i])]
-        isprop = lambda i: (isinstance(i, str)
-                            and isinstance(getattr(Probability, i, None), property))
-        ismeth = lambda i: (isinstance(i, str)
-                            and callable(getattr(Probability, i, None)))
-        isnp   = lambda i: ((isinstance(i, str) and hasattr(np, i))
-                            or callable(i) and getattr(np, i.__name__, None) is i)
-        method = lambda i: partial(lambda j, k: j(k[1]), getattr(Probability, i))
+        def add(verif):
+            "add a measure"
+            return [(i, meas.pop(i)) for i in tuple(meas) if verif(meas[i])]
+
+        def isprop(i):
+            "whether the arg is a property in the 'Probability' class"
+            return (
+                isinstance(i, str)
+                and isinstance(getattr(Probability, i, None), property)
+            )
+
+        def ismeth(i):
+            "whether the arg is a method in the 'Probability' class"
+            return (
+                isinstance(i, str)
+                and callable(getattr(Probability, i, None))
+            )
+
+        def isnp(i):
+            "whether the arg is a method in the 'numy'"
+            return (
+                (isinstance(i, str) and hasattr(np, i))
+                or callable(i) and getattr(np, i.__name__, None) is i
+            )
+
+        def method(i):
+            "return a method for measuring a value in 'Probability'"
+            return partial(lambda j, k: j(k[1]), getattr(Probability, i))
 
         self.__attrs  = ([('hybridisationrate', 'hybridisationrate'),
                           ('averageduration',   'averageduration'),
                           ('eventcount',        'nevents')]
-                         +add(isprop))
+                         + add(isprop))
         self.__np     = [(i, self.getfunction(j)) for i, j in add(isnp)]
         self.__aggs   = [(i, tuple(self.getfunction(k) for k in j))
                          for i, j in add(lambda x: isinstance(x, tuple))]
@@ -114,6 +139,8 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
         meas: Dict[str,np.ndarray] = {}
         if self.__events:
             self.__eventmeasure(meas, peaks)
+
+        if self.__events and not self.__dfevents:
             counts = np.array([sum(len(j) > 0 for j in i) for _, i in peaks])
         else:
             counts = np.ones(len(peaks), dtype = 'i4')
@@ -133,9 +160,15 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
 
     def __probmeasure(self, meas, peaks, counts):
         probs = [self.__prob(i) for _, i in peaks]
-        get   = lambda attr, obj: getattr(obj, attr)
-        meas.update({i: self.__peakmeasure(probs, counts, partial(get, j))
-                     for i, j in self.__attrs})
+        meas.update(
+            {
+                i: self.__peakmeasure(
+                    probs,
+                    counts,
+                    partial(lambda attr, obj: getattr(obj, attr), j)
+                )
+                for i, j in self.__attrs
+            })
 
     def __npmeasure(self, meas, peaks, counts):
         curr: List[List[np.ndarray]] = [[] for _ in self.__np]
@@ -163,21 +196,46 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
         tmp: Dict[str, List[np.ndarray]] = {i: [] for i in self.__events.keys()}
         tmp.update(cycle = [], start = [], length = [])
 
-        append = lambda x, y: tmp[x].append(np.array(list(y)))
+        def _append(name: str, data: Iterable):
+            tmp[name].append(np.array(list(data)))
+
         for _, pks in peaks:
-            append('cycle',  (i for i, j in enumerate(pks) if len(j)))
-            append('length', (j['start'][-1]+len(j['data'][-1]) - j['start'][0]
-                              for j in pks if len(j)))
-            append('start',  (j['start'][0]  for j in pks if len(j)))
+            _append('cycle',  (i for i, j in enumerate(pks) if len(j)))
+            _append(
+                'length',
+                (
+                    j['start'][-1]+len(j['data'][-1]) - j['start'][0]
+                    for j in pks if len(j)
+                )
+            )
+            _append('start',  (j['start'][0]  for j in pks if len(j)))
 
             arrs = tuple(np.concatenate(j['data']) for j in pks if len(j))
             for name, fcn in self.__events.items():
-                append(name, (fcn(i) for i in arrs))
+                _append(name, (fcn(i) for i in arrs))
 
         if len(next(iter(tmp.values()), ())):
             meas.update({i: np.concatenate(j) for i, j in tmp.items()})
+
+        if self.__dfevents:
+            self.__todfmeasure(meas, peaks)
 
     @staticmethod
     def __peakmeasure(peaks, cnt, fcn):
         tmp = [np.full(cnt[i], fcn(j)) for i, j in enumerate(peaks)]
         return np.concatenate(tmp) if tmp else np.empty(0, dtype = 'f4')
+
+    def __todfmeasure(self, meas, peaks):
+        evts = {
+            i: meas.pop(i)
+            for i in set(meas) & (set(self.__events) | {'cycle', 'start', 'length'})
+        }
+        meas['events'] = np.empty(len(peaks), dtype = 'O')
+        ix1 = 0
+        for ind, (pos, data) in enumerate(peaks):
+            ix2 = ix1 + len(data)
+            meas['events'][ind] = (
+                pd.DataFrame({i: j[ix1:ix2] for i, j in evts.items()})
+                .assign(peakposition = pos)
+            )
+            ix1 = ix2
