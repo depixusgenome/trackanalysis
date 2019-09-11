@@ -23,12 +23,13 @@ class BeadSubtractionTask(Task):
     Stretches of constant values are also removed prior to the subtraction.
     See `AberrantValuesRule` for a documentation.
     """
-    filter: Filter    = None
-    beads:  List[int] = []
-    agg:    AggType   = SubtractMedianSignal()
-    mindeltavalue     = 1e-6
-    mindeltarange     = 3
-    level             = Level.none
+    filter:        Filter    = None
+    beads:         List[int] = []
+    agg:           AggType   = SubtractMedianSignal()
+    mindeltavalue: float     = 1e-6  # warning: used in c++
+    mindeltarange: int       = 3     # warning: used in c++
+    level:         Level     = Level.none
+
     def __delayed_init__(self, _):
         if isinstance(self.agg, str):
             self.agg = aggtype(self.agg)
@@ -59,7 +60,7 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
         if toframe is None:
             return partial(cls.apply, cache = cache, **kwa)
 
-        task    = cls.tasktype(**kwa) # pylint: disable=not-callable
+        task = cls.tasktype(**kwa)  # pylint: disable=not-callable
         if len(task.beads) == 0:
             return toframe
 
@@ -68,10 +69,11 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
 
     def run(self, args):
         "updates frames"
-        cache = args.data.setcachedefault(self, {})
-        args.apply(self.apply(cache =  cache, **self.config()))
+        if self.task.beads:
+            cache = args.data.setcachedefault(self, {})
+            args.apply(self.apply(cache = cache, **self.config()))
 
-    def beads(self, _, selected: Iterable[int]) -> Iterable[int]: # type: ignore
+    def beads(self, _, selected: Iterable[int]) -> Iterable[int]:  # type: ignore
         "Beads selected/discarded by the task"
         sub = self.task.beads
         return (i for i in selected if i not in sub)
@@ -80,7 +82,7 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
         "returns the signal to subtract from beads"
         task  = self.task
 
-        next(iter(frame.keys())) # unlazyfy # type: ignore
+        next(iter(frame.keys()))  # unlazyfy # type: ignore
         data = cast(Dict, frame.data)
         itr  = (cast(Iterable[int], task.beads) if key is None else
                 cast(Iterable[int], list(zip(task.beads, repeat(key)))))

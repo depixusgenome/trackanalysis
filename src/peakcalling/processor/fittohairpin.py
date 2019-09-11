@@ -9,6 +9,7 @@ from   typing                      import (
 )
 
 import numpy                       as     np
+import pandas                      as     pd
 
 from   data.views                  import BEADKEY, TaskView
 from   peakfinding.peaksarray      import (
@@ -35,14 +36,16 @@ from   .._base                     import Range
 LOGS = getLogger(__name__)
 
 class DistanceConstraint(NamedTuple):
-    hairpin     : Optional[str]
-    constraints : Dict[str, Range]
+    hairpin:     Optional[str]
+    constraints: Dict[str, Range]
+
     def rescale(self, value:float) -> 'DistanceConstraint':
         "rescale factors (from µm to V for example) for a given bead"
         return type(self)(
             self.hairpin,
             {i: j.rescale(i, value) for i, j in self.constraints.items()}
         )
+
 
 Fitters     = Dict[Optional[str], HairpinFitter]
 Constraints = Dict[BEADKEY, DistanceConstraint]
@@ -196,12 +199,13 @@ class FitToHairpinTask(Task, zattributes = ('fit', 'constraints', 'singlestrand'
         return True
 
     @classmethod
-    def read(cls,
-             path   : StreamUnion,
-             oligos : Sequence[str],
-             fit    : Union[Fitters,  Type[HairpinFitter]] = None,
-             match  : Union[Matchers, Type[PeakMatching]]  = None,
-            ) -> 'FitToHairpinTask':
+    def read(
+            cls,
+            path:   StreamUnion,
+            oligos: Sequence[str],
+            fit:    Union[Fitters,  Type[HairpinFitter]] = None,
+            match:  Union[Matchers, Type[PeakMatching]]  = None,
+    ) -> 'FitToHairpinTask':
         "creates a BeadsByHairpin from a fasta file and a list of oligos"
         if isinstance(fit, dict):
             fit = fit.get(None, next(iter(fit.values()), None))
@@ -228,10 +232,12 @@ class FitToHairpinTask(Task, zattributes = ('fit', 'constraints', 'singlestrand'
                                             strandsize = value.strandsize)
                             for key, value in fits.items()})
 
+
 PeakEvents      = Iterable[PeakFindingOutput]
 PeakEventsTuple = Tuple[BEADKEY, PeakEvents]
 _PEAKS          = Tuple[np.ndarray, PeakListArray]
 Input           = Union[PeaksDict, PeakEvents]
+
 class FitBead(NamedTuple):
     key:          BEADKEY
     silhouette:   float
@@ -241,11 +247,12 @@ class FitBead(NamedTuple):
     baseline:     Optional[float]
     singlestrand: Optional[float]
 
-class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=too-many-ancestors
+class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]):  # pylint: disable=too-many-ancestors
     "iterator over peaks grouped by beads"
-    level:     Level  = FitToHairpinTask.level
+    level:     Level = FitToHairpinTask.level
     config:    FitToHairpinTask
     _resolved: Union[str, Path, Tuple[Union[str, Path],...]]
+
     def beadextension(self, ibead) -> Optional[float]:
         """
         Return the median bead extension (phase 3 - phase 1)
@@ -264,7 +271,7 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
             inp:      Optional[PeakListArray] = None,
             baseline: Optional[bool]          = None,
             strand:   Optional[bool]          = None,
-    )->Dict[Optional[str], Distance]:
+    ) -> Dict[Optional[str], Distance]:
         "compute distances from peak data"
         if inp is None:
             inp = self.__topeaks(cast(PeakEvents, cast(dict, self.data)[key]))
@@ -332,7 +339,6 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
         else:
             bead, inp = cast(PeakEventsTuple, aitem)
 
-
         events       = self.__topeaks(inp)
         baseline     = self.__baseline(bead, inp)
         singlestrand = self.__singlestrand(bead, inp)
@@ -382,10 +388,10 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]): # pylint: disable=t
 
     def __beadoutput(
             self,
-            key     : BEADKEY,
-            events  : PeakListArray,
-            dist    : Dict[Optional[str], Distance],
-            refs    : Tuple[Optional[float], Optional[float]]
+            key:    BEADKEY,
+            events: PeakListArray,
+            dist:   Dict[Optional[str], Distance],
+            refs:   Tuple[Optional[float], Optional[float]]
     ) -> FitBead:
         if len(dist) == 0:
             return FitBead(
@@ -406,7 +412,7 @@ class FitToHairpinProcessor(TaskViewProcessor[FitToHairpinTask, FitToHairpinDict
         fit         = cnf.get('fit',         None)
         match       = cnf.get('match',       None)
         constraints = cnf.get('constraints', None)
-        cnf.update(fit         = {} if not fit         else fit, # type: ignore
+        cnf.update(fit         = {} if not fit         else fit,  # type: ignore
                    constraints = {} if not constraints else constraints,
                    match       = {} if not match       else match)
         return cnf
@@ -441,6 +447,7 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
     * oligo:          the oligos used for fitting, if known.
     * stretch:        the stretch value from fitting to that hairpin.
     * bias:           the bias value from fitting to that hairpin.
+    * strandsize:     the sequence length
     * nbindings:      the number of expected bindings on the hairpin.
     * nblockages:     the number of blockage positions detected on the bead.
     * hfsigma:        the high frequency noise for that bead.
@@ -482,10 +489,25 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
             'hpin': max distance from expected bindings to a blockage position.
         }
         ```
-    * peaks: Dict[str, Any]
-        A dictionnary passed to a PeaksDataFrameFactory. The latter will
-        measure statistics on true positives and false positives, then report
-        the results aggregated by bead and hairpin.
+    * peaks: Union[Bool, Dict[str, Any]]
+        If `peaks = True`, then an additionnal *peaks* column is added holding
+        which holds a dataframe of the peaks for a given bead and hairpin. That
+        dataframe has at one row per peak and columns:
+            * *peakposition*
+            * *hybridisationrate*
+            * *averageduration*
+            * *status*: either '< baseline', 'baseline' 'falsepos', 'truepos',
+            'singlestrand', '> singlestrand' as needed.
+            * *baseposition*: the *peakposition* in base pairs
+            * *closest*: the closest theoretical position
+            * *distance*: the distance to the closest theoretical position
+
+        If *peaks* is a dictionnary, it is passed to a PeaksDataFrameFactory.
+        The latter will measure statistics on true positives and false
+        positives, then report the results aggregated by bead and hairpin.
+        Should the dictionnary contain `all = True`, then the previous *peaks*
+        column is added.
+
     * optionals: Dict[str, Callable[[FitToHairpinDict, int, FitBead], np.ndarray]]
         A dictionnary for creating additional columns. The functions take 3 arguments,
         the view, the bead id, and the results for that bead.
@@ -515,11 +537,20 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
             }
         )
 
+        self.__keeppeaks = False
+        if meas.get('peaks', None) is True:
+            meas.pop('peaks')
+            self.__keeppeaks = True
+        elif meas.get('peaks', {}).get('all', False):
+            self.__keeppeaks = True
+        meas.get('peaks', {}).pop('all', None)
+
         peaks = DataFrameTask(measures = meas.pop('peaks', {}))
         self.__peaks: PeaksDataFrameFactory = (
             PeaksDataFrameFactory(peaks, frame)
-            .discardcolumns('track', 'bead', 'cycle', 'avg', 'peakposition')
+            .discardcolumns('track', 'bead')
         )
+
         self.__aggregator: Callable[[Sequence[float]], float] = cast(
             Callable[[Sequence[float]], float],
             self.getfunction(meas.pop('aggregator', 'median'))
@@ -533,7 +564,7 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
             frame: FitToHairpinDict,
             bead:  int,
             res:   FitBead
-    ) -> Dict[str, np.ndarray]: # type: ignore
+    ) -> Dict[str, np.ndarray]:  # type: ignore
         frame = self.__config(frame)
         fits  = frame.fits(bead, res.events)
         out   = self.__basic(frame, bead, res, fits)
@@ -561,8 +592,7 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
 
         if not first:
             raise AttributeError(
-                "Dataframe can only be created if"
-                +" a FitToHairpinTask is in the tasklist"
+                "Dataframe can only be created if a FitToHairpinTask is in the tasklist"
             )
         return cast(FitToHairpinDict, first)
 
@@ -576,13 +606,14 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
     ) -> Dict[str, np.ndarray]:
         size = len(res.distances)
         return {
-            'hpin'      : np.array(list(res.distances),                    dtype = '<U20'),
-            'cost'      : np.array([i[0] for i in res.distances.values()], dtype = 'f4'),
-            'stretch'   : np.array([i[1] for i in res.distances.values()], dtype = 'f4'),
-            'bias'      : np.array([i[2] for i in res.distances.values()], dtype = 'f4'),
-            'nbindings' : np.array([i.peaks.size for i in fits.values()],  dtype = 'i4'),
-            'nblockages': np.full (size, len(res.events),                  dtype = 'i4'),
-            'hfsigma'   : np.full (size, frame.track.rawprecision(bead),   dtype = 'f4')
+            'hpin':       np.array(list(res.distances),                    dtype = '<U20'),
+            'cost':       np.array([i[0] for i in res.distances.values()], dtype = 'f4'),
+            'stretch':    np.array([i[1] for i in res.distances.values()], dtype = 'f4'),
+            'bias':       np.array([i[2] for i in res.distances.values()], dtype = 'f4'),
+            'nbindings':  np.array([i.peaks.size for i in fits.values()],  dtype = 'i4'),
+            'strandsize': np.array([i.strandsize for i in fits.values()],  dtype = 'i4'),
+            'nblockages': np.full(size, len(res.events),                   dtype = 'i4'),
+            'hfsigma':    np.full(size, frame.track.rawprecision(bead),    dtype = 'f4')
         }
 
     def __complex(
@@ -591,22 +622,28 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
             res:   FitBead,
             fits:  Dict[Optional[str], HairpinFitter],
     ) -> Dict[str, np.ndarray]:
-        out: Dict[str, List[float]] = {}
-        dist                        = res.distances
+        info: Dict[str, List[float]] = {}
+        dist = res.distances
+        data = self.__base_df(frame, res)
+        cols = list((set(data.columns) - {'peakposition', 'status'}))
         for tpe in ('bead', 'hpin'):
             for hpin, alg in fits.items():
-                good = self.__bead_hpin_complex(
+                window = self.__dist_complex(tpe, hpin, frame.config)
+                self.__bead_hpin_complex(
                     tpe,
-                    out,
+                    info,
                     self.__pks_complex(res, dist, hpin, alg),
-                    self.__dist_complex(tpe, hpin, frame.config)
+                    window
                 )
                 if tpe != 'hpin':
-                    self.__tp_fp_complex(out, frame, res, good)
-        return {
-            i: np.array(j, dtype = 'f4' if 'residuals' in i else 'i4')
-            for i, j in out.items()
-        }
+                    cur = self.__peaks_df(info, res.distances[hpin], alg.peaks, window, data)
+                    self.__tp_fp_complex(cols, info, cur)
+
+        out = {i: np.array(j, dtype = 'f4') for i, j in info.items() if i != 'peaks'}
+        if 'peaks' in info:
+            out['peaks'] = np.full(len(next(iter(out.values()))), None, dtype = 'O')
+            out['peaks'][:] = info['peaks']
+        return out
 
     @staticmethod
     def __pks_complex(res, dist, hpin, alg) -> Tuple[np.ndarray, np.ndarray]:
@@ -621,6 +658,56 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
             config.match[hpin].window   if hpin in config.match    else
             config.DEFAULT_MATCH.window
         )
+
+    def __base_df(self, frame, res) -> pd.DataFrame:
+        data   = pd.DataFrame(self.__peaks.dictionary(frame, (res.key, res.events)))
+        status = np.full(data.shape[0], "", dtype = "<U14")
+        if frame.config.baseline:
+            ind = (
+                BaselinePeakProcessor(task = frame.config.baseline)
+                .index(frame, res.key, res.events)
+            )
+            if ind is not None and 0 <= ind < len(res.events['peaks']):
+                pos = res.events['peaks'][ind]
+                status[data.peakposition < pos]  = "< baseline"
+                status[data.peakposition == pos] = "baseline"
+
+        if frame.config.singlestrand:
+            ind = (
+                SingleStrandProcessor(task = frame.config.singlestrand)
+                .index(frame, res.key, res.events)
+            )
+            if ind is not None and 0 <= ind < len(res.events['peaks']):
+                pos = res.events['peaks'][ind]
+                status[data.peakposition == pos] = "singlestrand"
+                status[data.peakposition > pos]  = "> singlestrand"
+        data['status'] = status
+        return data
+
+    def __peaks_df(   # pylint: disable=too-many-arguments
+            self, out, dist, hpinpeaks, window, data
+    ) -> pd.DataFrame:
+        hpos = (data['peakposition'] - dist[2]) * dist[1]
+        inds = np.minimum(len(hpinpeaks)-1, np.searchsorted(hpinpeaks, hpos))
+        inds[
+            np.abs(hpinpeaks[inds] - hpos) > np.abs(hpinpeaks[np.maximum(0, inds-1)] - hpos)
+        ] -= 1
+
+        delta  = hpinpeaks[inds] - hpos
+        status = np.copy(data['status'])
+        status[(status == '') & (np.abs(delta) < window)] = 'truepos'
+        status[status == ''] = 'falsepos'
+
+        data = data.assign(
+            closest      = hpinpeaks[inds],
+            distance     = delta,
+            baseposition = hpos,
+            status       = status
+        )
+
+        if self.__keeppeaks:
+            out.setdefault('peaks', []).append(data)
+        return data
 
     def __bead_hpin_complex(
             self,
@@ -645,32 +732,24 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
         out.setdefault(tpe+'truepos',     []).append(np.unique(ids).size)
         out.setdefault(tpe+'residuals',   []).append(
             self.__aggregator(
-                np.abs(arrs[tpe == 'exp'][ids]-arrs[tpe != 'exp'][good])
-                **2
+                np.abs(arrs[tpe == 'exp'][ids]-arrs[tpe != 'exp'][good]) ** 2
             )
         )
-        return good
 
-    def __tp_fp_complex(
+    def __tp_fp_complex(  # py
             self,
-            out: Dict[str, List[float]],
-            frame:  FitToHairpinDict,
-            res:    FitBead,
-            good:   np.ndarray
+            cols:   List[str],
+            out:    Dict[str, List[float]],
+            data:   pd.DataFrame,
     ):
-        if frame.config.baseline:
-            ind = (
-                BaselinePeakProcessor(task = frame.config.baseline)
-                .index(frame, res.key, res.events)
-            )
-        else:
-            ind = None
-
         for fmt in ('tp', 'fp'):
-            if ind is not None:
-                # remove the baseline
-                good[ind] = False
-            data = self.__peaks.dictionary(frame, (res.key, res.events))
-            for i, j in data.items():
-                out.setdefault(fmt+i, []).append(self.__aggregator(j))
-            good = np.logical_not(good)
+            tmp = data.loc[
+                data['status'] == ('truepos' if fmt == 'tp' else 'falsepos'),
+                cols
+            ]
+            if tmp.shape[0]:
+                for i, j in tmp.iteritems():
+                    out.setdefault(fmt+i, []).append(self.__aggregator(j))
+            else:
+                for i, j in tmp.iteritems():
+                    out.setdefault(fmt+i, []).append(np.NaN)

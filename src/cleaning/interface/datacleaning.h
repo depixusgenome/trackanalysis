@@ -41,6 +41,7 @@ namespace cleaning::datacleaning { namespace  {
     {
         cls.def(py::init([](py::kwargs kwa) { return _toptr<T>(kwa); }))
            .def("configure", [](T & i, py::dict d){ _fromkwa<T>(i, d); })
+           .def("config",    _getkwa<T>)
            .def("__eq__",
                 [](py::object & a, py::object b) -> bool
                 { 
@@ -49,7 +50,5 @@ namespace cleaning::datacleaning { namespace  {
                     return std::memcmp(a.cast<T*>(), b.cast<T*>(), sizeof(T)) == 0;
                 })
            .def(py::pickle(&_getkwa<T>, &_toptr<T>));
-        // pybind11 bug?
-        setattr(cls, "__setstate__", getattr(cls, "configure"));
     }
 }}

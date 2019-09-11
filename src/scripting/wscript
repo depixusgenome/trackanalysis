@@ -1,11 +1,18 @@
-require(python = dict(holoviews = '1.10.9'), rtime = False)
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+require(
+    python = dict(
+        holoviews = '1.10.9',
+        panel     = '0.4.0'
+    ),
+    rtime = False
+)
 
 suggest(
     python = dict(
         jupyter        = '1.0',
         jupyter_client = '5.2.3',
         hvplot         = '0.4',
-        panel          = '0.4.0',
         ipywidgets     = '7.4.2',
         ipyparallel    = '6.2.3',
         nb_conda       = '2.2.1',

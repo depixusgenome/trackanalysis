@@ -283,6 +283,17 @@ def test_dataframe():
     data = next(create(utfilepath('big_selected'),
                        EventDetectionTask(),
                        PeakSelectorTask(),
+                       DataFrameTask(merge = True, measures = dict(dfevents = True))).run())
+    assert isinstance(data, pd.DataFrame)
+    assert 'track' in data.index.names
+    assert 'bead'  in data.index.names
+    assert 'peakposition' in data
+    assert 'events' in data
+    assert isinstance(data.events[0], pd.DataFrame)
+
+    data = next(create(utfilepath('big_selected'),
+                       EventDetectionTask(),
+                       PeakSelectorTask(),
                        DataFrameTask(merge = True)).run())
     assert isinstance(data, pd.DataFrame)
     assert 'track' in data.index.names
@@ -399,4 +410,4 @@ def test_rescaling():
     assert obj == task
 
 if __name__ == '__main__':
-    test_baselinepeak()
+    test_dataframe()

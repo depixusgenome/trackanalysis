@@ -217,16 +217,14 @@ class DpxCleaning(Widget):
     subtracted         = props.String("")
     subtractcurrent    = props.Int(0)
 
-    __DFLT             = DataCleaningTask()
-    maxabsvalue        = props.Float(__DFLT.maxabsvalue)
-    maxderivate        = props.Float(__DFLT.maxderivate)
-    minpopulation      = props.Float(__DFLT.minpopulation)
-    minhfsigma         = props.Float(__DFLT.minhfsigma)
-    maxhfsigma         = props.Float(__DFLT.maxhfsigma)
-    minextent          = props.Float(__DFLT.minextent)
-    maxextent          = props.Float(__DFLT.maxextent)
-    maxsaturation      = props.Float(__DFLT.maxsaturation)
-    del __DFLT
+    maxabsvalue        = props.Float(getattr(DataCleaningTask, 'maxabsvalue'))
+    maxderivate        = props.Float(getattr(DataCleaningTask, 'maxderivate'))
+    minpopulation      = props.Float(getattr(DataCleaningTask, 'minpopulation'))
+    minhfsigma         = props.Float(getattr(DataCleaningTask, 'minhfsigma'))
+    maxhfsigma         = props.Float(getattr(DataCleaningTask, 'maxhfsigma'))
+    minextent          = props.Float(getattr(DataCleaningTask, 'minextent'))
+    maxextent          = props.Float(getattr(DataCleaningTask, 'maxextent'))
+    maxsaturation      = props.Float(getattr(DataCleaningTask, 'maxsaturation'))
 
 class CleaningFilterTheme:
     "cleaning filter theme"
@@ -365,6 +363,7 @@ class CleaningWidgets:
         agg      = '%(undersampling.aggregation)|mean:mean|none:none|'
         return f"""
             ## Fixed Beads
+            Automatically subtract fixed beads      %({fix}:automate)b
             {NAMES['extent']}  <                    %({fix}:maxextent).3F
             {NAMES['hfsigma']} <                    %({fix}:maxhfsigma).3F
             φ₅ repeatability: max(|z-mean(z)|) <    %({fix}:maxdiff).2F

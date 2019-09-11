@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updating FitToHairpinDict for scripting purposes"
-from   typing                           import List, Union, Iterator, Iterable
-from   copy                             import copy as shallowcopy
-
-import pandas                           as pd
-import numpy                            as np
+from   pathlib                          import Path
+from   typing                           import (
+    List, Union, Iterator, Callable, Dict, Iterable, Optional
+)
 
 from   data                             import Track
 from   data.tracksdict                  import TracksDict
 from   data.__scripting__.dataframe     import adddataframe
 from   peakfinding.__scripting__        import (Detailed,
                                                 PeaksTracksDictOperator as _PTDO)
-from   taskcontrol.processor.dataframe  import DataFrameProcessor
-from   taskmodel.__scripting__          import Tasks
+from   taskmodel.__scripting__          import Tasks, Task
 from   utils.decoration                 import addto
 from   ..toreference                    import HistogramFit, ChiSquareHistogramFit
 from   ..processor.fittohairpin         import (
@@ -112,7 +110,7 @@ def detailed(self, ibead, precision: float = None) -> Union[Iterator[Detailed], 
     if isinstance(self.data, FitToReferenceDict):
         if self.actions:
             raise NotImplementedError()
-        return self.data.detailed(ibead, precision) # type: ignore
+        return self.data.detailed(ibead, precision)  # type: ignore
 
     dtl  = self.data.detailed(ibead, precision)
     out  = self[...].withdata({ibead: dtl.output}).compute(ibead)
@@ -121,13 +119,13 @@ def detailed(self, ibead, precision: float = None) -> Union[Iterator[Detailed], 
 
 class PeaksTracksDictOperator(_PTDO, peaks = TracksDict):
     "Add dataframe method to tracksdict"
-    def dataframe( # pylint: disable=arguments-differ
+    def dataframe(  # pylint: disable=arguments-differ
             self,
-            *tasks,
-            transform = None,
-            assign    = None,
-            sequence  = None,
-            oligos    = None,
+            *tasks:    Union[Tasks, Task],
+            transform: Optional[Callable]                     = None,
+            assign:    Optional[Dict[str, Callable]]          = None,
+            sequence:  Union[str, Path, None, Dict[str, str]] = None,
+            oligos:    Union[str, Iterable[str], None]        = None,
             **kwa
     ):
         """
@@ -135,13 +133,21 @@ class PeaksTracksDictOperator(_PTDO, peaks = TracksDict):
 
         See documentation in *track.peaks.dataframe* for other options
         """
-        if sequence is not None:
+        if sequence is None:
+            sequence = kwa.pop("sequences", None)
+        if oligos is None:
+            oligos   = kwa.pop("oligo", None)
+        if sequence:
+            opts  = {
+                'fit', 'constraints', 'match', 'pullphaseratio', 'singlestrand', 'baseline'
+            }
             tasks = (
+                *tasks,
                 Tasks.fittohairpin(
                     sequences = sequence,
-                    oligos    = 'kmer' if oligos is None else oligos
-                ),
-                *tasks
+                    oligos    = 'kmer' if oligos is None else oligos,
+                    **{i: kwa.pop(i) for i in opts & set(kwa)}
+                )
             )
 
         tracks = self._dictview()
@@ -150,7 +156,11 @@ class PeaksTracksDictOperator(_PTDO, peaks = TracksDict):
                 pks    = self._items[self._reference].peaks
                 if self._beads:
                     pks = pks[list(self._beads)]
-                tasks = (Tasks.fittoreference(peaks = pks),) + tasks
+
+                if tasks and isinstance(tasks[-1], Tasks.fittohairpin().__class__):
+                    tasks = (*tasks[:-1], Tasks.fittoreference(peaks = pks), tasks[-1])
+                else:
+                    tasks = (*tasks, Tasks.fittoreference(peaks = pks))
 
             if self._reference in tracks:
                 tracks = tracks[f'~{self._reference}']
@@ -158,6 +168,7 @@ class PeaksTracksDictOperator(_PTDO, peaks = TracksDict):
                                 transform = transform,
                                 assign    = assign,
                                 **kwa)
+
 
 adddataframe(FitToHairpinDict, FitToReferenceDict)
 __all__: List[str] = ['HistogramFit', 'ChiSquareHistogramFit', 'FitToReferenceTask',

@@ -392,7 +392,35 @@ def test_tracksdict_creation():
         'test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec',
         'test035_5HPs_mix_GATG_5nM_25C_8sec_with_ramp'
     }
+    assert {Path(i.path).stem for i in TracksDict(path, match = "ctgt").values()} == {
+        'test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec',
+    }
+    assert {Path(i.path).stem for i in TracksDict(path, match = "gatg").values()} == {
+        'test035_5HPs_mix_GATG_5nM_25C_8sec_with_ramp'
+    }
 
+    cur = TracksDict(path, match = "4mer")
+    assert (
+        {Path(i.path).stem for i in TracksDict.leastcommonkeys(cur).values()}
+        == {
+            'test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec',
+            'test035_5HPs_mix_GATG_5nM_25C_8sec_with_ramp'
+        }
+    )
+    assert (
+        {Path(i.path).stem for i in TracksDict.leastcommonkeys(*cur.values()).values()}
+        == {
+            'test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec',
+            'test035_5HPs_mix_GATG_5nM_25C_8sec_with_ramp'
+        }
+    )
+    assert (
+        {Path(i.path).stem for i in TracksDict.leastcommonkeys(cur.values()).values()}
+        == {
+            'test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec',
+            'test035_5HPs_mix_GATG_5nM_25C_8sec_with_ramp'
+        }
+    )
 
 def test_io_recognition():
     "tests that the right IO class recognizes its paths"
@@ -548,4 +576,4 @@ def test_phasemanipulator():
     assert_equal(pma.duration(..., range(3)), track.phases[:,3]-track.phases[:,0])
 
 if __name__ == '__main__':
-    test_resampling()
+    test_tracksdict_creation()

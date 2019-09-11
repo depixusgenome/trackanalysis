@@ -4,7 +4,8 @@ u"testing peakcalling"
 # pylint: disable=import-error,no-name-in-module
 from concurrent.futures         import ProcessPoolExecutor
 from itertools                  import product
-import numpy as np
+import numpy  as np
+import pandas as pd
 from numpy.testing              import assert_allclose, assert_equal
 from pytest                     import approx
 
@@ -386,10 +387,26 @@ def test_hp_dataframe():
             oligos   = "4mer",
             fit      = ChiSquareFit()
         ),
+        DataFrameTask(merge = True, measures = dict(peaks = True)),
+    ).run()))
+    assert pair.shape == (102, 26)
+    assert pair.index.names == ['hpin', 'track', 'bead']
+    assert isinstance(pair.peaks.values[0], pd.DataFrame)
+
+    pair = next(iter(create(
+        TrackReaderTask(path = utpath("big_legacy")),
+        EventDetectionTask(),
+        PeakSelectorTask(),
+        FitToHairpinTask(
+            sequence = utpath("hairpins.fasta"),
+            oligos   = "4mer",
+            fit      = ChiSquareFit()
+        ),
         DataFrameTask(merge = True),
     ).run()))
-    assert pair.shape == (102, 24)
+    assert pair.shape == (102, 25)
     assert pair.index.names == ['hpin', 'track', 'bead']
+
 
 if __name__ == '__main__':
     test_hp_dataframe()

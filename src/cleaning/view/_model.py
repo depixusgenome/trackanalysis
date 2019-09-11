@@ -129,6 +129,7 @@ class FixedBeadDetectionConfig(FixedBeadDetection):
     """
     name:      str   = "fixedbeads"
     rescaling: float = 1.
+    automate:  bool  = True
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -142,10 +143,11 @@ class FixedBeadDetectionStore:
     def __init__(self, **_):
         pass
 
-class DataCleaningModelAccess(TaskPlotModelAccess):
+class DataCleaningModelAccess(TaskPlotModelAccess):  # pylint: disable=too-many-instance-attributes
     "Access to cleaning tasks"
     _fixedbeadsconfig = Indirection()
     _fixedbeadsstore  = Indirection()
+    __ADDED           = False   # TODO: Make modelacces MVC and remove this classvar
 
     def __init__(self, ctrl, **_):
         super().__init__(ctrl)
@@ -159,6 +161,10 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
 
     def addto(self, ctrl, noerase = False):
         "add to the controller"
+        if self.__ADDED:
+            return
+        self.__class__.__ADDED = True  # pylint: disable=protected-access
+
         @ctrl.tasks.observe
         def _onclosetrack(task = None, **_):
             data = self._fixedbeadsstore.data
@@ -166,6 +172,16 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
                 info = dict(data)
                 info.pop(task, None)
                 self._fixedbeadsstore = {'data': info}
+
+        @ctrl.tasks.observe
+        def _onopentrack(calllater = None, isarchive = False, **_):
+            if not self._fixedbeadsconfig.automate or isarchive:
+                return
+
+            @calllater.append
+            def _addsubtracted(*_1, **_2):
+                beads = self.availablefixedbeads
+                self.subtracted.update(beads = [i[-1] for i in beads])
 
         @ctrl.theme.observe
         @ctrl.display.observe

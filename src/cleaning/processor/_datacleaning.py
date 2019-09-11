@@ -4,7 +4,9 @@
 from    dataclasses  import dataclass
 from    itertools    import repeat
 from    functools    import partial
-from    typing       import Any, Dict, Iterator, List, Optional, Tuple, Type, cast
+from    typing       import (
+    Any, Dict, Iterator, List, Optional, Tuple, Type, ClassVar, cast
+)
 
 import  numpy             as     np
 
@@ -14,50 +16,53 @@ from    taskmodel               import Task, Level, PHASE, InstrumentType
 from    utils                   import initdefaults
 
 from    ..names                 import NAMES
-from    ..datacleaning          import DataCleaning
-from    .._core                 import Partial, AberrantValuesRule # pylint: disable=import-error
+from    .._core                 import (   # pylint: disable=import-error
+    DataCleaning, Partial, AberrantValuesRule
+)
 
-class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
+class DataCleaningTask(Task, zattributes = DataCleaning.zscaledattributes()):
     "Task for removing incorrect points or cycles or even the whole bead"
-    __doc__          = DataCleaning.__doc__
-    level            = Level.bead
-    hfsigmaphases    = PHASE.initial, PHASE.measure
-    populationphases = PHASE.initial, PHASE.measure
-    extentphases     = PHASE.initial, PHASE.measure
-    pingpongphases   = PHASE.initial, PHASE.measure
-    phasejumpphases  = PHASE.initial, PHASE.measure
-    saturationphases = PHASE.initial, PHASE.measure
+    __doc__          = getattr(DataCleaning, '__doc__', None)
+
+    hfsigmaphases:     Tuple[int, int] = (PHASE.initial, PHASE.measure)
+    populationphases:  Tuple[int, int] = (PHASE.initial, PHASE.measure)
+    extentphases:      Tuple[int, int] = (PHASE.initial, PHASE.measure)
+    pingpongphases:    Tuple[int, int] = (PHASE.initial, PHASE.measure)
+    phasejumpphases:   Tuple[int, int] = (PHASE.initial, PHASE.measure)
+    saturationphases:  Tuple[int, int] = (PHASE.initial, PHASE.measure)
+    locals().update(DataCleaning().config())
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        Task.__init__(self, **kwa)
-        DataCleaning.__setstate__(self, kwa)
 
-    def __eq__(self, other):
-        return Task.__eq__(self, other)
+    level:                  ClassVar[Level]          = Level.bead
+    PRE_CORRECTION_CYCLES:  ClassVar[Tuple[str,...]] = ('phasejump',)
+    POST_CORRECTION_CYCLES: ClassVar[Tuple[str,...]] = (
+        'population', 'hfsigma', 'extent', 'pingpong'
+    )
 
-    @classmethod
-    def __ana_default__(cls, right):
-        out = cls().__getstate__()
-        return ((i, j) for i, j in right if out[i] != j)
+    @property
+    def core(self) -> DataCleaning:
+        "return the c++ object"
+        tmp = DataCleaning()
+        tmp.configure(self.__dict__)
+        return tmp
 
-    def __getstate__(self):
-        state = super().__getstate__()
-        state.update(self.__dict__)
-        return state
-
-    def __setstate__(self, info: dict):
-        other = dict(self.__dict__)
-        other.update(type(self)().__dict__)
-        other.update({i for i in info.items() if i[0] in other})
-
-        DataCleaning.__setstate__(self, info)
-        self.__dict__.update(other)
+    @staticmethod
+    def badcycles(stats) -> np.ndarray:
+        "returns all bad cycles"
+        bad = np.empty(0, dtype = 'i4')
+        if stats is None:
+            return bad
+        for stat in stats.values() if isinstance(stats, dict) else stats:
+            bad = np.union1d(bad, stat.min)
+            bad = np.union1d(bad, stat.max)
+        return bad
 
 class DataCleaningErrorMessage:
     "creates the error message upon request"
-    def __init__(self, stats, cnf:Dict[str,Any], # pylint: disable=too-many-arguments
+    def __init__(self, stats, cnf:Dict[str,Any],  # pylint: disable=too-many-arguments
                  tasktype:Type[DataCleaningTask],
                  beadid: BEADKEY,
                  parents: tuple,
@@ -83,13 +88,13 @@ class DataCleaningErrorMessage:
     def data(self) -> List[Tuple[Optional[int], str, str]]:
         "returns a message if the test is invalid"
         dflt = self.tasktype()
-        if self.stats is None:
+        if not self.stats:
             pop = self.config.get('minpopulation', dflt.minpopulation)
             return [(None, 'population', '< %d' % pop)]
 
         stats = {i.name: i  for i in self.stats}
-        get1  = lambda i, j: len(getattr(stats[i], j))
-        get2  = lambda i, j: self.config.get(j+i, getattr(dflt, j+i))
+        get1  = lambda i, j: len(getattr(stats[i], j))                  # noqa: E731
+        get2  = lambda i, j: self.config.get(j+i, getattr(dflt, j+i))   # noqa: E731
         msg   = (('saturation', '> %.0f%%', 'max'),
                  ('population', '< %.0f%%', 'min'),
                  ('hfsigma',    '< %.4f',   'min'),
@@ -130,12 +135,12 @@ class DataCleaningErrorMessage:
 class DataCleaningException(ProcessorException):
     "Exception thrown when a bead is not selected"
     def __str__(self):
-        args = self.args[0] # pylint: disable=unsubscriptable-object
+        args = self.args[0]  # pylint: disable=unsubscriptable-object
         return f"{args.parents}: {args.beadid}\n{args}"
 
     def shortmessage(self):
         "return the shorter message"
-        return str(self.args[0]) # pylint: disable=unsubscriptable-object
+        return str(self.args[0])  # pylint: disable=unsubscriptable-object
 
 @dataclass
 class CleaningCacheData:
@@ -143,6 +148,7 @@ class CleaningCacheData:
     errors:  Tuple[Partial,...]
     discard: bool
     mask:    np.ndarray
+
     def __iter__(self):
         return iter((self.errors, self.discard, self.mask))
 
@@ -181,9 +187,12 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
     @classmethod
     def __precorrectiontest(cls, frame, bead, cnf) -> Iterator[Partial]:
         phases = frame.track.phase.select
-        sel    = cls.tasktype(**cnf)
+        sel    = DataCleaningTask(**cnf).core
         pha    = cycs = None
-        rules = (name for name in sel.PRE_CORRECTION_CYCLES if cls._doesapply(name, frame))
+        rules = (
+            name for name in DataCleaningTask.PRE_CORRECTION_CYCLES
+            if cls._doesapply(name, frame)
+        )
         for name in rules:
             cur = cls.__get(name+'phases', cnf)
             if cycs is None or pha != cur:
@@ -193,9 +202,12 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
     @classmethod
     def __postcorrectiontest(cls, frame, bead, cnf) -> Iterator[Partial]:
         phases = frame.track.phase.select
-        sel    = cls.tasktype(**cnf)
+        sel    = DataCleaningTask(**cnf).core
         pha    = cycs = None
-        rules = (name for name in sel.POST_CORRECTION_CYCLES if cls._doesapply(name, frame))
+        rules = (
+            name for name in DataCleaningTask.POST_CORRECTION_CYCLES
+            if cls._doesapply(name, frame)
+        )
         for name in rules:
             cur = cls.__get(name+'phases', cnf)
             if cycs is None or pha != cur:
@@ -208,7 +220,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
 
     @classmethod
     def __removebadcycles(cls, frame, cnf, val, arr):
-        bad = cls.tasktype.badcycles(val) # type: ignore
+        bad = DataCleaningTask.badcycles(val)
         if len(bad):
             for _, cyc in frame.track.view(
                     "cycles",
@@ -226,7 +238,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
         info = info[0], np.copy(info[1])
         res  = cls.compute(frame, info, **cnf)
         if isinstance(res, Exception):
-            raise res # pylint: disable=raising-bad-type
+            raise res  # pylint: disable=raising-bad-type
         return info
 
     @classmethod

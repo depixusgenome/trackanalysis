@@ -66,6 +66,7 @@ class TracksDict(_TracksDict):
     if __doc__:
         __doc__ = _TracksDict.__doc__ + __doc__
     _TRACK_TYPE = Track
+
     def __init__(self,          # pylint: disable=too-many-arguments
                  tracks  = None,
                  grs     = None,
@@ -129,7 +130,7 @@ class TracksDict(_TracksDict):
         return super().__getitem__([i for i in self if fcn(i.lower())])
 
     def __getitem__(self, key): # pylint: disable=too-many-return-statements
-        if isinstance(key, list) and all(isinstance(i, int) for i in key):
+        if isinstance(key, list) and key and all(isinstance(i, int) for i in key):
             tracks = self.clone()
             sel    = Tasks.selection(selected = list(key))
             for i in tracks.values():
@@ -233,6 +234,8 @@ class TracksDict(_TracksDict):
         **Warning:** the first task should be either event detection or peak
         selection.
         """
+        if not tasks:
+            tasks = (Tasks.alignment,)
         try:
             Tasks(tasks[0])
         except (IndexError, ValueError) as _:
@@ -300,7 +303,7 @@ class TracksDict(_TracksDict):
                   process   = True,
                   **kwa):
         "Returns either `basedataframe` or `trackdataframe`"
-        if len(tasks) == 0:
+        if len(tasks) == 0 and not kwa and not assign and not transform:
             return self.basedataframe(loadall)
         kwa.update(transform = transform, assign = assign, process = process)
         return self.trackdataframe(*tasks, **kwa)

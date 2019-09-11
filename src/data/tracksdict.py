@@ -18,8 +18,15 @@ from .trackio           import LegacyGRFilesIO, LegacyTrackIO, PATHTYPES
 
 TDictType = TypeVar('TDictType', bound = 'TracksDict')
 TrackType = TypeVar('TrackType', bound = 'Track')
+
+
 def _leastcommonkeys(itr):
     info   = dict(itr)
+    if len(info) == 0:
+        return {}
+    if len(info) == 1:
+        return info
+
     keys   = {i: i.split('_') for i in info.keys()}
     common = None
     for i in keys.values():
@@ -108,6 +115,7 @@ class TracksDict(dict):
     _SCAN_OPTS  = ('cgrdir', 'allleaves')
     _NTHREADS   = None
     _TRACK_TYPE = Track
+    _OSPLITS    = re.compile("([k345]mer)|([atgc]+)", re.IGNORECASE)
 
     def __init__(self,          # pylint: disable=too-many-arguments
                  tracks  = None,
@@ -278,15 +286,20 @@ class TracksDict(dict):
         """
         opts['cgrdir']    = cgrdir
         opts['allleaves'] = allleaves
-        if isinstance(match, str) and len(match) == 4 and match[1:] == 'mer':
+        if isinstance(match, str) and self._OSPLITS.match(match):
             from sequences.translator import splitoligos
-            grp  = False
-            itr  = cast(
+            grp   = False
+            match = match.lower()
+            ismer = match[1:] == 'mer'
+            itr   = cast(
                 Iterator[Tuple[Any, PATHTYPES]],
                 (
                     (Path(i).stem, i)
                     for i in LegacyTrackIO.scan(tracks)
-                    if splitoligos(match, i)
+                    if (
+                        (ismer and splitoligos(match, i))
+                        or (not ismer and match in splitoligos('kmer', i))
+                    )
                 )
             )
         else:
@@ -322,6 +335,54 @@ class TracksDict(dict):
         for i, j in info.items():
             self._set(i, j, allaxes)
         return info.keys()
+
+    @classmethod
+    def stemkeys(cls, *tracks):
+        """
+        creates a new TracksDict keyed using path stems as keys
+        """
+        def _iter():
+            rem = list(tracks)
+            while len(rem):
+                i = rem.pop()
+                if isinstance(i, (Path, str)):
+                    yield (Path(str(i)).stem, str(i))
+                elif isinstance(i, Track) and isinstance(i.path, (str, Path)):
+                    yield (Path(str(i.path)).stem, i)
+                elif isinstance(i, Track):
+                    yield (Path(str(i.path[0])).stem, i)
+                elif callable(getattr(i, 'values', None)):
+                    rem.extend(i.values())
+                else:
+                    rem.extend(i)
+
+        self = cls()
+        self.update(_iter())
+        return self
+
+    @classmethod
+    def leastcommonkeys(cls, *tracks):
+        """
+        creates a new TracksDict keyed using least common keys
+        """
+        def _iter():
+            rem = list(tracks)
+            while len(rem):
+                i = rem.pop()
+                if isinstance(i, (Path, str)):
+                    yield (Path(str(i)).stem, str(i))
+                elif isinstance(i, Track) and isinstance(i.path, (str, Path)):
+                    yield (Path(str(i.path)).stem, i)
+                elif isinstance(i, Track):
+                    yield (Path(str(i.path[0])).stem, i)
+                elif callable(getattr(i, 'values', None)):
+                    rem.extend(i.values())
+                else:
+                    rem.extend(i)
+
+        self = cls()
+        self.update(**_leastcommonkeys(_iter()))
+        return self
 
     def update(self, *args,
                tracks: Union[None, str, Sequence[str]] = None,
