@@ -76,14 +76,22 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
             prec   = None if self.precision in (0., None) else self.precision
             data   = self.data[ibead]
             meas   = self.track.phase.select(..., PHASE.measure)
-            ints   = self.events.computeall(data,
-                                            self.getprecision(prec, self.track, ibead),
-                                            meas,
-                                            self.track.phase.select(..., PHASE.measure+1)
-                                           )
-            return (EventsArray([(j, data[i+j:i+k]) for j, k in cyc],
-                                discarded = len(cyc) == 0)
-                    for i, cyc in zip(meas, ints))
+            ints   = self.events.computeall(
+                data,
+                self.getprecision(prec, self.track, ibead),
+                meas,
+                self.track.phase.select(..., PHASE.measure+1)
+            )
+
+            itr = (
+                EventsArray([(j, data[i+j:i+k]) for j, k in cyc], discarded = len(cyc) == 0)
+                for i, cyc in zip(meas, ints)
+            )
+            act = self.getaction()
+            return (
+                itr if act is None else
+                (act(self, ((ibead, i), j)) for i, j  in enumerate(itr))
+            )
         return iter(self[ibead, ...].values())
 
     def __simpleiter(self, first, itrs) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:

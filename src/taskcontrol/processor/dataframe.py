@@ -126,11 +126,27 @@ class SafeDataFrameProcessor(Processor[DataFrameTask]):
     def _merge(cls, task, buffers, frame):
         frame = cls._apply(task, buffers, frame)
         lst   = []
-        for i in frame.keys():
-            try:
-                lst.append(frame[i])
-            except ProcessorException:
-                continue
+        if callable(getattr(frame, 'bead', None)):
+            for i in {j for j, _ in frame.keys()}:
+                itr = None
+                try:
+                    itr = iter(frame.bead(i))
+                except ProcessorException:
+                    continue
+
+                while True:
+                    try:
+                        lst.append(next(itr)[-1])
+                    except ProcessorException:
+                        continue
+                    except StopIteration:
+                        break
+        else:
+            for i in frame.keys():
+                try:
+                    lst.append(frame[i])
+                except ProcessorException:
+                    continue
         return pd.concat(lst, sort = False) if lst else None
 
     @staticmethod
