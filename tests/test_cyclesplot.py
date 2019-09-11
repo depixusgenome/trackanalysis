@@ -24,9 +24,10 @@ def _check(server, name, value):
         assert server.widget[name].value == value
 
 @integrationmark
-def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
+def test_cyclesplot(bokehaction):  # pylint: disable=too-many-statements
     "test cyclesplot basic stuff"
     vals = [0.]*2
+
     def _printrng(old = None, model = None, **_):
         if 'ybounds' in old:
             vals[:2] = [0. if i is None else i for i in model.ybounds]
@@ -40,6 +41,7 @@ def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
     server.load('big_legacy')
 
     old = [None, None]
+
     def _press(val):
         krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
         with warnings.catch_warnings():
@@ -72,18 +74,25 @@ def test_cyclesplot(bokehaction): # pylint: disable=too-many-statements
     assert curr.bead in (None, 0)
     server.press('PageUp', andstop = False, rendered = True)
     assert curr.bead == 1
+
+    cnf  = server.savedconfig
+    # the filename oligo should already be set
+    assert cnf['config.sequence']['probes'] == ['ctgt']
+    assert cnf['config.sequence']['history'] == [['ctgt']]
+    _check(server, 'Cycles:Oligos', 'ctgt')
+
     server.change('Cycles:Oligos', 'value', ' TGGC  , aatt')
     _check(server, 'Cycles:Oligos', 'aatt, tggc')
 
     cnf  = server.savedconfig
     assert cnf['config.sequence']['probes'] == ['aatt', 'tggc']
-    assert cnf['config.sequence']['history'] == [['aatt', 'tggc']]
+    assert cnf['config.sequence']['history'] == [['aatt', 'tggc'], ['ctgt']]
 
     server.change('Cycles:Oligos', 'value', '')
     _check(server, 'Cycles:Oligos', '')
     cnf  = server.savedconfig
     assert not cnf['config.sequence'].get('probes', None)
-    assert cnf['config.sequence']['history'] == [['aatt', 'tggc']]
+    assert cnf['config.sequence']['history'] == [['aatt', 'tggc'], ['ctgt']]
 
     server.load('hairpins.fasta', rendered = False, andpress = False)
     server.change('Cycles:Sequence', 'value', '←')
@@ -149,6 +158,7 @@ def test_cyclesplot2(bokehaction):
     server.wait()
     server.change('Cycles:DriftWidget', 'value', [0], rendered = True)
 
+
 if __name__ == '__main__':
-    from tests.testutils.bokehtesting import BokehAction
+    from tests.testutils.bokehtesting import BokehAction  # noqa  # pylint: disable=ungrouped-imports
     test_cyclesplot(BokehAction(None))
