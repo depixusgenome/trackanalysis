@@ -310,7 +310,6 @@ def test_hairpingroup(bokehaction): # pylint: disable=too-many-statements,too-ma
 
     server.load('hairpins.fasta', andpress = False, rendered = False)
     server.change('Cycles:Sequence', 'value', '←')
-    server.change('Cycles:Oligos', 'value', 'ctgt', rendered = True)
     server.wait()
     assert rng.factors == ['1']
 
@@ -361,7 +360,6 @@ def test_reference(bokehaction):
 
     server.load('hairpins.fasta', andpress = False, rendered = False)
     server.change('Cycles:Sequence', 'value', '←')
-    server.change('Cycles:Oligos', 'value', 'ctgt', rendered = True)
 
 @integrationmark
 def test_hybridstat(bokehaction):
@@ -470,22 +468,37 @@ def test_advancedmenu(bokehaction):
     server.change('Cycles:Sequence', 'value', '←')
     server.change('Cycles:Oligos', 'value', 'CTGT')
 
-    tlist  = lambda: server.ctrl.tasks.tasklist(server.roottask)
-    subcnt = lambda: sum(isinstance(i, BeadSubtractionTask) for i in tlist())
     modal  = server.selenium.modal("//span[@class='icon-dpx-cog']", True)
 
-    assert subcnt() == 0
+    for task in server.ctrl.tasks.tasklist(server.roottask):
+        if isinstance(task, BeadSubtractionTask):
+            assert len(task.beads) == 0
+
     with modal:
         modal.input('Subtracted beads', '11, 31')
-    assert subcnt() == 1
+
+    for task in server.ctrl.tasks.tasklist(server.roottask):
+        if isinstance(task, BeadSubtractionTask):
+            assert set(task.beads) == {11, 31}
+            break
+    else:
+        assert False
+
     with modal:
         modal.input('Subtracted beads', '')
-    assert subcnt() == 0
 
-    fit = lambda: next(i for i in tlist() if isinstance(i, FitToHairpinTask))
+    for task in server.ctrl.tasks.tasklist(server.roottask):
+        if isinstance(task, BeadSubtractionTask):
+            assert len(task.beads) == 0
+
     def _test(tpe, symm):
-        assert all(isinstance(i, tpe) for i in fit().fit.values())
-        assert all(i.symmetry == Symmetry(symm) for i in fit().fit.values())
+        task = next(
+            i
+            for i in server.ctrl.tasks.tasklist(server.roottask)
+            if isinstance(i, FitToHairpinTask)
+        )
+        assert all(isinstance(i, tpe) for i in task.fit.values())
+        assert all(i.symmetry == Symmetry(symm) for i in task.fit.values())
     _test(PeakGridFit, 'both')
     with modal:
         modal.tab('Peaks').toggle('Exhaustive fit algorithm')
@@ -497,8 +510,9 @@ def test_advancedmenu(bokehaction):
         modal.tab('Peaks').toggle('Exhaustive fit algorithm')
     _test(PeakGridFit, 'left')
 
+
 if __name__ == '__main__':
     # pylint: disable=ungrouped-imports
     from tests.testingcore.bokehtesting import BokehAction
     with BokehAction(None) as bka:
-        test_peaksplot(bka)
+        test_advancedmenu(bka)
