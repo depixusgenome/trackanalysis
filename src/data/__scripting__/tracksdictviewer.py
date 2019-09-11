@@ -4,7 +4,7 @@
 A simple GUI for accessing files
 """
 from   abc      import abstractmethod
-from   typing   import TypeVar, Generic, Optional, Callable
+from   typing   import TypeVar, Generic, Optional, Callable, Any
 from   pathlib  import Path
 
 import pandas        as pd
@@ -19,25 +19,39 @@ from .track            import Track
 
 Item     = TypeVar("Item", Track, TracksDict)
 Selector = TypeVar("Selector", pnw.Select, pnw.CrossSelector)
+CallBack = Optional[Callable[['_BasePathSelector'], Any]]
 
 
 class _BasePathSelector(Generic[Item, Selector]):
     "GUI for selecting tracks and creating a TracksDict"
-    _col:  pn.Column
-    _root: Path
+    _col:   pn.Column
+    _root:  Path
+    _cback: CallBack
 
-    def __init__(self, defaultpath = "./**/*.trk"):
+    def __init__(self, defaultpath = "./**/*.trk", match = "", callback: CallBack = None):
         self.paths    = pnw.TextInput(name = "Path",  value = defaultpath, width = 600)
-        self.match    = pnw.TextInput(name = "Match", width = 200)
+        self.match    = pnw.TextInput(name = "Match", value = match, width = 200)
         self.selector = templateattribute(self, 1)(name = "Track", width = 850)
+        self._cback   = callback
 
         self.paths.param.watch(self._on_update, "value")
         self.match.param.watch(self._on_update, "value")
         self.selector.param.watch(self._on_newtracks, "value")
 
-    def display(self) -> pn.Column:
+    def display(
+            self,
+            defaultpath: Optional[str]                                  = None,
+            match:       Optional[str]                                  = None,
+            callback:    Optional[Callable[['_BasePathSelector'], Any]] = None
+    ) -> pn.Column:
         "create the view"
-        self._col = pn.Column(pn.Row(self.paths, self.match), self.selector, pn.Pane(hv.Div("")))
+        if defaultpath is not None:
+            self.paths.value = defaultpath
+        if match is not None:
+            self.match.value = match
+        if callback is not None:
+            self._cback = callback
+        self._col   = pn.Column(pn.Row(self.paths, self.match), self.selector, pn.Pane(hv.Div("")))
         self._on_update()
         return self._col
 
@@ -70,6 +84,8 @@ class _BasePathSelector(Generic[Item, Selector]):
         "update the values"
         old = self._col.objects[:-1]
         obj = hv.Div("No tracks selected") if not self.selector.value else self._new_display()
+        if self._cback:
+            self._cback(self)
         if obj is None:
             return
 
