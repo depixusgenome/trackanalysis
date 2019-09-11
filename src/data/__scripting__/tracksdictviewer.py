@@ -56,7 +56,7 @@ class _BasePathSelector(Generic[Item, Selector]):
         else:
             options = (root.glob(patt))
 
-        self._root, self.selector.options = relativepath(options)
+        self._root, self.selector.options = relativepath(sorted(options))
         if isinstance(self.selector, pnw.CrossSelector):
             self.selector.value = sorted(set(self.selector.value) & set(self.selector.options))
         else:
