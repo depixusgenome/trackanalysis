@@ -6,7 +6,7 @@ from   typing                           import (Optional, Iterable, Sequence,
                                                 NamedTuple, Generator, cast)
 import numpy                            as     np
 
-from   data.views                       import TaskView, BEADKEY
+from   data.views                       import TaskView
 from   eventdetection.data              import Events
 from   peakfinding.histogram            import HistogramData
 from   peakfinding.processor.dataframe  import PeaksDataFrameFactory, DataFrameFactory
@@ -18,13 +18,14 @@ from   taskmodel                        import Task, Level
 from   utils                            import initdefaults
 from   ..toreference                    import ReferenceFit, ReferencePeaksFit
 from   ..tohairpin                      import HairpinFitter
-from   .._core                          import match as _match # pylint: disable=import-error
+from   .._core                          import match as _match  # pylint: disable=import-error
+
+Fitters = Dict[int, 'FitData']
+
 
 class FitData(NamedTuple):
-    data   : Union[HistogramData, Tuple[HistogramData, np.ndarray], HairpinFitter]
-    params : Tuple[float, float]
-
-Fitters = Dict[BEADKEY, FitData]
+    data:    Union[HistogramData, Tuple[HistogramData, np.ndarray], HairpinFitter]
+    params:  Tuple[float, float]
 
 class FitToRefArray(np.ndarray):
     """
@@ -37,11 +38,13 @@ class FitToRefArray(np.ndarray):
     params:    Tuple[float, float] = (1., 0.)
     _dtype    = np.dtype([('peaks', 'f4'), ('events', 'O')])
     _order    = None
+
     def __new__(cls, array, **kwa):
-        obj  = np.asarray(array,
-                          dtype = kwa.get('dtype', cls._dtype),
-                          order = kwa.get('order', cls._order)
-                         ).view(cls)
+        obj  = np.asarray(
+            array,
+            dtype = kwa.get('dtype', cls._dtype),
+            order = kwa.get('order', cls._order)
+        ).view(cls)
         obj.discarded = kwa.get('discarded', cls.discarded)
         obj.params    = kwa.get('params',    cls.params)
         return obj
@@ -71,12 +74,12 @@ class _FitDataDescriptor:
         elif isinstance(val, Events):
             inst.fromevents(val)
         elif isinstance(val, dict):
-            val.update({i: FitData(j, (1., 0.)) # type: ignore
+            val.update({i: FitData(j, (1., 0.))  # type: ignore
                         for i, j in cast(dict, val.items())
                         if not isinstance(j, FitData)})
             inst.__dict__['fitdata'] = val
         else:
-            fcn = lambda j: (j if isinstance(j, FitData) else FitData(j, (1., 0)))
+            fcn = lambda j: (j if isinstance(j, FitData) else FitData(j, (1., 0)))  # noqa
             inst.__dict__['fitdata'] = {i: fcn(j) for i, j in cast(Dict, val).items()}
 
 class _DefaultFitData:
@@ -87,7 +90,7 @@ class _DefaultFitData:
     def __set__(self, inst, val):
         "returns the default data"
         alg = inst.fitalg
-        fcn = lambda j: (j if isinstance(j, FitData) else FitData(j, (1., 0)))
+        fcn = lambda j: (j if isinstance(j, FitData) else FitData(j, (1., 0)))  # noqa
         out = fcn(alg.frompeaks(next(val.values())) if isinstance(val, PeaksDict) else
                   alg.fromevents(val)               if isinstance(val, Events)    else
                   val)
@@ -96,13 +99,14 @@ class _DefaultFitData:
 
 class FitToReferenceTask(Task, zattributes = ('fitalg', "~window")):
     "Fits a bead to a reference"
-    level   : Level        = Level.peak
-    defaultdata            = None
-    fitdata                = cast(Fitters, _FitDataDescriptor())
-    fitalg  : ReferenceFit = ReferencePeaksFit()
-    window  : float        = 10./StretchFactor.DNA.value
+    level:  Level        = Level.peak
+    defaultdata          = None
+    fitdata              = cast(Fitters, _FitDataDescriptor())
+    fitalg: ReferenceFit = ReferencePeaksFit()
+    window: float        = 10./StretchFactor.DNA.value
+
     @initdefaults(frozenset(locals()) - {'level'},
-                  peaks       = lambda self, val: self.frompeaks (val),
+                  peaks       = lambda self, val: self.frompeaks(val),
                   events      = lambda self, val: self.fromevents(val))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -143,8 +147,8 @@ class FitToReferenceTask(Task, zattributes = ('fitalg', "~window")):
         "whether this task implies long computations"
         return True
 
-class FitToReferenceDict( # pylint: disable=too-many-ancestors
-        TaskView[FitToReferenceTask, BEADKEY]
+class FitToReferenceDict(  # pylint: disable=too-many-ancestors
+        TaskView[FitToReferenceTask, int]
 ):
     "iterator over peaks grouped by beads"
     level: Level  = FitToReferenceTask.level
@@ -153,8 +157,8 @@ class FitToReferenceDict( # pylint: disable=too-many-ancestors
         return cls._transform_to_bead_ids(sel)
 
     def _keys(self,
-              sel:Optional[Sequence[BEADKEY]],
-              _  : Optional[bool] = None) -> Iterable[BEADKEY]:
+              sel: Optional[Sequence[int]],
+              _:   Optional[bool] = None) -> Iterable[int]:
         if self.config.defaultdata is not None:
             return super()._keys(sel, _)
 
@@ -174,7 +178,7 @@ class FitToReferenceDict( # pylint: disable=too-many-ancestors
                 return FitData(self.config.fitalg.fromevents(view[key,...]), (1., 0.))
         return ref
 
-    def optimize(self, key: BEADKEY, data: FitToRefArray):
+    def optimize(self, key: int, data: FitToRefArray):
         "returns stretch & bias"
         if len(data) == 0:
             return 1., 0.
@@ -189,7 +193,7 @@ class FitToReferenceDict( # pylint: disable=too-many-ancestors
             return stretch/ref.params[0], bias-ref.params[1]*ref.params[0]/stretch
         return stretch, bias
 
-    def compute(self, key: BEADKEY) -> np.ndarray:
+    def compute(self, key: int) -> np.ndarray:
         "Action applied to the frame"
         tmp  = cast(np.ndarray, cast(dict, self.data)[key])
         if isinstance(tmp, (Iterator, Generator, tuple)):
@@ -205,7 +209,7 @@ class FitToReferenceDict( # pylint: disable=too-many-ancestors
                 i['data'][:] = [(j-bias)*stretch for j in i['data']]
         return data
 
-class FitToReferenceProcessor(TaskViewProcessor[FitToReferenceTask, FitToReferenceDict, BEADKEY]):
+class FitToReferenceProcessor(TaskViewProcessor[FitToReferenceTask, FitToReferenceDict, int]):
     "Changes the Z axis to fit the reference"
 
 @DataFrameFactory.adddoc
@@ -230,19 +234,21 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
     ```
     """
     if __doc__:
-        __doc__ += ('\n'+PeaksDataFrameFactory.__doc__                # type: ignore
-                    [PeaksDataFrameFactory.__doc__.find('# Agg')-5:]) # type: ignore
+        __doc__ += ('\n'+PeaksDataFrameFactory.__doc__                 # type: ignore
+                    [PeaksDataFrameFactory.__doc__.find('# Agg')-5:])  # type: ignore
     PREC     = 5e-6
-    def __init__(self, task, frame):
-        get = lambda i: (i  if task.measures.get(i, False) is True else
+
+    def __init__(self, task, buffers, frame):
+        get = lambda i: (i  if task.measures.get(i, False) is True else  # noqa
                          '' if not task.measures.get(i, False)     else
                          task.measures.get(i, False))
-        super().__init__(task, frame)
+        super().__init__(task, buffers, frame)
         self.__stretch = get('stretch')
         self.__bias    = get('bias')
-        self.__parent  = PeaksDataFrameFactory(task, frame, stretch = None, bias = None)
-        self.__peaks: Dict[BEADKEY, np.ndarray] = {i: self.__getpeaks(j)
-                                                   for i, j in frame.config.fitdata.items()}
+        self.__parent  = PeaksDataFrameFactory(task, buffers, frame, stretch = None, bias = None)
+        self.__peaks: Dict[int, np.ndarray] = {
+            i: self.__getpeaks(j) for i, j in frame.config.fitdata.items()
+        }
 
     # pylint: disable=arguments-differ
     def _run(self, frame, key, peaks) -> Dict[str, np.ndarray]:

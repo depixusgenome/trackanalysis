@@ -68,16 +68,20 @@ class CleaningDataFrameFactory(DataFrameFactory[Beads]):
             self.__cleaning = buffers.getcache(DataCleaningTask)()
         except IndexError:
             self.__cleaning = {}
-        super().__init__(task, frame)
+        super().__init__(task, buffers, frame)
 
     @classmethod
-    def _proc_apply(cls, task, buffers, frame):
+    def create(cls, task, buffers, frame):
+        "creates itself"
         try:
-            frame.actions = [cls(task, buffers, frame).dataframe]
-            return frame
+            return cls(task, buffers, frame)
         except IndexError:
-            pass
-        return None
+            return None
+
+    def apply(self, frame):
+        "applies itself to the frame"
+        frame.actions = [self.dataframe]
+        return frame
 
     def dataframe(self, frame, info):
         "creates a dataframe"

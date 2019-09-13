@@ -401,9 +401,11 @@ def test_cleaning_dataframe():
         DataCleaningTask(),
         DataFrameTask(merge = True)
     )
-    data = next(iter(proc.run())).reset_index(0)
-    assert list(data.loc[5].bad.unique()) == [True]
-    assert list(data.loc[0].bad.unique()) == [False]
+    data = next(iter(proc.run()))
+    assert list(data.reset_index(0).loc[5].bad.unique()) == [True]
+    assert list(data.reset_index(0).loc[0].bad.unique()) == [False]
+    assert 'modification' in data.columns
+    assert hasattr(data, 'tasklist')
 
 def test_subtraction_dataframe():
     "test cleanin creation"
@@ -416,6 +418,8 @@ def test_subtraction_dataframe():
     assert 'status' in data.columns
     assert isinstance(data.status.values[0], pd.DataFrame)
     assert data[data.fixed].reset_index().status[0].shape[0] == 0
+    assert 'modification' in data.columns
+    assert hasattr(data, 'tasklist')
 
     proc  = create(
         TrackReaderTask(path = utpath("fixedbeads.pk")),

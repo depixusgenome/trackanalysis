@@ -66,8 +66,8 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
     Should one use `dfevents` as a keyword instead, then all events related data
     will be stored in dataframes inside an *events* column.
     """
-    def __init__(self, task, frame, **kwa):
-        super().__init__(task, frame)
+    def __init__(self, task, buffers, frame, **kwa):
+        super().__init__(task, buffers, frame)
 
         self.__prob   = peakprobability(frame)
         meas          = dict(task.measures)

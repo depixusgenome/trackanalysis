@@ -480,6 +480,8 @@ def test_dataframe():
     assert 'cycle' in data.index.names
     assert 'event' in data.index.names
     assert 'avg'   in data
+    assert 'modification' in data.columns
+    assert hasattr(data, 'tasklist')
 
 def test_rescale():
     "test rescale"

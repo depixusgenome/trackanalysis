@@ -5,7 +5,10 @@ Base track file data.
 """
 from    typing      import (
     Type, Optional, Union, Dict, Tuple, Any, List, ClassVar,
-    Sequence, Iterator, Iterable, overload, cast)
+    Sequence, Iterator, Iterable, overload, cast
+)
+from   datetime     import datetime
+from   pathlib      import Path
 from    copy        import deepcopy
 from    enum        import Enum
 import  numpy       as     np
@@ -26,11 +29,11 @@ DIMENSIONS   = Tuple[Tuple[float, float], Tuple[float, float]]
 _PRECISIONS  = Dict[BEADKEY, float]
 
 
-def _doc(tpe):
+def _doc(tpe: type) -> str:
     if tpe.__doc__:
         doc = cast(str, tpe.__doc__).strip()
         return doc[0].lower()+doc[1:].replace('\n', '\n    ')+"\n"
-    return None
+    return ''
 
 
 class Axis(Enum):
@@ -416,6 +419,60 @@ class PhaseManipulator:
                 phases[cid,pid]) - phases[0,0]
 
 
+class PathInfo:
+    """
+    Provides information on the path itself:
+
+    * `paths`: a tuple of paths
+    * `trackpath`: the main path, i.e. not the grs
+    * `size` (*megabytes*) is the size in bytes (megabytes) of *trackpath*
+    * `stat`: stats on the *trackpath*
+    * `modification`: the date oflast modification. This is basically the
+    time of experiment.
+    * `creation`: the creation date. **DISCARD** when using PicoTwist tracks.
+    """
+    track: 'Track'
+
+    def __get__(self, inst, tpe):
+        if inst is None:
+            return self
+        cpy       = PathInfo()
+        cpy.track = inst
+        return cpy
+
+    @property
+    def paths(self) -> List[Path]:
+        "returns all paths"
+        path = self.track.path
+        return (
+            [Path(path)] if isinstance(path, str)  else
+            [path]       if isinstance(path, Path) else
+            []           if path is None           else
+            [Path(str(i)) for i in cast(Iterable, path)]
+        )
+
+    @property
+    def trackpath(self) -> Path:
+        "returns all paths"
+        path = self.track.path
+        return Path(str(path[0])) if isinstance(path, (list, tuple)) else Path(str(path))
+
+    pathcount    = property(lambda self: len(self.paths))
+    stat         = property(lambda self: self.trackpath.stat())
+    size         = property(lambda self: self.stat.st_size)
+    megabytes    = property(lambda self: self.size >> 20)
+    creation     = property(lambda self: datetime.fromtimestamp(self.stat.st_ctime))
+
+    @property
+    def modification(self):
+        "return the modification date of the **original** track file."
+        out = (
+            getattr(self.track, '_modificationdate')
+            if hasattr(self.track, '_modificationdate') else
+            self.stat.st_mtime
+        )
+        return datetime.fromtimestamp(out)
+
 @levelprop(Level.project)
 class Track:
     """
@@ -456,9 +513,15 @@ class Track:
     * `nphases` is the number of phases
     * `secondaries` {secondaries}
     * `fov` {fov}
+    * `pathinfo` {pathinfo}
     """
     if __doc__:
-        __doc__ = __doc__.format(secondaries = _doc(Secondaries), fov = _doc(FoV))
+        __doc__ = __doc__.format(
+            secondaries = _doc(Secondaries),
+            fov         = _doc(FoV),
+            pathinfo    = _doc(PathInfo)
+        )
+
     key: Optional[str] = None
     instrument         = cast(Dict[str, Any],      LazyProperty())
     phases             = cast(np.ndarray,          LazyProperty())
@@ -467,18 +530,22 @@ class Track:
     secondaries        = cast(Secondaries,         LazyProperty(tpe = Secondaries))
     path               = cast(Optional[PATHTYPES], ResettingProperty())
     axis               = cast(Axis,                ResettingProperty())
-    data               = cast(DATA,                property(lambda self: self.getdata(),
-                                                            lambda self, val: self.setdata(val)))
+    data               = cast(
+        DATA,
+        property(lambda self: self.getdata(), lambda self, val: self.setdata(val))
+    )
+
     @initdefaults('key',
                   **{i: '_' for i in locals() if i != 'key' and i[0] != '_'})
     def __init__(self, **_):
         self._rawprecisions: _PRECISIONS = {}
 
-    ncycles = cast(int,                 property(lambda self: len(self.phases)))
-    nphases = cast(int,                 property(lambda self: self.phases.shape[1]))
-    beads   = cast(Beads,               ViewDescriptor())
-    cycles  = cast(Cycles,              ViewDescriptor())
-    phase   = property(PhaseManipulator, doc = PhaseManipulator.__doc__)
+    ncycles  = cast(int,                 property(lambda self: len(self.phases)))
+    nphases  = cast(int,                 property(lambda self: self.phases.shape[1]))
+    beads    = cast(Beads,               ViewDescriptor())
+    cycles   = cast(Cycles,              ViewDescriptor())
+    phase    = property(PhaseManipulator, doc = PhaseManipulator.__doc__)
+    pathinfo = PathInfo()
 
     def getdata(self) -> DATA:
         "returns the dataframe with all bead info"

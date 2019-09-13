@@ -516,10 +516,11 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
     def __init__(
             self,
             task,
+            buffers,
             frame:     FitToHairpinDict,
             **kwa:     Callable[[FitToHairpinDict, int, FitBead], np.ndarray]
     ):
-        super().__init__(task, frame)
+        super().__init__(task, buffers, frame)
         meas                               = dict(task.measures, **kwa)
         distances                          = meas.pop('distances', None)
         self.__distances: Dict[str, float] = (
@@ -547,7 +548,7 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
 
         peaks = DataFrameTask(measures = meas.pop('peaks', {}))
         self.__peaks: PeaksDataFrameFactory = (
-            PeaksDataFrameFactory(peaks, frame)
+            PeaksDataFrameFactory(peaks, buffers, frame)
             .discardcolumns('track', 'bead')
         )
 

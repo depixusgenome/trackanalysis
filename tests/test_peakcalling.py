@@ -389,9 +389,11 @@ def test_hp_dataframe():
         ),
         DataFrameTask(merge = True, measures = dict(peaks = True)),
     ).run()))
-    assert pair.shape == (102, 26)
+    assert pair.shape == (102, 27)
     assert pair.index.names == ['hpin', 'track', 'bead']
     assert isinstance(pair.peaks.values[0], pd.DataFrame)
+    assert 'modification' in pair.columns
+    assert hasattr(pair, 'tasklist')
 
     pair = next(iter(create(
         TrackReaderTask(path = utpath("big_legacy")),
@@ -404,8 +406,10 @@ def test_hp_dataframe():
         ),
         DataFrameTask(merge = True),
     ).run()))
-    assert pair.shape == (102, 25)
+    assert pair.shape == (102, 26)
     assert pair.index.names == ['hpin', 'track', 'bead']
+    assert 'modification' in pair.columns
+    assert hasattr(pair, 'tasklist')
 
 
 if __name__ == '__main__':

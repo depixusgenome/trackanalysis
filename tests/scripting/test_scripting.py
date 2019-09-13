@@ -108,7 +108,7 @@ def test_muwells(scriptingcleaner):
     }
 
 @integrationmark
-def test_tracksdict_hpfit(scriptingcleaner):
+def test_tracksdict_hpfit_dataframe(scriptingcleaner):
     "test that we can launch a fit to hp on a tracksdict"
     from scripting          import TracksDict
     from tests.testingcore  import path as utpath
@@ -124,13 +124,23 @@ def test_tracksdict_hpfit(scriptingcleaner):
     assert frame.shape == (80, 27)
     assert frame.index.names == ['hpin', 'track', 'bead']
 
+    assert 'trackcount' in frame.columns
+    assert 'modification' in frame.columns
+    assert hasattr(frame, 'tasklist')
+
 
 @integrationmark
-def test_tracksdict_cleaning_df(scriptingcleaner):
+def test_tracksdict_cleaning_dataframe(scriptingcleaner):
     "test TracksDict.basedataframe"
     from scripting          import TracksDict
     from tests.testingcore  import path as utpath
     tracks = TracksDict(utpath("100bp_4mer")+"/*.pk")
+
+    dframe = tracks.dataframe(status = True)
+    assert 'trackcount' in dframe.columns
+    assert 'modification' in dframe.columns
+    assert hasattr(dframe, 'tasklist')
+
     dframe = tracks.dataframe(loadall = True)
     assert 'good' in dframe.columns
     assert 'fixed' in dframe.columns
@@ -161,4 +171,4 @@ def test_viewer(scriptingcleaner):
 
 
 if __name__ == '__main__':
-    test_viewer(None)
+    test_tracksdict_cleaning_dataframe(None)

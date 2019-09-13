@@ -9,10 +9,8 @@ We add some methods and change the default behaviour:
 * an *events* property is added
 """
 from   copy                 import copy  as shallowcopy, deepcopy
-from   datetime             import datetime
 from   functools            import partial
-from   pathlib              import Path
-from   typing               import List, cast
+from   typing               import cast
 
 import numpy                as     np
 
@@ -28,51 +26,6 @@ from   ..trackops              import (selectbeads, dropbeads, selectcycles,
                                        concatenatetracks, renamebeads, clone,
                                        dataframe)
 from   .tracksdict             import TracksDict
-
-@addproperty(Track, 'pathinfo')
-class PathInfo:
-    """
-    Provides information on the path itself:
-
-        * `paths`: a tuple of paths
-        * `trackpath`: the main path, i.e. not the grs
-        * `size` (*megabytes*) is the size in bytes (megabytes) of *trackpath*
-        * `stat`: stats on the *trackpath*
-        * `modification`: the date oflast modification. This is basically the
-        time of experiment.
-        * `creation`: the creation date. **DISCARD** when using PicoTwist tracks.
-    """
-    def __init__(self, trk: 'Track') -> None:
-        self._trk = trk
-
-    @property
-    def paths(self) -> List[Path]:
-        "returns all paths"
-        path = self._trk.path
-        if isinstance(path, str):
-            return [Path(path)]
-        if isinstance(path, Path):
-            return [path]
-        return [Path(str(i)) for i in path]
-
-    @property
-    def trackpath(self) -> Path:
-        "returns all paths"
-        path = self._trk.path
-        return Path(str(path[0])) if isinstance(path, (list, tuple)) else Path(str(path))
-
-    pathcount    = property(lambda self: len(self.paths))
-    stat         = property(lambda self: self.trackpath.stat())
-    size         = property(lambda self: self.stat.st_size)
-    megabytes    = property(lambda self: self.size >> 20)
-    creation     = property(lambda self: datetime.fromtimestamp(self.stat.st_ctime))
-    @property
-    def modification(self):
-        "return the modification date of the **original** track file."
-        out = (getattr(self._trk, '_modificationdate')
-               if hasattr(self._trk, '_modificationdate') else
-               self.stat.st_mtime)
-        return datetime.fromtimestamp(out)
 
 @addproperty(Track, 'op')
 class TrackOperations:
@@ -170,9 +123,10 @@ class TrackOperations:
 class _TrackMixin:
     "Additional track methods"
     if __doc__:
-        __doc__  = ('    * `op` a'          + cast(str, TrackOperations.__doc__)[6:]
-                    +'\n    * `pathinfo` p' + cast(str, PathInfo.__doc__)[6:])
+        __doc__  = '    * `op` a'          + cast(str, TrackOperations.__doc__)[6:]
+
     cleaned = LazyProperty('cleaned')
+
     def tasklist(self, *args):
         "creates a tasklist"
         return Tasks.tasklist(self.path, *args)
@@ -260,8 +214,9 @@ class _TrackMixin:
 
         return selectbeads(self, value)
 
+
 addattributes(Track, protected = dict(cleaned = False))
-Track.cycles    .args['copy'] = True
-Track.beads     .args['copy'] = True
+Track.cycles.args['copy'] = True
+Track.beads .args['copy'] = True
 
 __all__ = ['Track']

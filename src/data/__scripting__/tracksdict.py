@@ -5,7 +5,9 @@ Adds a dictionnaries to access tracks, experiments, ...
 """
 import re
 import sys
-from   typing                       import List, FrozenSet, TypeVar, Optional, cast
+from   typing                       import (
+    List, FrozenSet, TypeVar, Optional, Union, Dict, Iterable, Callable, cast
+)
 from   functools                    import partial
 import pandas                       as     pd
 import numpy                        as     np
@@ -45,9 +47,34 @@ class FrozenTrack(Track):
                      secondaries = dict(self.secondaries.data))
         return state
 
+def defaulttdtransform(tasklist, dframe) -> pd.DataFrame:
+    "default tranform applied to all dataframes produced using tracksdict"
+    if 'track' not in getattr(dframe.index, 'names', ()):
+        return dframe
+
+    ind    = dframe.index.names
+    dframe = dframe.reset_index()
+    dframe = dframe[[i for i in dframe.columns if i != 'index']]
+
+    cnt = (
+        dframe
+        .groupby(['bead', 'track']).first()
+        .reset_index()
+        .groupby('bead').track.count()
+        .rename('trackcount')
+    )
+    dframe = (
+        dframe
+        .join(cnt, on = ['bead'])
+        .sort_values(['modification'])
+        .set_index(ind)
+    )
+    dframe.__dict__['tasklist'] = tasklist
+    return dframe
+
 class TracksDict(_TracksDict):
     """
-    ## Saving
+     ## Saving
 
     It's possible to save the tracks to a '.pk' which are much faster at
     loading. To save the files:
@@ -67,7 +94,7 @@ class TracksDict(_TracksDict):
         __doc__ = _TracksDict.__doc__ + __doc__
     _TRACK_TYPE = Track
 
-    def __init__(self,          # pylint: disable=too-many-arguments
+    def __init__(self,           # pylint: disable=too-many-arguments
                  tracks  = None,
                  grs     = None,
                  match   = None,
@@ -124,12 +151,17 @@ class TracksDict(_TracksDict):
 
             tot = sum(cnt)
 
-        fcn = lambda i: (len(i) == tot and
-                         i.count('a') + i.count('t') == cnt[0] and
-                         i.count('c') + i.count('g') == cnt[1])
-        return super().__getitem__([i for i in self if fcn(i.lower())])
+        return super().__getitem__([
+            i
+            for i in self
+            if (
+                len(i) == tot
+                and sum(i.count(j) for j in 'aAtT') == cnt[0]
+                and sum(i.count(j) for j in 'cCgG') == cnt[1]
+            )
+        ])
 
-    def __getitem__(self, key): # pylint: disable=too-many-return-statements
+    def __getitem__(self, key):  # pylint: disable=too-many-return-statements
         if isinstance(key, list) and key and all(isinstance(i, int) for i in key):
             tracks = self.clone()
             sel    = Tasks.selection(selected = list(key))
@@ -153,8 +185,10 @@ class TracksDict(_TracksDict):
                     tracks = tracks[i]
             return tracks
 
-        if (callable(getattr(key, 'match', None)) or
-                (key in ('clean', '~clean') and key not in self)):
+        if (
+                callable(getattr(key, 'match', None))
+                or (key in ('clean', '~clean') and key not in self)
+        ):
             return self.select(key)
 
         if key not in self and ('w' in key.lower() or 's' in key.lower()):
@@ -222,78 +256,71 @@ class TracksDict(_TracksDict):
                         for i in ('pathcount', 'modification', 'megabytes')})
         return pd.DataFrame(frame).sort_values('modification')
 
-    def trackdataframe(self, *tasks, # pylint: disable=too-many-locals
-                       transform = None,
-                       assign    = None,
-                       process   = True,
-                       **kwa) -> pd.DataFrame:
+    def trackdataframe(
+            self,
+            *tasks:      Union[Tasks, Task],
+            process:     bool                                      = True,
+            assign:      Optional[Dict[str, Callable]]             = None,
+            transform:   Union[Iterable[Callable], Callable, None] = None,
+            tdtransform: Union[bool, None, Callable]               = True,
+            **kwa
+    ) -> pd.DataFrame:
         """
         Tasks are applied to each track, with the last one being a
         DataFrameTask constructed using all other keywords.
 
-        **Warning:** the first task should be either event detection or peak
-        selection.
+        Parameters
+        ----------
+        *tasks:
+            The tasks to apply to the tracks prior to taking the dataframe
+        assign:
+            Other columns to add to the dataframe after computations
+        tranform:
+            An attribute of the DataFrameTask
+        process:
+            Whether to run all tracks or simply return the `Parallel` instance.
+        tdtransform:
+            Method for transforming the full dataframe (all tasks). If `None`,
+            a default method `defaulttdtransform` is used
         """
+        transform = (
+            [partial(pd.DataFrame.assign, **assign)] if assign else cast(List[Callable], [])
+            + (
+                [transform] if callable(transform) else
+                []          if transform is None   else
+                list(transform)
+            )
+        )
+
         if not tasks:
             tasks = (Tasks.alignment,)
-        try:
-            Tasks(tasks[0])
-        except (IndexError, ValueError) as _:
-            raise ValueError('The first task should be either '
-                             'event detection or peak selection.')
-
-        transform = ([transform] if callable(transform) else
-                     []          if transform is None   else
-                     list(transform))
-        if assign is not None:
-            transform.insert(0, partial(pd.DataFrame.assign, **assign))
-
-        if Tasks(tasks[-1]) is Tasks.dataframe:
+        elif Tasks(tasks[-1]) is Tasks.dataframe:
             transform = tasks[-1].transform + transform
-            tmp, kwa  = kwa, tasks[-1].measures
-            kwa.update(tmp)
-            tasks = tasks[:-1]
+            kwa       = dict(tasks[-1].measures, **kwa)
+            tasks     = tasks[:-1]
 
-        dframe   = Tasks.dataframe(merge = True, measures = kwa, transform = transform)
-        created  = [Tasks.create(i) for i in tasks]
-        procs    = register(SafeDataFrameProcessor, cache = register(), recursive = False)
-        par      = Parallel()
-        tasklist = []
-        for j in self.values():
-            tasklist.append([
+        tasklist = [
+            [
                 Tasks.trackreader(path = j.path, key = j.key),
                 *Tasks.defaulttasklist(j, tasks[0], j.cleaned)[:-1],
-                *created,
-                dframe
-            ])
-            par.extend([j], *tasklist[-1][1:], processors = procs)
+                *(Tasks.create(i) for i in tasks),
+                Tasks.dataframe(merge = True, measures = kwa, transform = transform)
+            ]
+            for j in self.values()
+        ]
+
+        procs = register(SafeDataFrameProcessor, cache = register(), recursive = False)
+        par   = Parallel()
+        for track, tlist in zip(self.values(), tasklist):
+            par.extend([track], *tlist[1:], processors = procs)
 
         if process:
-            out  = par.process(None, 'concat')
-            if 'track' not in getattr(out.index, 'names', ()):
-                return out
-
-            ind = out.index.names
-            out = out.reset_index()
-            out = out[[i for i in out.columns if i != 'index']]
-            mod = self.basedataframe()[['key', 'modification']].set_index('key')
-            cnt = (
+            out = par.process(None, 'concat')
+            return (
+                defaulttdtransform(tasklist, out) if tdtransform is True   else
+                tdtransform(out)                  if callable(tdtransform) else
                 out
-                .groupby(['bead', 'track']).first()
-                .reset_index()
-                .groupby('bead').track.count()
-                .rename('trackcount')
             )
-            out = (
-                out
-                .join(mod, on = ['track'])
-                .join(cnt, on = ['bead'])
-                .sort_values(['modification'])
-                .assign(bead = out.bead.astype(int))
-                .set_index(ind)
-            )
-            out.__dict__['tasklist'] = tasklist
-            return out
         return par
 
     def dataframe(self, *tasks,
@@ -326,18 +353,22 @@ class TracksDict(_TracksDict):
                 setattr(track, i, j)
         return this
 
-    dataframe.__doc__ =(
+    dataframe.__doc__ = (
         f"""
         Returns a dataframe which is either:
 
-        ### Tasks are provided
+         ### Tasks are provided
         {trackdataframe.__doc__}
 
-        ### Tasks not are provided
+         ### Tasks not are provided
         {basedataframe.__doc__}
-        """)
+        """
+    )
+
 
 Self = TypeVar('Self', bound = 'TracksDictOperator')
+
+
 class TracksDictOperator:
     """
     Allows applying operations to a specific portion of the tracksdict
@@ -346,7 +377,8 @@ class TracksDictOperator:
     _keys:      Optional[List[str]]     = None
     _reference: Optional[str]           = None
     _items:     Optional[TracksDict]    = None
-    KEYWORDS: FrozenSet[str] = frozenset(locals()) - {'_items'}
+    KEYWORDS:   FrozenSet[str]          = frozenset(locals()) - {'_items'}
+
     def __init__(self, items, **opts):
         if all(hasattr(items, i) for i in ('_beads', '_keys', '_reference', '_items')):
             opts, kwa   = items.config(minimal = True), opts
@@ -369,10 +401,11 @@ class TracksDictOperator:
         if isinstance(name, str):
             return getattr(self, '_'+name)
 
-        keys = {i for i in self.__dict__
-                if (i != '_items' and
-                    len(i) > 2 and i[0] == '_'   and
-                    i[1].lower() == i[1])}
+        keys = {
+            i
+            for i in self.__dict__
+            if (i != '_items' and len(i) > 2 and i[0] == '_' and i[1].lower() == i[1])
+        }
         if minimal:
             keys -= {i for i in keys if getattr(self, i) == getattr(self.__class__, i)}
 
@@ -382,7 +415,7 @@ class TracksDictOperator:
         """
         Return the cloned TracksDict corresponding to the current selected items
         """
-        return self._items[self._keys, self._beads] # type: ignore
+        return self._items[self._keys, self._beads]  # type: ignore
 
     def __call__(self: Self, **opts) -> Self:
         default = self.__class__(self._items).config()
@@ -424,6 +457,7 @@ class TracksDictOperator:
             raise KeyError("Could not slice the operator")
         return self
 
+
 # replace the class so as to have correct import later
-sys.modules['data.tracksdict'].TracksDict = TracksDict # type: ignore
+sys.modules['data.tracksdict'].TracksDict = TracksDict  # type: ignore
 __all__ = ['TracksDict']

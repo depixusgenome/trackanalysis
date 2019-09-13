@@ -10,8 +10,9 @@ from cleaning.processor                   import DataCleaningException
 from peakfinding.processor                import PeakSelectorTask
 from peakfinding.reporting.processor      import PeakFindingExcelTask
 from peakcalling.processor                import FitToHairpinTask, BeadsByHairpinTask
-from peakcalling.processor.fittoreference import (FitToReferenceTask, FitToReferenceDict,
-                                                  TaskViewProcessor, BEADKEY)
+from peakcalling.processor.fittoreference import (
+    FitToReferenceTask, FitToReferenceDict, TaskViewProcessor
+)
 from taskcontrol.taskcontrol              import create as _createdata
 from taskcontrol.taskio                   import (
     ConfigTrackIO, ConfigGrFilesIO, ConfigMuWellsFilesIO, TaskIO
@@ -28,13 +29,13 @@ LOGS = getLogger(__name__)
 
 class _PeaksIOMixin:
     def __init__(self, ctrl):
-        type(self).__bases__ [1].__init__(self, ctrl) # type: ignore
+        type(self).__bases__[1].__init__(self, ctrl)  # type: ignore
         self.__ctrl = ctrl
 
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         "opens a track file and adds a alignment"
         # pylint: disable=no-member
-        items = type(self).__bases__[1].open(self, path, model) # type: ignore
+        items = type(self).__bases__[1].open(self, path, model)  # type: ignore
 
         if items is not None:
             task = PeaksPlotModelAccess(self.__ctrl, True).defaultidenfication
@@ -42,19 +43,19 @@ class _PeaksIOMixin:
                 items[0] += (task,)
         return items
 
-class PeaksConfigTrackIO(_PeaksIOMixin, ConfigTrackIO): # type: ignore
+class PeaksConfigTrackIO(_PeaksIOMixin, ConfigTrackIO):  # type: ignore
     "selects the default tasks"
 
-class PeaksConfigMuWellsFilesIO(_PeaksIOMixin, ConfigMuWellsFilesIO): # type: ignore
+class PeaksConfigMuWellsFilesIO(_PeaksIOMixin, ConfigMuWellsFilesIO):  # type: ignore
     "selects the default tasks"
 
-class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO): # type: ignore
+class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO):  # type: ignore
     "selects the default tasks"
 
 class _SafeTask(FitToReferenceTask):
     "safe fit to ref"
 
-class _SafeDict(FitToReferenceDict): # pylint: disable=too-many-ancestors
+class _SafeDict(FitToReferenceDict):  # pylint: disable=too-many-ancestors
     "iterator over peaks grouped by beads"
     def _getrefdata(self, key):
         try:
@@ -63,12 +64,15 @@ class _SafeDict(FitToReferenceDict): # pylint: disable=too-many-ancestors
             out = True
         return out
 
-class _SafeProc( # pylint: disable=duplicate-bases
-        TaskViewProcessor[_SafeTask, _SafeDict, BEADKEY]
+class _SafeProc(  # pylint: disable=duplicate-bases
+        TaskViewProcessor[_SafeTask, _SafeDict, int]
 ):
     "Changes the Z axis to fit the reference"
 
+
 FileDialogTheme.types['pkz'] = (u'pickled report', '.pkz')
+
+
 class ConfigXlsxIOTheme:
     "ConfigXlsxIOTheme"
     name   = 'hybridstat.configxlsxio'
@@ -81,6 +85,7 @@ class ConfigXlsxIO(TaskIO):
     EXT      = 'xlsx', 'csv', 'pkz'
     RUNNING  = False
     POOLTYPE = ProcessPoolExecutor
+
     def __init__(self, ctrl):
         super().__init__(ctrl)
         self.__ctrl  = ctrl
@@ -133,6 +138,7 @@ class ConfigXlsxIO(TaskIO):
         return ret
 
     __TASKS  = 'singlestrand', 'baselinefilter', 'fittoreference', 'identification'
+
     def __complete_model(self, model, pksmdl):
         if not any(isinstance(i, pksmdl.identification.tasktype) for i in model):
             # If this methods gets called prior to the user using the peaks tab, some
@@ -155,7 +161,7 @@ class ConfigXlsxIO(TaskIO):
         if ref is not None and ind is not None:
             procs                  = self.__ctrl.tasks.processors(ref, PeakSelectorTask)
             model[ind]             = _SafeTask(**model[ind].config())
-            model[ind].defaultdata =  procs.data
+            model[ind].defaultdata = procs.data
         return model
 
     def __msg(self, msg):
@@ -179,6 +185,7 @@ class ConfigXlsxIO(TaskIO):
                                                       **xlscnf))
 
         error: List[Optional[Exception]] = [None]
+
         def _process():
             try:
                 with cls.POOLTYPE() as pool:
@@ -211,13 +218,15 @@ def setupio(cls):
             self._ismain(ctrl, tasks = self.TASKS,
                          **setupio(getattr(self._plotter, '_model')))
 
-        cls.TASKS    =  ('extremumalignment', 'clipping', 'eventdetection', # type: ignore
-                         'peakselector', 'singlestrand', 'baselinepeakfilter')
-        cls.advanced = advanced    #type: ignore
-        cls.ismain   = ismain      #type: ignore
+        cls.TASKS    = (   # type: ignore
+            'extremumalignment', 'clipping', 'eventdetection',
+            'peakselector', 'singlestrand', 'baselinepeakfilter'
+        )
+        cls.advanced = advanced     # type: ignore
+        cls.ismain   = ismain       # type: ignore
         return cls
 
-    name = lambda i: __name__ + '.'+i
+    name = lambda i: __name__ + '.'+i  # noqa
     return dict(ioopen = (slice(None, -2),
                           name('PeaksConfigGRFilesIO'),
                           name('PeaksConfigMuWellsFilesIO'),

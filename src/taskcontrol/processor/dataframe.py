@@ -18,10 +18,11 @@ from    .base                   import Processor, ProcessorException
 Frame = TypeVar('Frame', bound = TrackView)
 class DataFrameFactory(Generic[Frame]):
     "base class for creating dataframes"
-    def __init__(self, task: DataFrameTask, _: TrackView) -> None:
+    def __init__(self, task: DataFrameTask, buffers, _) -> None:
         self.task      = task
         transf         = list(self.task.transform)  if self.task.transform else []
         self.transform = [(parametercount(i), i) for i in transf]
+        self.tasklist  = list(buffers.model)
 
     @staticmethod
     def adddoc(newcls):
@@ -55,7 +56,7 @@ class DataFrameFactory(Generic[Frame]):
 
     @staticmethod
     def trackname(track:Track) -> str:
-        "returns the track name"
+        "returns data track name"
         return trackname(track)
 
     @classmethod
@@ -84,25 +85,57 @@ class DataFrameFactory(Generic[Frame]):
         if len(inds):
             data = pd.concat([pd.DataFrame(inds), data], 1, sort = False)
 
-        cols = [i for i in self.task.indexes if i in data]
-        if len(cols):
-            data.set_index(cols, inplace = True)
-
         for cnt, fcn in self.transform:
-            itm = (fcn(data)        if cnt == 1 else
-                   fcn(frame, data) if cnt == 2 else
-                   fcn(frame, info, data))
-            if itm is not None:
-                data = itm
-                assert isinstance(data, pd.DataFrame)
-        return info[0], data
+            if cnt == 2:
+                itm = fcn(frame, info, data)
+                if itm is not None:
+                    data = itm
+                    assert isinstance(data, pd.DataFrame)
+
+        return info[0], data if self.task.merge else self.defaulttransform(frame, data)
 
     def _run(self, frame, key, values) -> Dict[str, np.ndarray]:
         raise NotImplementedError()
 
+    def defaulttransform(self, frame, data: pd.DataFrame) -> pd.DataFrame:
+        "default transform action"
+        for col in ('bead', 'cycle'):
+            if col not in data or data[col].dtype == np.int64:
+                continue
+
+            if np.issubdtype(data[col].dtype, np.int64):
+                data[col] = data[col].astype(np.int64)
+            else:
+                try:
+                    data[col] = np.round(data[col]).astype(np.int64)
+                except ValueError:
+                    pass
+
+        if 'track' in data and hasattr(frame.track, 'pathinfo'):
+            data['modification'] = frame.track.pathinfo.modification
+
+        for cnt, fcn in self.transform:
+            data.__dict__['tasklist'] = self.tasklist  # set again because of pandas behaviour
+            itm = fcn(data) if cnt == 1 else fcn(frame, data) if cnt == 2 else None
+            if itm is not None:
+                data = itm
+                assert isinstance(data, pd.DataFrame)
+
+        cols = [i for i in self.task.indexes if i in data]
+        if len(cols):
+            data.set_index(cols, inplace = True)
+
+        data.__dict__['tasklist'] = self.tasklist
+        return data
+
     @classmethod
-    def _proc_apply(cls, task, _, frame):
-        return frame.withaction(cls(task, frame).dataframe)
+    def create(cls, task, buffers, frame):
+        "creates itself"
+        return cls(task, buffers, frame)
+
+    def apply(self, frame):
+        "applies itself to the frame"
+        return frame.withaction(self.dataframe)
 
 class SafeDataFrameProcessor(Processor[DataFrameTask]):
     """
@@ -124,8 +157,13 @@ class SafeDataFrameProcessor(Processor[DataFrameTask]):
 
     @classmethod
     def _merge(cls, task, buffers, frame):
-        frame = cls._apply(task, buffers, frame)
-        lst   = []
+        factory = cls.factory(frame).create(task, buffers, frame)
+        frame   = factory.apply(frame)
+        return factory.defaulttransform(frame, pd.concat(cls._merge_list(frame), sort = False))
+
+    @staticmethod
+    def _merge_list(frame):
+        lst = []
         if callable(getattr(frame, 'bead', None)):
             for i in {j for j, _ in frame.keys()}:
                 itr = None
@@ -147,7 +185,7 @@ class SafeDataFrameProcessor(Processor[DataFrameTask]):
                     lst.append(frame[i])
                 except ProcessorException:
                     continue
-        return pd.concat(lst, sort = False) if lst else None
+        return lst
 
     @staticmethod
     def __iter_subclasses() -> Iterator[type]:
@@ -172,9 +210,11 @@ class SafeDataFrameProcessor(Processor[DataFrameTask]):
         frametype = type(frame)
         for sub in cls.__iter_subclasses():
             if frametype is cast(Any, sub).frametype():
-                out = getattr(sub, '_proc_apply')(task, buffers, frame)
-                if out is not None:
-                    return out
+                factory = sub.create(task, buffers, frame)
+                if factory is not None:
+                    out = factory.apply(frame)
+                    if out is not None:
+                        return out
         raise RuntimeError(f'Could not process {type(frame)} into a pd.DataFrame')
 
 class DataFrameProcessor(SafeDataFrameProcessor):
@@ -183,6 +223,9 @@ class DataFrameProcessor(SafeDataFrameProcessor):
 
     Exceptions are *not* silently ignored.
     """
-    @classmethod
-    def _merge(cls, task, buffers, frame):
-        return pd.concat([i for _, i in cls._apply(task, buffers, frame)], sort = False)
+    @staticmethod
+    def _merge_list(frame):
+        if callable(getattr(frame, 'bead', None)):
+            keys = {i for i, _ in frame.keys()}
+            return [j[-1] for i in keys for j in frame.bead(i)]
+        return [i[-1] for i in frame]
