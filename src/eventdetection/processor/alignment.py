@@ -11,8 +11,10 @@ from   data                  import Cycles
 from   utils                 import initdefaults
 from   taskmodel             import Task, Level, PhaseArg
 from   taskcontrol.processor import Processor
-from   cleaning.processor    import DataCleaningErrorMessage, DataCleaningException
-from   .._core               import (# pylint: disable=import-error
+from   cleaning.processor    import (
+    DataCleaningErrorMessage, DataCleaningException, Partial
+)
+from   .._core               import (  # pylint: disable=import-error
     translate, medianthreshold, ExtremumAlignment, ExtremumAlignmentMode,
     PhaseEdgeAlignment, PhaseEdgeAlignmentMode
 )
@@ -20,7 +22,7 @@ from   .._core               import (# pylint: disable=import-error
 def _min_extension() -> float:
     from importlib import import_module
     try:
-        return import_module("cleaning._core").ExtentRule().minextent # type: ignore
+        return import_module("cleaning._core").ExtentRule().minextent  # type: ignore
     except ImportError:
         from utils.logconfig import getLogger
         getLogger(__name__).warning("Could not obtain min extension from the cleaning module")
@@ -120,7 +122,10 @@ class _Args(NamedTuple):
     pull:    np.ndarray
     measure: np.ndarray
 
+
 _OUT = Tuple[np.ndarray, '_Args']
+
+
 class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
     "Aligns cycles to zero"
     class _Utils:
@@ -225,8 +230,8 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
         percentile = cls._get(kwa, 'percentile')
 
         phase = frame.phaseindex()
-        inits = cycles.bias(phase.initial, window, edge, percentile) # ≈ min
-        pulls = cycles.bias(phase.pull, window, edge, 100.-percentile) # ≈ max
+        inits = cycles.bias(phase.initial, window, edge, percentile)    # ≈ min
+        pulls = cycles.bias(phase.pull, window, edge, 100.-percentile)  # ≈ max
 
         if meas:
             return _Args(
@@ -260,7 +265,7 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
 
     @classmethod
     def __filter_on_relax(cls, args, kwa, bias):
-        minv =  cls._get(kwa, 'minrelax')
+        minv = cls._get(kwa, 'minrelax')
         if minv is not None:
             ind: int = args.cycles.frame.phaseindex()['relax']
             medianthreshold(
@@ -273,7 +278,7 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
 
     @classmethod
     def __less(cls, array, kwa, name):
-        val                    =  cls._get(kwa, name)
+        val                    = cls._get(kwa, name)
         array[np.isnan(array)] = val
         return array < val
 
@@ -304,15 +309,27 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
         exc        = cls.test(cls.tasktype(**kwa), frame, (info[0], bias))
         if exc is None:
             return out
-        raise exc # pylint: disable=raising-bad-type
+        raise exc  # pylint: disable=raising-bad-type
 
     @staticmethod
-    def test(task, frame, info)-> Optional[AlignmentException]:
+    def test(task, frame, info) -> Optional[AlignmentException]:
         "test how much remaining pop"
         if np.isfinite(info[1]).sum() <= len(info[1]) * task.minpopulation * 1e-2:
             ncy = getattr(frame.track, 'ncycles', 0)
             msg = AlignmentErrorMessage(
-                None, task.config(), type(task), info[0], frame.parents, ncy
+                (
+                    Partial(
+                        name   = "alignment",
+                        min    = np.empty(0, dtype                  = 'i4'),
+                        max    = np.isfinite(info[1]).astype('i4'),
+                        values = info[1]
+                    ),
+                ),
+                task.config(),
+                type(task),
+                info[0],
+                frame.parents,
+                ncy
             )
             return AlignmentException(msg, 'warning')
         return None

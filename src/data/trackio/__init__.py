@@ -7,4 +7,4 @@ from ._pickle   import PickleIO, savetrack
 from ._legacy   import LegacyTrackIO
 from ._legacygr import LegacyGRFilesIO
 from ._muwells  import MuWellsFilesIO
-from ._handler  import Handler, checkpath, opentrack, instrumenttype
+from ._handler  import Handler, checkpath, opentrack, instrumenttype, instrumentinfo

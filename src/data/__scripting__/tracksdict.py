@@ -28,10 +28,10 @@ from   ..tracksdict                     import TracksDict as _TracksDict
 from   ..views                          import isellipsis
 
 @addto(Handler)
-def __call__(self, track = None, __old__ = Handler.__call__) -> Track:
+def __call__(self, track = None, cycles = None, __old__ = Handler.__call__) -> Track:
     if track is None:
         track = Track()
-    return __old__(self, track)
+    return __old__(self, track, cycles = cycles)
 
 class FrozenTrack(Track):
     "Track where the data is also part of the state"
@@ -49,6 +49,9 @@ class FrozenTrack(Track):
 
 def defaulttdtransform(tasklist, dframe) -> pd.DataFrame:
     "default tranform applied to all dataframes produced using tracksdict"
+    if 'track' not in getattr(dframe.index, 'names', ()) and 'track' in dframe.columns:
+        dframe.set_index('track', inplace = True)
+
     if 'track' not in getattr(dframe.index, 'names', ()):
         return dframe
 

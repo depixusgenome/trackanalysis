@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=arguments-differ
 "Loading and save tracks"
-from    typing             import Sequence, Union, Tuple, Optional, Iterator, Dict, cast
+from    typing             import (
+    Any, Sequence, Union, Tuple, Optional, Iterator, Dict, cast
+)
 from    itertools          import chain
 from    functools          import partial
 from    pathlib            import Path
@@ -59,12 +61,12 @@ class LegacyGRFilesIO(TrackIO):
         return (trk,) + grs
 
     @staticmethod
-    def instrumenttype(path: str) -> str:
+    def instrumentinfo(path: str) -> Dict[str, Any]:
         "return the instrument type"
-        return _legacyinstrumenttype(path)
+        return {'type': _legacyinstrumenttype(path), 'dimension': 'µm', 'name': None}
 
     @classmethod
-    def open(cls, paths:Tuple[PATHTYPE,PATHTYPE], **kwa) -> dict: # type: ignore
+    def open(cls, paths:Tuple[PATHTYPE,PATHTYPE], **kwa) -> dict:  # type: ignore
         "opens the directory"
         output = LegacyTrackIO.open(paths[0], **kwa)
         if output is None:

@@ -33,11 +33,11 @@ def test_track(scriptingcleaner):
     assert track.cleaned is False
 
     assert ([Tasks(i) for i in Tasks.defaulttasklist(None, Tasks.clipping, False)]
-            == [Tasks.cleaning, Tasks.alignment, Tasks.clipping])
+            == [Tasks.undersampling, Tasks.cleaning, Tasks.alignment, Tasks.clipping])
     assert ([Tasks(i) for i in Tasks.defaulttasklist(track, Tasks.clipping)]
-            == [Tasks.cleaning, Tasks.alignment, Tasks.clipping])
+            == [Tasks.undersampling, Tasks.cleaning, Tasks.alignment, Tasks.clipping])
     assert ([Tasks(i) for i in Tasks.defaulttasklist(track, ...)]
-            == [Tasks.cleaning, Tasks.alignment, Tasks.clipping, Tasks.eventdetection,
+            == [Tasks.undersampling, Tasks.cleaning, Tasks.alignment, Tasks.clipping, Tasks.eventdetection,
                 Tasks.peakselector, Tasks.fittohairpin])
     assert ([Tasks(i) for i in Tasks.defaulttasklist(None, Tasks.alignment, True)]
             == [Tasks.alignment])
@@ -55,7 +55,7 @@ def test_track(scriptingcleaner):
     assert set(track.tasks.subtraction.beads) == {1,2}
     track.cleaned = False
     assert ([Tasks(i) for i in Tasks.defaulttasklist(track, Tasks.alignment)]
-            == [Tasks.subtraction, Tasks.cleaning, Tasks.alignment])
+            == [Tasks.undersampling, Tasks.subtraction, Tasks.cleaning, Tasks.alignment])
 
     assert track.op[:,:5].ncycles == 5
     assert set(track.op[[1,2]].beads.keys()) == {1,2}
@@ -148,6 +148,18 @@ def test_tracksdict_cleaning_dataframe(scriptingcleaner):
     assert not all(i is None for i in dframe['fixed'])
 
 @integrationmark
+def test_tracksdict_ramps_dataframe(scriptingcleaner):
+    "test TracksDict.basedataframe"
+    from scripting          import TracksDict
+    from tests.testingcore  import path as utpath
+    tracks = TracksDict(utpath("100bp_4mer")+"/../ramp*.trk")
+
+    dframe = tracks.dataframe(ramps = True)
+    assert 'modification' in dframe.columns
+    assert hasattr(dframe, 'tasklist')
+    assert dframe.tasklist[0][-1].__class__.__name__.startswith("Ramp")
+
+@integrationmark
 def test_viewer(scriptingcleaner):
     "test TracksDict.basedataframe"
     from scripting import displaytrack, displaytracksdict
@@ -171,4 +183,4 @@ def test_viewer(scriptingcleaner):
 
 
 if __name__ == '__main__':
-    test_tracksdict_cleaning_dataframe(None)
+    test_tracksdict_ramps_dataframe(None)

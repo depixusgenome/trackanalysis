@@ -20,7 +20,7 @@ FILTERS = [
 
 def test_dataframe():
     "test ramp dataframe"
-    add = {'fixed', 'status', 'good'}
+    add = {'fixed', 'status', 'good', 'track', 'modification'}
     out = next(create(
         TrackReaderTask(path = path("ramp_legacy")),
         RampStatsTask()

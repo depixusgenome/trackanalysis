@@ -32,12 +32,15 @@ namespace legacy
         pybind11::object _toarray(std::vector<T> const && ptr)
         { return _toarray(ptr.size(), ptr.data()); }
 
-        void _open(legacy::GenRecord & rec, std::string name)
+        void _open(
+                legacy::GenRecord & rec, std::string name,
+                int nbeads = -1, int start = -1, int stop = -1, int nphases = -1
+                )
         {
             try
             {
                 pybind11::gil_scoped_release lock;
-                rec.open(name);
+                rec.open(name, nbeads, start, stop, nphases);
             }
             catch(TrackIOException const & exc)
             {
@@ -88,17 +91,23 @@ namespace legacy
     pybind11::object _readfov(std::string name)
     {
         legacy::GenRecord rec;
-        _open(rec, name);
+        _open(rec, name, 0);
 
         return rec.ncycles() == 0 ? pybind11::none() : _readrecfov(rec);
     }
 
     pybind11::object _readtrack(std::string name,
                                 bool notall     = true,
-                                std::string tpe = "")
+                                std::string tpe = "",
+                                int = -1,
+                                int lastcycle  = -1
+                                )
     {
         legacy::GenRecord   rec;
-        _open(rec, name);
+        if(lastcycle >= 0)
+            _open(rec, name, -1, -1, -1, lastcycle);
+        else
+            _open(rec, name);
         if((notall && rec.ncycles() <= 4) || rec.ncycles() == 0)
             return pybind11::none();
 
@@ -285,7 +294,7 @@ namespace legacy
                 "\n\nThis is found by checking for calibration images in the first\n"
                 "10'000 lines of the file");
         mod.def("readtrack", _readtrack, "path"_a,
-                "clipcycles"_a = true, "axis"_a = "z",
+                "clipcycles"_a = true, "axis"_a = "z", "firstcycle"_a = -1, "lastcycle"_a = -1,
                 "Reads a '.trk' file and returns a dictionnary of beads,\n"
                 "possibly removing the first 3 cycles and the last one.\n"
                 "axes are x, y or z");

@@ -123,7 +123,7 @@ def test_ref_peaksgrid_2D():
         ret  = ret[1]*8.8e-4, ret[2][0]
         assert_allclose(ret, i, rtol = 5e-4, atol = 5e-4)
 
-def test_toref_controller():
+def test_toref_dataframe():
     "tests reference comparison"
     peaks = np.array([.1, .5, .6, 1.], dtype = 'f4')
     root  = ByPeaksEventSimulatorTask(bindings       = peaks[::-1],
@@ -149,16 +149,18 @@ def test_toref_controller():
                                                             std3 = 'resolution')))
     beads = tuple(i for i in pair.run())[0][0]
     assert set(beads.index.names) == {'track', 'bead'}
-    assert set(beads.columns)     == {'peakposition',      'averageduration',
-                                      'hybridisationrate', 'eventcount',
-                                      'referenceposition', 'std1', 'std2', 'std3'}
+    assert set(beads.columns)     == {
+        'peakposition', 'averageduration', 'hybridisationrate', 'eventcount',
+        'referenceposition', 'std1', 'std2', 'std3', 'modification'
+    }
 
     pair  = create(root, tsk, DataFrameTask(measures = dict(events = True)))
     beads = tuple(i for i in pair.run())[0][0]
     assert set(beads.index.names) == {'track', 'bead', 'cycle'}
-    assert set(beads.columns)     == {'peakposition',      'averageduration',
-                                      'hybridisationrate', 'eventcount',
-                                      'referenceposition', 'avg', 'length', 'start'}
+    assert set(beads.columns)     == {
+        'peakposition',      'averageduration', 'hybridisationrate', 'eventcount',
+        'referenceposition', 'avg', 'length', 'start', 'modification'
+    }
 
 def test_cost_value():
     u"Tests peakcalling.cost.compute"

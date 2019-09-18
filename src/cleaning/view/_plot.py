@@ -218,9 +218,9 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
     __source:   ColumnDataSource
     __fig:      Figure
 
-    def __init__(self,  ctrl, plotmodel = None, **kwa) -> None:
+    def __init__(self,  ctrl, model = None, plotmodel = None, **kwa) -> None:
         "sets up this plotter's info"
-        super().__init__(ctrl, noerase = False, plotmodel = plotmodel)
+        super().__init__(ctrl, noerase = False, model = model, plotmodel = plotmodel)
         self._widgets = CleaningWidgets(ctrl, self._model, self._plotmodel, **kwa)
 
     def observe(self, ctrl, noerase = True):

@@ -34,8 +34,7 @@ def test_cyclesplot(bokehaction):  # pylint: disable=too-many-statements
 
     server = bokehaction.start(
         'cyclesplot.CyclesPlotView',
-        'taskapp.toolbar',
-        runtime = "browser"
+        'taskapp.toolbar'
     )
     server.ctrl.display.observe("cycles", _printrng)
     server.load('big_legacy')
@@ -126,8 +125,7 @@ def test_cyclesplot2(bokehaction):
     "test cyclesplot data actions"
     server = bokehaction.start(
         'cyclesplot.CyclesPlotView',
-        'taskapp.toolbar',
-        runtime = "browser"
+        'taskapp.toolbar'
     )
     server.load('big_legacy')
 

@@ -119,13 +119,24 @@ class TrackOperations:
             trk.instrument.pop('rescaling', None)
         return trk
 
+class CleanedProperty(LazyProperty):
+    "Checks whether the file was opened prior to returning a value"
+    def _load(self, inst):
+        if inst.isloaded:
+            return
+
+        if isinstance(inst.path, (tuple, list)) and len(inst.path) > 1:
+            inst.load()
+        else:
+            setattr(inst, self._name, False)
+
 @extend(Track)
 class _TrackMixin:
     "Additional track methods"
     if __doc__:
         __doc__  = '    * `op` a'          + cast(str, TrackOperations.__doc__)[6:]
 
-    cleaned = LazyProperty('cleaned')
+    cleaned = CleanedProperty()
 
     def tasklist(self, *args):
         "creates a tasklist"

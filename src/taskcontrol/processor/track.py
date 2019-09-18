@@ -17,7 +17,7 @@ from    taskmodel        import Level
 from    .base            import Processor
 
 if TYPE_CHECKING:
-    from .runner    import Runner # pylint: disable=unused-import
+    from .runner    import Runner  # pylint: disable=unused-import
 
 class InMemoryTrackProcessor(Processor[_tasks.InMemoryTrackTask]):
     "Generates output from a _tasks.InMemoryTrackProcessor"
@@ -28,16 +28,22 @@ class InMemoryTrackProcessor(Processor[_tasks.InMemoryTrackTask]):
         args.apply((trk.beads,), levels = self.levels)
 
     @staticmethod
-    def beads(cache, selected: Iterable[int]) -> Iterable[int]: # pylint: disable=unused-argument
+    def beads(cache, selected: Iterable[int]) -> Iterable[int]:  # pylint: disable=unused-argument
         "Beads selected/discarded by the task"
         return cache.beads.keys()
 
 class TrackReaderProcessor(Processor[_tasks.TrackReaderTask]):
     "Generates output from a _tasks.CycleCreatorTask"
     @classmethod
-    def __get(cls, attr, cpy, trk):
+    def __get(cls, attr, cpy, trk, und):
+
+        def _open(trk):
+            if und is not None:
+                trk.load(und.cycles)
+            return getattr(trk, attr).withcopy(cpy, 0)
+
         vals = (trk,) if isinstance(trk, Track) else trk.values()
-        return tuple(getattr(i, attr).withcopy(cpy, 0) for i in vals)
+        return tuple(_open(i) for i in vals)
 
     def run(self, args:'Runner'):
         "updates frames"
@@ -51,10 +57,15 @@ class TrackReaderProcessor(Processor[_tasks.TrackReaderTask]):
                                             Track(path = task.path,
                                                   key  = task.key,
                                                   axis = task.axis))
-            args.apply(self.__get(attr, task.copy, trk), levels = self.levels)
+
+        und = next(
+            (i for i in args.data.model if isinstance(i, _tasks.UndersamplingTask)),
+            None
+        )
+        args.apply(self.__get(attr, task.copy, trk, und), levels = self.levels)
 
     @staticmethod
-    def beads(cache, selected: Iterable[int]) -> Iterable[int]: # pylint: disable=unused-argument
+    def beads(cache, selected: Iterable[int]) -> Iterable[int]:  # pylint: disable=unused-argument
         "Beads selected/discarded by the task"
         return cache.beads.keys()
 
@@ -102,7 +113,7 @@ class CycleCreatorProcessor(Processor[_tasks.CycleCreatorTask]):
     @classmethod
     def apply(cls, toframe = None, **kwa):
         "applies the task to a frame or returns a function that does so"
-        fcn = lambda data: data[...,...].withphases(kwa['first'], kwa['last'])
+        fcn = lambda data: data[...,...].withphases(kwa['first'], kwa['last'])  # noqa
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args:'Runner'):
@@ -133,7 +144,7 @@ class DataSelectionProcessor(Processor[_tasks.DataSelectionTask]):
     @classmethod
     def apply(cls, toframe = None, **kwa):
         "applies the task to a frame or returns a function that does so"
-        names = lambda i: ('selecting'  if i == 'selected'  else
+        names = lambda i: ('selecting'  if i == 'selected'  else  # noqa
                            'discarding' if i == 'discarded' else
                            'with'+i)
 
@@ -146,7 +157,7 @@ class DataSelectionProcessor(Processor[_tasks.DataSelectionTask]):
         "updates frames"
         args.apply(self.apply(**self.config()))
 
-    def beads(self, _, selected: Iterable[int]) -> Iterable[int]: # type: ignore
+    def beads(self, _, selected: Iterable[int]) -> Iterable[int]:  # type: ignore
         "Beads selected/discarded by the task"
         task = cast(_tasks.DataSelectionTask, self.task)
         if task.selected and task.discarded:

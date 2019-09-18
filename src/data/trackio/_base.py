@@ -49,11 +49,16 @@ class TrackIO(ABC):
         return None
 
     @classmethod
+    def instrumenttype(cls, path:str) -> str:
+        "return the instrument type"
+        return cls.instrumentinfo(path)['type']
+
+    @classmethod
     @abstractmethod
     def open(cls, path:PATHTYPE, **_) -> Dict[Union[str, int], Any]:
         "opens a track file"
 
     @staticmethod
     @abstractmethod
-    def instrumenttype(path:str) -> str:
+    def instrumentinfo(path:str) -> Dict[str, Any]:
         "return the instrument type"

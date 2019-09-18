@@ -11,6 +11,7 @@ import pandas            as pd
 
 from   data                  import Track
 from   data.views            import Cycles, Beads
+from   data.trackops         import trackname
 from   signalfilter          import nanhfsigma
 from   taskcontrol.processor import Processor, ProcessorException
 from   taskmodel             import Task, Level
@@ -78,7 +79,10 @@ class RampStatsTask(Task):
         data   = pd.DataFrame({
             j: [k[i] for k in lst] for i,j in enumerate(fields) # type: ignore
         })
-        return self.status(data)
+        data    = self.status(data)
+        data['track'] = trackname(frame.track)
+        data['modification'] = frame.track.pathinfo.modification
+        return data
 
     __AGGS = {
         "extent":     "median",

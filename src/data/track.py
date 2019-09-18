@@ -18,7 +18,7 @@ from    taskmodel       import levelprop, Level, InstrumentType
 from    taskmodel.level import PHASE
 from    utils           import initdefaults
 from   .views           import Beads, Cycles, BEADKEY, isellipsis, TrackView
-from   .trackio         import opentrack, PATHTYPES
+from   .trackio         import opentrack, PATHTYPES, instrumentinfo
 
 IDTYPE       = Union[None, int, range]  # missing Ellipsys as mypy won't accept it
 PIDTYPE      = Union[IDTYPE, slice, Sequence[int]]
@@ -35,6 +35,9 @@ def _doc(tpe: type) -> str:
         return doc[0].lower()+doc[1:].replace('\n', '\n    ')+"\n"
     return ''
 
+def _lazies():
+    return ('_data', '_rawprecisions') + tuple(LazyProperty.LIST)
+
 
 class Axis(Enum):
     "which axis to look at"
@@ -48,7 +51,6 @@ class Axis(Enum):
         if name in 'XYZ':
             name += 'axis'
         return cls(name)
-
 
 class Bead:
     """
@@ -69,7 +71,6 @@ class Bead:
         pos  = fov.topixel(np.array(list(self.position[:2])))
         ind  = np.int32(np.round(pos))-size//2  # type: ignore
         return fov.image[ind[1]:ind[1]+size,ind[0]:ind[0]+size]
-
 
 class FoV:
     """
@@ -138,7 +139,6 @@ class FoV:
 
         tpe = iter if hasattr(arr, '__next__') else type(arr)
         return tpe([(sl1*i+int1, sl2*j+int2) for i, j in arr])  # type: ignore
-
 
 class Secondaries:
     """
@@ -242,7 +242,6 @@ class Secondaries:
         arr           = arr[arr['index'] < self.__track.nframes]
         return arr
 
-
 class LazyProperty:
     "Checks whether the file was opened prior to returning a value"
     LIST: List[str] = []
@@ -259,18 +258,29 @@ class LazyProperty:
     def __set_name__(self, _, name):
         self.__init__(name, self._type)
 
+    @staticmethod
+    def _load(inst):
+        inst.load()
+
     def __get__(self, inst: 'Track', owner):
         if inst is not None:
-            inst.load()
+            self._load(inst)
 
         return (self._type(inst) if self._type and inst else
                 getattr(owner if inst is None else inst, self._name))
 
     def __set__(self, obj: 'Track', val):
-        obj.load()
+        self._load(obj)
         setattr(obj, self._name, val)
         return getattr(obj, self._name)
 
+class InstrumentProperty(LazyProperty):
+    "Checks whether the file was opened prior to returning a value"
+    def _load(self, inst):
+        if not inst.isloaded:
+            info = instrumentinfo(inst)
+            info['type'] = InstrumentType(info['type'])
+            setattr(inst, self._name, info)
 
 class ResettingProperty:
     "Resets all if this attribute is changed"
@@ -288,7 +298,6 @@ class ResettingProperty:
         obj.unload()
         return getattr(obj, self._name)
 
-
 class ViewDescriptor:
     "Access to views"
     tpe:  Optional[type] = None
@@ -301,11 +310,6 @@ class ViewDescriptor:
         self.tpe  = Cycles if name.startswith('cycles') else Beads
         self.args = dict(copy = False)
         setattr(self, '__doc__', getattr(self.tpe, '__doc__', None))
-
-
-def _lazies():
-    return ('_data', '_rawprecisions') + tuple(LazyProperty.LIST)
-
 
 class PhaseManipulator:
     """
@@ -418,7 +422,6 @@ class PhaseManipulator:
                 phases[cid,:] if ells[1]   else
                 phases[cid,pid]) - phases[0,0]
 
-
 class PathInfo:
     """
     Provides information on the path itself:
@@ -466,12 +469,12 @@ class PathInfo:
     @property
     def modification(self):
         "return the modification date of the **original** track file."
-        out = (
-            getattr(self.track, '_modificationdate')
-            if hasattr(self.track, '_modificationdate') else
-            self.stat.st_mtime
-        )
-        return datetime.fromtimestamp(out)
+        date = getattr(self.track, '_modificationdate', None)
+        if date is None and self.trackpath.exists():
+            date = self.stat.st_mtime
+        else:
+            date = 0
+        return datetime.fromtimestamp(date)
 
 @levelprop(Level.project)
 class Track:
@@ -523,7 +526,7 @@ class Track:
         )
 
     key: Optional[str] = None
-    instrument         = cast(Dict[str, Any],      LazyProperty())
+    instrument         = cast(Dict[str, Any],      InstrumentProperty())
     phases             = cast(np.ndarray,          LazyProperty())
     framerate          = cast(float,               LazyProperty())
     fov                = cast(FoV,                 LazyProperty())
@@ -569,10 +572,10 @@ class Track:
         "returns whether the data was already acccessed"
         return self._data is not None
 
-    def load(self) -> 'Track':
+    def load(self, cycles: Optional[slice] = None) -> 'Track':
         "Loads the data"
         if self._data is None and self._path is not None:
-            opentrack(self)
+            opentrack(self, cycles)
         return self
 
     def unload(self):

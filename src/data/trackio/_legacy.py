@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=arguments-differ
 "Load trk tracks"
-from    typing             import Optional, Iterator
+from    typing             import Optional, Iterator, Dict, Any
 from    itertools          import chain
 from    pathlib            import Path
 
@@ -23,14 +23,17 @@ class LegacyTrackIO(TrackIO):
     @staticmethod
     def open(path:PATHTYPE, **kwa) -> dict:
         "opens a track file"
-        axis = kwa.pop('axis', 'Z')
-        axis = getattr(axis, 'value', axis)[0]
-        return readtrack(str(path), kwa.pop('notall', True), axis)
+        cycles = kwa.pop('cycles', None)
+        start  = 0#cycles.start if cycles else -1
+        stop   = cycles.stop+5 if cycles else -1
+        axis   = kwa.pop('axis', 'Z')
+        axis   = getattr(axis, 'value', axis)[0]
+        return readtrack(str(path), kwa.pop('notall', True), axis, start, stop)
 
     @staticmethod
-    def instrumenttype(path: str) -> str:
+    def instrumentinfo(path: str) -> Dict[str, Any]:
         "return the instrument type"
-        return _legacyinstrumenttype(path)
+        return {'type': _legacyinstrumenttype(path), 'dimension': 'µm', 'name': None}
 
     @classmethod
     def scan(cls, trkdirs) -> Iterator[Path]:
