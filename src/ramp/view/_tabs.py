@@ -7,7 +7,7 @@ from control.decentralized  import Indirection
 from fov                    import BaseFoVPlotCreator, FoVPlotModel
 from view.plots             import PlotView
 from taskview.tabs          import TabsView, TabsTheme, initsubclass
-from cleaning.view          import CleaningPlotCreator,  CleaningWidgets
+from cleaning.view          import CleaningPlotCreator,  CleaningWidgets, DataCleaningModelAccess
 from ._plot                 import RampPlotView
 from ._model                import RampTaskPlotModelAccess, RampPlotDisplay
 
@@ -17,6 +17,7 @@ class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess, # type: ignore
     _plotmodel: FoVPlotModel
     _model:     RampTaskPlotModelAccess
     _rampdisplay = Indirection()
+
     def observe(self, ctrl, noerase = True):
         "sets-up model observers"
         super().observe(ctrl, noerase = noerase)
@@ -36,10 +37,24 @@ class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess, # type: ignore
 class FoVPlotView(PlotView[FoVPlotCreator]):
     "FoV plot view"
 
+class RampDataCleaningModelAccess(DataCleaningModelAccess):
+    "ramp data cleaning model access"
+    def addto(self, ctrl, noerase = False):
+        "add to the controller"
+
+    @property
+    def availablefixedbeads(self):
+        "returns bead ids for potential fixed beads"
+        return []
+
 class RampCleaningPlotCreator(CleaningPlotCreator):
     "cleaning for ramps"
     def __init__(self, ctrl):
-        super().__init__(ctrl, text = '\n'.join(CleaningWidgets.text(None).split('\n')[:-2]))
+        txt = CleaningWidgets.text(None).split('\n')
+        txt = txt[next((i for i, j in enumerate(txt) if '## Cleaning' in j), 0):]
+        txt = [i for i in txt if '(clipping.' not in i]
+        model = RampDataCleaningModelAccess(ctrl)
+        super().__init__(ctrl, model = model, text = '\n'.join(txt))
 
 class CleaningView(PlotView[RampCleaningPlotCreator]):
     "Peaks plot view"

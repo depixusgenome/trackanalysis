@@ -16,10 +16,10 @@ namespace legacy
     {
         GenRecord()                  = default;
         GenRecord(GenRecord const &) = delete;
-        GenRecord(std::string x)    : GenRecord() { open(x); }
+        GenRecord(std::string x, int nbeads = -1)    : GenRecord() { open(x, nbeads); }
         ~GenRecord() { close(); }
 
-        void open(std::string x);
+        void open(std::string x, int nbeads = -1, int start = -1, int stop = -1, int nphases = -1);
 
         void close()
         { auto x = _ptr; _ptr   = nullptr; freegr(x); }

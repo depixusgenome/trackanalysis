@@ -80,11 +80,13 @@ class PickleIO(TrackIO):
             return pickle.dump(info, stream)
 
     @classmethod
-    def instrumenttype(cls, path: str) -> str:
+    def instrumentinfo(cls, path: str) -> Dict[str, Any]:
         "return the instrument type"
-        return cls.open(path).get('instrument', {'type': 'picotwist'})['type']
+        return cls.open(path).get('instrument', {'type': 'picotwist', 'dimension': 'µm'})
+
 
 N_SAVE_THREADS = 4
+
 def _savetrack(args):
     if not isinstance(args[2], dict):
         try:

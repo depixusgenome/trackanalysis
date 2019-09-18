@@ -3,7 +3,7 @@
 # pylint: disable=arguments-differ
 "Loading and save tracks"
 import  sys
-from    typing    import Any, Union, Dict, TYPE_CHECKING
+from    typing    import Any, Union, Dict, Optional, TYPE_CHECKING
 from    pathlib   import Path
 import  numpy     as     np
 
@@ -13,7 +13,9 @@ from    ._base    import TrackIO, globfiles, PATHTYPES
 if TYPE_CHECKING:
     from    ._base import Track
 
-_CALLERS = lambda: sorted(TrackIO.__subclasses__(), key = lambda i: -i.PRIORITY)
+def _CALLERS():
+    return sorted(TrackIO.__subclasses__(), key = lambda i: -i.PRIORITY)
+
 
 class Handler:
     "A handler for opening the provided path"
@@ -21,7 +23,7 @@ class Handler:
         self.path    = path
         self.handler = handler
 
-    def __call__(self, track = None) -> "Track":
+    def __call__(self, track = None, cycles: Optional[slice] = None) -> "Track":
         path = self.path
         if (not isinstance(path, (str, Path))) and len(path) == 1:
             path = path[0]
@@ -30,12 +32,15 @@ class Handler:
             from .track import Track as _Track
             track = _Track()
 
-        kwargs = self.handler.open(path,
-                                   notall = getattr(track, 'notall', True),
-                                   axis   = getattr(track, 'axis',   'Zaxis'))
+        kwargs = self.handler.open(
+            path,
+            notall = getattr(track, 'notall', True),
+            axis   = getattr(track, 'axis',   'Zaxis'),
+            cycles = cycles
+        )
         state  = track.__getstate__()
         self.__instrument(state, kwargs)
-        self.__fov (state, kwargs)
+        self.__fov(state, kwargs)
         self.__data(state, kwargs)
         if isinstance(kwargs.get("tasks", None), str):
             import taskstore as _ana
@@ -51,10 +56,15 @@ class Handler:
         path = self.path[0] if isinstance(self.path, (list, tuple)) else self.path
         return self.handler.instrumenttype(str(path))
 
+    def instrumentinfo(self) -> Dict[str, Any]:
+        "return the instrument type"
+        path = self.path[0] if isinstance(self.path, (list, tuple)) else self.path
+        return self.handler.instrumentinfo(str(path))
+
     @classmethod
     def todict(cls, track: 'Track') -> Dict[str, Any]:
         "the oposite of __call__"
-        data = dict(track.data) # get the data first because of lazy instantiations
+        data = dict(track.data)  # get the data first because of lazy instantiations
         data.update(track.__getstate__())
         if 'tasks' in data:
             import taskstore as _ana
@@ -127,7 +137,7 @@ class Handler:
     def __data(state, kwargs):
         if kwargs is None:
             data: Dict[str, Union[float, np.ndarray, str]] = {}
-            sec : Dict[str, np.ndarray]                    = {}
+            sec:  Dict[str, np.ndarray]                    = {}
         else:
             dtpe = np.dtype([('index', 'i4'), ('value', 'f4')])
             vtpe = [('index', 'f4'), ('zmag',  'f4'), ('vcap',  'f4')]
@@ -147,8 +157,9 @@ class Handler:
             res['instrument'] = kwargs.pop("instrument")
             assert "type" in res['instrument']
         else:
-            res['instrument'] = {"type": self.instrumenttype(), "name": None}
+            res['instrument'] = self.instrumentinfo()
         res['instrument'].setdefault("dimension", "µm")
+        res['instrument'].setdefault('name', None)
 
     @staticmethod
     def __fov(res, kwargs):
@@ -185,10 +196,14 @@ def checkpath(track, **opts) -> Handler:
     """
     return Handler.check(track, **opts)
 
-def opentrack(track):
+def opentrack(track, cycles: Optional[slice] = None):
     "Opens a track depending on its extension"
-    checkpath(track)(track)
+    checkpath(track)(track, cycles = cycles)
 
 def instrumenttype(track) -> str:
     "return the instrument type"
     return checkpath(getattr(track, 'path', track)).instrumenttype()
+
+def instrumentinfo(track) -> Dict[str, Any]:
+    "return the instrument info"
+    return checkpath(getattr(track, 'path', track)).instrumentinfo()

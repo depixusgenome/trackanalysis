@@ -10,7 +10,7 @@ from typing                   import (Type, Tuple, List, Callable, Dict, Any,
 from concurrent.futures       import ProcessPoolExecutor
 
 from copy                     import deepcopy
-from enum                     import Enum, _EnumDict # type: ignore
+from enum                     import Enum, _EnumDict  # type: ignore
 
 import taskstore
 from data.views                  import TrackView
@@ -29,7 +29,10 @@ def _update(self, *args, **kwa):
     info = dict(*args, **kwa)
     for i, j in info.items():
         self[i] = j
-_EnumDict.update = _update # correcting a python bug
+
+
+_EnumDict.update = _update  # correcting a python bug
+
 
 for name in ('cleaning.processor', 'cordrift', 'eventdetection.processor',
              'peakfinding.processor', 'peakcalling.processor'):
@@ -52,7 +55,10 @@ class _DOCHelper(Enum):
     action         = (
         "a Callable[[TrackView, Tuple[KEY, DATA]], Tuple[KEY, Any]]",
         " which transforms each input indivually"
-        )
+    )
+    undersampling  = (
+        "Can resamples the track, potentially reducing the number of cycles and frames.",
+    )
     subtraction    = (
         "if one or more fixed beads has been indicated,",
         "subtracts from the current bead the median signal per frame of the",
@@ -70,11 +76,11 @@ class _DOCHelper(Enum):
     driftperbead   = (
         "recomputes an *average fixed bead* cycle from all cycles in a bead",
         "and subtracts it from all cycles in the bead"
-        )
+    )
     driftpercycle  = (
         "recomputes an *average fixed bead* from all beads",
         "and subtracts it from all cycles in the bead"
-        )
+    )
     cycles         = ("returns a Cycles view",)
     eventdetection = (
         "flat events are detected in `PHASE.measure`",
@@ -93,7 +99,7 @@ class _DOCHelper(Enum):
     fittoreference = (
         "transforms the z-axis to fit the extension from the same bead in",
         "another experiment."
-        )
+    )
     beadsbyhairpin = ("beads identified as the same hairpin are grouped together",)
     dataframe      = ("transforms the whole frame to a `pandas.DataFrame`",)
 
@@ -117,7 +123,7 @@ class _DOCHelper(Enum):
         "decorator for adding doc"
         doc = cls.todoc(*args, indent = indent)
         if header:
-            doc = header+ "\n\n" + doc
+            doc = header + "\n\n" + doc
 
         def _wrapper(fcn):
             if hasattr(fcn, '__doc__'):
@@ -128,7 +134,7 @@ class _DOCHelper(Enum):
             return fcn
         return _wrapper
 
-class Tasks(Enum): # pylint: disable=too-many-public-methods
+class Tasks(Enum):  # pylint: disable=too-many-public-methods
     """
     Most available tasks can be created using this class:
 
@@ -229,7 +235,7 @@ class Tasks(Enum): # pylint: disable=too-many-public-methods
         This order is defined in `Tasks.__taskorder__()`.
         """
         if order is None:
-            order =  cls.__taskorder__()
+            order = cls.__taskorder__()
         items = tuple(type(cls(i)()) for i in order[::-1])
         return cast(Tuple[Type[Task],...], items[::-1])
 
@@ -245,7 +251,7 @@ class Tasks(Enum): # pylint: disable=too-many-public-methods
         3. keep only those tasks in `Tasks.__nodefault__()` which don't have
         only default values for their attributes.
         """
-        tasks = list(cls.__tasklist__()) # type: ignore
+        tasks = list(cls.__tasklist__())  # type: ignore
         paths = getattr(obj, 'path', obj)
         if (
                 getattr(obj, 'cleaned', cleaned)
@@ -259,15 +265,15 @@ class Tasks(Enum): # pylint: disable=too-many-public-methods
                     )
                 )
         ):
-            tasks = [i for i in tasks if i not in cls.__cleaning__()] # type: ignore
+            tasks = [i for i in tasks if i not in cls.__cleaning__()]  # type: ignore
 
         upto  = cls(upto) if upto is not None and upto is not Ellipsis else Ellipsis
         itms  = (tasks if upto is Ellipsis  else
                  ()    if upto not in tasks else
                  tasks[:tasks.index(upto)+1])
         nod   = cls.__nodefault__()
-        isdef = lambda i: i == type(i)()
-        return [i() for i in itms if i not in nod or not isdef(i())] # type: ignore
+        isdef = lambda i: i == type(i)()   # noqa
+        return [i() for i in itms if i not in nod or not isdef(i())]  # type: ignore
 
     @classmethod
     @_DOCHelper.add(header = "These can be:")
@@ -328,7 +334,7 @@ class Tasks(Enum): # pylint: disable=too-many-public-methods
         task  = self(*resets, **kwa)
         return register(None)[type(task)](task = task)
 
-    def __call__(self, *resets, **kwa)-> Task:
+    def __call__(self, *resets, **kwa) -> Task:
         return getattr(self, '_default_'+self.name, self._default_call)(*resets, **kwa)
 
     class _TaskGetter:
@@ -343,7 +349,7 @@ class Tasks(Enum): # pylint: disable=too-many-public-methods
             return tpe._apply_cls if obj is None else obj._apply_self
     apply = _TaskApply()
 
-    def _apply_self(self, toframe: TrackView = None, # pylint: disable=keyword-arg-before-vararg
+    def _apply_self(self, toframe: TrackView = None,  # pylint: disable=keyword-arg-before-vararg
                     *resets, **kwa) -> TrackView:
         """
         Applies the task to the frame
@@ -428,9 +434,11 @@ class Tasks(Enum): # pylint: disable=too-many-public-methods
 
     def __repr__(self):
         tpe = self.tasktype()
-        return (f'<{str(self)}> ↔ {tpe.__module__}.{tpe.__qualname__}\n\n    '
-                +'\n    '.join(getattr(_DOCHelper, self.name).value)
-                +'\n')
+        return (
+            f'<{str(self)}> ↔ {tpe.__module__}.{tpe.__qualname__}\n\n    '
+            + '\n    '.join(getattr(_DOCHelper, self.name).value)
+            + '\n'
+        )
 
     @classmethod
     @_DOCHelper.add('eventdetection', 'peakselector', 'fittohairpin',
@@ -440,10 +448,10 @@ class Tasks(Enum): # pylint: disable=too-many-public-methods
 
     @classmethod
     def __base_cleaning__(cls):
-        return cls.subtraction, cls.cleaning, cls.alignment, cls.clipping
+        return cls.undersampling, cls.subtraction, cls.cleaning, cls.alignment, cls.clipping
 
     @classmethod
-    @_DOCHelper.add('subtraction', 'cleaning', 'alignment', "clipping",
+    @_DOCHelper.add('undersampling', 'subtraction', 'cleaning', 'alignment', "clipping",
                     header = "Cleaning consists in the following tasks:")
     def __cleaning__(cls):
         return cls.__base_cleaning__()
@@ -451,8 +459,8 @@ class Tasks(Enum): # pylint: disable=too-many-public-methods
     @classmethod
     def __tasklist__(cls):
         cleaning = cls.__cleaning__()
-        assert cleaning[0] is cls.subtraction
-        tasks    = (cls.cyclesampling, cleaning[0], cls.selection) + cleaning[1:]
+        assert cleaning[1] is cls.subtraction
+        tasks    = (*cleaning[:2], cls.selection) + cleaning[2:]
         ords     = cls.__taskorder__()
         if tasks[-1] == cls.clipping and ords[0] == cls.alignment:
             return tasks[:-1] + ords[:1] + tasks[-1:] + ords[1:]
@@ -479,11 +487,10 @@ class Tasks(Enum): # pylint: disable=too-many-public-methods
         if isinstance(value, drift):
             return cls('driftper'+('bead' if getattr(value, 'onbeads') else 'cycle'))
 
-        return super()._missing_(value) # type: ignore
-
+        return super()._missing_(value)  # type: ignore
 
     @classmethod
-    def __create(cls: Any, arg, kwa): # pylint: disable=too-many-return-statements
+    def __create(cls: Any, arg, kwa):  # pylint: disable=too-many-return-statements
         if isinstance(arg, cls):
             return arg(**kwa)
 
@@ -528,7 +535,9 @@ def nondefaults(self) -> Dict[str, Any]:
     """
     Return non default attributes
     """
-    out = eval(taskstore.dumps(self))[1] # pylint: disable=eval-used
+    out = eval(taskstore.dumps(self))[1]  # pylint: disable=eval-used
     out.pop(taskstore.TPE)
     return out
+
+
 setattr(Tasks, 'RESET', Ellipsis)

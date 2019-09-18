@@ -3385,7 +3385,7 @@ namespace legacy
             int64_t pos64 = 0;
             float T0 = 0,  T1,  T2;
             int64_t f_size64,tmp64;
-            static int n_im, st_im, bd_st, rn_bead;
+            int n_im, st_im, bd_st, rn_bead;
 # if defined(PLAYITSAM) || defined(PIAS)
             char cor_filename[512];
 # endif
@@ -3788,7 +3788,74 @@ namespace legacy
             return 0;
         }
 
-        int _readdata(gen_record *g_r, int starting_im, int n_images)
+        int _retrieve_min_max_event_and_phases(gen_record const *g_r, int *min, int *max, int *ph_max)
+        {
+            int  j, found = 0, page_n, i_page, point;
+            int nf, first = 1, pmax, ph, lmin = std::numeric_limits<int>::max(),
+                lmax = -std::numeric_limits<int>::max();
+
+            if (g_r == NULL)
+            {
+                return -1;
+            }
+
+            nf = g_r->abs_pos;
+
+            if (nf <= 0)
+            {
+                return -2;
+            }
+
+            for (j = 0, found = 0, pmax = 0; j < nf; j++)
+            {
+                page_n = j / g_r->page_size;
+                i_page = j % g_r->page_size;
+                point = (0xffff & (g_r->action_status[page_n][i_page] >> 8));
+                ph = (0xff & (g_r->action_status[page_n][i_page]));
+
+                if (first)
+                {
+                    lmin = lmax = point;
+                    first = 0;
+                }
+
+                if (point < lmin)
+                {
+                    lmin = point;
+                    found |= 1;
+                }
+
+                if (point > lmax)
+                {
+                    lmax = point;
+                    found |= 2;
+                }
+
+                if (point > 0 && ph > pmax)
+                {
+                    pmax = ph;
+                }
+            }
+
+            if (min)
+            {
+                *min = lmin;
+            }
+
+            if (max)
+            {
+                *max = lmax;
+            }
+
+            if (ph_max)
+            {
+                *ph_max = pmax;
+            }
+
+            return (found == 3) ? 0 : -3;
+        }
+
+        int _readdata(gen_record *g_r, int starting_im, int n_images, int n_phases)
         {
             int i, j;
             FILE *fp = NULL;
@@ -3822,6 +3889,8 @@ namespace legacy
             tmp64 += g_r->header_size;
             fseeko64(fp, tmp64 , SEEK_SET);
             g_r->file_error = 0;
+            int phcnt = 0; 
+            int point = 0;
             for (j = 0;j < n_images && abs_pos < n_im && g_r->file_error == 0; j++)
             {
                 tmp64 = (abs_pos + 1);
@@ -4067,7 +4136,7 @@ namespace legacy
                     g_r->c_bead++;
                 }
 
-                for (i = 0, g_r->c_bead = 0; i < g_r->in_bead; i++)
+                for (i = 0, g_r->c_bead = 0; i < g_r->in_bead && g_r->n_bead > 0; i++)
                 {
                     b_r = g_r->b_r[0];
 
@@ -4124,78 +4193,27 @@ namespace legacy
 
                 g_r->imi_start = g_r->imi[0][0];  // time origin
                 g_r->timing_mode = 1;
+
+                if (n_phases >= 0
+                        && (0xffff & (g_r->action_status[page_n][i_page] >> 8)) != point
+                        && (0xff & (g_r->action_status[page_n][i_page])) == 0
+                )
+                {
+                    point  = (0xffff & (g_r->action_status[page_n][i_page] >> 8));
+                    phcnt += 1;
+                    if(phcnt > n_phases)
+                    {
+                        int minv, maxv, phmax;
+                        _retrieve_min_max_event_and_phases(g_r, &minv, &maxv, &phmax);
+                        if(maxv-minv > n_phases)
+                            break;
+                    }
+                }
             }
 
             fclose(fp);
             _remove_trk_NAN_data(g_r);
             return 0;
-        }
-
-        int _retrieve_min_max_event_and_phases(gen_record const *g_r, int *min, int *max, int *ph_max)
-        {
-            int  j, found = 0, page_n, i_page, point;
-            int nf, first = 1, pmax, ph, lmin = std::numeric_limits<int>::max(),
-                lmax = -std::numeric_limits<int>::max();
-
-            if (g_r == NULL)
-            {
-                return -1;
-            }
-
-            nf = g_r->abs_pos;
-
-            if (nf <= 0)
-            {
-                return -2;
-            }
-
-            for (j = 0, found = 0, pmax = 0; j < nf; j++)
-            {
-                page_n = j / g_r->page_size;
-                i_page = j % g_r->page_size;
-                point = (0xffff & (g_r->action_status[page_n][i_page] >> 8));
-                ph = (0xff & (g_r->action_status[page_n][i_page]));
-
-                if (first)
-                {
-                    lmin = lmax = point;
-                    first = 0;
-                }
-
-                if (point < lmin)
-                {
-                    lmin = point;
-                    found |= 1;
-                }
-
-                if (point > lmax)
-                {
-                    lmax = point;
-                    found |= 2;
-                }
-
-                if (point > 0 && ph > pmax)
-                {
-                    pmax = ph;
-                }
-            }
-
-            if (min)
-            {
-                *min = lmin;
-            }
-
-            if (max)
-            {
-                *max = lmax;
-            }
-
-            if (ph_max)
-            {
-                *ph_max = pmax;
-            }
-
-            return (found == 3) ? 0 : -3;
         }
 
         /*
@@ -4570,7 +4588,7 @@ namespace legacy
         return 0;
     }
 
-    gen_record* load(char *fullfile)
+    gen_record* load(char *fullfile, int nbeads, int start, int stop, int n_phases)
     {
         gen_record *g_r = _readheader(fullfile);
         if (g_r == nullptr)
@@ -4590,9 +4608,22 @@ namespace legacy
         tmp64 /= g_r->one_im_data_size;
         fclose(fp);
 
+        if(start > 0 && start < stop)
+        {
+            g_r->starting_fr_from_trk = start;
+            g_r->nb_fr_from_trk = stop-start;
+        }
         int n_im = tmp64;
         int st_im = 0;
-        if (_readdata(g_r, st_im, n_im))
+        auto noldbeads = g_r->n_bead;
+        if(nbeads >= 0)
+            g_r->n_bead = 0;
+
+        bool fail = false;
+        try { fail = _readdata(g_r, st_im, n_im, n_phases); } catch(...) { fail = true; }
+
+        g_r->n_bead = noldbeads;
+        if(fail)
         {
             freegr(g_r);
             throw TrackIOException("Problem reading track file");
@@ -5120,12 +5151,12 @@ namespace legacy
     bool GenRecord::sdi() const
     { return _ptr != nullptr && _ptr->SDI_mode != 0; }
 
-    void GenRecord::open(std::string x)
+    void GenRecord::open(std::string x, int nbeads, int start, int stop, int nphases)
     {
         close();
         char tmp[2048];
         strncpy(tmp, x.c_str(), sizeof(tmp));
-        _ptr  = load(tmp);
+        _ptr  = load(tmp, nbeads, start, stop, nphases);
         _name = x;
     }
 

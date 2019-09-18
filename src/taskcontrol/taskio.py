@@ -150,15 +150,7 @@ class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
         if path is None:
             return None
 
-        mdls = ConfigTrackIO.open(self, path, _)
-        if mdls is None:
-            return None
-
-        task = type(self._config.tasks.get('extremumalignment', None))
-        ret  = []
-        for mdl in mdls:
-            ret.append(tuple(i for i in mdl if not isinstance(i, task)))
-        return ret
+        return ConfigTrackIO.open(self, path, _)
 
 class ConfigMuWellsFilesIO(ConfigTrackIO):
     "Adds an alignment to the tracks per default"

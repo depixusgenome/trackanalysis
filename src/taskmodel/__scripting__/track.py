@@ -101,7 +101,7 @@ class LocalTasks:
             cleaning.append(Tasks('driftperbead'))
         if len(cleaning):
             old      = tuple(Tasks.__base_cleaning__())
-            cleaning = old[:1] + tuple(cleaning) + old[1:] #type: ignore
+            cleaning = old[:1] + tuple(cleaning) + old[1:]  # type: ignore
             changes["scripting"] = dict(cleaning = cleaning)
 
         return ctrl.localcontext(**changes)
@@ -125,7 +125,15 @@ class LocalTasks:
     eventdetection = TaskDescriptor()
     peakselector   = TaskDescriptor()
 
-Track.tasks = LazyProperty('tasks')
+class TasksProperty(LazyProperty):
+    "Checks whether the file was opened prior to returning a value"
+    @staticmethod
+    def _load(inst):
+        if str(inst.pathinfo.trackpath).endswith(".ana"):
+            inst.load()
+
+
+Track.tasks = TasksProperty('tasks')
 addattributes(Track, protected = dict(tasks = LocalTasks()))
 
 def localtasks(self: Track, *args, force = True, **kwa) -> Track:
@@ -142,11 +150,13 @@ def localtasks(self: Track, *args, force = True, **kwa) -> Track:
     cpy.load()
     for i in args:
         if force or (isinstance(i, Task) and i != Tasks(i)()):
-            setattr(cpy.tasks, Tasks(i).name, i) # type: ignore
+            setattr(cpy.tasks, Tasks(i).name, i)  # type: ignore
 
     for i, j in kwa.items():
-        setattr(cpy.tasks, i, j) # type: ignore
+        setattr(cpy.tasks, i, j)  # type: ignore
     return cpy
+
+
 Track.localtasks = localtasks
 
 if LocalTasks.__doc__:

@@ -9,7 +9,7 @@ from   typing                    import Optional, Union, Any, Dict, cast
 import taskstore
 from   taskmodel.__scripting__.track import LocalTasks
 from   ..trackio                 import Handler, TrackIO
-from   ..trackio                 import PATHTYPES, PATHTYPE, instrumenttype
+from   ..trackio                 import PATHTYPES, PATHTYPE, instrumentinfo
 from   .track                    import Track
 
 class ScriptAnaIO(TrackIO):
@@ -37,9 +37,9 @@ class ScriptAnaIO(TrackIO):
         return mdl, cnf
 
     @classmethod
-    def instrumenttype(cls, path: str) -> str:
+    def instrumentinfo(cls, path: str) -> Dict[str, Any]:
         "return the instrument type"
-        return instrumenttype(cls.__open(str(path))[1]['path'][0])
+        return instrumentinfo(cls.__open(str(path))[1]['path'][0])
 
     @classmethod
     def open(cls, path:PATHTYPE, **_) -> Dict[Union[str, int], Any]:

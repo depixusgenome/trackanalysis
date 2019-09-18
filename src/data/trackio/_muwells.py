@@ -8,7 +8,7 @@ import  numpy                    as     np
 from    numpy.lib.stride_tricks  import as_strided
 from    scipy.interpolate        import interp1d
 import  pandas                   as     pd
-from    legacy                   import readtrack # pylint: disable=no-name-in-module
+from    legacy                   import readtrack  # pylint: disable=no-name-in-module
 from    utils                    import initdefaults
 from    ._base                   import TrackIO, PATHTYPE, PATHTYPES
 
@@ -18,7 +18,7 @@ class LIAFilesIOConfiguration:
     clipcycles:      int       = 2
     sep:             str       = "[;,]"
     header:          int       = 4
-    engine:          str       ="python"
+    engine:          str       = "python"
     indexbias:       int       = -7
     colnames:        str       = '% Time (s), Amplitude (V)'
     maxcycles:       float     = 1.3
@@ -95,12 +95,12 @@ class MuWellsFilesIO(TrackIO):
         return (trk,) + lia
 
     @staticmethod
-    def instrumenttype(_) -> str:
+    def instrumentinfo(_) -> Dict[str, Any]:
         "return the instrument type"
-        return "muwells"
+        return {'type': "muwells", "dimension": "µV", 'name': None}
 
     @classmethod
-    def open(cls, paths:Tuple[PATHTYPE,PATHTYPE], **kwa) -> dict: # type: ignore
+    def open(cls, paths:Tuple[PATHTYPE,PATHTYPE], **kwa) -> dict:  # type: ignore
         "opens the directory"
         cnf    = LIAFilesIOConfiguration(**dict(cls.DEFAULT.config(), **kwa))
 
@@ -116,8 +116,7 @@ class MuWellsFilesIO(TrackIO):
         }
         output['picofrate']  = output.pop("framerate", None)
         output['phases']     = output["phases"][cnf.clipcycles:, :]
-        output['instrument']["type"] = cls.instrumenttype(paths)
-        output['instrument']["dimension"] = "µV"
+        output['instrument'] = cls.instrumentinfo(paths)
         output['sequencelength']     = {}
         output['experimentallength'] = {}
         for i, liapath in enumerate(paths[1:]):
@@ -199,7 +198,6 @@ class MuWellsFilesIO(TrackIO):
             arr *= 1e6
         else:
             raise NotImplementedError(f"Tension should be in (V) : {frames.columns[1]}")
-
 
         trk.update({
             index:                arr[phases[0,0]:last],
@@ -296,7 +294,7 @@ class MuWellsFilesIO(TrackIO):
     @classmethod
     def __extractphases(cls, trk, frames, framerate, cnf) -> np.ndarray:
         phases  = trk['phases']
-        indamp  =  cls.__extractdiffpeaks(trk, frames, cnf)
+        indamp  = cls.__extractdiffpeaks(trk, frames, cnf)
         delttrk = phases[1:,2]-phases[:-1,2]
         deltamp = np.diff(indamp)
         good    = (
@@ -309,7 +307,7 @@ class MuWellsFilesIO(TrackIO):
         deltamp = np.append(deltamp, np.nanmedian(deltamp))
         bias    = cnf.indexbias*framerate/trk['picofrate']
         phases  = bias + np.vstack([
-            np.round((phases[i,:]-phases[i,2])* (k/j)+.5).astype('i4') + l
+            np.round((phases[i,:]-phases[i,2]) * (k/j)+.5).astype('i4') + l
             for i, j, k, l in zip(
                 range(max(0, good), phases.shape[0]),
                 delttrk[max(0, good):],

@@ -31,7 +31,7 @@ run(locals(),
     star    = ("signalfilter", "utils.datadump", "utils.scripting",
                *(f"{i}.__scripting__" for i in ("taskmodel", "taskapp", "data", "cleaning",
                                                 "eventdetection", "peakfinding",
-                                                "taskapp", "peakcalling"))),
+                                                "taskapp", "peakcalling", 'ramp'))),
     jupyter = (f"{i}.__scripting__.holoviewing"
                for i in ("data", "cleaning", "eventdetection", "peakfinding", "peakcalling",
                          "qualitycontrol", "ramp", "taskmodel")))

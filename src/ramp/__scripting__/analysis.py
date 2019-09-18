@@ -10,8 +10,23 @@ from   data.track        import Track, isellipsis
 from   data.views        import Beads
 from   taskmodel.__scripting__  import Tasks
 from   ..processor              import (
-    RampConsensusBeadTask, RampDataFrameProcessor, RampConsensusBeadProcessor
+    RampConsensusBeadTask, RampDataFrameProcessor, RampConsensusBeadProcessor,
+    RampStatsTask
 )
+
+assert not hasattr(Tasks, '_default_dataframe')
+
+def _default_dataframe(self, *resets, measures = None, **kwa):
+    # pylint: disable=protected-access
+    ramp = (
+        kwa.pop('ramp', kwa.pop('ramps', False))
+        or measures and measures.pop('ramp', measures.pop('ramps', False))
+    )
+    if ramp:
+        kwa['current'] = RampStatsTask(**dict(kwa, **(measures if measures else {})))
+    return self._default_call(*resets, **kwa)
+
+setattr(Tasks, '_default_dataframe', _default_dataframe)
 
 class RampAnalysis:
     """
@@ -64,11 +79,18 @@ class RampAnalysis:
         """
         return a dataframe containing all info
         """
-        beads = self.__beads(track, beadlist)
-        return RampDataFrameProcessor.dataframe(
+        beads  = self.__beads(track, beadlist)
+        dframe = RampDataFrameProcessor.dataframe(
             beads,
             **dict(self.dataframetask, **kwa)
         )
+        dframe.__dict__['tasklist'] = [
+            Tasks.trackreader(path = track.path),
+            Tasks.cleaning(**self.cleaning, instrument = track.instrument['type']),
+            Tasks.alignment(**self.cleaning, instrument = track.instrument['type']),
+            RampStatsTask(**dict(self.dataframetask, **kwa))
+        ]
+        return dframe
 
     def consensus(
             self,
@@ -92,3 +114,6 @@ class RampAnalysis:
         if status is not None and isellipsis(beads):
             beads = self.beads(track, status)
         return itm if isellipsis(beads) else itm[list(cast(list, beads))]
+
+
+__all__ = ['RampAnalysis']
