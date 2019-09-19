@@ -7,7 +7,10 @@ from .alignment     import (PeakCorrelationAlignmentTask, PeakCorrelationAlignme
                             GELSPeakAlignmentTask, GELSPeakAlignmentProcessor)
 from .selector      import PeakSelectorTask, PeakSelectorProcessor, PeaksDict
 from .probabilities import PeakProbabilityProcessor, PeakProbabilityTask
-from .peakfiltering import (SingleStrandTask, SingleStrandProcessor,
-                            BaselinePeakTask, BaselinePeakProcessor,
-                            BaselinePeakFilterTask, BaselinePeakFilterProcessor)
+from .peakfiltering import (
+    SingleStrandTask, SingleStrandProcessor,
+    BaselinePeakTask, BaselinePeakProcessor,
+    BaselinePeakFilterTask, BaselinePeakFilterProcessor,
+    PeakStatusComputer
+)
 from .dataframe     import PeaksDataFrameFactory

@@ -158,7 +158,7 @@ class CleaningCacheData:
     def apply(self, cnf, frame, info):
         "reapply the previous work"
         if self.discard:
-            val = tuple(i for i in self.errors if hasattr(DataCleaningProcessor.tasktype, i.name))
+            val = tuple(i for i in self.errors if hasattr(DataCleaning, i.name))
             return DataCleaningProcessor.exc(val, cnf, info, frame)
 
         info[1][self.mask] = np.NaN

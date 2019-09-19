@@ -17,7 +17,7 @@ from   peakfinding.peaksarray      import (
 )
 from   peakfinding.processor       import (
     PeaksDict, SingleStrandTask, BaselinePeakTask, SingleStrandProcessor,
-    BaselinePeakProcessor
+    BaselinePeakProcessor, PeakStatusComputer
 )
 from   peakfinding.processor.dataframe import PeaksDataFrameFactory
 from   sequences                       import splitoligos
@@ -661,28 +661,11 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
         )
 
     def __base_df(self, frame, res) -> pd.DataFrame:
-        data   = pd.DataFrame(self.__peaks.dictionary(frame, (res.key, res.events)))
-        status = np.full(data.shape[0], "", dtype = "<U14")
-        if frame.config.baseline:
-            ind = (
-                BaselinePeakProcessor(task = frame.config.baseline)
-                .index(frame, res.key, res.events)
-            )
-            if ind is not None and 0 <= ind < len(res.events['peaks']):
-                pos = res.events['peaks'][ind]
-                status[data.peakposition < pos]  = "< baseline"
-                status[data.peakposition == pos] = "baseline"
-
-        if frame.config.singlestrand:
-            ind = (
-                SingleStrandProcessor(task = frame.config.singlestrand)
-                .index(frame, res.key, res.events)
-            )
-            if ind is not None and 0 <= ind < len(res.events['peaks']):
-                pos = res.events['peaks'][ind]
-                status[data.peakposition == pos] = "singlestrand"
-                status[data.peakposition > pos]  = "> singlestrand"
-        data['status'] = status
+        data = pd.DataFrame(self.__peaks.dictionary(frame, (res.key, res.events)))
+        data['status'] = (
+            PeakStatusComputer(frame.config.baseline, frame.config.singlestrand)
+            (frame, res.key, res.events)
+        )
         return data
 
     def __peaks_df(   # pylint: disable=too-many-arguments

@@ -151,7 +151,7 @@ def test_toref_dataframe():
     assert set(beads.index.names) == {'track', 'bead'}
     assert set(beads.columns)     == {
         'peakposition', 'averageduration', 'hybridisationrate', 'eventcount',
-        'referenceposition', 'std1', 'std2', 'std3', 'modification'
+        'referenceposition', 'std1', 'std2', 'std3', 'modification', 'status'
     }
 
     pair  = create(root, tsk, DataFrameTask(measures = dict(events = True)))
@@ -159,7 +159,7 @@ def test_toref_dataframe():
     assert set(beads.index.names) == {'track', 'bead', 'cycle'}
     assert set(beads.columns)     == {
         'peakposition',      'averageduration', 'hybridisationrate', 'eventcount',
-        'referenceposition', 'avg', 'length', 'start', 'modification'
+        'referenceposition', 'avg', 'length', 'start', 'modification', 'status'
     }
 
 def test_cost_value():

@@ -8,16 +8,20 @@ import numpy      as     np
 
 from   taskcontrol.processor.dataframe import DataFrameFactory
 from   .probabilities                  import Probability, peakprobability
+from   .peakfiltering                  import PeakStatusComputer
 from   .selector                       import PeaksDict
 
 @DataFrameFactory.adddoc
-class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
+class PeaksDataFrameFactory(  # pylint: disable=too-many-instance-attributes
+        DataFrameFactory[PeaksDict]
+):
     """
     Transform a `PeaksDict` to one or more `pandas.DataFrame`.
 
     # Default Columns
 
     * *peakposition*
+    * *status*: whether the peak is detected as a baseline or singlestrand
     * *averageduration*
     * *hybridisationrate*
     * *eventcount*
@@ -72,6 +76,13 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
         self.__prob   = peakprobability(frame)
         meas          = dict(task.measures)
         meas.update(kwa)
+
+        self.__peakstatus = PeakStatusComputer(
+            *(meas.get(i, True) for i in ('baseline', 'singlestrand'))
+        )
+        if {self.__peakstatus.baseline, self.__peakstatus.singlestrand} == {None}:
+            self.__peakstatus = None
+
         self.__events   = meas.pop('events', meas.get('dfevents', None))
         self.__dfevents = meas.pop('dfevents', False) and self.__events
         if self.__events is True:
@@ -134,7 +145,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
         return self
 
     # pylint: disable=arguments-differ
-    def _run(self, _1, _2, apeaks) -> Dict[str, np.ndarray]:
+    def _run(self, frame, bead, apeaks) -> Dict[str, np.ndarray]:
         peaks  = cast(Tuple[Tuple[float, np.ndarray], ...], tuple(apeaks))
         meas: Dict[str,np.ndarray] = {}
         if self.__events:
@@ -145,6 +156,11 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
         else:
             counts = np.ones(len(peaks), dtype = 'i4')
 
+        if self.__peakstatus:
+            status         = self.__peakstatus(frame, bead, apeaks)
+            meas['status'] = np.concatenate([
+                np.full(i, j, dtype = status.dtype) for i, j in zip(counts, status)
+            ])
         if self.__calls:
             self.__callmeasure(meas, peaks, counts)
         if self.__aggs:
