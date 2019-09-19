@@ -3,6 +3,7 @@
 """
 Find the peak corresponding to a single strand DNA
 """
+from   dataclasses        import dataclass
 from   typing             import TYPE_CHECKING, Union, Optional, List, Tuple, cast
 from   functools          import partial
 
@@ -41,20 +42,24 @@ class SingleStrandTask(Task, zattributes = ('delta',)):
     :param percentage: the min ratio of events in the single-strand peak
     detected as non-closing.
     """
-    level       = Level.peak
-    phase       = PHASE.rampdown # phase
-    eventstart  = 5
-    delta       = -0.015
-    percentage  = 50
+    level:      Level = Level.peak
+    phase:      int   = PHASE.rampdown  # phase
+    eventstart: int   = 5
+    delta:      float = -0.015
+    percentage: int   = 50
+
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
         super().__init__(**_)
 
+
 _DTYPE = np.dtype([('peaks', 'f4'), ('events', 'O')])
+_Track = Union[Track, TrackView]
+
 def _topeakarray(arr):
     return arr if isinstance(arr, np.ndarray) else np.array(list(arr), dtype = _DTYPE)
 
-_Track = Union[Track, TrackView]
+
 class SingleStrandProcessor(Processor[SingleStrandTask]):
     """
     Find the peak corresponding to a single strand DNA and remove it
@@ -62,6 +67,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
     def closingindex(self, frame:_Track, beadid:BEADKEY) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has no break"
         delta   = self.task.delta
+
         def _greater(arr):
             arr  = np.diff(arr)
             good = np.where(np.isfinite(arr))[0]
@@ -74,6 +80,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
     def nonclosingramps(self, frame:_Track, beadid:BEADKEY) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has no break"
         delta   = self.task.delta
+
         def _greater(arr):
             arr = np.diff(arr)
             arr = arr[np.isfinite(arr)]
@@ -83,6 +90,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
     def closingramps(self, frame: _Track, beadid:BEADKEY) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has a break"
         delta  = self.task.delta
+
         def _lesser(arr):
             arr = np.diff(arr)
             arr = arr[np.isfinite(arr)]
@@ -98,7 +106,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
             return []
 
         start = self.task.eventstart
-        good  = lambda evt: len(evt) and evt[0][0] < start
+        good  = lambda evt: len(evt) and evt[0][0] < start  # noqa
         return [[i for i in cycles if good(peak[i])] for _, peak in peaks]
 
     def index(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[int]:
@@ -155,7 +163,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
                 beads = cast(Beads, getattr(beads, 'data', None))
 
             if beads is None:
-                beads = frame.track.beads # type: ignore
+                beads = frame.track.beads  # type: ignore
 
         return cast(Cycles, beads[beadid,:]).withphases(self.task.phase)
 
@@ -284,3 +292,41 @@ class BaselinePeakFilterProcessor(Processor[BaselinePeakFilterTask]):
     def run(self, args):
         "updates frames"
         args.apply(self.apply(**self.config()))
+
+@dataclass
+class PeakStatusComputer:
+    "creates a status vector out of a frame and a list of peaks"
+    baseline:     BaselinePeakTask
+    singlestrand: SingleStrandTask
+
+    def __post_init__(self):
+        if not hasattr(self, 'baseline') or self.baseline is True:
+            self.baseline = BaselinePeakTask()
+        elif isinstance(self.baseline, dict):
+            self.baseline = BaselinePeakTask(**dict(self.baseline))
+
+        if not hasattr(self, 'singlestrand') or self.singlestrand is True:
+            self.singlestrand = SingleStrandTask()
+        elif isinstance(self.singlestrand, dict):
+            self.singlestrand = SingleStrandTask(**dict(self.singlestrand))
+
+    def __call__(self, frame, bead, peaks):
+        status = np.full(len(peaks), "", dtype = "<U14")
+        if self.baseline:
+            ind = (
+                BaselinePeakProcessor(task = self.baseline)
+                .index(frame, bead, peaks)
+            )
+            if ind is not None and 0 <= ind < len(peaks):
+                status[:ind] = "< baseline"
+                status[ind]  = "baseline"
+
+        if self.singlestrand:
+            ind = (
+                SingleStrandProcessor(task = self.singlestrand)
+                .index(frame, bead, peaks)
+            )
+            if ind is not None and 0 <= ind < len(peaks):
+                status[ind]    = "singlestrand"
+                status[ind+1:] = "> singlestrand"
+        return status
