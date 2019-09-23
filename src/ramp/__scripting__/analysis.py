@@ -24,7 +24,7 @@ def _default_dataframe(self, *resets, measures = None, **kwa):
     )
     if ramp:
         kwa['current'] = RampStatsTask(**dict(kwa, **(measures if measures else {})))
-    return self._default_call(*resets, **kwa)
+    return self._default_call(*resets, measures = measures, **kwa)
 
 setattr(Tasks, '_default_dataframe', _default_dataframe)
 
