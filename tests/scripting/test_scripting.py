@@ -6,6 +6,7 @@
 "Tests interval detection"
 from   typing              import cast
 import pickle
+import sys
 from   tests.testutils     import integrationmark
 
 @integrationmark
@@ -180,6 +181,19 @@ def test_tracksdict_ramps_dataframe(scriptingcleaner):
     assert 'modification' in dframe.columns
     assert hasattr(dframe, 'tasklist')
     assert dframe.tasklist[0][-1].__class__.__name__.startswith("Ramp")
+
+@integrationmark
+def test_tracksdict_ramps_beaddata(scriptingcleaner):
+    "test TracksDict.basedataframe"
+    sys.modules['ACCEPT_SCRIPTING'] = 'jupyter'
+    from scripting import TracksDict
+    from tests.testingcore import path as utpath
+    track = TracksDict(utpath("100bp_4mer")+"/../ramp*.trk")['Hela_mRNA_CIP_4ul_F9']
+    data = track.ramp.beaddata(8)
+    assert list(data.columns) == ['zmag', 'z', 'phase', 'cycle']
+    assert data['zmag'].dropna().shape[0] == track.nframes
+    assert data['z'].mean() > 0.01
+    assert data.dropna().shape[0] > 0.99*data.shape[0]
 
 @integrationmark
 def test_viewer(scriptingcleaner):

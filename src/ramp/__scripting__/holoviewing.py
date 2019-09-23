@@ -136,30 +136,39 @@ class RampDisplay(BasicDisplay, ramp = Track):
                             cycles)
         return self
 
-    def getmethod(self): # pylint: disable=too-many-arguments
+    def _concat(self, itms: np.ndarray):
+        return popclip(
+            np.concatenate([(i if j else [np.NaN]) for i in itms for j in (0,1)]),
+            *self._popclip
+        )
+
+    def beaddata(self, bead: int) -> pd.DataFrame:
+        "return dataframe for given bead containing its cleaned data"
         if self._cycles is None:
             cycles = ... if self._cycles is None else self._cycles
 
         items = self._analysis.beadsview(self._items, *self._tasks)[...,...]
 
-        def _concat(itms):
-            return popclip(
-                np.concatenate([(i if j else [np.NaN]) for i in itms for j in (0,1)]),
-                *self._popclip
-            )
+        zcid = self._concat(self._items.secondaries.cidcycles[...,cycles].values())
+        zcyc = self._concat(self._items.secondaries.zmagcycles[..., cycles].values())
+        zpha = self._concat(self._items.secondaries.phasecycles[..., cycles].values())
+        data = self._concat([(j-self._bias)*self._stretch  for i, j in items[bead,cycles]])
+        return pd.DataFrame({"zmag": zcyc, "z": data, "phase": zpha, "cycle": zcid})
 
-        zcid = _concat(self._items.secondaries.cidcycles.values())
-        zcyc = _concat(self._items.secondaries.zmagcycles.values())
-        zpha = _concat(self._items.secondaries.phasecycles.values())
+
+    def getmethod(self):
         def _show(bead):
             try:
-                data = _concat([(j-self._bias)*self._stretch  for i, j in items[bead,cycles]])
+                info = self.beaddata(bead=bead)
                 exc  = ""
-            except Exception as _: # pylint: disable=broad-except
+            except Exception as _:  # pylint: disable=broad-except
+                zcyc = self._concat(self._items.secondaries.zmagcycles.values())
+                info = pd.DataFrame({"zmag":  zcyc,
+                                     "z":     np.zeros_like(zcyc),
+                                     "phase": np.ones_like(zcyc),
+                                     "cycle": np.ones_like(zcyc)})
                 exc  = str(_)
 
-                data =  np.zeros(len(zcyc))
-            info = pd.DataFrame({"zmag": zcyc, "z": data, "phase": zpha, "cycle": zcid})
             crv  = (
                 hv.Curve(info, 'zmag', ["z", "phase"])
                 .options(alpha = self._alpha, color = "gray")
@@ -167,7 +176,7 @@ class RampDisplay(BasicDisplay, ramp = Track):
             return (
                 crv
                 * crv.to.scatter().opts(color = "phase", cmap ="greens")
-                * hv.Text(info.zmag.mean(), .5, exc)
+                * hv.Text((info.zmag.min()+info.zmag.max())/2, .5, exc)
             )
         return _show
 

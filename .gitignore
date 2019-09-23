@@ -17,6 +17,7 @@ pyenv/
 .vs
 *.VC.*
 *.sln
+.env
 *.lastbuild
 *.lastbuildstate
 .idea

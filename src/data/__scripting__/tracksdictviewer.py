@@ -51,7 +51,7 @@ class _BasePathSelector(Generic[Item, Selector]):
             self.match.value = match
         if callback is not None:
             self._cback = callback
-        self._col   = pn.Column(pn.Row(self.paths, self.match), self.selector, pn.Pane(hv.Div("")))
+        self._col = pn.Column(pn.Row(self.paths, self.match), self.selector, pn.Pane(hv.Div("")))
         self._on_update()
         return self._col
 
