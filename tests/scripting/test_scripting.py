@@ -128,6 +128,10 @@ def test_tracksdict_hpfit_dataframe(scriptingcleaner):
     assert 'modification' in frame.columns
     assert hasattr(frame, 'tasklist')
 
+def customf(*args,**kwa):
+    "custom and picklable function for peaks.dataframe"
+    return 2
+
 @integrationmark
 def test_tracksdict_custom_dataframe(scriptingcleaner):# 
     "test that we can apply custom function to dataframe"
@@ -136,10 +140,8 @@ def test_tracksdict_custom_dataframe(scriptingcleaner):#
     import pandas as pd
     tracks = TracksDict()
     tracks['xxx'] = utpath("big_legacy")
-    def f(*args,**kwa):
-        return 2
 
-    frame = tracks.peaks.dataframe(test = f, std = np.std)
+    frame = tracks.peaks.dataframe(test = customf, std = 'std')
     assert isinstance(frame, pd.DataFrame)
     assert isinstance(frame.tasklist[0], list)
     assert frame.shape == (285,9)
