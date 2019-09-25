@@ -15,7 +15,7 @@ from   utils                import dataclass, dflt
 from   view.plots           import checksizes, themed
 from   view.dialog          import FileDialog
 from   .                    import marksequence
-from   .modelaccess         import SequenceModel, SequenceDisplay
+from   .modelaccess         import SequencePlotModelAccess, SequenceDisplay
 
 @dataclass
 class SequenceTickerTheme:
@@ -26,7 +26,7 @@ class SequenceTickerTheme:
                                      'basic': ('gray', 'lightgreen')},
                            'width': (1,          1),
                            'alpha': (.8,         .8),
-                           'dash' : ('solid',    'solid')})
+                           'dash':  ('solid',    'solid')})
 
 def estimatebias(position: np.ndarray, cnt: np.ndarray) -> float:
     "estimate the bias using the plot data"
@@ -39,7 +39,7 @@ def estimatebias(position: np.ndarray, cnt: np.ndarray) -> float:
                         key     = cnt.__getitem__,
                         default = (ind1+ind2)//2)]
 
-class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
+class SequenceTicker(BasicTicker):  # pylint: disable=too-many-ancestors
     "Generate ticks at fixed, explicitly supplied locations."
     major      = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
     minor      = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
@@ -54,7 +54,7 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 
     __implementation__ = "sequenceticker.ts"
 
-    def __init__( # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments
             self,
             ctrl    = None,
             fig     = None,
@@ -134,18 +134,18 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 
         resets[self].update(major = majors, minor = minors, key = key)
 
-        minor = dict.fromkeys(majors.keys(), tuple()) # type:ignore
+        minor = dict.fromkeys(majors.keys(), tuple())  # type:ignore
         major = {i: majors[i]+minors[i] for i in majors}
         resets[self.__axis].update(major = major, minor = minor, key = key)
 
 @dataclass
 class SequenceHoverTheme:
     "sequence hover theme"
-    name      : str   = "sequence.hover"
-    radius    : float = 1.
-    policy    : str   = 'follow_mouse'
-    tooltips  : str   = '@z{1.1111} ↔ @values: @text'
-    oligosize : int   = 4
+    name:      str   = "sequence.hover"
+    radius:    float = 1.
+    policy:    str   = 'follow_mouse'
+    tooltips:  str   = '@z{1.1111} ↔ @values: @text'
+    oligosize: int   = 4
 
 class SequenceHoverMixin:
     "controls keypress actions"
@@ -192,7 +192,7 @@ class SequenceHoverMixin:
         return self.renderers[0].data_source
 
     @classmethod
-    def create(cls, ctrl, doc, fig, mdl, xrng = None): # pylint: disable=too-many-arguments
+    def create(cls, ctrl, doc, fig, mdl, xrng = None):  # pylint: disable=too-many-arguments
         "Creates the hover tool for histograms"
         theme = ctrl.theme.add(SequenceHoverTheme(), False)
         args  = dict(x                = 'inds',
@@ -217,6 +217,7 @@ class SequenceHoverMixin:
         fig.add_tools(self)
 
         done = [False]
+
         @ctrl.display.observe(SequenceDisplay().name)
         def _onchange(old = None, **_):
             if (
@@ -233,7 +234,6 @@ class SequenceHoverMixin:
                 # pylint: disable=protected-access
                 self.source.update(data = self.__data(ctrl, mdl))
         return self
-
 
     def reset(self, resets, ctrl, model, **kwa):
         "updates the tooltips for a new file"
@@ -275,33 +275,35 @@ class SequenceHoverMixin:
         ind   = code.rfind('}')
         return (
             ''.join(imps)
-            +code[:ind]
-            +'\n'
-            +''.join(lines[len(imps):])
-            +code[ind:]
+            + code[:ind]
+            + '\n'
+            + ''.join(lines[len(imps):])
+            + code[ind:]
         )
 
 @dataclass
 class SequencePathTheme:
     "SequencePathWidgetTheme"
-    name       : str = "sequence.path"
-    dlgtitle   : str = 'Open a fasta file'
-    missingkey : str = 'Select a hairpin sequence'
+    name:        str = "sequence.path"
+    dlgtitle:    str = 'Open a fasta file'
+    missingkey:  str = 'Select a hairpin sequence'
     missingpath: str = 'Select a hairpin path'
-    refcheck   : str = '(ref) '
-    inds       : str = '₁₂₃₄₅₆₇₈₉'
-    width      : int = 280
-    height     : int = 32
+    refcheck:    str = '(ref) '
+    inds:        str = '₁₂₃₄₅₆₇₈₉'
+    width:       int = 280
+    height:      int = 32
 
 class SequencePathWidget:
     "Dropdown for choosing a fasta file"
     _dialog: FileDialog
     _widget: Dropdown
     _theme:  SequencePathTheme
-    _model:  SequenceModel
-    def __init__(self, ctrl, noerase = False, **kwa):
-        self._theme           = ctrl.theme.add(SequencePathTheme(**kwa), noerase = noerase)
-        self._model           = SequenceModel().addto(ctrl, noerase = noerase)
+    _model:  SequencePlotModelAccess
+
+    def __init__(self, ctrl, **kwa):
+        self._theme = ctrl.theme.swapmodels(SequencePathTheme(**kwa))
+        self._model = SequencePlotModelAccess()
+        self._model.swapmodels(ctrl)
 
     def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
         "creates the widget"
@@ -311,10 +313,10 @@ class SequencePathWidget:
                                 **self._data())
 
         mainview.differedobserver(self._data, self._widget,
-                                  ctrl.theme,   self._model.config,
-                                  ctrl.display, self._model.display)
+                                  ctrl.theme,   self._model.sequencemodel.config,
+                                  ctrl.display, self._model.sequencemodel.display)
 
-        self._widget.on_click(ctrl.action(lambda new: self._onclick(ctrl, new)))
+        self._widget.on_click(ctrl.action(self._onclick))
         return [self._widget]
 
     def observe(self, ctrl):
@@ -347,8 +349,8 @@ class SequencePathWidget:
         return self._widget
 
     def _data(self) -> dict:
-        lst   = sorted(self._model.config.sequences.keys())
-        key   = self._model.currentkey
+        lst   = sorted(self._model.sequencemodel.config.sequences.keys())
+        key   = self._model.sequencemodel.currentkey
         val   = key if key in lst else None
         label = self._theme.missingkey if val is None else key
 
@@ -357,26 +359,26 @@ class SequencePathWidget:
 
         return dict(menu  = menu, label = label, value = '→' if val is None else val)
 
-    def _onclick(self, ctrl, new):
+    def _onclick(self, new):
         if new.item == '←':
             path = self._dialog.open()
             self._widget.value = '→'
-            if self._model.setnewsequencepath(ctrl, path):
+            if self._model.setnewsequencepath(path):
                 if path is not None:
                     raise IOError("Could not find any sequence in the file")
         elif new.item != '→':
-            self._model.setnewkey(ctrl, new.item)
+            self._model.setnewsequencekey(new.item)
 
 @dataclass
 class OligoListTheme:
     "OligoListTheme"
-    name   : str = "sequence.probes"
-    title  : str = ""
+    name:    str = "sequence.probes"
+    title:   str = ""
     tooltip: str = 'c!cwgg, aat, +aaa, 0, singlestrand ...?'
-    width  : int = 280
-    height : int = 32
+    width:   int = 280
+    height:  int = 32
 
-class DpxAutocompleteInput(AutocompleteInput): # pylint: disable=too-many-ancestors
+class DpxAutocompleteInput(AutocompleteInput):  # pylint: disable=too-many-ancestors
     "autocomplete which allows having no selection"
     __implementation__ = "_autocomplete.ts"
 
@@ -384,10 +386,12 @@ class OligoListWidget:
     "Input for defining a list of oligos"
     __widget: DpxAutocompleteInput
     __theme:  OligoListTheme
-    __model:  SequenceModel
-    def __init__(self, ctrl, noerase = False):
-        self.__theme = ctrl.theme.add(OligoListTheme(), noerase = noerase)
-        self.__model = SequenceModel().addto(ctrl, noerase = noerase)
+    __model:  SequencePlotModelAccess
+
+    def __init__(self, ctrl):
+        self.__theme = ctrl.theme.swapmodels(OligoListTheme())
+        self.__model = SequencePlotModelAccess()
+        self.__model.swapmodels(ctrl)
 
     def addtodoc(self, mainview, ctrl, *_) -> List[Widget]:
         "creates the widget"
@@ -400,12 +404,12 @@ class OligoListWidget:
             name        = 'Cycles:Oligos'
         )
 
-        fcn = ctrl.action(lambda attr, old, new: self.__model.setnewprobes(ctrl, new))
+        fcn = ctrl.action(lambda attr, old, new: self.__model.setnewprobes(new))
         self.__widget.on_change('value', fcn)
 
         mainview.differedobserver(self.__data, self.__widget,
-                                  ctrl.theme,   self.__model.config,
-                                  ctrl.display, self.__model.display)
+                                  ctrl.theme,   self.__model.sequencemodel.config,
+                                  ctrl.display, self.__model.sequencemodel.display)
         return [self.__widget]
 
     def reset(self, resets):
@@ -414,7 +418,7 @@ class OligoListWidget:
         resets[self.__widget].update(**data)
 
     def __data(self):
-        hist = self.__model.config.history
+        hist = self.__model.sequencemodel.config.history
         lst  = [', '.join(sorted(j.lower() for j in i)) for i in hist]
-        ols  = ', '.join(sorted(j.lower() for j in self.__model.currentprobes))
+        ols  = ', '.join(sorted(j.lower() for j in self.__model.sequencemodel.currentprobes))
         return dict(value = ols, completions = lst)

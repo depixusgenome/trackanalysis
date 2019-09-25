@@ -24,6 +24,7 @@ class ConsensusHistPlotCreator(
     "Creates hist for a consensus bead"
     _plotmodel: ConsensusHistPlotModel
     _model:     ConsensusModelAccess
+
     def _createpeaks(self, itms, out):
         peaks, allpks, factor = self._model.consensuspeaks(itms)
         colors = [tohex(themed(self._model.themename, self._theme.pkcolors)[i])
@@ -64,6 +65,7 @@ class ConsensusScatterPlotCreator(
     _theme:     ConsensusScatterTheme
     _src:       ColumnDataSource
     _fig:       Figure
+
     def _addtodoc(self, ctrl, doc, *_): # pylint: disable=unused-argument,no-self-use
         assert False
 
@@ -99,10 +101,9 @@ class ConsensusScatterPlotCreator(
 class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
     "Building scatter & hist plots"
     def __init__(self, ctrl):
-        super().__init__(ctrl, addto = False)
-        args = {'noerase': False, 'model':   self._model}
-        self._scatter  = ConsensusScatterPlotCreator(ctrl, **args)
-        self._hist     = ConsensusHistPlotCreator(ctrl, **args)
+        super().__init__(ctrl)
+        self._scatter  = ConsensusScatterPlotCreator(ctrl, model = self._model)
+        self._hist     = ConsensusHistPlotCreator(ctrl,    model = self._model)
         self._widgets  = ConsensusPlotWidgets(ctrl, self._model)
         self.addto(ctrl)
 
@@ -111,9 +112,9 @@ class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
         "return figure list"
         return [self._hist, self._scatter]
 
-    def observe(self, ctrl, noerase = True):
+    def observe(self, ctrl):
         "observes the model"
-        super().observe(ctrl, noerase = noerase)
+        super().observe(ctrl)
         self._widgets.observe(ctrl)
         setpoolobservers(self, ctrl, self._model, "consensus.plot.scatter")
 
@@ -121,10 +122,10 @@ class ConsensusPlotCreator(TaskPlotCreator[ConsensusModelAccess, None]):
         def _on_cnf(**_):
             self.reset(False)
 
-    def addto(self, ctrl, noerase = True):
+    def addto(self, ctrl):
         "adds the models to the controller"
-        self._scatter.addto(ctrl, noerase=noerase)
-        self._hist.addto(ctrl, noerase=noerase)
+        self._scatter.addto(ctrl)
+        self._hist.addto(ctrl)
 
     def _addtodoc(self, ctrl, doc, *_):
         "returns the figure"

@@ -152,14 +152,16 @@ class RampPlotCreator(TaskPlotCreator[RampTaskPlotModelAccess, RampPlotModel]):
     _display:   RampPlotDisplay
     __src:      Tuple[ColumnDataSource,...]
     __fig:      Figure
-    def __init__(self,  ctrl) -> None:
-        "sets up this plotter's info"
-        super().__init__(ctrl, noerase = False)
-        self.__widgets = RampWidgets(ctrl, self._plotmodel)
 
-    def observe(self, ctrl, noerase = True):
+    def __init__(self,  ctrl):
+        "sets up this plotter's info"
+        super().__init__(ctrl)
+        self.__widgets = RampWidgets(ctrl, self._plotmodel)
+        self.addto(ctrl)
+
+    def observe(self, ctrl):
         "sets-up model observers"
-        super().observe(ctrl, noerase = noerase)
+        super().observe(ctrl)
         self.__widgets.observe(self, ctrl)
         observetracks(self._plotmodel, ctrl)
 

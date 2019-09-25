@@ -35,10 +35,6 @@ class BeadSubtractionModalDescriptor:
     def getdefault(model) -> str:
         "return the modal dialog line"
         mdl = getattr(model, '_model', model)
-        ref = mdl.subtracted.referencebeads()
-        if ref is not None:
-            return f'ref = {intlistsummary(ref)}'
-
         pot = intlistsummary([i[-1] for i in mdl.availablefixedbeads], False)
         return f'{pot} ?' if pot else ''
 
@@ -119,10 +115,8 @@ class CyclesListWidget:
         itm.update(columns = self.__cols())
 
     def __cols(self):
-        track = self.__task.track
-        dim   = track.instrument['dimension'] if track else 'µm'
-
-        clrs  = self.__colors.colors
+        dim  = self.__task.instrumentdim
+        clrs = self.__colors.colors
 
         def _dot(i, j):
             return self.__model.dot.format(clrs[i], j) if i in clrs else j
@@ -414,10 +408,10 @@ class CleaningWidgets:
             elif pcount == 1:
                 widget.observe(mainview, ctrl)
 
+        @ctrl.theme.observe("cleaning.downsampling")
         def _ondownsampling(old = None, **_):
             if 'value' in old:
                 mainview.reset(False)
-        ctrl.theme.observe("cleaning.downsampling", _ondownsampling)
 
     def addtodoc(self, mainview, ctrl, doc, fig):
         "add to the document"

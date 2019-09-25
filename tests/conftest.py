@@ -2,8 +2,13 @@
 # -*- coding: utf-8 -*-
 "Imported by pytest: adds 2 fixtures"
 import pytest
-from tests.testutils.modulecleanup import modulecleanup
-from tests.testutils               import needsdisplay
+
+pytest.register_assert_rewrite("tests.testconfig")
+pytest.register_assert_rewrite("tests.testingcore")
+
+# pylint: disable=wrong-import-position
+from tests.testutils.modulecleanup import modulecleanup  # noqa
+from tests.testutils               import needsdisplay   # noqa
 
 @pytest.fixture(params = [pytest.param("", marks = needsdisplay)])
 def bokehaction(monkeypatch):

@@ -38,7 +38,9 @@ class _PeaksIOMixin:
         items = type(self).__bases__[1].open(self, path, model)  # type: ignore
 
         if items is not None:
-            task = PeaksPlotModelAccess(self.__ctrl, True).defaultidenfication
+            acc = PeaksPlotModelAccess()
+            acc.swapmodels(self.__ctrl)
+            task = acc.defaultidenfication
             if task is not None:
                 items[0] += (task,)
         return items
@@ -93,7 +95,8 @@ class ConfigXlsxIO(TaskIO):
 
     def save(self, path:str, models):
         "creates a Hybridstat report"
-        pksmdl = PeaksPlotModelAccess(self.__ctrl, True)
+        pksmdl = PeaksPlotModelAccess()
+        pksmdl.swapmodels(self.__ctrl)
         curr   = pksmdl.roottask
         models = [i for i in models if curr is i[0]]
         if not len(models):

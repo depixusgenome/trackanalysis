@@ -23,7 +23,7 @@ from ._model                    import (PeaksPlotModelAccess, PeaksPlotTheme,
 from ._widget                   import PeaksPlotWidgets
 from ._io                       import setupio
 
-class PeaksSequenceHover(# pylint: disable=too-many-instance-attributes,too-many-ancestors
+class PeaksSequenceHover(  # pylint: disable=too-many-instance-attributes,too-many-ancestors
         HoverTool,
         SequenceHoverMixin
 ):
@@ -44,9 +44,8 @@ class PeaksSequenceHover(# pylint: disable=too-many-instance-attributes,too-many
         __file__
     )
 
-
     @classmethod
-    def create(cls, ctrl, doc, fig, mdl, xrng = None): # pylint: disable=too-many-arguments
+    def create(cls, ctrl, doc, fig, mdl, xrng = None):  # pylint: disable=too-many-arguments
         "Creates the hover tool for histograms"
         self = super().create(ctrl, doc, fig, mdl, xrng = xrng)
         jsc = CustomJS(args = {'fig': fig, 'source': self.source},
@@ -54,13 +53,13 @@ class PeaksSequenceHover(# pylint: disable=too-many-instance-attributes,too-many
         self.js_on_change("updating", jsc)
         return self
 
-    def reset(self, resets, ctrl, mdl): # pylint: disable=arguments-differ
+    def reset(self, resets, ctrl, mdl):  # pylint: disable=arguments-differ
         "Creates the hover tool for histograms"
         super().reset(resets, ctrl, mdl,
                       biases    = {i: j.bias    for i, j in mdl.distances.items()},
                       stretches = {i: j.stretch for i, j in mdl.distances.items()})
 
-    def jsslaveaxes(self, fig, src): # pylint: disable=arguments-differ
+    def jsslaveaxes(self, fig, src):  # pylint: disable=arguments-differ
         "slaves a histogram's axes to its y-axis"
         rng = fig.y_range
         rng.callback = CustomJS(code = "hvr.on_change_bounds(fig, src)",
@@ -79,12 +78,14 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     _errors:    PlotError
     _hover:     PeaksSequenceHover
     _ticker:    SequenceTicker
+
     def __init__(self, ctrl):
-        super().__init__(ctrl, noerase = False)
+        super().__init__(ctrl)
         self._src: Dict[str, ColumnDataSource] = {}
         self._widgets                          = PeaksPlotWidgets(ctrl, self._model)
         SequenceTicker.init(ctrl)
         PeaksSequenceHover.init(ctrl)
+        self.addto(ctrl)
 
     hover       = cast(PeaksSequenceHover,   property(lambda self: self._hover))
     ticker      = cast(SequenceTicker,       property(lambda self: self._ticker))
@@ -93,10 +94,9 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
     peaksdata   = cast(ColumnDataSource,     property(lambda self: self._src['peaks']))
     plottheme   = cast(PeaksPlotTheme,       property(lambda self: self._theme))
 
-    def observe(self, ctrl, noerase = True):
+    def observe(self, ctrl):
         "observes the model"
-        super().observe(ctrl, noerase = noerase)
-        self._model.setobservers(ctrl)
+        super().observe(ctrl)
         self._widgets.observe(ctrl)
         SequenceAnaIO.observe(ctrl)
 
@@ -128,7 +128,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             if tmp is not None and self._model.fiterror():
                 self._errors.reset(cache, self._theme.fiterror, False)
 
-            for i, j in dicos.items(): # type: ignore
+            for i, j in dicos.items():  # type: ignore
                 cache[self._src[i]].update(data = j)
 
             self._hover .reset(cache, self._ctrl, self._model)
@@ -139,13 +139,12 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             cache[self._fig.y_range] = self.newbounds('y', inds)
 
             inds = (inds - self._model.bias)*self._model.stretch
-            rng  = self._fig.extra_y_ranges['bases'] # pylint: disable=unsubscriptable-object
+            rng  = self._fig.extra_y_ranges['bases']  # pylint: disable=unsubscriptable-object
             cache[rng] = self.newbounds(None, inds)
 
-            if self._model.track:
-                dim = self._model.track.instrument['dimension']
-                lbl = self._theme.ylabel.split('(')[0]
-                cache[self._fig.yaxis[0]].update(axis_label = f"{lbl} ({dim})")
+            dim = self._model.instrumentdim
+            lbl = self._theme.ylabel.split('(')[0]
+            cache[self._fig.yaxis[0]].update(axis_label = f"{lbl} ({dim})")
 
             _color('peakscount',    'default',  'below')
             _color('peaksduration', 'duration', 'above')
@@ -165,10 +164,13 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                      themed(self, self._theme.pkcolors)[name])
 
     def __defaults(self):
-        empty = lambda *cols: {i: np.empty(0, dtype = 'f4') for i in cols}
-        return {'':        empty('z', 'count', 'ref'),
-                'events' : empty('z', 'count'),
-                'peaks':   self.__peaks(None)}
+
+        def _empty(*cols):
+            return {i: np.empty(0, dtype = 'f4') for i in cols}
+
+        return {'':       _empty('z', 'count', 'ref'),
+                'events': _empty('z', 'count'),
+                'peaks':  self.__peaks(None)}
 
     def __peaks(self, val):
         return createpeaks(self._model, self._theme.pkcolors, val)
@@ -190,7 +192,6 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
                        count = interpolator(data['z'], data['count'], fit2ref.hmin)(pos))
         return {'': data, 'events': events, 'peaks': self.__peaks(dtl)}
 
-
     def __create_fig(self):
         self._fig    = self.figure(
             y_range = Range1d(start = 0., end = 1.),
@@ -198,10 +199,11 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
             name    = 'Peaks:fig',
             extra_x_ranges = {"duration": Range1d(start = 0., end = 1.)}
         )
-        axis  = LinearAxis(x_range_name          = "duration",
-                           axis_label            = self._theme.xtoplabel,
-                           axis_label_text_color = self.__colors('peaksduration')
-                          )
+        axis  = LinearAxis(
+            x_range_name          = "duration",
+            axis_label            = self._theme.xtoplabel,
+            axis_label_text_color = self.__colors('peaksduration')
+        )
         self._fig.xaxis[0].axis_label_text_color = self.__colors('peakscount')
         self._fig.add_layout(axis, 'above')
         self.linkmodeltoaxes(self._fig)
@@ -266,8 +268,11 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
 
 class PeaksPlotView(PlotView[PeaksPlotCreator]):
     "Peaks plot view"
-    TASKS = ('extremumalignment', 'clipping', 'eventdetection', 'peakselector',
-             'singlestrand', 'baselinepeakfilter')
+    TASKS = (
+        'extremumalignment', 'clipping', 'eventdetection', 'peakselector',
+        'singlestrand', 'baselinepeakfilter'
+    )
+
     def advanced(self):
         "triggers the advanced dialog"
         self._plotter.advanced()

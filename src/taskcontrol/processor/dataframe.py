@@ -115,7 +115,7 @@ class DataFrameFactory(Generic[Frame]):
             data['modification'] = frame.track.pathinfo.modification
 
         for cnt, fcn in self.transform:
-            data.__dict__['tasklist'] = self.tasklist  # set again because of pandas behaviour
+            self.addtasklist(data)
             itm = fcn(data) if cnt == 1 else fcn(frame, data) if cnt == 2 else None
             if itm is not None:
                 data = itm
@@ -125,8 +125,14 @@ class DataFrameFactory(Generic[Frame]):
         if len(cols):
             data.set_index(cols, inplace = True)
 
-        data.__dict__['tasklist'] = self.tasklist
+        self.addtasklist(data)
         return data
+
+    def addtasklist(self, data: pd.DataFrame):
+        "adds the tasklist to the dataframe"
+        data.__dict__['tasklist'] = self.tasklist
+        if 'tasklist' not in getattr(data, '_metadata'):
+            getattr(data, '_metadata').append('tasklist')
 
     @classmethod
     def create(cls, task, buffers, frame):

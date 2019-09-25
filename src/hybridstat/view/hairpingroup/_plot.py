@@ -215,7 +215,6 @@ class GBHistCreator(TaskPlotCreator[HairpinGroupModelAccess, HairpinGroupHistMod
 
 def setpoolobservers(self, ctrl, mdl, statename):
     "sets pool observers"
-    mdl.setobservers(ctrl)
 
     @ctrl.display.observe(mdl.sequencemodel.display)
     def _onchangekey(old = None, **_):
@@ -260,8 +259,8 @@ def setpoolobservers(self, ctrl, mdl, statename):
 class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
     "Building scatter & hist plots"
     def __init__(self, ctrl):
-        super().__init__(ctrl, addto = False)
-        args = {'noerase': False, 'model':   self._model}
+        super().__init__(ctrl)
+        args = {'model':   self._model}
         self._scatter  = GBScatterCreator(ctrl, **args)
 
         args.update(
@@ -293,9 +292,9 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
         "return figure list"
         return [self._scatter, self._duration, self._rate]
 
-    def observe(self, ctrl, noerase = False):
+    def observe(self, ctrl):
         "observes the model"
-        super().observe(ctrl, noerase = noerase)
+        super().observe(ctrl)
         setpoolobservers(self, ctrl, self._model, "hairpingroup.plot")
 
         self._widgets.observe(ctrl)
@@ -307,10 +306,10 @@ class HairpinGroupPlotCreator(TaskPlotCreator[HairpinGroupModelAccess, None]):
                 self.reset(False)
 
 
-    def addto(self, ctrl, noerase = True):
+    def addto(self, ctrl):
         "adds the models to the controller"
         for i in self.plots:
-            i.addto(ctrl, noerase=noerase)
+            i.addto(ctrl)
 
     def advanced(self):
         "triggers the advanced dialog"

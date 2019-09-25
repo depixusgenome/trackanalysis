@@ -73,6 +73,8 @@ def defaulttdtransform(tasklist, dframe) -> pd.DataFrame:
         .set_index(ind)
     )
     dframe.__dict__['tasklist'] = tasklist
+    if 'tasklist' not in getattr(dframe, '_metadata'):
+        getattr(dframe, '_metadata').append('tasklist')
     return dframe
 
 class TracksDict(_TracksDict):

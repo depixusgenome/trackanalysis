@@ -2,14 +2,13 @@
 # -*- coding: utf-8 -*-
 "Cycles plot view for cleaning data"
 from    functools                   import partial
-from    typing                      import Dict, Optional
+from    typing                      import Dict, Optional, List, Tuple, TYPE_CHECKING
 from    bokeh.plotting              import Figure
 from    bokeh.models                import LinearAxis, ColumnDataSource, Range1d
 from    bokeh                       import layouts
 
 import  numpy                       as     np
 
-from    data                        import Track
 from    taskmodel                   import PHASE, Task
 from    taskcontrol.modelaccess     import ReplaceProcessors, ProcessorController
 from    utils.array                 import repeat
@@ -26,8 +25,13 @@ from    ._model                     import (DataCleaningModelAccess, CleaningPlo
 from    ._widget                    import CleaningWidgets
 from    .._core                     import Partial, DataCleaning  # pylint: disable=import-error
 from    ..names                     import NAMES
-from    ..processor                 import (DataCleaningProcessor,
-                                            ClippingProcessor, ClippingTask)
+from    ..processor                 import (
+    DataCleaningProcessor, ClippingProcessor, ClippingTask
+)
+
+if TYPE_CHECKING:
+    from data import Track, Cycles  # noqa
+
 LOGS = getLogger(__name__)
 
 class GuiExtremumAlignmentProcessor(ExtremumAlignmentProcessor):
@@ -113,16 +117,17 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
         cache['gui'] = np.isnan(curr)
         cache['exc'] = exc
 
-    @staticmethod
-    def nans(mdl, nans):
-        "returns an array with nan positions per cycle"
-        if nans is None:
-            return ()
-        return (np.asarray(i, dtype = 'bool')
-                for i in mdl.track.cycles.withdata({0:nans}).values())
-
     @classmethod
-    def computeall(cls, track:Track, bead:int, ctrl:ProcessorController, **tasks: Optional[Task]):
+    def computeall(
+            cls,
+            bead:    int,
+            ctrl:    ProcessorController,
+            **tasks: Optional[Task]
+    ) -> Tuple[
+        Optional[List[Tuple[Tuple[int, int], np.ndarray]]],
+        Dict[str, 'Cycles'],
+        Optional[Exception]
+    ]:
         "updates the cache in the gui and returns the nans"
         ctx   = ReplaceProcessors(
             ctrl,
@@ -131,11 +136,14 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
             GuiClippingProcessor,
             copy = True
         )
-        items = exc = None
-        nans: Dict[str, np.ndarray]  = {}
+
+        items: Optional[List[Tuple[Tuple[int, int], np.ndarray]]] = None
+        exc:   Optional[Exception]                                = None
+        nans:  Dict[str, 'Cycles']                                = {}
         with ctx as cycles:
             if cycles is not None:
                 items = list(cycles[bead, ...])
+                track = cycles.track
 
                 for name, tskname in (
                         ('aberrant',  'cleaning'),
@@ -144,10 +152,14 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
                 ):
                     if tasks.get(tskname, None):
                         tsk        = tasks[tskname]
-                        exc        = ctx.taskcache(tsk).pop('exc', None) if exc is None else exc
+                        exc        = (
+                            ctx.taskcache(tsk).pop('exc', None) if exc is None else exc
+                        )
                         tmp        = ctx.taskcache(tsk).pop('gui', None)
                         if tmp is not None:
-                            nans[name] = tmp
+                            nans[name] = track.cycles.withdata(
+                                {0: np.asarray(tmp, dtype = 'bool')}
+                            )
 
                 if tasks.get('cleaning', None):
                     cls.__discarded(ctx, track, bead, tasks, nans)
@@ -160,7 +172,7 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
     def runbead(cls, mdl, ctrl = None):
         "updates the cache in the gui and returns the nans"
         return cls.computeall(
-            mdl.track, mdl.bead,
+            mdl.bead,
             mdl.processors() if ctrl is None else ctrl,
             cleaning  = mdl.cleaning.task,
             alignment = mdl.alignment.task,
@@ -169,13 +181,13 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
 
     # pylint: disable=too-many-arguments
     @classmethod
-    def __discarded(cls, ctx, track: Track, bead: int, tasks:Dict[str, Optional[Task]], nans):
+    def __discarded(cls, ctx, track: 'Track', bead: int, tasks:Dict[str, Optional[Task]], nans):
         vals = None
         for i in nans.values():
             if vals is None:
-                vals  = np.copy(i)
+                vals  = np.copy(i.data[0])
             else:
-                vals |= i
+                vals |= i.data[0]
 
         pha  = track.phase.select(..., [PHASE.measure, PHASE.measure+1]).ravel()
         disc = Partial(
@@ -194,7 +206,7 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
         ctx.taskcache(tasks['cleaning'])[bead].errors += (disc,)
 
     @classmethod
-    def __add(cls, ctx, track:Track, bead: int, tasks: Dict[str, Optional[Task]], name: str):
+    def __add(cls, ctx, track: 'Track', bead: int, tasks: Dict[str, Optional[Task]], name: str):
         if tasks.get(name, None) is None:
             clipping = Partial(
                 name,
@@ -220,12 +232,13 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
 
     def __init__(self,  ctrl, model = None, plotmodel = None, **kwa) -> None:
         "sets up this plotter's info"
-        super().__init__(ctrl, noerase = False, model = model, plotmodel = plotmodel)
+        super().__init__(ctrl, model = model, plotmodel = plotmodel)
         self._widgets = CleaningWidgets(ctrl, self._model, self._plotmodel, **kwa)
+        self.addto(ctrl)
 
-    def observe(self, ctrl, noerase = True):
+    def observe(self, ctrl):
         "sets-up model observers"
-        super().observe(ctrl, noerase)
+        super().observe(ctrl)
         self._widgets.observe(self, ctrl)
 
     def getfigure(self) -> Figure:
@@ -244,8 +257,9 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         items   = nans = exc = None
         disable = True
         try:
-            items, nans, exc = GuiDataCleaningProcessor.runbead(self._model)
-            disable          = False
+            if self._model.bead is not None:
+                items, nans, exc = GuiDataCleaningProcessor.runbead(self._model)
+                disable          = False
         except Exception as err:  # pylint: disable=broad-except
             LOGS.exception(err)
             self._errors.reset(cache, err)
@@ -270,10 +284,9 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
             )
             cache[self.__source]['data'] = data
 
-            if self._model.track:
-                dim = self._model.track.instrument['dimension']
-                lbl = self._theme.ylabel.split('(')[0]
-                cache[self.__fig.yaxis[0]].update(axis_label = f"{lbl} ({dim})")
+            dim = self._model.instrumentdim
+            lbl = self._theme.ylabel.split('(')[0]
+            cache[self.__fig.yaxis[0]].update(axis_label = f"{lbl} ({dim})")
 
             self._widgets.reset(cache, disable)
 
@@ -316,10 +329,9 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess, CleaningPlotM
         )
         cache  = self._model.cleaning.cache
         for name in self._theme.order:
-            if name in nancache:
-                color   = hexes[name]
-                cycnans = GuiDataCleaningProcessor.nans(self._model, nancache[name])
-                for cyc, nans in enumerate(cycnans):
+            if nancache.get(name, None) is not None:
+                color = hexes[name]
+                for cyc, nans in enumerate(nancache[name].values()):
                     tmp[order[cyc],:len(nans)][nans] = color
 
             elif cache is not None:

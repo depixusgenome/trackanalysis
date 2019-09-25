@@ -5,7 +5,6 @@ from pathlib                 import Path
 from tempfile                import mkstemp
 from typing                  import Any, Sequence, List, Optional, Dict, Union, cast
 
-from control.decentralized   import Indirection
 from taskcontrol.modelaccess import TaskPlotModelAccess
 from taskmodel.application   import TasksDisplay
 from utils                   import dataclass, field
@@ -38,60 +37,11 @@ class SequenceModel:
     display: SequenceDisplay = field(default_factory = SequenceDisplay)
     tasks:   TasksDisplay    = field(default_factory = TasksDisplay)
 
-    def addto(self, ctrl, noerase = False):
+    def swapmodels(self, ctrl):
         "add to the controller"
-        first = self.config.name not in ctrl.theme
-        self.config  = ctrl.theme.  add(self.config,  noerase)
-        self.display = ctrl.display.add(self.display, noerase)
-        self.tasks   = ctrl.display.add(self.tasks,   noerase)
-        if first:
-            @ctrl.tasks.observe
-            def _onopentrack(calllater = None, **_):
-                @calllater.append
-                def _addoligo():
-                    if not self.currentprobes:
-                        self.setnewprobes(ctrl, "kmer")
-
-        return self
-
-    def setnewkey(self, ctrl, new):
-        "sets new probes"
-        hpins = dict(self.display.hpins)
-        if new is None:
-            hpins.pop(self.tasks.bead, None)
-        else:
-            hpins[self.tasks.bead] = new
-        ctrl.display.update(self.display, hpins = hpins)
-
-    def setnewprobes(self, ctrl, new):
-        "sets new probes"
-        root = getattr(ctrl.display.get("tasks", "roottask"), "path")
-        ols  = splitoligos(new, path = root)
-        hist = self.config.history
-        lst  = list(i for i in hist if i != ols)[:self.config.maxlength]
-        ctrl.theme.update(self.config,  history = ([ols] if len(ols) else []) + lst)
-
-        old  = dict(self.display.probes)
-        if ols != old.get(self.tasks.roottask, None):
-            old[self.tasks.roottask] = ols
-            ctrl.display.update(self.display, probes = old)
-        if ols != self.config.probes:
-            ctrl.theme.update(self.config, probes = ols)
-
-    def setnewsequencepath(self, ctrl, path) -> bool:
-        "sets a new path if it is correct"
-        if path is None or not Path(path).exists():
-            return True
-        try:
-            seqs = dict(_readsequence(path))
-        except IOError:
-            return True
-
-        if len(seqs) > 0:
-            ctrl.theme.update(self.config, path = path, sequences = seqs)
-            ctrl.display.update(self.display, hpins = {})
-            return False
-        return True
+        self.config  = ctrl.theme.  swapmodels(self.config)
+        self.display = ctrl.display.swapmodels(self.display)
+        self.tasks   = ctrl.display.swapmodels(self.tasks)
 
     @property
     def _defaultkey(self):
@@ -143,7 +93,10 @@ class SequenceAnaIO:
         "action to be performed on saving a file"
         cnf = controller.theme.getconfig("sequence").maps[0]
         cnf.pop('history', None)
-        cnf['probes'] = SequenceModel().addto(controller).currentprobes
+
+        mdl = SequenceModel()
+        mdl.swapmodels(controller)
+        cnf['probes'] = mdl.currentprobes
         if not cnf['probes']:
             cnf.pop('probes')
         model["sequence"] = cnf
@@ -156,14 +109,28 @@ class SequenceAnaIO:
 
 class SequencePlotModelAccess(TaskPlotModelAccess):
     "access to the sequence path and the oligo"
-    _seqconfig  = Indirection()
-    _seqdisplay = Indirection()
+    def __init__(self):
+        super().__init__()
+        self._seqconfig:  SequenceConfig  = SequenceConfig()
+        self._seqdisplay: SequenceDisplay = SequenceDisplay()
 
-    def __init__(self, ctrl) -> None:
-        SequenceModel().addto(ctrl, noerase = False)
-        super().__init__(ctrl)
-        self._seqconfig  = SequenceConfig()
-        self._seqdisplay = SequenceDisplay()
+    def swapmodels(self, ctrl) -> bool:
+        "swap models with those in the controller"
+        if super().swapmodels(ctrl):
+            self._seqconfig  = ctrl.theme.swapmodels(self._seqconfig)
+            self._seqdisplay = ctrl.display.swapmodels(self._seqdisplay)
+            return True
+        return False
+
+    def observe(self, ctrl):
+        "observe the controller"
+        super().observe(ctrl)
+
+        @ctrl.tasks.observe
+        @ctrl.tasks.hashwith(self._tasksdisplay)
+        def _onopentrack(calllater = None, isarchive = False, **_):
+            if not isarchive:
+                calllater.append(lambda: self.setnewprobes("kmer"))
 
     @property
     def sequencemodel(self):
@@ -213,7 +180,41 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
 
     def setnewsequencepath(self, path):
         "sets a new path if it is correct"
-        if not self.sequencemodel.setnewsequencepath(self._ctrl, path):
+        if path is None or not Path(path).exists():
+            return True
+        try:
+            seqs = dict(_readsequence(path))
+        except IOError:
+            return True
+
+        if len(seqs) > 0:
+            self._updatetheme(self._seqconfig, path = path, sequences = seqs)
+            self._updatedisplay(self._seqdisplay, hpins = {})
             self.reset()
             return False
         return True
+
+    def setnewsequencekey(self, new):
+        "sets new probes"
+        hpins = dict(self._seqdisplay.hpins)
+        if new is None:
+            hpins.pop(self.bead, None)
+        else:
+            hpins[self.bead] = new
+        self._updatedisplay(self._seqdisplay, hpins = hpins)
+
+    def setnewprobes(self, new):
+        "sets new probes"
+        root = self.roottask
+        ols  = splitoligos(new, path = root.path)
+        cnf  = self._seqconfig
+
+        disp = self._seqdisplay
+        if ols != disp.probes.get(root, None):
+            self._updatedisplay(disp, probes = {**disp.probes, root: ols})
+
+        self._updatetheme(
+            cnf,
+            history = ([ols] if ols else []) + [i for i in cnf.history[:cnf.maxlength] if i != ols],
+            **({} if ols == cnf.probes else {'probes': ols})
+        )

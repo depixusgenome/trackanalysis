@@ -12,13 +12,16 @@ def test_toolbar(bokehaction):
     server = bokehaction.start('taskview.toolbar.BeadToolbar', 'taskapp.default')
     tbar = server.widget['Main:toolbar']
     ctrl = server.ctrl
-    curr = lambda: ctrl.display.get('tasks', 'roottask')
+
+    def _currtrack():
+        return ctrl.display.get('tasks', 'roottask')
+
     def _checknone():
         assert tbar.frozen
-        assert curr() is None
+        assert _currtrack() is None
 
     def _checkpath(name):
-        track = curr()
+        track = _currtrack()
         assert not tbar.frozen
         assert str(track.path[0]) == _utpath(name)
 
@@ -36,19 +39,20 @@ def test_toolbar(bokehaction):
     _checkopen()
 
     server.load('big_legacy', rendered = "toolbardialog")
-    assert len(curr().path) == 1
+    assert len(_currtrack().path) == 1
     _checkpath('big_legacy')
 
-    track = curr()
+    proc = ctrl.display.get('tasks', 'taskcache')
+
     def _reset():
         server.press('Control-z')
-        server.cmd(lambda: ctrl.display.update("tasks", roottask = track))
-        assert len(curr().path) == 1
+        server.cmd(lambda: ctrl.display.update("tasks", taskcache = proc))
+        assert len(_currtrack().path) == 1
         _checkpath('big_legacy')
 
     server.load('CTGT_selection', rendered = "toolbardialog")
-    assert len(curr().path) == 2
-    assert str(curr().path[1]) == _utpath('CTGT_selection')
+    assert len(_currtrack().path) == 2
+    assert str(_currtrack().path[1]) == _utpath('CTGT_selection')
     _checkpath('big_legacy')
 
     _reset()
@@ -57,8 +61,8 @@ def test_toolbar(bokehaction):
         'CTGT_selection/test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.cgr',
         rendered = "toolbardialog"
     )
-    assert len(curr().path) == 2
-    assert str(curr().path[1]) == _utpath('CTGT_selection')
+    assert len(_currtrack().path) == 2
+    assert str(_currtrack().path[1]) == _utpath('CTGT_selection')
     _checkpath('big_legacy')
 
     _reset()
@@ -70,8 +74,8 @@ def test_toolbar(bokehaction):
         ),
         rendered = "toolbardialog"
     )
-    assert len(curr().path) == 2
-    assert str(curr().path[1]) == _utpath('CTGT_selection/Z(t)bd0track10.gr')
+    assert len(_currtrack().path) == 2
+    assert str(_currtrack().path[1]) == _utpath('CTGT_selection/Z(t)bd0track10.gr')
     _checkpath('big_legacy')
 
 @integrationmark

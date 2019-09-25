@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "access to the model"
-from typing                         import Optional, List, Dict, Tuple, Any, cast
+from typing                         import List, Dict, Tuple, Any
 import numpy as np
 
 # pylint: disable=unused-import
-from control.decentralized               import Indirection
 from eventdetection.processor.__config__ import ExtremumAlignmentTask
 from model.plots                         import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from taskcontrol.modelaccess             import TaskPlotModelAccess, TaskAccess
 from taskmodel                           import RootTask
-from taskmodel.application               import rescalingevent
+from taskmodel.application               import rescalingevent, TasksModel
 from utils                               import NoArgs, initdefaults
 from ..beadsubtraction                   import FixedBeadDetection, FixedList
 from ..processor.__config__              import (
@@ -50,9 +49,12 @@ class DataCleaningAccess(TaskAccess, tasktype = DataCleaningTask):
     def sorted(self, order, cache = NoArgs):
         "returns cycles ordered by category"
         astats = self.cache if cache is NoArgs else cache
+        track  = self.track
         if astats is None:
-            return (np.zeros(1, dtype = 'i4') if self.track is None     else
-                    np.arange(self.track.ncycles, dtype = 'i4'))
+            return (
+                np.zeros(1, dtype = 'i4') if track is None     else
+                np.arange(track.ncycles, dtype = 'i4')
+            )
 
         stats = astats if isinstance(astats, dict) else dict(astats)
         if 'discarded' in stats:
@@ -90,22 +92,6 @@ class BeadSubtractionAccess(TaskAccess, tasktype = BeadSubtractionTask):
         lst               = list(vals) if vals else []
         self.update(beads = sorted(lst), disabled = len(lst) == 0)
 
-    def referencebeads(self) -> Optional[List[int]]:
-        "return beads from the reference if they exist"
-        track = self.track
-        root  = self._ctrl.theme.get("fittoreference", "reference", None)
-        if root is None or track is None:
-            return None
-
-        lst  = self._ctrl.tasks.tasklist(root)
-        task = next((t for t in lst if isinstance(t, self.tasktype)), None)
-        if task is None:
-            return []
-
-        mine  = set(track.beads.keys())
-        beads = [i for i in cast(BeadSubtractionTask, task).beads if i in mine]
-        return beads
-
     def switch(self, bead):
         "adds or removes the bead"
         self.beads = set(self.beads).symmetric_difference({bead})
@@ -136,86 +122,114 @@ class FixedBeadDetectionConfig(FixedBeadDetection):
         super().__init__(**_)
 
 class FixedBeadDetectionStore:
-    "For saving in the right place"
-    name                             = "fixedbeads"
+    """
+    Fixed bead detection data
+    """
+    name                            = "fixedbeads"
     data: Dict[RootTask, FixedList] = {}
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
-class DataCleaningModelAccess(TaskPlotModelAccess):  # pylint: disable=too-many-instance-attributes
-    "Access to cleaning tasks"
-    _fixedbeadsconfig = Indirection()
-    _fixedbeadsstore  = Indirection()
-    __ADDED           = False   # TODO: Make modelacces MVC and remove this classvar
+class FixedBeadDetectionModel:
+    """
+    Fixed bead detection info
+    """
+    def __init__(self):
+        self.config:     FixedBeadDetectionConfig = FixedBeadDetectionConfig()
+        self.store:      FixedBeadDetectionStore  = FixedBeadDetectionStore()
+        self.tasksmodel: TasksModel               = TasksModel()
 
-    def __init__(self, ctrl, **_):
-        super().__init__(ctrl)
-        self.undersampling     = UndersamplingTaskAccess(self)
-        self._fixedbeadsconfig = FixedBeadDetectionConfig()
-        self._fixedbeadsstore  = FixedBeadDetectionStore()
-        self.alignment         = ExtremumAlignmentTaskAccess(self)
-        self.clipping          = ClippingTaskAccess(self)
-        self.cleaning          = DataCleaningAccess(self)
-        self.subtracted        = BeadSubtractionAccess(self)
+    def swapmodels(self, ctrl):
+        "swap models with those existing in the controller"
+        self.tasksmodel.swapmodels(ctrl)
+        self.config = ctrl.theme.swapmodels(self.config)
+        self.store  = ctrl.display.swapmodels(self.store)
 
-    def addto(self, ctrl, noerase = False):
-        "add to the controller"
-        if self.__ADDED:
-            return
-        self.__class__.__ADDED = True  # pylint: disable=protected-access
+    def observe(self, ctrl):
+        "observe to a model"
 
         @ctrl.tasks.observe
+        @ctrl.tasks.hashwith(self.store)
         def _onclosetrack(task = None, **_):
-            data = self._fixedbeadsstore.data
+            data = self.store.data
             if task in data:
                 info = dict(data)
                 info.pop(task, None)
-                self._fixedbeadsstore = {'data': info}
+                ctrl.display.update(self.store, data = info)
+
+        @ctrl.theme.observe(self.config)
+        @ctrl.theme.hashwith(self.config)
+        def _onchangeconfig(**_):
+            info                                   = dict(self.store.data)
+            info[self.tasksmodel.display.roottask] = self.__compute()
+            ctrl.display.update(self.store, data = info)
 
         @ctrl.tasks.observe
+        @ctrl.tasks.hashwith(self.store)
         def _onopentrack(calllater = None, isarchive = False, **_):
-            if not self._fixedbeadsconfig.automate or isarchive:
+            if not self.config.automate or isarchive:
                 return
 
             @calllater.append
             def _addsubtracted(*_1, **_2):
-                beads = self.availablefixedbeads
-                self.subtracted.update(beads = [i[-1] for i in beads])
+                _onchangeconfig()
+                root  = self.tasksmodel.display.roottask
+                assert root is not None
 
-        @ctrl.theme.observe
-        @ctrl.display.observe
-        def _ontasks(old = None, **_):
-            done, cur, coeff = rescalingevent(ctrl, old, self._fixedbeadsconfig.rescaling)
-            if not done:
-                ctrl.theme.update(
-                    self._fixedbeadsconfig,
-                    rescaling = cur,
-                    **dict(self._fixedbeadsconfig.zscaled(coeff))
+                beads = [i[-1] for i in self.store.data.get(root, ())]
+                ctrl.tasks.addtask(
+                    root,
+                    BeadSubtractionTask(beads = beads),
+                    index = self.tasksmodel.config.defaulttaskindex(
+                        self.tasksmodel.display.tasklist,
+                        BeadSubtractionTask,
+                    )
                 )
 
-        @ctrl.theme.observe(self._fixedbeadsconfig)
-        def _onchangeconfig(**_):
-            self._fixedbeadsstore = {'data': {}}
+        @ctrl.theme.observe(self.tasksmodel.config)
+        @ctrl.display.observe(self.tasksmodel.display)
+        @ctrl.display.hashwith(self.store, self.config)
+        def _ontasks(old = None, **_):
+            done, cur, coeff = rescalingevent(ctrl, old, self.config.rescaling)
+            if not done:
+                ctrl.theme.update(self.config, rescaling = cur, **dict(self.config.zscaled(coeff)))
+
+    @property
+    def available(self) -> FixedList:
+        "returns bead ids for potential fixed beads"
+        return self.store.data.get(self.tasksmodel.display.roottask, [])
+
+    def __compute(self, force = False):
+        root = self.tasksmodel.display.roottask
+        if root is None:
+            return []
+
+        track = self.tasksmodel.display.track
+        if track is None:
+            return []
+
+        if not force and self.store.data.get(root, None):
+            return self.store.data[root]
+
+        return self.config(track.beads)
+
+class DataCleaningModelAccess(TaskPlotModelAccess):  # pylint: disable=too-many-instance-attributes
+    "Access to cleaning tasks"
+    def __init__(self, **_):
+        super().__init__()
+        self.undersampling = UndersamplingTaskAccess(self)
+        self.fixedbeads    = FixedBeadDetectionModel()
+        self.alignment     = ExtremumAlignmentTaskAccess(self)
+        self.clipping      = ClippingTaskAccess(self)
+        self.cleaning      = DataCleaningAccess(self)
+        self.subtracted    = BeadSubtractionAccess(self)
 
     @property
     def availablefixedbeads(self) -> FixedList:
         "returns bead ids for potential fixed beads"
-        root = self.roottask
-        if root is None:
-            return []
-
-        data  = self._fixedbeadsstore.data
-        beads = data.get(root, None)
-        if beads is None:
-            track = self._ctrl.tasks.track(root)
-            if track is None:
-                return []
-
-            info  = dict(data)
-            beads = info[root] = self._fixedbeadsconfig(track.beads)
-            self._fixedbeadsstore = {'data': info}
-        return beads
+        return self.fixedbeads.available
 
 class CleaningPlotTheme(PlotTheme):
     """

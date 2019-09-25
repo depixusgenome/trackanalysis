@@ -9,6 +9,7 @@ from copy               import deepcopy
 from utils              import initdefaults
 from utils.configobject import ConfigObject
 from .base              import Task, RootTask
+from .processors        import TaskCacheList
 from .dataframe         import DataFrameTask
 from .level             import InstrumentType
 from .order             import TASK_ORDER, taskorder
@@ -16,16 +17,18 @@ from .track             import (CycleSamplingTask, TrackReaderTask,
                                 DataSelectionTask, CycleCreatorTask)
 if TYPE_CHECKING:
     # pylint: disable=unused-import
-    from data.track              import Track
-    from taskcontrol.taskcontrol import ProcessorController
+    from data.track              import Track                   # noqa
+    from taskcontrol.taskcontrol import TaskCacheList     # noqa
 
 Configuration  = Dict[str, Task]
 Configurations = Dict[str, Configuration]
+Rescalings     = Dict[str, "RescalingParameters"]
 
 class ConfigurationDescriptor:
     """ configurations """
     _Type: ClassVar[Type[Enum]] = InstrumentType
     _instr: str
+
     def __set_name__(self, _, name):
         self._instr = self._Type(name)
 
@@ -74,9 +77,9 @@ class InstrumentDescriptor:
 
 class RescalingParameters:
     "Parameters used for rescaling"
-    experimental : float = 1.073      # HP005 sequence length * µm ↔ bases at phase 3 (18 pN)
-    mumtobase    : float = 1.e-3      # µm ↔ bases at phase 3 (18 pN)
-    sequence     : float = 1073       # HP005 sequence length
+    experimental: float = 1.073      # HP005 sequence length * µm ↔ bases at phase 3 (18 pN)
+    mumtobase:    float = 1.e-3      # µm ↔ bases at phase 3 (18 pN)
+    sequence:     float = 1073       # HP005 sequence length
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -94,8 +97,7 @@ class RescalingParameters:
             sequence     = self.sequence if seqlen is None else seqlen,
         )
 
-Rescalings = Dict[str, RescalingParameters]
-class TasksConfig(ConfigObject):
+class TasksConfig(ConfigObject, hashattributes = 'name'):
     """
     permanent globals on tasks
     """
@@ -182,38 +184,61 @@ class TasksConfig(ConfigObject):
 
         return {
             'rescaling': cnv,
-            instr: { i: j.rescale(coeff) for i, j in getattr(self, instr).items()}
+            instr: {i: j.rescale(coeff) for i, j in getattr(self, instr).items()}
         }
 
-class TasksDisplay(ConfigObject):
+class TasksDisplay(ConfigObject, hashattributes = 'name'):
     """
     runtime globals on tasks
     """
-    name                         = "tasks"
-    bead:     Optional[int]      = None
-    roottask: Optional[RootTask] = None
+    name:      str
+    taskcache: TaskCacheList
+    bead:      Optional[int]
 
-    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
-        pass
+        self.name      = 'tasks'
+        self.taskcache = _.get('taskcache', TaskCacheList())
+        self.bead      = _.get('bead',      None)
 
-    def track(self, ctrl) -> Optional['Track']:
+    @property
+    def roottask(self) -> Optional[RootTask]:
+        "return the first task in the model"
+        return None if self.undefined else self.taskcache.model[0]
+
+    @property
+    def undefined(self) -> bool:
+        "whether the taskcache instance contains anything"
+        return not self.taskcache.model
+
+    @property
+    def track(self) -> Optional['Track']:
         "return the track associated to the root task"
-        return None if self.roottask is None else ctrl.tasks.track(self.roottask)
+        if self.undefined:
+            return None
 
-    def tasklist(self, ctrl) -> Iterator[Task]:
+        track = self.taskcache.data[0].cache()
+        if track is None:
+            self.taskcache.run(self.taskcache.model[0])  # create cache if needed
+            track = self.taskcache.data[0].cache()
+        return track
+
+    @property
+    def tasklist(self) -> Iterator[Task]:
         "return the tasklist associated to the root task"
-        return ctrl.tasks.tasklist(self.roottask) if self.roottask else iter(())
+        return iter(() if self.undefined else self.taskcache.model)
 
-    def processors(self, ctrl, upto:Task = None) -> Optional['ProcessorController']:
+    def processors(self, upto:Task = None) -> Optional['TaskCacheList']:
         "return the tasklist associated to the root task"
-        return ctrl.tasks.processors(self.roottask, upto) if self.roottask else None
+        return None if self.undefined else self.taskcache.keepupto(upto)
 
-    def cache(self, ctrl, task) -> Callable[[], Any]:
+    def cache(self, task) -> Callable[[], Any]:
         "returns the processor's cache if it exists"
-        return ctrl.tasks.cache(self.roottask, task) if task else lambda: None
+        return (
+            self.taskcache.data.getcache(task) if task and not self.undefined else
+            lambda: None
+        )
 
-class TaskIOTheme(ConfigObject):
+class TaskIOTheme(ConfigObject, hashattributes  = 'name'):
     """
     Info used when opening track files
     """
@@ -278,16 +303,25 @@ class TasksModel:
         self.config  = TasksConfig()
         self.display = TasksDisplay()
 
-    def addto(self, ctrl, noerase = True):
+    def swapmodels(self, ctrl) -> bool:
         """
         adds the current obj to the controller
         """
-        self.config  = ctrl.theme  .add(self.config,  noerase)
-        self.display = ctrl.display.add(self.display, noerase)
+        old          = self.config
+        self.config  = ctrl.theme  .add(self.config, False)
+        self.display = ctrl.display.add(self.display, False)
+        return old is self.display
+
+    def addto(self, ctrl):
+        """
+        adds the current obj to the controller
+        """
+        self.config  = ctrl.theme  .swapmodels(self.config)
+        self.display = ctrl.display.swapmodels(self.display)
 
 def rescalingevent(ctrl, params, previous) -> Tuple[bool, Optional[float], Optional[float]]:
     "return the rescaling parameter"
-    if 'rescaling' not in params and "roottask" not in params:
+    if 'rescaling' not in params and "taskcache" not in params:
         return True, None, None
 
     root  = ctrl.display.get("tasks", "roottask")
@@ -299,9 +333,10 @@ def rescalingevent(ctrl, params, previous) -> Tuple[bool, Optional[float], Optio
     coeff = float(model.rescaling[instr]) if instr in model.rescaling else 1.
     return (abs(coeff - previous) < 1e-5, coeff, coeff/previous)
 
-def setupdefaulttask(tasktype: Type[Task], name :str = '', **kwa) -> str:
+def setupdefaulttask(tasktype: Type[Task], name: str = '', **kwa) -> str:
     "add task to the instruments"
     return ConfigurationDescriptor.setupdefaulttask(tasktype, name, **kwa)
+
 
 setupdefaulttask(CycleSamplingTask)
 setupdefaulttask(TrackReaderTask)

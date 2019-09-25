@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot"
-from    typing               import TYPE_CHECKING
 from    bokeh                import layouts
 
-from    taskcontrol.taskio   import ConfigTrackIO, GrFilesIO
 from    taskview.plots       import PlotView, CACHE_TYPE, TaskPlotCreator
 from    view.base            import stretchout
 from   ._bokehext            import DpxHoverModel
@@ -13,19 +11,21 @@ from   ._raw                 import RawMixin
 from   ._hist                import HistMixin
 from   ._widget              import WidgetMixin
 
-class CyclesPlotCreator( # pylint: disable=too-many-ancestors
-        TaskPlotCreator[CyclesModelAccess, CyclesPlotModel], # type: ignore
+class CyclesPlotCreator(  # pylint: disable=too-many-ancestors
+        TaskPlotCreator[CyclesModelAccess, CyclesPlotModel],  # type: ignore
         HistMixin, RawMixin, WidgetMixin
 ):
     "Displays cycles and their projection"
     _model: CyclesModelAccess
     _hover: DpxHoverModel
-    def __init__(self, ctrl) -> None:
+
+    def __init__(self, ctrl):
         "sets up this plotter's info"
-        super().__init__(ctrl, noerase = False)
+        super().__init__(ctrl)
         RawMixin   .__init__(self)
         HistMixin  .__init__(self, ctrl)
         WidgetMixin.__init__(self, ctrl, self._model)
+        self.addto(ctrl)
 
     def _addtodoc(self, ctrl, doc, *_):
         "returns the figure"
@@ -71,16 +71,19 @@ class CyclesPlotCreator( # pylint: disable=too-many-ancestors
     def ismain(self, ctrl):
         WidgetMixin.ismain(self, ctrl)
 
-    def observe(self, ctrl, noerase = True):
+    def observe(self, ctrl):
         "sets-up model observers"
-        super().observe(ctrl, noerase)
+        super().observe(ctrl)
         self._histobservers(ctrl)
         self._widgetobservers(ctrl)
+
         ctrl.theme.observe(self._model.cycles.theme,  lambda **_: self.reset(False))
         ctrl.theme.observe(self._model.cycles.config, lambda **_: self.reset(False))
 
+        @ctrl.theme.observe(self._theme)
         def _onchangefig(old = None, **_):
             if 'figsize' in old:
+
                 @self.calllater
                 def _cb():
                     theme = self._theme.figsize
@@ -91,12 +94,12 @@ class CyclesPlotCreator( # pylint: disable=too-many-ancestors
                     self._raw.trigger("sizing_mode", theme[-1], theme[-1])
                     self._hist.trigger("sizing_mode", theme[-1], theme[-1])
 
-        ctrl.theme.observe(self._theme, _onchangefig)
 
 class CyclesPlotView(PlotView[CyclesPlotCreator]):
     "Cycles plot view"
     APPNAME = 'cyclesplot'
     TASKS   = 'extremumalignment', 'eventdetection'
+
     def advanced(self):
         "triggers the advanced dialog"
         self._plotter.advanced()

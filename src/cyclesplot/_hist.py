@@ -111,7 +111,6 @@ class HistMixin(ABC):
                 self._ticker.reset(cache)
                 self._hover.reset(cache, self._ctrl, self._model)
 
-
     def _histobservers(self, ctrl):
         ctrl.theme.observe('sequence', self._oncyclessequence)
 

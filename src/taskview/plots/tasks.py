@@ -11,12 +11,13 @@ class TaskPlotCreator(PlotCreator[TModelType, PlotModelType]):
     "Base plotter for tracks"
     _plotmodel: PlotModelType
     _model:     TModelType
+
     def _onchangetask(self, parent = None, task = None, calllater = None, **_):
         if self._model.impacts(parent, task):
             calllater.append(lambda: self.reset(False))
 
     def _onchangedisplay(self, old = None, calllater = None, **_):
-        calllater.append(lambda: self.reset('roottask' in old))
+        calllater.append(lambda: self.reset('taskcache' in old))
 
     def observetasks(self, ctrl, name = "tasks"):
         "sets-up task model observers"
@@ -27,9 +28,9 @@ class TaskPlotCreator(PlotCreator[TModelType, PlotModelType]):
     def _statehash(self):
         return self._model.statehash(task = ...)
 
-    def observe(self, ctrl, noerase = True):
+    def observe(self, ctrl):
         "sets-up model observers"
-        super().observe(ctrl, noerase)
+        super().observe(ctrl)
         self.observetasks(ctrl)
 
     @abstractmethod

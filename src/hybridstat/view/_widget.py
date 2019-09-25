@@ -52,7 +52,7 @@ class ReferenceWidget:
     __widget: Dropdown
 
     def __init__(self, ctrl, model) -> None:
-        self.__theme = ctrl.theme.add(ReferenceWidgetTheme(), noerase = False)
+        self.__theme = ctrl.theme.swapmodels(ReferenceWidgetTheme())
         self.__model = model
         self.__files = FileList(ctrl)
 
@@ -215,7 +215,7 @@ class PeaksStatsWidget:
 
     def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
         self.__model = model
-        self.__theme = ctrl.theme.add(PeaksStatsWidgetTheme(), noerase = False)
+        self.__theme = ctrl.theme.swapmodels(PeaksStatsWidgetTheme())
 
     def addtodoc(self, *_) -> List[Widget]:  # pylint: disable=arguments-differ
         "creates the widget"
@@ -244,14 +244,16 @@ class PeaksStatsWidget:
 
         def trackdependant(self, mdl):
             "all track dependant stats"
-            if mdl.track is None:
+            track = mdl.track
+            if track is None:
                 return
-            _           = PeaksStatsOrder
-            dim         = mdl.track.instrument['dimension']
+
+            _   = PeaksStatsOrder
+            dim = mdl.instrumentdim
             self.titles = [(i.replace('µm', dim), j) for i,j in self.titles]
 
-            self.values[_.cycles]  = mdl.track.ncycles
-            self.values[_.sigmahf] = rawprecision(mdl.track, mdl.bead)
+            self.values[_.cycles]  = track.ncycles
+            self.values[_.sigmahf] = rawprecision(track, mdl.bead)
             if len(mdl.peaks['z']):
                 self.values[_.sigmapeaks] = mdl.peaks['sigma']
             self.values[_.skew] = mdl.peaks['skew']
@@ -378,14 +380,11 @@ class PeakListWidget:
     theme:    PeakListTheme
 
     def __init__(self, ctrl, model:PeaksPlotModelAccess, theme = None) -> None:
-        self.__ctrl  = ctrl
         self.__model = model
-        self.theme   = ctrl.theme.add(PeakListTheme() if theme is None else theme,
-                                      noerase = False)
+        self.theme   = ctrl.theme.swapmodels(PeakListTheme() if theme is None else theme)
 
-    def __cols(self, ctrl):
-        track = ctrl.tasks.track(ctrl.display.get("tasks", "roottask"))
-        dim   = track.instrument['dimension'] if track else 'µm'
+    def __cols(self):
+        dim = self.__model.instrumentdim
 
         def _fmt(line):
             return (
@@ -411,7 +410,7 @@ class PeakListWidget:
             self, _1, _2, src
     ) -> List[Widget]:
         "creates the widget"
-        cols  = self.__cols(self.__ctrl)
+        cols  = self.__cols()
         self.__widget = DataTable(
             source         = src,
             columns        = cols,
@@ -425,7 +424,7 @@ class PeakListWidget:
 
     def reset(self, resets):
         "resets the wiget when a new file is opened"
-        resets[self.__widget].update(columns = self.__cols(self.__ctrl))
+        resets[self.__widget].update(columns = self.__cols())
 
 class CSVExporter:
     "exports all to csv"
@@ -464,7 +463,7 @@ class PeakIDPathWidget:
     def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
         self.keeplistening  = True
         self.__peaks        = model
-        self.__theme        = ctrl.theme.add(PeakIDPathTheme(), noerase = False)
+        self.__theme        = ctrl.theme.swapmodels(PeakIDPathTheme())
 
     def _doresetmodel(self, ctrl):
         mdl  = self.__peaks.identification
@@ -556,8 +555,7 @@ class PeakIDPathWidget:
                 if not path.endswith(".xlsx"):
                     raise IOError(*self.__theme.tableerror)
 
-                track = ctrl.tasks.track(ctrl.display.get("tasks", "roottask"))
-                dim   = track.instrument['dimension'] if track else 'µm'
+                dim = self.__peaks.instrumentdim
                 writecolumns(path, "Summary",
                              [('Bead',                  [self.__peaks.bead]),
                               ('Reference',             [self.__peaks.sequencekey]),

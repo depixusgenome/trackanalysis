@@ -7,12 +7,8 @@ from typing                 import (Tuple, Optional, Iterator, Union, Any,
                                     TYPE_CHECKING, cast)
 from copy                   import copy as shallowcopy
 
-from control.decentralized  import Indirection
-from data.track             import Track
-from data.views             import TrackView
-from data.views             import BEADKEY
 from taskmodel              import RootTask, Task
-from taskmodel.application  import ConfigurationDescriptor, TasksModel
+from taskmodel.application  import ConfigurationDescriptor, TasksDisplay, TasksConfig
 from utils                  import NoArgs
 from utils.inspection       import diffobj
 from .processor             import Processor
@@ -21,13 +17,13 @@ from .taskcontrol           import ProcessorController
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
-    from taskapp.maincontrol import SuperController
+    from data.views          import TrackView        # noqa
+    from data.track          import Track            # noqa
+    from taskapp.maincontrol import SuperController  # noqa
 
 class PlotModelAccess:
     "Default plot model"
-    def __init__(self, model:Union['SuperController', 'PlotModelAccess']) -> None:
-        self._model = model
-        self._ctrl  = getattr(model, 'ctrl', model)
+    _ctrl: 'SuperController'
 
     @property
     def ctrl(self):
@@ -47,7 +43,7 @@ class PlotModelAccess:
         "return the theme name"
         return self._ctrl.theme.get("main", "themename", "dark")
 
-    def addto(self, ctrl, noerase = False):
+    def addto(self, ctrl):
         "add to controller"
 
 class ReplaceProcessors(CacheReplacement):
@@ -75,43 +71,53 @@ class ReplaceProcessors(CacheReplacement):
             ctrl = self.ctrl
         return ctrl if self.copy is None else next(iter(ctrl.run(copy = self.copy)))
 
+class _TDDescriptor:
+    _name: str
+
+    def __set_name__(self, _, name):
+        self._name = name
+
+    def __get__(self, inst, tpe):
+        return (
+            self if inst is None else getattr(getattr(inst, '_tasksdisplay'), self._name)
+        )
+
 class TaskPlotModelAccess(PlotModelAccess):
     "Contains all access to model items likely to be set by user actions"
-    _tasksconfig  = Indirection()
-    _tasksdisplay = Indirection()
-    def __init__(self, model:Union['SuperController', 'PlotModelAccess']) -> None:
-        super().__init__(model)
-        mdl = TasksModel()
-        self._tasksconfig               = mdl.config
-        self._tasksdisplay              = mdl.display
+    def __init__(self):
+        self._tasksconfig  = TasksConfig()
+        self._tasksdisplay = TasksDisplay()
+        self._defaulttasks = TasksConfig()
+
+    roottask = cast(Optional[RootTask], _TDDescriptor())
+    tasklist = cast(Iterator[Task],     _TDDescriptor())
+    bead     = cast(Optional[int],      _TDDescriptor())
 
     @property
-    def roottask(self) -> Optional[RootTask]:
-        "returns the current track"
-        return self._tasksdisplay.roottask
+    def rawtrack(self) -> Optional['Track']:
+        "return the raw track, not undersampled"
+        return self._tasksdisplay.track
 
     @property
-    def tasklist(self) -> Iterator[Task]:
-        "return the tasklist associated to the root task"
-        return self._tasksdisplay.tasklist(self._ctrl)
-
-    @property
-    def track(self) -> Optional[Track]:
-        "returns the current track"
-        proc = self._tasksdisplay.processors(self._ctrl)
-        return None if proc is None else next(iter(proc.run())).track
-
-    @property
-    def bead(self) -> Optional[BEADKEY]:
-        "returns the current bead number"
-        return self._tasksdisplay.bead
+    def track(self) -> Optional['Track']:
+        "return the potentiallly undersampled track"
+        ctrl  = self.processors()
+        return None if ctrl is None else  next(iter(ctrl.run(copy = True))).track
 
     @property
     def instrument(self) -> str:
         "the current instrument type"
-        if self.roottask is None:
-            return self._ctrl.theme.get("tasks", "instrument")
-        return self._ctrl.tasks.instrumenttype(self.roottask)
+        track = self.rawtrack
+        return (
+            self._tasksdisplay.instrument if track is None else
+            track.instrument['type'].name
+        )
+
+    @property
+    def instrumentdim(self) -> Optional[str]:
+        "the current instrument type"
+        track = self.rawtrack
+        return 'µm' if track is None else track.instrument['dimension']
 
     def impacts(self, root:RootTask, task:Task) -> bool:
         "returns whether changing this tasks affects the model output"
@@ -130,11 +136,15 @@ class TaskPlotModelAccess(PlotModelAccess):
 
         check = tuple(i.check for i in self.__dict__.values() if isinstance(i, TaskAccess))
         good  = next((j for j in tuple(self.tasklist)[::-1] if any(i(j) for i in check)), None)
-        return self._tasksdisplay.processors(self._ctrl, good) if good else None
+        return self._tasksdisplay.processors(good) if good else None
 
     def statehash(self, root = NoArgs, task = NoArgs):
         "returns a tag specific to the current state"
-        lst = tuple(self._ctrl.tasks.tasklist(self.roottask if root is NoArgs else root))
+        lst = tuple(
+            self._tasksdisplay.tasklist if root is NoArgs else
+            self._ctrl.tasks.tasklist(root)
+        )
+
         if task is NoArgs:
             check = tuple(
                 i.check for i in self.__dict__.values() if isinstance(i, TaskAccess)
@@ -149,7 +159,7 @@ class TaskPlotModelAccess(PlotModelAccess):
             lst = lst[:lst.index(task)+1]
         return pickle.dumps(lst)
 
-    def runbead(self) -> Optional[TrackView]:
+    def runbead(self) -> Optional['TrackView']:
         "returns a TrackView to be displayed"
         ctrl  = self.processors()
         return None if ctrl is None else  next(iter(ctrl.run(copy = True)))
@@ -166,14 +176,62 @@ class TaskPlotModelAccess(PlotModelAccess):
     def addtodoc(self, _):
         "adds items to the doc"
 
+    def swapmodels(self, ctrl) -> bool:
+        "swap models with those in the controller"
+        if ctrl is getattr(self, '_ctrl', ''):
+            return False
+        self._ctrl         = ctrl
+        self._tasksconfig  = ctrl.theme.swapmodels(self._tasksconfig)
+        self._defaulttasks = ctrl.theme.model(self._tasksconfig, defaults = True)
+        self._tasksdisplay = ctrl.display.swapmodels(self._tasksdisplay)
+        for i in self.__dict__.values():
+            if callable(getattr(i, 'swapmodels', None)):
+                i.swapmodels(ctrl)
+        return True
+
+    def observe(self, ctrl):
+        "observe models in the controller"
+        for i in self.__dict__.values():
+            if callable(getattr(i, 'observe', None)):
+                i.observe(ctrl)
+
+    def addto(self, ctrl):
+        "add to the controller"
+        if self.swapmodels(ctrl):
+            self.observe(ctrl)
+
+    def _updatedisplay(self, mdl, **kwa):
+        self._ctrl.display.update(mdl, **kwa)
+
+    def _updatetheme(self, mdl, **kwa):
+        self._ctrl.theme.update(mdl, **kwa)
+
+class _TMDescriptor:
+    _name: str
+
+    def __set_name__(self, _, name):
+        self._name = name
+
+    def __get__(self, inst, tpe):
+        return (
+            self if inst is None else getattr(getattr(inst, '_tasksmodel'), self._name)
+        )
+
 class TaskAccess:
     "access to tasks"
     tasktype:   ClassVar[Type[Task]]
     attrs:      ClassVar[Tuple[Tuple[str, Any],...]]
     side:       ClassVar[int]
     configname: ClassVar[str]
+
     def __init__(self, model: TaskPlotModelAccess):
         self._tasksmodel = model
+
+    def swapmodels(self, ctrl):
+        "swap models for those in the controller"
+        for i, j  in self.__dict__.items():
+            if i != '_tasksmodel' and callable(getattr(j, 'swapmodels', None)):
+                j.swapmodels(ctrl)
 
     def __init_subclass__(cls,
                           tasktype:   Type[Task]               = Task,
@@ -182,48 +240,29 @@ class TaskAccess:
                           configname: str                      = '') -> None:
         if tasktype is Task:
             raise KeyError(f"missing tasktype in class signature: {cls}")
-        cls.attrs      = () if attrs is None else tuple(attrs.items()) # type: ignore
+        cls.attrs      = () if attrs is None else tuple(attrs.items())  # type: ignore
         cls.side       = 0 if side == 'LEFT' else 1
         cls.tasktype   = tasktype
         cls.configname = ConfigurationDescriptor.defaulttaskname(configname, tasktype)
 
-    @property
-    def roottask(self) -> Optional[RootTask]:
-        "returns the current track"
-        return self._tasksmodel.roottask
-
-    @property
-    def tasklist(self) -> Iterator[Task]:
-        "return the tasklist associated to the root task"
-        return self._tasksmodel.tasklist
-
-    @property
-    def track(self) -> Optional[Track]:
-        "returns the current track"
-        return self._tasksmodel.track
-
-    @property
-    def bead(self) -> Optional[BEADKEY]:
-        "returns the current bead number"
-        return self._tasksmodel.bead
-
-    @property
-    def instrument(self) -> str:
-        "the current instrument type"
-        if self.roottask is None:
-            return self._ctrl.theme.get("tasks", "instrument")
-        return self._ctrl.tasks.instrumenttype(self.roottask)
+    roottask      = cast(Optional[RootTask], _TDDescriptor())
+    tasklist      = cast(Iterator[Task],     _TDDescriptor())
+    bead          = cast(Optional[int],      _TDDescriptor())
+    instrument    = cast(str,                _TMDescriptor())
+    instrumentdim = cast(str,                _TMDescriptor())
+    rawtrack      = cast(Optional['Track'],  _TMDescriptor())
+    track         = cast(Optional['Track'],  _TMDescriptor())
 
     def processors(self, task = None) -> Optional[ProcessorController]:
         "returns a tuple (dataitem, bead) to be displayed"
         task = self.task if task is None else task
-        return None if task is None else self._tasksdisplay.processors(self._ctrl, task)
+        return None if task is None else self._tasksdisplay.processors(task)
 
     @property
     def defaultconfigtask(self) -> Task:
         "returns the config task"
-        mdl  = self._ctrl.theme.get("tasks", self.instrument, defaultmodel = True)
-        resc = self._ctrl.theme.get("tasks", "rescaling").get(self.instrument, None)
+        mdl  = getattr(self._defaulttasks, self.instrument)
+        resc = self._tasksconfig.rescaling.get(self.instrument, None)
         if resc:
             return mdl[self.configname].rescale(float(resc))
         return mdl[self.configname]
@@ -231,7 +270,7 @@ class TaskAccess:
     @property
     def configtask(self) -> Task:
         "returns the config task"
-        return self._ctrl.theme.get("tasks", self.instrument)[self.configname]
+        return getattr(self._tasksconfig, self.instrument)[self.configname]
 
     @configtask.setter
     def configtask(self, values: Union[Task, Dict[str,Task]]):
@@ -240,7 +279,7 @@ class TaskAccess:
         kwa = self._configattributes(kwa)
         if kwa:
             instr                = self.instrument
-            cnf                  = dict(self._ctrl.theme.get("tasks", instr))
+            cnf                  = dict(getattr(self._tasksconfig, instr))
             cnf[self.configname] = self.__deepcopy(cnf[self.configname], kwa)
             self._ctrl.theme.update("tasks", **{instr: cnf})
 
@@ -258,7 +297,7 @@ class TaskAccess:
     @property
     def cache(self) -> Callable[[],Any]:
         "returns the processor's cache if it exists"
-        return self._tasksdisplay.cache(self._ctrl, self.task)
+        return self._tasksdisplay.cache(self.task)
 
     @cache.setter
     def cache(self, value):
@@ -317,6 +356,16 @@ class TaskAccess:
     @property
     def _tasksconfig(self):
         return getattr(self._tasksmodel, '_tasksconfig')
+
+    @property
+    def _defaulttasks(self):
+        return getattr(self._tasksmodel, '_defaulttasks')
+
+    def _updatedisplay(self, mdl, **kwa):
+        getattr(self._tasksmodel, '_updatedisplay')(mdl, **kwa)
+
+    def _updatetheme(self, mdl, **kwa):
+        getattr(self._tasksmodel, '_updatetheme')(mdl, **kwa)
 
     @property
     def _task(self) -> Optional[Task]:
