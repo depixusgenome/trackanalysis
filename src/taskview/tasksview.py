@@ -2,36 +2,64 @@
 # -*- coding: utf-8 -*-
 "Deals with global information"
 from functools                import partial
-from control.decentralized    import Indirection
-from taskcontrol.beadscontrol import findanybead
-from taskmodel                import Task
+from itertools                import chain
+from taskcontrol.beadscontrol import BeadController
 from taskmodel.application    import TasksDisplay, TaskIOTheme
 
 class TasksView:
     "View listing all tasks global info"
-    _display = Indirection()
-    _io      = Indirection()
     def __init__(self, ctrl):
-        self._ctrl    = ctrl
         self._display = TasksDisplay()
         self._io      = TaskIOTheme()
+        if ctrl:
+            self._display = ctrl.display.add(TasksDisplay(), False)
+            self._io      = ctrl.theme.add(TaskIOTheme(), False)
 
-    def _onclosetrack(self, ctrl, **_):
-        inst = next(ctrl.tasks.tasklist(...), None)
-        if inst is not None:
-            inst = next(iter(inst), None)
-        ctrl.display.update(self._display, roottask = inst)
+    def _ontask(self, ctrl, calllater = None, **_):
+        calllater.insert(0, partial(self._openedtrack, ctrl, self._display.taskcache))
 
-    def _onopentrack(self, ctrl, model = None, calllater = None, **_):
-        calllater.insert(0, partial(self._openedtrack, ctrl,  model[0]))
+    def _onclosetrack(self, ctrl, new = None, **_):
+        self._openedtrack(ctrl, new)
 
-    def _openedtrack(self, ctrl, root: Task):
-        bead = self._display.bead
-        if bead is None:
-            bead = findanybead(ctrl, root)
-        self._display = {'roottask': root, 'bead': bead}
+    def _onopentrack(self, ctrl, taskcache = None, calllater = None, **_):
+        calllater.insert(0, partial(self._openedtrack, ctrl, taskcache))
+
+    def _openedtrack(self, ctrl, taskcache):
+        old       = self._display.bead
+        beadsctrl = BeadController(taskcache = taskcache, bead = old)
+        if beadsctrl.track is None:
+            bead  = None
+        else:
+            selected  = sorted(beadsctrl.availablebeads)
+            bead      = (
+                None                        if not selected    else
+                old                         if old in selected else
+                next(iter(selected), None)  if old is None     else
+                next(
+                    chain(
+                        (i for i in selected if i > old),
+                        (i for i in selected if i < old)
+                    ),
+                    None
+                )
+            )
+
+        args = {}
+
+        if taskcache is not self._display.taskcache:
+            args['taskcache'] = taskcache
+        if bead != old:
+            args['bead'] = bead
+
+        if args:
+            ctrl.display.update(self._display, **args)
 
     def observe(self, ctrl):
         "observing the controller"
-        ctrl.tasks.observe(closetrack = partial(self._onclosetrack, ctrl),
-                           opentrack  = partial(self._onopentrack,  ctrl))
+        ctrl.tasks.observe(
+            closetrack = partial(self._onclosetrack, ctrl),
+            opentrack  = partial(self._onopentrack,  ctrl),
+            updatetask = partial(self._ontask,       ctrl),
+            addtask    = partial(self._ontask,       ctrl),
+            removetask = partial(self._ontask,       ctrl)
+        )

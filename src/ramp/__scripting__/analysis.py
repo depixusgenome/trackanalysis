@@ -90,6 +90,8 @@ class RampAnalysis:
             Tasks.alignment(**self.cleaning, instrument = track.instrument['type']),
             RampStatsTask(**dict(self.dataframetask, **kwa))
         ]
+        if 'tasklist' not in getattr(dframe, '_metadata'):
+            getattr(dframe, '_metadata').append('tasklist')
         return dframe
 
     def consensus(

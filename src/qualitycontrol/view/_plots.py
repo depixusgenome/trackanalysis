@@ -39,7 +39,8 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess,
         theme        = kwa.setdefault('theme',   DriftControlPlotTheme())
         theme.name   = name+'.plot'
         theme.ylabel = f'T {name[3:].lower()} (°C)'
-        super().__init__(ctrl, addto = True, noerase = False, **kwa)
+        super().__init__(ctrl, **kwa)
+        self.addto(ctrl)
         assert self._plotmodel.theme in ctrl.theme
         assert self._plotmodel.display in ctrl.display
         assert self._plotmodel.config in ctrl.theme
@@ -197,10 +198,9 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
 
     def _reset(self, cache:CACHE_TYPE):
         super()._reset(cache)
-        if self._model.track:
-            dim = self._model.track.instrument['dimension']
-            lbl = self._theme.ylabel.split('(')[0]
-            cache[self._fig.yaxis[0]].update(axis_label = f"{lbl} ({dim})")
+        dim = self._model.instrumentdim
+        lbl = self._theme.ylabel.split('(')[0]
+        cache[self._fig.yaxis[0]].update(axis_label = f"{lbl} ({dim})")
 
 class QualityControlPlots:
     "All plots together"
@@ -209,11 +209,12 @@ class QualityControlPlots:
         self.tsink   = TSinkPlotCreator(ctrl,     model = mdl)
         self.tservo  = TServoPlotCreator(ctrl,    model = mdl)
         self.ext     = ExtensionPlotCreator(ctrl, model = mdl)
+        self.observe(ctrl)
 
     def observe(self, ctrl):
         "observe the controller"
         for i in self.__dict__.values():
-            getattr(i, '_model').addto(ctrl, noerase = False)
+            getattr(i, '_model').addto(ctrl)
 
     def reset(self, bkmodels):
         "resets the plots"

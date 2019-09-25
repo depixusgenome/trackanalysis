@@ -124,7 +124,6 @@ class TrackQC:
         frame = frame.pivot_table(index   = ['bead', 'track'],
                                   columns = 'longmessage',
                                   values  = 'cycles')
-        print(frame)
 
         frame['status'] = [self.status[j][i] for i, j in iter(frame.index)]
         fixed           = frame.status.apply(lambda x: x in ('missing', 'fixed'))

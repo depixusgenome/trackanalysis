@@ -13,7 +13,6 @@ from   typing                   import (
 import numpy                    as     np
 
 from cleaning.view              import DataCleaningModelAccess
-from control.decentralized      import Indirection
 from model.plots                import PlotModel, PlotTheme, PlotAttrs, PlotDisplay
 from peakfinding.histogram      import interpolator
 from peakfinding.selector       import PeakSelectorDetails
@@ -45,6 +44,14 @@ from peakfinding.processor.__config__    import (PeakSelectorTask, SingleStrandT
                                                  BaselinePeakFilterTask)
 from peakcalling.processor.__config__    import FitToHairpinTask, FitToReferenceTask
 
+_DUMMY = type('_DummyDict', (),
+              dict(get          = lambda *_: None,
+                   __contains__ = lambda _: False,
+                   __len__      = lambda _: 0,
+                   __iter__     = lambda _: iter(())))()
+ConstraintsDict = Dict[RootTask, Constraints]
+
+
 class PeaksPlotTheme(PlotTheme):
     """
     peaks plot theme
@@ -69,6 +76,7 @@ class PeaksPlotTheme(PlotTheme):
                                         found           = 'gray'))
     toolbar          = dict(PlotTheme.toolbar)
     toolbar['items'] = 'ypan,ybox_zoom,ywheel_zoom,reset,save,tap'
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
@@ -83,7 +91,6 @@ class PeaksPlotConfig:
 class PeaksPlotDisplay(PlotDisplay):
     "PeaksPlotDisplay"
     name:            str                   = "hybridstat.peaks"
-    observing:       bool                  = False
     distances:       Dict[str, Distance]   = dict()
     peaks:           Dict[str, np.ndarray] = dict()
     baseline:        Optional[float]       = None
@@ -92,6 +99,7 @@ class PeaksPlotDisplay(PlotDisplay):
     estimatedbias:   float                 = 0.
     constraintspath: Any                   = None
     useparams:       bool                  = False
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -103,24 +111,16 @@ class PeaksPlotModel(PlotModel):
     theme   = PeaksPlotTheme()
     display = PeaksPlotDisplay()
     config  = PeaksPlotConfig()
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        super().__init__()
 
 class FitToReferenceConfig:
     """
     stuff needed to display the FitToReferenceTask
     """
     def __init__(self):
-        self.name          : str   = 'hybridstat.fittoreference'
-        self.histmin       : float = 1e-4
-        self.peakprecision : float = 1e-2
+        self.name:          str   = 'hybridstat.fittoreference'
+        self.histmin:       float = 1e-4
+        self.peakprecision: float = 1e-2
 
-_DUMMY = type('_DummyDict', (),
-              dict(get          = lambda *_: None,
-                   __contains__ = lambda _: False,
-                   __len__      = lambda _: 0,
-                   __iter__     = lambda _: iter(())))()
 class FitToReferenceStore:
     """
     stuff needed to display the FitToReferenceTask
@@ -128,19 +128,18 @@ class FitToReferenceStore:
     DEFAULTS = dict(ident        = None,   reference = None,
                     fitdata      = _DUMMY, peaks     = _DUMMY,
                     interpolator = _DUMMY)
+
     def __init__(self, reference = None):
-        self.name         : str                 = 'hybridstat.fittoreference'
-        self.ident        : Optional[bytes]     = None
-        self.reference    : Optional[RootTask]  = reference
-        self.refcache     : Dict[RootTask, Any] = {}
-        self.fitdata      : Dict[RootTask, Any] = {}
-        self.peaks        : Dict[RootTask, Any] = {}
-        self.interpolator : Dict[RootTask, Any] = {}
+        self.name:         str                 = 'hybridstat.fittoreference'
+        self.ident:        Optional[bytes]     = None
+        self.reference:    Optional[RootTask]  = reference
+        self.refcache:     Dict[RootTask, Any] = {}
+        self.fitdata:      Dict[RootTask, Any] = {}
+        self.peaks:        Dict[RootTask, Any] = {}
+        self.interpolator: Dict[RootTask, Any] = {}
 
 class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
     "access to the FitToReferenceTask"
-    __store = Indirection()
-    __theme = Indirection()
     def __init__(self, mdl):
         super().__init__(mdl)
         self.__store = FitToReferenceStore()
@@ -178,7 +177,7 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
         if val is not self.reference:
             info = FitToReferenceStore(reference = val).__dict__
             info.pop('name')
-            self._ctrl.display.update(self.__store, **info)
+            self._updatedisplay(self.__store, **info)
 
     @property
     def referencepeaks(self) -> Optional[np.ndarray]:
@@ -187,20 +186,29 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
         pks = self.__store.peaks.get(self.bead, None)
         return None if pks is None or len(pks) == 0 else pks
 
-    def setobservers(self, ctrl):
+    def swapmodels(self, ctrl):
+        "swap models for those in the controller"
+        super().swapmodels(ctrl)
+        self.__store = ctrl.display.swapmodels(self.__store)
+        self.__theme = ctrl.theme.swapmodels(self.__theme)
+
+    def observe(self, ctrl):
         "observes the global model"
+
+        @ctrl.display.observe(self.__store)
+        @ctrl.display.hashwith(self.__store)
         def _onref(old = None, **_):
             if 'reference' in old:
                 self.resetmodel()
-        type(self).__store.observe(ctrl, self, _onref)
 
+        @ctrl.tasks.observe("updatetask", "addtask", "removetask")
+        @ctrl.display.hashwith(self.__store)
         def _ontask(parent = None, **_):
             if parent == self.reference:
                 info = FitToReferenceStore(reference = self.reference).__dict__
                 info.pop('name')
                 ctrl.display.update(self.__store, **info)
                 self.resetmodel()
-        ctrl.tasks.observe("updatetask", "addtask", "removetask", _ontask)
 
     def resetmodel(self):
         "adds a bead to the task"
@@ -236,7 +244,7 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
         return {}
 
     def __computefitdata(self) -> bool:
-        args  = {} # type: Dict[str, Any]
+        args  = {}  # type: Dict[str, Any]
         ident = self.statehash(self.reference, ...)
         if self.__store.ident == ident:
             if self.referencepeaks is not None:
@@ -261,16 +269,16 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
         try:
             if self.reference is not None and ibead is not None:
                 pks, dtls = runrefbead(self._ctrl, self.reference, ibead)
-        except Exception as exc: # pylint: disable=broad-except
-            self._ctrl.display.update("message", message = exc)
+        except Exception as exc:  # pylint: disable=broad-except
+            self._updatedisplay("message", message = exc)
 
         peaks[ibead] = np.array([i for i, _ in pks], dtype = 'f4')
         if len(pks):
-            fits [ibead] = FitData(self.fitalg.frompeaks(pks), (1., 0.)) # type: ignore
+            fits[ibead]  = FitData(self.fitalg.frompeaks(pks), (1., 0.))  # type: ignore
             intps[ibead] = interpolator(dtls, miny = self.hmin, fill_value = 0.)
 
         if args:
-            self._ctrl.display.update(self.__store, **args)
+            self._updatedisplay(self.__store, **args)
         return True
 
 class FitToHairpinConfig:
@@ -278,22 +286,21 @@ class FitToHairpinConfig:
     stuff needed to display the FitToHairpinTask
     """
     def __init__(self):
-        cls                                  = FitToHairpinTask
-        self.name        : str               = 'hybridstat.fittohairpin'
-        self.fit         : HairpinFitter     = cls.DEFAULT_FIT()
-        self.match       : PeakMatching      = cls.DEFAULT_MATCH()
-        self.constraints : Dict[str, Range]  = deepcopy(cls.DEFAULT_CONSTRAINTS)
-        self.stretch     : Tuple[float, int] = (5.,   1)
-        self.bias        : Tuple[float, int] = (5e-3, 1)
+        cls                                 = FitToHairpinTask
+        self.name:        str               = 'hybridstat.fittohairpin'
+        self.fit:         HairpinFitter     = cls.DEFAULT_FIT()
+        self.match:       PeakMatching      = cls.DEFAULT_MATCH()
+        self.constraints: Dict[str, Range]  = deepcopy(cls.DEFAULT_CONSTRAINTS)
+        self.stretch:     Tuple[float, int] = (5.,   1)
+        self.bias:        Tuple[float, int] = (5e-3, 1)
 
     def zscaled(self, value) -> Iterator[Tuple[str, Any]]:
         "rescale the config"
         yield ('fit',         self.fit.rescale(value))
         yield ('constraints', {i: j.rescale(i, value) for i, j in self.constraints.items()})
-        yield ('stretch',     (self.stretch[0]/value, self.stretch[1]))
-        yield ('bias',        (self.bias[0]   *value, self.bias[1]))
+        yield ('stretch',     (self.stretch[0] / value, self.stretch[1]))
+        yield ('bias',        (self.bias[0]   * value, self.bias[1]))
 
-ConstraintsDict = Dict[RootTask, Constraints]
 class FitToHairpinDisplay:
     """
     stuff needed to display the FitToHairpinTask
@@ -304,12 +311,11 @@ class FitToHairpinDisplay:
 
 class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
     "access to the FitToHairpinTask"
-    __defaults = Indirection()
-    __display  = Indirection()
     def __init__(self, mdl):
         super().__init__(mdl)
-        self.__defaults = FitToHairpinConfig()
-        self.__display  = FitToHairpinDisplay()
+        self.__defaults        = FitToHairpinConfig()
+        self.__factorydefaults = FitToHairpinConfig()
+        self.__store           = FitToHairpinDisplay()
 
     def getforcedbeads(self, seq: Optional[str]) -> Set[int]:
         "return the bead forced to the current sequence key"
@@ -332,7 +338,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         if task is None:
             return
         root        = cast(RootTask, self.roottask)
-        cstrs       = dict(self.__display.constraints)
+        cstrs       = dict(self.__store.constraints)
         cstrs[root] = cur = dict(cstrs.get(root, {}))
         for i in forced-values:
             if cur[i].constraints:
@@ -343,19 +349,19 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         for i in values-forced:
             cur[i] = DistanceConstraint(seq, {})
 
-        self._ctrl.display.update(self.__display, constraints = cstrs)
+        self._updatedisplay(self.__store, constraints = cstrs)
         self.update(constraints = deepcopy(cur))
 
     def newconstraint(self,
-                      hairpin : Optional[str],
-                      stretch : Optional[float],
-                      bias    : Optional[float]):
+                      hairpin: Optional[str],
+                      stretch: Optional[float],
+                      bias:    Optional[float]):
         "update the constraints"
         if self.constraints() == (hairpin, stretch, bias):
             return
 
         root, bead  = cast(RootTask, self.roottask), cast(int, self.bead)
-        cstrs       = dict(self.__display.constraints)
+        cstrs       = dict(self.__store.constraints)
         cstrs[root] = dict(cstrs.get(root, {}))
         if (hairpin, stretch, bias) == (None, None, None):
             cstrs[root].pop(bead, None)
@@ -368,14 +374,15 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
 
             cstrs[root][bead] = DistanceConstraint(hairpin, params)
 
-        self._ctrl.display.update(self.__display, constraints = cstrs)
+        self._updatedisplay(self.__store, constraints = cstrs)
         if  self.task is not None:
             self.update(constraints = deepcopy(cstrs[root]))
 
-    def constraints(self,
-                    root: Optional[RootTask] = None,
-                    bead: Optional[int]      = None
-                   ) -> Tuple[Optional[str], Optional[float], Optional[float]]:
+    def constraints(
+            self,
+            root: Optional[RootTask] = None,
+            bead: Optional[int]      = None
+    ) -> Tuple[Optional[str], Optional[float], Optional[float]]:
         "returns the constraints"
         root = self.roottask if root is None else root
         bead = self.bead     if bead is None else bead
@@ -383,7 +390,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
             return None, None, None
 
         # pylint: disable=no-member
-        cur = self.__display.constraints.get(root, {}).get(bead, None)
+        cur = self.__store.constraints.get(root, {}).get(bead, None)
         if cur is None:
             return None, None, None
 
@@ -393,7 +400,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
 
     def update(self, **kwa):
         "removes the task"
-        cache = self.cache() # pylint: disable=not-callable
+        cache = self.cache()  # pylint: disable=not-callable
         if len(kwa) != 1 or 'constraints' not in kwa or not cache:
             super().update(**kwa)
         else:
@@ -409,15 +416,28 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
             if cache:
                 self.cache = cache
 
-    def setobservers(self, mdl, ctrl):
+    def swapmodels(self, ctrl):
+        "swap models for those in the controller"
+        super().swapmodels(ctrl)
+        self.__store           = ctrl.display.swapmodels(self.__store)
+        self.__defaults        = ctrl.theme.swapmodels(self.__defaults)
+        self.__factorydefaults = ctrl.theme.model(self.__defaults, defaults = True)
+
+    def observe(self, ctrl):
         "observes the global model"
         keys = {'probes', 'path', 'constraintspath', 'useparams', 'fit', 'match'}
+
+        @ctrl.theme.observe(self._tasksmodel.sequencemodel.config)
+        @ctrl.display.observe(self._tasksmodel.peaksmodel.display)
+        @ctrl.theme.observe(self.__defaults)
+        @ctrl.display.hashwith(self._tasksdisplay)
         def _observe(old = None, **_):
             if keys.intersection(old):
-                task = self.default(mdl)
+                task = self.default(self._tasksmodel)
                 self.update(**(task.config() if task else {'disabled': True}))
 
         @ctrl.tasks.observe("addtask", "updatetask", "removetask")
+        @ctrl.display.hashwith(self._tasksdisplay)
         def _ondataselection(task = None, cache = None, **_):
             if isinstance(task, DataSelectionTask):
                 for proc, elem in cache:
@@ -426,11 +446,8 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
                             elem.pop(i, None)
                         self.cache = elem
 
-        ctrl.theme  .observe(mdl.sequencemodel.config, _observe)
-        type(self).__defaults.observe(ctrl, self, _observe)
-        ctrl.display.observe(mdl.peaksmodel.display,   _observe)
-
         @ctrl.display.observe
+        @ctrl.display.hashwith(self.__store)
         def _onopenanafile(model = None, **_):
             tasklist = model.get('tasks', [[None]])[0]
             task     = next((i for i in tasklist if isinstance(i, FitToHairpinTask)),
@@ -438,12 +455,13 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
             if task is not None:
                 root  = tasklist[0]
                 cstrs = dict(task.constraints)
+
                 def _fcn(model = None,  **_):
                     if model[0] is not root:
                         return
-                    cur       = dict(self.__display.constraints)
+                    cur       = dict(self.__store.constraints)
                     cur[root] = cstrs
-                    ctrl.display.update(self.__display, constraints = cur)
+                    ctrl.display.update(self.__store, constraints = cur)
                 ctrl.tasks.oneshot("opentrack", _fcn)
 
     @staticmethod
@@ -458,11 +476,11 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         inst = (inst() if isinstance(inst, type) else
                 inst   if inst is not None       else
                 getattr(self.__defaults, attr))
-        self._ctrl.theme.update(self.__defaults, **{attr: updatecopy(inst, **kwa)})
+        self._updatetheme(self.__defaults, **{attr: updatecopy(inst, **kwa)})
 
     def defaultattribute(self, name, usr):
         "return a task attribute"
-        return self._ctrl.theme.get(self.__defaults, name, defaultmodel = not usr)
+        return getattr(self.__defaults if usr else self.__factorydefaults, name)
 
     def attribute(self, name, key = NoArgs):
         "return a task attribute"
@@ -487,7 +505,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
                                     constraints = cstr, fit = dist, match = pid)
         except FileNotFoundError:
             return None
-        task.constraints.update(self.__display.constraints.get(self.roottask, {}))
+        task.constraints.update(self.__store.constraints.get(self.roottask, {}))
         return task
 
     def rescale(self, ctrl, mdl, value):
@@ -518,14 +536,22 @@ class SingleStrandConfig:
 
 class SingleStrandTaskAccess(TaskAccess, tasktype = SingleStrandTask):
     "access to the SingleStrandTask"
-    __config = Indirection()
     def __init__(self, mdl):
         super().__init__(mdl)
         self.__config = SingleStrandConfig()
 
-    def setobservers(self, mdl, ctrl):
+    def swapmodels(self, ctrl):
+        "swap models for those in the controller"
+        super().swapmodels(ctrl)
+        self.__config = ctrl.theme.swapmodels(self.__config)
+
+    def observe(self, ctrl):
         "observes the global model"
-        ctrl.theme.observe(self.__config, lambda **_: mdl.reset())
+
+        @ctrl.theme.observe(self.__config)
+        @ctrl.theme.hashwith(self._tasksdisplay)
+        def _ontasks(**_):
+            self._tasksmodel.reset()
 
     def resetmodel(self, mdl):
         "resets the model"
@@ -563,14 +589,6 @@ class BaselinePeakFilterTaskAccess(TaskAccess, tasktype = BaselinePeakFilterTask
         out    = proc.index(dframe, self.bead, dtl)
         return None if out is None else dtl[out][0]
 
-
-
-class ObserversDisplay:
-    "PeaksPlotDisplay"
-    name = "hybridstat.observers"
-    def __init__(self):
-        self.observing = False
-
 class PoolComputationsConfig:
     "PoolComputationsConfig"
     def __init__(self):
@@ -587,16 +605,45 @@ class PoolComputationsDisplay:
 
 class PoolComputations:
     "Deals with pool computations"
-    _config  = Indirection()
-    _display = Indirection()
     def __init__(self, mdl):
         self._mdl     = mdl
         self._config  = PoolComputationsConfig()
         self._display = PoolComputationsDisplay()
 
-    @property
-    def _ctrl(self):
-        return self._mdl.ctrl
+    def swapmodels(self, ctrl):
+        "swap models for those in the controller"
+        self._config  = ctrl.theme.swapmodels(self._config)
+        self._display = ctrl.display.swapmodels(self._display)
+
+    def observe(self, ctrl):
+        "sets observers"
+
+        @ctrl.display.hashwith(self._display)
+        def _start(calllater = None, **_):
+            disp = self._display
+            if not disp.canstart:
+                return
+
+            ctrl.display.update(disp, calls = disp.calls+1)
+
+            @calllater.append
+            def _poolcompute():
+                with ctrl.display("hybridstat.peaks.store", args = {}) as sendevt:
+                    self._poolcompute(sendevt, disp.calls)
+
+        @ctrl.display.observe("tasks")
+        @ctrl.display.hashwith(self._display)
+        def _onchangetrack(old = None, calllater = None, **_):
+            if "taskcache" in old:
+                _start(calllater)
+
+        @ctrl.display.observe(self._display)
+        @ctrl.display.hashwith(self._display)
+        def _onprecompute(calllater = None, old = None, **_):
+            if {"canstart"} == set(old):
+                _start(calllater)
+
+        ctrl.tasks.observe("addtask", "updatetask", "removetask", _start)
 
     @staticmethod
     def _poolrun(pipe, procs, refcache, keys):
@@ -607,31 +654,11 @@ class PoolComputations:
                 return
         pipe.send((None, None, None))
 
-    def setobservers(self, ctrl):
-        "sets observers"
-        def _start(calllater = None, **_):
-            disp = self._display
-            if disp.canstart:
-                self._ctrl.display.update(disp, calls = disp.calls+1)
-                calllater.append(lambda: self._poolcompute(disp.calls))
-
-        @ctrl.display.observe("tasks")
-        def _onchangetrack(old = None, calllater = None, **_):
-            if "roottask" in old:
-                _start(calllater)
-
-        @ctrl.display.observe(self._display.name)
-        def _onprecompute(calllater = None, old = None, **_):
-            if {"canstart"} == set(old):
-                _start(calllater)
-
-        ctrl.tasks.observe("addtask", "updatetask", "removetask", _start)
-
     def _keepgoing(self, cache, root, idtag):
         calls = self._display.calls
         return root is self._mdl.roottask and calls == idtag and cache() is not None
 
-    def _poolcompute(self, identity, **_):
+    def _poolcompute(self, sendevt, identity, **_):  # pylint: disable=too-many-locals
         if (
                 self._config.ncpu <= 0
                 or not self._display.canstart
@@ -681,51 +708,59 @@ class PoolComputations:
                 inp.send(True)
 
         async def _thread():
-            with mdl.ctrl.display("hybridstat.peaks.store", args = {}) as evt:
-                evt({"bead": None, "check": keepgoing})
-                async for bead, itms, ref in _iter(): # pylint: disable=not-an-iterable
-                    store[bead] = itms
-                    if ref is not None:
-                        refc[bead] = ref
-                    evt({"bead": bead, "check": keepgoing})
+            sendevt({"bead": None, "check": keepgoing})
+            async for bead, itms, ref in _iter():  # pylint: disable=not-an-iterable
+                store[bead] = itms
+                if ref is not None:
+                    refc[bead] = ref
+                sendevt({"bead": bead, "check": keepgoing})
 
         spawn(_thread)
 
 # pylint: disable=too-many-instance-attributes
 class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
     "Access to peaks"
-    _observers = Indirection()
-    def __init__(self, ctrl, addto = False):
-        DataCleaningModelAccess.__init__(self, ctrl)
-        SequencePlotModelAccess.__init__(self, ctrl)
-        self.peaksmodel     = PeaksPlotModel.create(ctrl, False)
+    def __init__(self):
+        DataCleaningModelAccess.__init__(self)
+        SequencePlotModelAccess.__init__(self)
+
         self.eventdetection = EventDetectionTaskAccess(self)
         self.peakselection  = PeakSelectorTaskAccess(self)
         self.singlestrand   = SingleStrandTaskAccess(self)
         self.baselinefilter = BaselinePeakFilterTaskAccess(self)
         self.fittoreference = FitToReferenceAccess(self)
         self.identification = FitToHairpinAccess(self)
+        self.peaksmodel     = PeaksPlotModel()
+        self.pool           = PoolComputations(self)
 
-        self.peaksmodel.display.peaks = PeakInfoModelAccess(self).createpeaks([])
-        self._observers     = ObserversDisplay()
-        if addto:
-            self.addto(ctrl, noerase = False)
+    def swapmodels(self, ctrl) -> bool:
+        "swap models with those in the controller"
+        if super().swapmodels(ctrl):
+            ctrl.display.update(
+                self.peaksmodel.display, peaks = PeakInfoModelAccess(self).createpeaks([])
+            )
+            return True
+        return False
 
-    def addto(self, ctrl, noerase = False):
+    def observe(self, ctrl):
         "add to the controller"
-        super().addto(ctrl, noerase = noerase)
-        @ctrl.theme.observe
-        @ctrl.display.observe
+        super().observe(ctrl)
+
+        self.pool.observe(ctrl)
+
+        @ctrl.theme.observe(self._tasksconfig)
+        @ctrl.display.observe(self._tasksdisplay)
+        @ctrl.theme.hashwith(self._tasksdisplay)
         def _ontasks(old = None, **_):
-            if 'rescaling' not in old and "roottask" not in old:
+            if 'rescaling' not in old and "taskcache" not in old:
                 return
 
-            root  = ctrl.display.get("tasks", "roottask")
+            root  = self._tasksdisplay.roottask
             if root is None:
                 return
 
-            model = ctrl.theme.model("tasks")
-            instr = getattr(ctrl.tasks.track(root).instrument['type'], 'value', None)
+            model = self._tasksconfig
+            instr = self.instrument
             coeff = float(model.rescaling[instr]) if instr in model.rescaling else 1.
             if abs(coeff - self.peaksmodel.config.rescaling) < 1e-5:
                 return
@@ -743,7 +778,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
     def getfitparameters(self, key = NoArgs, bead = NoArgs) -> Tuple[float, float]:
         "return the stretch  & bias for the current bead"
         if bead is not NoArgs:
-            tmp   = None if self.roottask is None else self._ctrl.tasks.cache(self.roottask, -1)()
+            tmp   = None if self.roottask is None else self._tasksdisplay.cache(-1)()
             cache = (None, None) if tmp is None or bead not in tmp else tmp[bead]
 
         if key is not None:
@@ -780,14 +815,14 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
     def sequencekey(self) -> Optional[str]:
         "returns the sequence key"
         dist = self.peaksmodel.display.distances
-        tmp  =  min(dist, key = dist.__getitem__) if dist else None
+        tmp  = min(dist, key = dist.__getitem__) if dist else None
         return self.sequencemodel.display.hpins.get(self.sequencemodel.tasks.bead,
                                                     tmp)
 
     @sequencekey.setter
     def sequencekey(self, value):
         "sets the new sequence key"
-        self.sequencemodel.setnewkey(self._ctrl, value)
+        self.setnewsequencekey(value)
 
     @property
     def constraintspath(self):
@@ -819,10 +854,10 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         pksel    = cast(PeakSelectorTask, self.peakselection.task)
         pkinfo   = PeakInfoModelAccess(self)
         out      = runbead(self.processors(), self.bead, self.fittoreference.refcache)
-        tmp, dtl = out if isinstance(out, tuple) else (None, None) # type: ignore
+        tmp, dtl = out if isinstance(out, tuple) else (None, None)  # type: ignore
         data     = tuple(() if pksel is None else pksel.details2output(dtl))
 
-        self._ctrl.display.update(
+        self._updatedisplay(
             self.peaksmodel.display,
             distances     = getattr(tmp, 'distances', {}),
             estimatedbias = getattr(dtl, 'peaks', [0.])[0],
@@ -831,21 +866,21 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         )
 
         # pkinfo.createpeaks requires the distances to be already set!
-        self._ctrl.display.update(
+        self._updatedisplay(
             self.peaksmodel.display,
             peaks = pkinfo.createpeaks(data),
         )
 
         if dtl is not None:
-            self.sequencemodel.setnewkey(self._ctrl, self.sequencekey)
+            self.setnewsequencekey(self.sequencekey)
 
         if isinstance(out, Exception):
-            raise out # pylint: disable=raising-bad-type
+            raise out  # pylint: disable=raising-bad-type
         return dtl
 
-    def reset(self) -> bool: # type: ignore
+    def reset(self) -> bool:  # type: ignore
         "adds tasks if needed"
-        if self.track is None:
+        if self.rawtrack is None:
             return True
 
         if self.eventdetection.task is None:
@@ -858,15 +893,6 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         self.identification.resetmodel(self)
         self.singlestrand.resetmodel(self)
         return False
-
-    def setobservers(self, ctrl):
-        "observes the global model"
-        if ctrl.display.update(ObserversDisplay.name, observing = True) is None:
-            return
-        self.identification.setobservers(self, ctrl)
-        self.fittoreference.setobservers(ctrl)
-        self.singlestrand.setobservers(self, ctrl)
-        PoolComputations(self).setobservers(ctrl)
 
     def fiterror(self) -> bool:
         "True if not fit was possible"

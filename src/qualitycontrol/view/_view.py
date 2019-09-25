@@ -37,16 +37,18 @@ class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess, None]
     _model:     QualityControlModelAccess
     _RESET:     frozenset = frozenset()
     state = cast(PlotState, _StateDescriptor())
+
     def __init__(self, ctrl):
-        super().__init__(ctrl, addto = False)
+        super().__init__(ctrl)
         self._widgets = QualityControlWidgets(ctrl, self._model)
         self._plots   = QualityControlPlots  (ctrl, self._model)
         self._state   = QCPlotState()
         ctrl.display.add(self._state)
+        self.addto(ctrl)
 
-    def observe(self, ctrl, noerase = True):
+    def observe(self, ctrl):
         "observes the model"
-        super().observe(ctrl, noerase = noerase)
+        super().observe(ctrl)
         self._plots  .observe(ctrl)
         self._widgets.observe(self, ctrl)
 

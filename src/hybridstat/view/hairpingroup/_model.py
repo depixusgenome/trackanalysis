@@ -6,7 +6,6 @@ from typing                            import (Dict, Optional, List, Tuple, Set,
 from itertools                         import product
 import numpy                           as     np
 
-from control.decentralized             import Indirection
 from model.plots                       import PlotTheme, PlotModel, PlotDisplay, PlotAttrs
 from peakfinding.processor.__config__  import PeakSelectorTask
 from taskmodel                         import InstrumentType
@@ -17,9 +16,13 @@ from .._peakinfo                       import (PeakInfoModelAccess as _PeakInfoM
                                                IdentificationPeakInfo, StatsPeakInfo)
 from ..cyclehistplot                   import HistPlotTheme
 
+Output = Dict[int, Tuple[List[np.ndarray], Dict[str, np.ndarray]]]
+
+
 class PeakInfoModelAccess(_PeakInfoModelAccess):
     "Limiting the info to extract from all peaks"
     _CLASSES = [IdentificationPeakInfo(), StatsPeakInfo()]
+
     def __init__(self, mdl, bead):
         super().__init__(mdl, bead, self._CLASSES)
 
@@ -103,13 +106,18 @@ class HairpinGroupStore:
         self.name:      str                 = "hairpingroup"
         self.discarded: Dict[str, Set[int]] = {}
 
-Output = Dict[int, Tuple[List[np.ndarray], Dict[str, np.ndarray]]]
 class HairpinGroupModelAccess(PeaksPlotModelAccess):
     "task acces to grouped beads"
-    __store = Indirection()
-    def __init__(self, ctrl, addto = False):
-        super().__init__(ctrl, addto = addto)
+    def __init__(self):
+        super().__init__()
         self.__store  = HairpinGroupStore()
+
+    def swapmodels(self, ctrl) -> bool:
+        "swap models for those in the controller"
+        if super().swapmodels(ctrl):
+            self.__store = ctrl.display.swapmodels(self.__store)
+            return True
+        return False
 
     @property
     def discardedbeads(self) -> Set[int]:
@@ -122,7 +130,7 @@ class HairpinGroupModelAccess(PeaksPlotModelAccess):
         store = self.__store
         info  = dict(store.discarded)
         info[self.sequencekey] = set(values)
-        self._ctrl.display.update(store, discarded = info)
+        self._updatedisplay(store, discarded = info)
 
     def _defaultfitparameters(self, bead, itm) -> Tuple[float, float]:
         "return the stretch  & bias for the current bead"
@@ -138,7 +146,7 @@ class HairpinGroupModelAccess(PeaksPlotModelAccess):
     def displayedbeads(self, cache = None) -> Dict[int, Tuple[float, float]]:
         "return the displayed beads"
         if not cache:
-            cache = self._ctrl.tasks.cache(self.roottask, -1)()
+            cache = self._tasksdisplay.cache(-1)()
             if not cache:
                 return {}
             cache = dict(cache)
@@ -155,7 +163,7 @@ class HairpinGroupModelAccess(PeaksPlotModelAccess):
 
         seq = self.sequencekey
         if seq is not None and self.oligos:
-            best  = lambda y: min(y, default = None, key = lambda x: y[x][0])
+            best  = lambda y: min(y, default = None, key = lambda x: y[x][0])  # noqa
             return {
                 i: self.getfitparameters(seq, i)
                 for i, j in cache.items()
@@ -168,10 +176,10 @@ class HairpinGroupModelAccess(PeaksPlotModelAccess):
             if j[1] is not None
         }
 
-    def runbead(self) -> Optional[Output]: # type: ignore
+    def runbead(self) -> Optional[Output]:  # type: ignore
         "collects the information already found in different peaks"
         super().runbead()
-        cache = self._ctrl.tasks.cache(self.roottask, -1)()
+        cache = self._tasksdisplay.cache(-1)()
         if cache is None:
             return None
 
@@ -183,7 +191,7 @@ class HairpinGroupModelAccess(PeaksPlotModelAccess):
         tsk         = cast(PeakSelectorTask, self.peakselection.task)
         out: Output = {}
         bead        = self.bead
-        keyfcn      = lambda x: -1000 if x[0] == bead else x[0]
+        keyfcn      = lambda x: -1000 if x[0] == bead else x[0]  # noqa
         for bead, params in sorted(beads.items(), key = keyfcn):
             itms      = tuple(tsk.details2output(cache[bead][1]))
             out[bead] = [], PeakInfoModelAccess(self, bead).createpeaks(itms)
@@ -248,7 +256,7 @@ class ConsensusHistPlotTheme(HistPlotTheme):
 class ConsensusHistPlotModel(PlotModel):
     "consensus plot plot model: histogram"
     theme   = ConsensusHistPlotTheme()
-    display = PlotDisplay  (name = "consensus.plot.hist")
+    display = PlotDisplay(name = "consensus.plot.hist")
 
 class ConsensusConfig:
     "consensus bead config"
@@ -267,12 +275,19 @@ class ConsensusConfig:
 
 class ConsensusModelAccess(HairpinGroupModelAccess):
     "task acces to grouped beads"
-    __config = Indirection()
     if TYPE_CHECKING:
         instrument: str
-    def __init__(self, ctrl, addto = False):
-        super().__init__(ctrl, addto = addto)
+
+    def __init__(self):
+        super().__init__()
         self.__config = ConsensusConfig()
+
+    def swapmodels(self, ctrl) -> bool:
+        "swap models for those in the controller"
+        if super().swapmodels(ctrl):
+            self.__config = ctrl.display.swapmodels(self.__config)
+            return True
+        return False
 
     def consensuspeaks(self, dtl):
         "peaks for the consensus bead"
@@ -296,14 +311,14 @@ class ConsensusModelAccess(HairpinGroupModelAccess):
         cnv  = {'pos': 'bases', 'bases': 'peaks', 'basesstd': 'peaksstd'}
         return {cnv.get(i, i): j for i, j in out.items()}, allinfo, kern[kern.size//2]
 
-    def runbead(self) -> Optional[Output]: # type: ignore
+    def runbead(self) -> Optional[Output]:  # type: ignore
         "collects the information already found in different peaks"
         track = self.track
         if track is None:
             return None
 
         PeaksPlotModelAccess.runbead(self)
-        cache = self._ctrl.tasks.cache(self.roottask, -1)()
+        cache = self._tasksdisplay.cache(-1)()
         if cache is None:
             return None
 
@@ -326,7 +341,7 @@ class ConsensusModelAccess(HairpinGroupModelAccess):
     def __consensuspeakinfo(self) -> Dict[int, Dict[str, np.ndarray]]:
         if self.roottask is None:
             return {}
-        cache = self._ctrl.tasks.cache(self.roottask, -1)()
+        cache = self._tasksdisplay.cache(-1)()
         assert cache is not None
         beads = set(self.displayedbeads(cache))
         fcn   = cast(PeakSelectorTask, self.peakselection.task).details2output
@@ -378,7 +393,7 @@ class ConsensusModelAccess(HairpinGroupModelAccess):
         tmp   = fcn(out['pos'], 1., 0)['key']
         good  = tmp >= 0
 
-        out['id']      [good] = tmp[good]
+        out['id'][good]       = tmp[good]
         out['distance'][good] = (tmp - out['pos'])[good]
         out['orient']         = IdentificationPeakInfo.strand(
             info,

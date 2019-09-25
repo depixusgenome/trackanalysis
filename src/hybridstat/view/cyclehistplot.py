@@ -117,6 +117,10 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
     _errors: PlotError
     plot  = cast(Figure,           property(lambda self: self._fig))
 
+    def __init__(self, ctrl, **_):
+        super().__init__(ctrl, **_)
+        self.addto(ctrl)
+
     def _addtodoc(self, ctrl, doc, *_):  # pylint: disable=unused-argument
         self._src  = ColumnDataSource(data = self._data(None))
         self._fig  = self.figure(y_range = Range1d, x_range = Range1d)
@@ -312,7 +316,9 @@ class BaseHistPlotCreator(TaskPlotCreator[TModelAccess, PlotModelType]):
 class HistPlotCreator(BaseHistPlotCreator[PeaksPlotModelAccess,  # type: ignore
                                           HistPlotModel]):
     "Creates a histogram of peaks"
-
+    def __init__(self, ctrl, **_):
+        super().__init__(ctrl, **_)
+        self.addto(ctrl)
 
 class _StateDescriptor:
     def __get__(self, inst, owner):
@@ -371,9 +377,9 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
     state = cast(PlotState, _StateDescriptor())
 
     def __init__(self, ctrl):
-        super().__init__(ctrl, addto = False)
-        self._cycle   = CyclePlotCreator(ctrl,  noerase = False, model = self._model)
-        self._hist    = HistPlotCreator(ctrl, noerase = False, model = self._model)
+        super().__init__(ctrl)
+        self._cycle   = CyclePlotCreator(ctrl, model = self._model)
+        self._hist    = HistPlotCreator(ctrl, model = self._model)
         theme         = PeakListTheme(name = "cyclehist.peak.list", height = 200)
         theme.columns = [i for i in theme.columns if i[0] not in ("z", "skew")]
 
@@ -403,10 +409,9 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
     peaksdata    = cast(ColumnDataSource, property(lambda self: self._hist.peaksdata))
     plottheme    = cast(PeaksPlotTheme,   property(lambda self: self._theme))
 
-    def observe(self, ctrl, noerase = True):
+    def observe(self, ctrl):
         "observes the model"
-        super().observe(ctrl, noerase = noerase)
-        self._model.setobservers(ctrl)
+        super().observe(ctrl)
         self._widgets.observe(ctrl)
         SequenceAnaIO.observe(ctrl)
 
@@ -419,10 +424,11 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
                 if root is not None and {'hpins'} == set(old):
                     self.calllater(lambda: self.reset(False))
 
-    def addto(self, ctrl, noerase = True):
+    def addto(self, ctrl):
         "adds the models to the controller"
         for i in self._plots:
-            i.addto(ctrl, noerase=noerase)
+            i.addto(ctrl)
+        self._model.addto(ctrl)
 
     def _addtodoc(self, ctrl, doc, *_) -> LayoutDOM:
         "returns the figure"

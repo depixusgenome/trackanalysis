@@ -574,7 +574,7 @@ def test_cycletable(bead: int, taskcount: int):
     track = ctrl.data.getcache(tasks[0])()
 
     GuiDataCleaningProcessor.computeall(
-        track, bead, ctrl,
+        bead, ctrl,
         cleaning  = find(DataCleaningTask),
         alignment = find(ExtremumAlignmentTask),
         clipping  = find(ClippingTask)

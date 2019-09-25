@@ -4,7 +4,6 @@
 import sys
 import time
 from typing               import Callable, Iterator, Tuple, Any, TYPE_CHECKING
-from itertools            import chain
 from functools            import partial
 from pathlib              import Path
 
@@ -26,7 +25,7 @@ from view.static              import route
 LOGS  = getLogger(__name__)
 
 if TYPE_CHECKING:
-    from taskmodel import RootTask # pylint: disable=unused-import
+    from taskmodel import RootTask   # noqa # pylint: disable=unused-import
 
 class BeadToolbarTheme:
     "BeadToolbarTheme"
@@ -44,11 +43,15 @@ class BeadToolbarTheme:
     def __init__(self, **_):
         pass
 
+
 STORAGE = 'open', 'save'
+
+
 class TrackFileDialog(FileDialog):
     "A file dialog that doesn't open .gr files first"
     def __init__(self, ctrl):
         super().__init__(ctrl, multiple  = 1, storage = STORAGE[0])
+
         def _defaultpath(ext, bopen):
             assert bopen
 
@@ -72,7 +75,7 @@ class TrackFileDialog(FileDialog):
         if paths is not None:
             def _toolbaropen():
                 with ctrl.action:
-                    self.__store(paths, True) # pylint: disable=not-callable
+                    self.__store(paths, True)  # pylint: disable=not-callable
                     ctrl.tasks.opentrack(paths)
             doc.add_next_tick_callback(_toolbaropen)
 
@@ -80,10 +83,11 @@ class SaveFileDialog(FileDialog):
     "A file dialog that adds a default save path"
     def __init__(self, ctrl):
         super().__init__(ctrl, storage = STORAGE[1])
+
         def _defaultpath(ext, bopen):
             assert not bopen
             pot = [i for i in self.storedpaths(ctrl, STORAGE[0], ext) if i.exists()]
-            ope = next((i for i in pot if not i.suffix in ('', '.gr')), None)
+            ope = next((i for i in pot if i.suffix not in ('', '.gr')), None)
             if ope is None:
                 ope = self.firstexistingpath(pot)
 
@@ -122,7 +126,7 @@ class SaveFileDialog(FileDialog):
         if paths is not None:
             def _toolbarsave():
                 with ctrl.action:
-                    self.__store(paths, False) # pylint: disable=not-callable
+                    self.__store(paths, False)  # pylint: disable=not-callable
                     ctrl.tasks.savetrack(paths)
             doc.add_next_tick_callback(_toolbarsave)
 
@@ -148,6 +152,7 @@ class DpxToolbar(Widget):
     helpmessage = props.String('')
     hasquit     = props.Bool(False)
     hasdoc      = props.Bool(False)
+
     def __init__(self, **kwa):
         super().__init__(name = 'Main:toolbar', **kwa)
 
@@ -224,6 +229,7 @@ class MessagesView:
         self._tbar = tbar
         self._doc  = doc
         self._last = [None, None, self._theme.timeout['normal']]
+
         def _setmsg():
             if self._last[0] is None:
                 return
@@ -304,34 +310,15 @@ class BeadInput:
 
         def _chg_cb(attr, old, new):
             with ctrl.action:
-                bdctrl.bead = new
+                bdctrl.setbead(ctrl, new)
             tbar.bead = bdctrl.bead
 
         def _chg_cb2(step):
             if bdctrl.bead is not None:
-                new = bdctrl.bead+step
-                with ctrl.action:
-                    bdctrl.bead = new
-                tbar.bead = bdctrl.bead
-
-        def _onproject(**_):
-            bead  = bdctrl.bead
-            if bead is None:
-                return
-
-            avail = set(bdctrl.availablebeads)
-            if bead not in avail:
-                pot = next(chain((i for i in avail if i > bead),
-                                 (i for i in avail if i < bead)),
-                           None)
-                if pot is not None:
-                    bdctrl.bead = pot
-                    return
-            tbar.bead = bead
+                _chg_cb(None, None, bdctrl.bead+step)
 
         tbar.on_change('bead', _chg_cb)
-        ctrl.display.observe("tasks", _onproject)
-        ctrl.tasks  .observe("updatetask", "addtask", "removetask", _onproject)
+
         ctrl.display.updatedefaults(
             'keystroke',
             beadup   = lambda: _chg_cb2(1),
@@ -349,12 +336,13 @@ class RejectedBeadsInput:
     def setup(ctrl, tbar: DpxToolbar, _):
         "sets-up the gui"
         bdctrl = DataSelectionBeadController(ctrl)
+
         def _ondiscard_currentbead(*_):
             bead = bdctrl.bead
             if bead is None:
                 return
             with ctrl.action:
-                bdctrl.discarded = set(bdctrl.discarded) | {bead}
+                bdctrl.setdiscarded(ctrl, set(bdctrl.discarded) | {bead})
 
         def _ondiscard_currentbead_cb(attr, old, value):
             _ondiscard_currentbead()
@@ -367,7 +355,7 @@ class RejectedBeadsInput:
                 beads = set(bdctrl.allbeads) - beads
                 if (not tbar.seltype) and beads != set(bdctrl.discarded):
                     with ctrl.action:
-                        bdctrl.discarded = beads
+                        bdctrl.setdiscarded(ctrl, beads)
                     return
             _ontasks()
 
@@ -378,7 +366,7 @@ class RejectedBeadsInput:
             if not (None in beads or (len(new) and len(beads) == 0)):
                 if tbar.seltype and beads != set(bdctrl.discarded):
                     with ctrl.action:
-                        bdctrl.discarded = beads
+                        bdctrl.setdiscarded(ctrl, beads)
                     return
             _ontasks()
 
@@ -496,11 +484,11 @@ class FileListInput:
             trackdown = lambda: _chg_cb2(-1)
         )
 
-class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
+class BeadToolbar(BokehView):  # pylint: disable=too-many-instance-attributes
     "Toolbar"
-    _HELPERS   = BeadInput, RejectedBeadsInput, FileListInput
-    __diagopen : TrackFileDialog
-    __diagsave : SaveFileDialog
+    _HELPERS  = BeadInput, RejectedBeadsInput, FileListInput
+    __diagopen: TrackFileDialog
+    __diagsave: SaveFileDialog
 
     def __init__(self, ctrl = None, **kwa):
         "Sets up the controller"
@@ -546,22 +534,25 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         )
 
         tbar.on_change("doc", lambda attr, old, new: ctrl.display.handle('changelog', args = {}))
-        def _ontasks(old = None, **_):
-            if 'roottask' not in old:
-                return
-            root = ctrl.display.get("tasks", "roottask")
-            if not root:
-                tbar.frozen = True
-                return
-            tbar.frozen = False
-            path = ctrl.display.get("tasks", "roottask").path
-            if isinstance(path, (list, tuple)):
-                path = path[0]
 
-            title = doc.title.split(':')[0]
-            if path:
-                title += ':' + Path(path).stem
-            doc.title = title
+        def _ontasks(old = None, **_):
+            if 'bead'      in old:
+                tbar.bead = ctrl.display.get("tasks", "bead")
+
+            if 'taskcache' in old:
+                root        = ctrl.display.get("tasks", "roottask")
+                tbar.frozen = root is None
+                if tbar.frozen:
+                    return
+
+                title = doc.title.split(':')[0]
+                path  = (
+                    root.path[0] if isinstance(root.path, (list, tuple)) else root.path
+                )
+
+                if path:
+                    title += ':' + Path(path).stem
+                doc.title = title
 
         def _onbtn_cb(attr, old, new):
             if attr == 'open':

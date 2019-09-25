@@ -11,16 +11,16 @@ from cleaning.view          import CleaningPlotCreator,  CleaningWidgets, DataCl
 from ._plot                 import RampPlotView
 from ._model                import RampTaskPlotModelAccess, RampPlotDisplay
 
-class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess, # type: ignore
+class FoVPlotCreator(BaseFoVPlotCreator[RampTaskPlotModelAccess,  # type: ignore
                                         FoVPlotModel]):
     "Plots a default bead and its FoV"
     _plotmodel: FoVPlotModel
     _model:     RampTaskPlotModelAccess
     _rampdisplay = Indirection()
 
-    def observe(self, ctrl, noerase = True):
+    def observe(self, ctrl):
         "sets-up model observers"
-        super().observe(ctrl, noerase = noerase)
+        super().observe(ctrl)
         self._rampdisplay = RampPlotDisplay()
 
         @ctrl.display.observe(self._rampdisplay)
@@ -39,8 +39,9 @@ class FoVPlotView(PlotView[FoVPlotCreator]):
 
 class RampDataCleaningModelAccess(DataCleaningModelAccess):
     "ramp data cleaning model access"
-    def addto(self, ctrl, noerase = False):
-        "add to the controller"
+    def __init__(self, **_):
+        super().__init__(**_)
+        self.fixedbeads.config.automate = False
 
     @property
     def availablefixedbeads(self):
@@ -53,17 +54,20 @@ class RampCleaningPlotCreator(CleaningPlotCreator):
         txt = CleaningWidgets.text(None).split('\n')
         txt = txt[next((i for i, j in enumerate(txt) if '## Cleaning' in j), 0):]
         txt = [i for i in txt if '(clipping.' not in i]
-        model = RampDataCleaningModelAccess(ctrl)
+        model = RampDataCleaningModelAccess()
         super().__init__(ctrl, model = model, text = '\n'.join(txt))
 
 class CleaningView(PlotView[RampCleaningPlotCreator]):
     "Peaks plot view"
     TASKS = 'aberrant', 'datacleaning', 'extremumalignment'
+
     def ismain(self, ctrl):
         "Cleaning and alignment, ... are set-up by default"
         self._ismain(ctrl, tasks  = self.TASKS)
 
+
 PANELS = {FoVPlotView: 'fov', CleaningView: 'cleaning', RampPlotView: 'ramp'}
+
 
 class RampTabTheme(TabsTheme):
     "Ramps tab theme"

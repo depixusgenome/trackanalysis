@@ -18,17 +18,22 @@ class WidgetTheme:
     height: int       = 48
     labels: List[str] = ['ø', 'best', 'Φ1', 'Φ3']
     title:  str       = 'css:dpx-alignment-widget'
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
 
+
 ButtonT = TypeVar("ButtonT", RadioButtonGroup, CheckboxGroup)
-class BaseWidget(Generic[ButtonT]):
+
+
+class BaseWidget(Generic[ButtonT, ]):
     "Allows aligning the cycles on a given phase"
     __widget: ButtonT
-    def __init__(self, ctrl, model, noerase = False, **kwa):
+
+    def __init__(self, ctrl, model, **kwa):
         name        = self.__class__.__name__.lower()
-        self._theme = ctrl.theme.add(WidgetTheme(name = name, **kwa), noerase)
+        self._theme = ctrl.theme.swapmodels(WidgetTheme(name = name, **kwa))
         self._task  = getattr(model, name.replace('widget', ''), model)
 
     def addtodoc(self, mainview, ctrl) -> List[Widget]:
@@ -116,10 +121,6 @@ class AlignmentModalDescriptor:
             alignment.remove()
         else:
             alignment.update(phase = self.__ORDER[value])
-
-class EventDetectionWidgetTheme:
-    "EventDetectionWidgetTheme"
-    name   = "eventdetection"
 
 class EventDetectionWidget(BaseWidget[CheckboxGroup]):
     "Allows displaying only events"

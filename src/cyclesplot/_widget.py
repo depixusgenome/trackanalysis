@@ -36,8 +36,8 @@ class PeaksTableTheme:
 
 class PeaksTableDisplay:
     "peaks table display"
-    name    = "peakstable"
-    peaks : Dict[RootTask, Dict[int, Tuple[float, float]]] = {}
+    name:  str                                            = "peakstable"
+    peaks: Dict[RootTask, Dict[int, Tuple[float, float]]] = {}
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -50,6 +50,7 @@ class PeaksTableDisplay:
 class PeaksTableWidget:
     "Table of peaks in z and dna units"
     __widget: DataTable
+
     def __init__(self, ctrl, tasks:CyclesModelAccess) -> None:
         self.__theme   = ctrl.theme.add(PeaksTableTheme())
         self.__display = ctrl.display.add(PeaksTableDisplay())
@@ -78,8 +79,7 @@ class PeaksTableWidget:
     def __columns(self):
         width  = self.__theme.width
         fmt    = DpxNumberFormatter(format = self.__theme.zformat, text_align = 'right')
-        track  = self.__ctrl.tasks.track(self.__ctrl.display.get('tasks', "roottask"))
-        dim    = track.instrument["dimension"] if track else 'µm'
+        dim    = self.__tasks.instrumentdim
 
         def _rep(ind):
             title = self.__theme.columns[ind]
@@ -111,13 +111,13 @@ class PeaksTableWidget:
     def callbacks(self, hover):
         "adding callbacks"
         jsc = CustomJS(code = "hvr.on_change_peaks_table(cb_obj)", args = dict(hvr = hover))
-        self.__widget.source.js_on_change("data", jsc) # pylint: disable=no-member
+        self.__widget.source.js_on_change("data", jsc)   # pylint: disable=no-member
 
     def __data(self):
         info = self.__display[self.__tasks.sequencemodel.tasks]
         hyb  = self.__tasks.hybridisations(None)
         if hyb is not None  and len(hyb) > 2 and info is None:
-            info =  hyb['position'][0], hyb['position'][-1]
+            info = hyb['position'][0], hyb['position'][-1]
 
         if info is None:
             info = 0, 1000
@@ -147,6 +147,7 @@ class ConversionSlidersWidget:
     __stretch: Slider
     __bias:    Slider
     __figdata: ColumnDataSource
+
     def __init__(self, ctrl, display) -> None:
         self.__display = display
         self.__theme   = ctrl.theme.add(ConversionSliderTheme())
@@ -201,11 +202,9 @@ class ConversionSlidersWidget:
             step  = center*2.*self.__theme.stretch['ratio']/self.__theme.bias['step']
         )
 
-        track  = self.__ctrl.tasks.track(self.__ctrl.display.get('tasks', "roottask"))
-        if track:
-            dim = track.instrument["dimension"]
-            resets[self.__bias].update(title = self.__theme.bias['title'].replace('µm', dim))
-            resets[self.__stretch].update(title = self.__theme.stretch['title'].replace('µm', dim))
+        dim = self.__display.instrumentdim
+        resets[self.__bias].update(title = self.__theme.bias['title'].replace('µm', dim))
+        resets[self.__stretch].update(title = self.__theme.stretch['title'].replace('µm', dim))
 
     def callbacks(self, hover):
         "adding callbacks"
@@ -230,6 +229,7 @@ class DriftWidgetTheme:
 class DriftWidget:
     "Allows removing the drifts"
     __widget: CheckboxButtonGroup
+
     def __init__(self, ctrl, tasks:CyclesModelAccess) -> None:
         self.__theme = ctrl.theme.add(DriftWidgetTheme())
         self.__tasks = tasks
@@ -261,7 +261,7 @@ class DriftWidget:
         resets[self.__widget].update(**self.__data())
 
     def __data(self) -> dict:
-        value = [] # type: List[int]
+        value: List[int] = []
         if self.__tasks.driftperbead.task  is not None:
             value  = [0]
         if self.__tasks.driftpercycle.task is not None:
@@ -271,6 +271,7 @@ class DriftWidget:
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
     __objects: TaskWidgetEnabler
+
     def __init__(self, ctrl, model):
         cnf = CyclesModelConfig.__name__
         adv = tab(f"""
@@ -318,6 +319,7 @@ class WidgetMixin(ABC):
 
         mode   = self.defaultsizingmode()
         border = ctrl.theme.get("theme", "borders")
+
         def _items(tpe, itms):
             children = list(itms)
             return getattr(layouts, tpe)(
@@ -350,7 +352,7 @@ class WidgetMixin(ABC):
 
     def _resetwidget(self, cache: CACHE_TYPE, disable: bool):
         for ite in self.__widgets.values():
-            ite.reset(cache) # type: ignore
+            ite.reset(cache)  # type: ignore
         self.__objects.disable(cache, disable)
 
     def __slave_to_hover(self, widgets):

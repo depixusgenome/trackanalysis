@@ -14,7 +14,7 @@ from .._widget              import (PeakIDPathWidget, PeaksSequencePathWidget,
                                     OligoListWidget, TaskWidgetEnabler, advanced,
                                     PeakListTheme, PeakListWidget)
 from ._model                import (HairpinGroupScatterModel, ConsensusHistPlotModel,
-                                    ConsensusConfig, Indirection)
+                                    ConsensusConfig)
 
 class DpxDiscardedBeads(Widget):
     "Toolbar model"
@@ -169,14 +169,13 @@ class WidthWidgetTheme:
 
 class WidthWidget:
     "sets the width of the peaks"
-    _config = Indirection()
-    _theme  = Indirection()
     _widget : TextInput
+
     def __init__(self, ctrl, mdl, *_):
         self._ctrl   = ctrl
         self._mdl    = mdl
-        self._config = ConsensusConfig()
-        self._theme  = WidthWidgetTheme()
+        self._config = ctrl.theme.swapmodels(ConsensusConfig())
+        self._theme  = ctrl.display.swapmodels(WidthWidgetTheme())
 
     def addtodoc(self, mainview, ctrl, *_):
         "sets-up the gui"

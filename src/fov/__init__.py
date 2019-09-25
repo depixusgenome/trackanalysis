@@ -75,6 +75,7 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
     _beadssource: ColumnDataSource
     _imgsource:   ColumnDataSource
     _calibsource: ColumnDataSource
+
     def __init__(self,  ctrl) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)

@@ -36,8 +36,8 @@ class CyclesPlotTheme(PlotTheme):
     name       = "cycles.plot"
     raw        = PlotAttrs('color', 'o', .1, alpha = .5,
                            palette = {'dark': 'YlOrBr', 'basic': 'inferno'})
-    selection  = {'dark'  : PlotAttrs('lightblue', 'line',   3),
-                  'basic' : PlotAttrs('blue', 'line',   3)}
+    selection  = {'dark':  PlotAttrs('lightblue', 'line',   3),
+                  'basic': PlotAttrs('blue', 'line',   3)}
     tooltips   = [('(cycle, t, z)', '(@cycle, $~x{1}, $data_y{1.1111})')]
     radius     = 1.
     histframes     = PlotAttrs('~gray', '┸', 1, fill_color = 'gray')
@@ -48,6 +48,7 @@ class CyclesPlotTheme(PlotTheme):
     toolbar        = dict(PlotTheme.toolbar)
     toolbar.update(raw   = 'tap,ypan,ybox_zoom,reset,save,dpxhover',
                    items = 'ypan,ybox_zoom,reset,save')
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -57,12 +58,16 @@ class BeadInfo:
     bead related info
     """
     stretch: float           = StretchFactor.DNA.value
-    bias   : Optional[float] = None
+    bias:    Optional[float] = None
+
     @initdefaults
     def __init__(self, **kwa):
         pass
 
+
 INFO = Dict[RootTask, Dict[int, BeadInfo]]
+
+
 class CyclesPlotDisplay(PlotDisplay):
     "CyclesPlotDisplay"
     name             = "cycles"
@@ -109,7 +114,12 @@ class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
     "Access to the event detection task"
     def __init__(self, mdl):
         super().__init__(mdl)
-        self.__model = self._ctrl.theme.model(CyclesModelConfig())
+        self.__model = CyclesModelConfig()
+
+    def swapmodels(self, ctrl):
+        "swap models for those in the controller"
+        super().swapmodels(ctrl)
+        self.__model = ctrl.theme.swapmodels(self.__model)
 
     @property
     def task(self) -> Optional[EventDetectionTask]:
@@ -124,7 +134,7 @@ class EventDetectionTaskAccess(TaskAccess, tasktype = EventDetectionTask):
 
     def update(self, **kwa):
         "adds/updates the task"
-        self._ctrl.theme.update(self.__model, showevents = not kwa.pop('disabled', False))
+        self._updatetheme(self.__model, showevents = not kwa.pop('disabled', False))
         super().update(**kwa)
 
 class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
@@ -147,21 +157,22 @@ class CyclesDriftTaskAccess(TaskAccess,
 
 class CyclesModelAccess(SequencePlotModelAccess):
     "Model for Cycles View"
-    def __init__(self, ctrl) -> None:
-        super().__init__(ctrl)
-        self.cycles         = CyclesPlotModel.create(ctrl)
+    def __init__(self) -> None:
+        super().__init__()
+        self.cycles         = CyclesPlotModel()
         self.alignment      = ExtremumAlignmentTaskAccess(self)
         self.clipping       = ClippingTaskAccess(self)
         self.driftperbead   = BeadsDriftTaskAccess(self)
         self.driftpercycle  = CyclesDriftTaskAccess(self)
         self.eventdetection = EventDetectionTaskAccess(self)
 
-    def addto(self, ctrl, noerase = False):
+    def observe(self, ctrl):
         "add to the controller"
-        super().addto(ctrl, noerase = noerase)
+        super().observe(ctrl)
 
-        @ctrl.theme.observe
-        @ctrl.display.observe
+        @ctrl.theme.observe(self._tasksconfig)
+        @ctrl.display.observe(self._tasksdisplay)
+        @ctrl.theme.hashwith(self.cycles.config, self.cycles.display)
         def _ontasks(old = None, **_):
             cnf              = self.cycles.config
             done, cur, coeff = rescalingevent(ctrl, old, cnf.rescaling)

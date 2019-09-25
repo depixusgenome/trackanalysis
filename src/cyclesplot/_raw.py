@@ -17,11 +17,12 @@ from    ._model         import CyclesPlotTheme, CyclesModelAccess
 
 class RawMixin(ABC):
     "Building the graph of cycles"
-    _theme    : CyclesPlotTheme
-    _model    : CyclesModelAccess
-    _hover    : DpxHoverModel
-    attrs     : Callable
-    newbounds : Callable
+    _theme:    CyclesPlotTheme
+    _model:    CyclesModelAccess
+    _hover:    DpxHoverModel
+    attrs:     Callable
+    newbounds: Callable
+
     def __init__(self):
         "sets up this plotter's info"
         self._rawsource: ColumnDataSource = None
@@ -41,8 +42,8 @@ class RawMixin(ABC):
     @staticmethod
     def __event_data(items):
         size = max(j[0]+len(j[1])+k for _, i in  items for k, j in enumerate(i))
-        val  = np.full ((len(items), size), np.NaN, dtype = 'f4')
-        time = np.full ((len(items), size), np.NaN, dtype = 'f4')
+        val  = np.full((len(items), size), np.NaN, dtype = 'f4')
+        time = np.full((len(items), size), np.NaN, dtype = 'f4')
 
         for xvals, tvals, (_, j) in zip(val, time, items):
             for k, (start, arr) in enumerate(j):
@@ -87,7 +88,7 @@ class RawMixin(ABC):
         fig.x_range.callback = CustomJS(code = "hvr.on_change_raw_bounds(cb_obj, trng)",
                                         args = dict(hvr  = self._hover,
                                                     trng = fig.extra_x_ranges["time"]))
-        fcn = lambda attr, old, new: self._model.newparams(**{attr: new})
+        fcn = lambda attr, old, new: self._model.newparams(**{attr: new})  # noqa
         self._hover.on_change("stretch", fcn)
         self._hover.on_change("bias",    fcn)
 
@@ -104,7 +105,6 @@ class RawMixin(ABC):
 
         self.attrs(self._theme.raw).addto(self._raw, x = 't', y = 'z', source = self._rawsource)
 
-
         axis = LinearAxis(x_range_name="time", axis_label = self._theme.xtoplabel)
         self._raw.add_layout(axis, 'above')
         return shape
@@ -119,8 +119,7 @@ class RawMixin(ABC):
             bnds                     = self.newbounds('x', data['t'])
             cache[self._raw.x_range] = {'bounds': (bnds['reset_start'], bnds['reset_end'])}
 
-            if self._model.track:
-                dim = self._model.track.instrument['dimension']
-                lbl = self._theme.ylabel.split('(')[0]
-                cache[self._raw.yaxis[0]].update(axis_label = f"{lbl} ({dim})")
+            dim = self._model.instrumentdim
+            lbl = self._theme.ylabel.split('(')[0]
+            cache[self._raw.yaxis[0]].update(axis_label = f"{lbl} ({dim})")
         return shape

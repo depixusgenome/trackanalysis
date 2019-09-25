@@ -353,6 +353,14 @@ class MessagesListWidget:
         )
         return [self.__widget]
 
+    def observe(self, mainview, ctrl):
+        "observe the controller"
+
+        @ctrl.display.observe(self.__model.messagedisplay.name)
+        def _onmsg(**_):
+            if mainview.isactive():
+                mainview.calllater(lambda: self.reset(None))
+
     def reset(self, resets):
         "resets the widget"
         itm  = self.__widget.source if resets is None else resets[self.__widget.source]
@@ -360,13 +368,14 @@ class MessagesListWidget:
 
     def shoulddisable(self) -> bool:
         "whether one can enable the widget"
-        return self.__model.track is None
+        return self.__model.rawtrack is None
 
     def __data(self) -> Dict[str, List]:
         msgs = deepcopy(self.__model.messages())
-        if len(msgs['bead']):
+        if msgs.get('bead', None):
+            track = self.__model.track
             trans = self.__theme.labels
-            ncyc  = self.__model.track.ncycles if self.__model.track is not None else 1
+            ncyc  = track.ncycles if track is not None else 1
             msgs['cycles'] = [ncyc if i is None else i  for i in msgs['cycles']]
             msgs['type']   = [trans.get(i, i)           for i in msgs['type']]
         return {i: list(j) for i, j in msgs.items()}

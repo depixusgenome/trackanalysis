@@ -3,22 +3,20 @@
 "View module showing all messages concerning discarded beads"
 from   functools                import partial
 from   typing                   import List, Dict, Set, Tuple, Iterator, Any
+import asyncio
 
 from   data                     import BEADKEY
-from   control.decentralized    import Indirection
 from   cleaning.view            import DataCleaningModelAccess
 from   cleaning.processor       import (
     DataCleaningProcessor, ClippingProcessor, ClippingTask
 )
 from   eventdetection.processor.alignment import ExtremumAlignmentProcessor
 from   model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
-from   taskmodel                import PHASE
-from   taskcontrol.beadscontrol import DataSelectionBeadController
+from   taskmodel                import PHASE, DataSelectionTask
 from   utils                    import initdefaults
 
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from   cleaning.processor.__config__ import DataCleaningTask  # noqa:F401
-
 
 def _extend(cache, info, exc):
     if exc:
@@ -48,14 +46,12 @@ class GuiClippingProcessor(ClippingProcessor):
         cache = args.data.setcachedefault(self, dict())
         return args.apply(partial(self.apply, cache = cache, **self.config()))
 
-
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf):
         "returns the result of the beadselection"
         _extend(cache, info, super().compute(frame, info, cache = cache, **cnf))
-
 
 class GuiExtremumAlignmentProcessor(ExtremumAlignmentProcessor):
     "gui extremum alignment cleaning processor"
@@ -74,7 +70,6 @@ class GuiExtremumAlignmentProcessor(ExtremumAlignmentProcessor):
         cache = args.data.setcachedefault(self, dict())
         return args.apply(partial(self.apply, cache = cache, **self.config()))
 
-
 class MissinBeadDetectionConfig:
     "filters on messages to reinterpret these as missing beads"
     def __init__(self):
@@ -90,57 +85,93 @@ class MissinBeadDetectionConfig:
         return (i for i, j, k in zip(msgs["bead"], msgs["type"], msgs["cycles"])
                 if k is None or (vals.get(j, ncycles+1) <= k))
 
-
 class QualityControlDisplay:
     "QualityControlDisplay"
     def __init__(self):
         self.name:     str             = "qc"
-        self.messages: Dict[str, list] = {}
-
+        keys = ('type', 'message', 'bead', 'cycles')
+        self.messages: Dict[str, list] = {i: [] for i in keys}
+        self.default:  Dict[str, list] = {i: [] for i in keys}
+        self.linked:   bool            = False
 
 class QualityControlModelAccess(DataCleaningModelAccess):
     "access to data cleaning"
-    __missing = Indirection()
-    __display = Indirection()
-
-    def __init__(self, ctrl) -> None:
-        super().__init__(ctrl)
+    def __init__(self) -> None:
+        super().__init__()
         self.__missing = MissinBeadDetectionConfig()
         self.__display = QualityControlDisplay()
 
-    def addto(self, ctrl, noerase = False):
-        "set models to same as main"
-        super().addto(ctrl, noerase = noerase)
-        ctrl.tasks.observe("addtask", "updatetask", "removetask", self._ontask)
+    @property
+    def messagedisplay(self) -> QualityControlDisplay:
+        "return the message display"
+        return self.__display
 
-    def buildmessages(self):
-        "creates beads and warnings where applicable"
-        self._ctrl.display.update(self.__display, messages = self.__buildmessages())
+    def swapmodels(self, ctrl) -> bool:
+        "swap models with those  in the controller"
+        if super().swapmodels(ctrl):
+            self.__display = ctrl.display.swapmodels(self.__display)
+            self.__missing = ctrl.theme.swapmodels(self.__missing)
+            return True
+        return False
+
+    def observe(self, ctrl):
+        "set models to same as main"
+        if self.__display.linked:
+            return
+
+        ctrl.display.update(self.__display, linked = True)
+        super().observe(ctrl)
+
+        _lock_     = asyncio.Lock()
+        _next_     = [0]
+
+        @ctrl.tasks.observe("addtask", "updatetask", "removetask")
+        @ctrl.tasks.hashwith(self.__display)
+        def _ontask(parent = None, task = None, **_):
+            if not self.impacts(parent, task):
+                return
+
+            _cur_      = _next_[0]+1
+            _next_[0] += 1
+
+            async def _compute(_cur_ = _cur_):
+                if _next_[0] != _cur_:
+                    return
+
+                async with _lock_:
+                    if _next_[0] == _cur_:
+                        msgs = self.__buildmessages(_next_, _cur_)
+                        if _next_[0] == _cur_:
+                            ctrl.display.update(self.__display, messages = msgs)
+
+            asyncio.create_task(_compute())
 
     def badbeads(self) -> Set[BEADKEY]:
         "returns bead ids with messages"
-        if self.track is None:
+        if self.rawtrack is None:
             return set()
         return set(self.messages()['bead'])  # pylint: disable=unsubscriptable-object
 
     def messages(self) -> Dict[str, List]:
         "returns beads and warnings where applicable"
-        msg = self.__display.messages
-        if not msg:
-            self.buildmessages()
-        return self.__display.messages
+        return self.__display.default if not self.__display.messages else self.__display.messages
 
     def status(self) -> Dict[str, Set[int]]:
         "returns beads and warnings where applicable"
-        if self.track is None:
+        track = self.track
+        if track is None:
             return {i: set() for i in ('bad', 'ok', 'fixed', 'missing')}
 
-        msg  = self.messages()
-        data = {'bad':       set(msg["bead"]),  # pylint: disable=unsubscriptable-object
-                'fixed':     set(i[-1] for i in self.availablefixedbeads),
-                'ok':        set(self.track.beads.keys()),
-                'missing':   set(self.__missing.filter(self.track.ncycles, msg)),
-                'discarded': set(DataSelectionBeadController(self._ctrl).discarded)}
+        msg   = self.__display.messages
+        data  = {
+            'bad':       set(msg["bead"]),  # pylint: disable=unsubscriptable-object
+            'fixed':     set(i[-1] for i in self.availablefixedbeads),
+            'ok':        set(track.beads.keys()),
+            'missing':   set(self.__missing.filter(track.ncycles, msg)),
+            'discarded': set(
+                getattr(self._tasksdisplay.taskcache.task(DataSelectionTask), "discarded", ())
+            )
+        }
 
         for i, j in data.items():
             if i != "ok":
@@ -151,21 +182,14 @@ class QualityControlModelAccess(DataCleaningModelAccess):
                         j.difference_update(data['discarded'])
         return data
 
-    def clear(self):
-        "clears the model's cache"
-        self._ctrl.display.update(self.__display, messages = {})
-
-    def _ontask(self, parent = None, task = None, **_):
-        if self.impacts(parent, task):
-            self.clear()
-
-    def __buildmessages(self) -> Dict[str, List[Any]]:
-        default: Dict[str, List] = {i: [] for i in ('type', 'message', 'bead', 'cycles')}
-        if self.track is None:
+    def __buildmessages(self, curid, myid) -> Dict[str, List[Any]]:
+        default: Dict[str, List] = {i: [] for i in self.__display.default}
+        track                    = self.track
+        if track is None:
             return default
 
         tasks = self.cleaning.task, self.clipping.task, self.alignment.task
-        ncy   = self.track.ncycles
+        ncy   = track.ncycles
         if not any(i is not None for i in tasks):
             return default
 
@@ -175,7 +199,8 @@ class QualityControlModelAccess(DataCleaningModelAccess):
         with ctx as view:
             if view is not None:
                 for _ in view:
-                    pass
+                    if curid[0] != myid:
+                        return default
 
             for tsk in tasks:
                 if tsk is None:
@@ -192,7 +217,6 @@ class QualityControlModelAccess(DataCleaningModelAccess):
                 default['type']    += [i[2] for i in mem]
                 default['message'] += [i[3] for i in mem]
         return default
-
 
 class DriftControlPlotTheme(PlotTheme):
     "drift control plot theme"
@@ -222,7 +246,6 @@ class DriftControlPlotTheme(PlotTheme):
     def __init__(self, **_):
         super().__init__(**_)
 
-
 class DriftControlPlotConfig:
     "allows configuring the drift control plots"
     def __init__(self):
@@ -231,7 +254,6 @@ class DriftControlPlotConfig:
         self.yspan:            Tuple[List[int], float] = ([5, 95], 0.3)
         self.phases:           Tuple[int, int]         = (PHASE.initial, PHASE.pull)
         self.warningthreshold: float                   = 0.3
-
 
 class DriftControlPlotModel(PlotModel):
     "qc plot model"
@@ -243,7 +265,6 @@ class DriftControlPlotModel(PlotModel):
     def __init__(self, **_):
         super().__init__()
 
-
 class ExtensionPlotConfig(DriftControlPlotConfig):
     "allows configuring the drift control plots"
     def __init__(self):
@@ -251,7 +272,6 @@ class ExtensionPlotConfig(DriftControlPlotConfig):
         self.name:             str       = "qc.extension"
         self.ybarspercentiles: List[int] = [25, 75]
         self.warningthreshold: float     = 1.5e-2
-
 
 class ExtensionPlotTheme(DriftControlPlotTheme):
     "drift control plot theme"
