@@ -349,6 +349,19 @@ def test_reference(bokehaction):
     ref = server.ctrl.display.get("tasks", "roottask")
 
     server.load('100bp_4mer/AACG.pk')
+    aacg = server.ctrl.display.get("tasks", "roottask")
+
+    server.cmd(
+        lambda: server.ctrl.display.update("tasks", taskcache = server.ctrl.tasks.processors(ref)),
+        rendered = True
+    )
+    assert server.ctrl.display.get("tasks", "roottask") is ref
+
+    server.cmd(
+        lambda: server.ctrl.display.update("tasks", taskcache = server.ctrl.tasks.processors(aacg)),
+        rendered = True
+    )
+    assert server.ctrl.display.get("tasks", "roottask") is aacg
 
     store = server.ctrl.display.model("hybridstat.fittoreference")
     assert server.widget['HS:reference'].value == '-1'
@@ -360,6 +373,12 @@ def test_reference(bokehaction):
 
     server.load('hairpins.fasta', andpress = False, rendered = False)
     server.change('Cycles:Sequence', 'value', '←')
+
+    server.cmd(
+        lambda: server.ctrl.tasks.closetrack(ref),
+        rendered = True
+    )
+    assert store.reference is None
 
 @integrationmark
 def test_hybridstat(bokehaction):
@@ -515,4 +534,4 @@ if __name__ == '__main__':
     # pylint: disable=ungrouped-imports
     from tests.testingcore.bokehtesting import BokehAction
     with BokehAction(None) as bka:
-        test_advancedmenu(bka)
+        test_reference(bka)

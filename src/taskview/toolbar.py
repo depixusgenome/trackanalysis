@@ -426,6 +426,7 @@ class FileListInput:
     def setup(ctrl, tbar: DpxToolbar, _):
         "sets-up the gui"
         stop = [False]
+
         @ctrl.tasks.observe("opentrack", "closetrack")
         def _setfilelist(model = None, **_):
             vals  = list(FileList.get(ctrl))
@@ -452,7 +453,7 @@ class FileListInput:
                 _setfilelist(model = [ctrl.display.get("tasks", "roottask")])
             elif not stop[0]:
                 with ctrl.action:
-                    ctrl.display.update("tasks", roottask = lst[inew][1])
+                    ctrl.display.update("tasks", taskcache = ctrl.tasks.processors(lst[inew][1]))
         tbar.on_change('currentfile', _oncurrentfile_cb)
 
         def _ondelfile_cb(attr, old, new):

@@ -132,11 +132,18 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
         @ctrl.tasks.observe("updatetask", "addtask", "removetask")
         @ctrl.display.hashwith(self.__store)
         def _ontask(parent = None, **_):
-            if parent == self.reference:
+            if parent is self.reference:
                 info = FitToReferenceStore(reference = self.reference).__dict__
                 info.pop('name')
                 ctrl.display.update(self.__store, **info)
-                self.resetmodel()
+
+        @ctrl.tasks.observe("closetrack")
+        @ctrl.display.hashwith(self.__store)
+        def _ontask(task, **_):
+            if task is self.reference:
+                info = FitToReferenceStore(reference = None).__dict__
+                info.pop('name')
+                ctrl.display.update(self.__store, **info)
 
     def resetmodel(self):
         "adds a bead to the task"

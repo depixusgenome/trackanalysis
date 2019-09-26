@@ -15,13 +15,13 @@ class TasksView:
             self._display = ctrl.display.add(TasksDisplay(), False)
             self._io      = ctrl.theme.add(TaskIOTheme(), False)
 
-    def _ontask(self, ctrl, calllater = None, **_):
+    def _ontask(self, ctrl, calllater, **_):
         calllater.insert(0, partial(self._openedtrack, ctrl, self._display.taskcache))
 
-    def _onclosetrack(self, ctrl, new = None, **_):
-        self._openedtrack(ctrl, new)
+    def _onclosetrack(self, ctrl, new, calllater, **_):
+        calllater.insert(0, partial(self._openedtrack, ctrl, new))
 
-    def _onopentrack(self, ctrl, taskcache = None, calllater = None, **_):
+    def _onopentrack(self, ctrl, taskcache, calllater, **_):
         calllater.insert(0, partial(self._openedtrack, ctrl, taskcache))
 
     def _openedtrack(self, ctrl, taskcache):
