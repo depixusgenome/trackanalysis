@@ -16,7 +16,7 @@ from taskview.plots            import TaskPlotCreator, PlotError
 from view.base                 import stretchout
 from view.colors               import tohex
 from view.plots                import PlotView, GroupStateDescriptor, themed, CACHE_TYPE
-from .._model                  import resetrefaxis, PeaksPlotTheme, PoolComputationsDisplay
+from .._model                  import resetrefaxis, PeaksPlotTheme, JobDisplay
 from .._io                     import setupio
 from ._model                   import (
     HairpinGroupScatterModel, HairpinGroupModelAccess,
@@ -226,7 +226,7 @@ def setpoolobservers(self, ctrl, mdl, statename):
     @ctrl.display.observe(statename)
     def _onactivate(old = None, **_):
         if self.isactive() and 'state' in old:
-            ctrl.display.update(PoolComputationsDisplay(), canstart = True)
+            ctrl.display.update(JobDisplay(), canstart = True)
 
     name = HairpinGroupScatterTheme().name
     curr = [False, lambda: False]

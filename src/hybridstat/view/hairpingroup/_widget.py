@@ -9,7 +9,7 @@ from bokeh.models           import Widget, TextInput
 
 from view.static            import route
 from utils.gui              import parseints
-from .._model               import PoolComputationsConfig
+from .._model               import JobConfig
 from .._widget              import (PeakIDPathWidget, PeaksSequencePathWidget,
                                     OligoListWidget, TaskWidgetEnabler, advanced,
                                     PeakListTheme, PeakListWidget)
@@ -145,8 +145,8 @@ class HairpinGroupPlotWidgets(Widgets):
         self.cstrpath  = PeakIDPathWidget(ctrl, mdl)
         self.advanced  = advanced(
             cnf       = self._MDL(),
-            accessors = (PoolComputationsConfig,),
-            peakstext = "Cores used for precomputations %(PoolComputationsConfig:ncpu)D"
+            accessors = (JobConfig,),
+            peakstext = "Cores used for precomputations %(JobConfig:ncpu)D"
         )(ctrl, mdl)
 
     def _addtodoc(self, mainview, ctrl, doc, *_):
