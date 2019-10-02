@@ -62,6 +62,32 @@ def test_track(scriptingcleaner):
     assert set(track.op[[1,2]].beads.keys()) == {1,2}
 
 @integrationmark
+def test_track_dataframe(scriptingcleaner):
+    "test scripting enhanced track"
+    from scripting import Track, Tasks, localcontext, Task
+    from data import Cycles, Beads
+    from eventdetection.data import Events
+    from peakfinding.processor import PeaksDict
+    from tests.testingcore import path as utpath
+    from cleaning.processor import DataCleaningTask
+
+    track = Track(path=utpath("small_legacy"))
+    assert track.path == utpath("small_legacy")
+
+    raw_df = track.beads.dataframe()
+    clean_df = track.apply(..., Tasks.cleaning(maxsaturation=20, maxextent=2)).dataframe()
+
+    assert set(raw_df.columns) == set(clean_df.columns)  # columns should remain the same
+    assert hasattr(raw_df, 'tasklist')
+    assert hasattr(clean_df, 'tasklist')
+
+    assert len(raw_df.tasklist) == 0
+    assert DataCleaningTask in [type(task) for task in clean_df.tasklist]
+
+    assert clean_df.isna().sum().sum() > raw_df.isna().sum().sum()  # cleaned data replaced by NaNs
+    assert (clean_df['cycleframe']==1).sum() == track.ncycles  # all cycles should have at least 2 frames
+
+@integrationmark
 def test_trackconfig(scriptingcleaner):
     "test scripting enhanced track"
     from scripting             import Track, Tasks, localcontext
