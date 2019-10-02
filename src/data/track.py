@@ -188,6 +188,17 @@ class Secondaries:
         return arr
 
     @property
+    def cycleframe(self) -> np.ndarray:
+        "return the frame-number per cycle, with each cycle starting at 0"
+        arr = np.zeros(self.__track.nframes, dtype='i4')
+        for j in np.split(
+                arr,
+                self.__track.phases[:, 0]-self.__track.phases[0, 0]
+        )[1:]:
+            j[:] = np.arange(len(j))
+        return arr
+
+    @property
     def cidcycles(self) -> Cycles:
         "return the phases per frame in cycles"
         return self.__track.cycles.withdata({"cid": self.cid})

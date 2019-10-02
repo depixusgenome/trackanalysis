@@ -6,29 +6,40 @@ from   copy                        import copy as shallowcopy
 import pandas                      as     pd
 import numpy                       as     np
 from   utils.decoration            import addto
+from   taskcontrol.processor       import ProcessorException
 from   taskcontrol.processor.dataframe import SafeDataFrameProcessor, DataFrameTask
 from   ..views                     import Cycles, Beads
 
+
 @addto(Beads)
-def dataframe(self):
+def dataframe(self) -> pd.DataFrame:
     """
     Creates a dataframe with as many columns as there are beads.
 
     Columns *cycle* and *phase* are also added.
+
+    If applied to *cleanbeads*, non-clean beads are removed,
+    aberrant values are replaced by NaNs.
     """
-    allpha = self.phases
-    phase  = np.zeros(self.nframes, 0, dtype = 'i4')
-    npha   = self.track.nphases
-    for i, j in enumerate(np.split(phase, allpha.ravel()[1:])):
-        j[:] = i % npha
+    length = self.track.secondaries.phase.shape[0]
 
-    cycle  = np.zeros(self.nframes, 0, dtype = 'i4')
-    for i, j in enumerate(np.split(phase, allpha[1:,0])):
-        j[:] = i // npha
+    info = {}
+    for ibead in self.keys():
+        try:
+            info[ibead] = self[ibead]
+        except ProcessorException:  # replace cleaned beads by NaNs
+            info[ibead] = np.full(length, np.nan)
 
-    info = {ibead: data for ibead, data in self}
-    info.update(phase = phase, cycle = cycle)
-    return pd.DataFrame(info)
+    info.update(phase      = self.track.secondaries.phase,
+                cycle      = self.track.secondaries.cid,
+                cycleframe = self.track.secondaries.cycleframe,
+                zmag       = self.track.secondaries.zmag)
+
+    dframe = pd.DataFrame(info)
+    dframe._metadata += ["tasklist"]
+    dframe.tasklist = self.tasklist if hasattr(self, 'tasklist') else []
+
+    return dframe
 
 @addto(Cycles)       # type: ignore
 def dataframe(self): # pylint: disable=function-redefined
