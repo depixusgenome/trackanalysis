@@ -24,7 +24,8 @@ from   taskmodel.__scripting__.track    import LocalTasks
 from   ..processor                      import (DataCleaningProcessor,
                                                 DataCleaningErrorMessage,
                                                 BeadSubtractionTask,
-                                                BeadSubtractionProcessor)
+                                                BeadSubtractionProcessor,
+                                                DataCleaningException)
 from   ..beadsubtraction                import  FixedBeadDetection
 
 @addto(BeadSubtractionTask, staticmethod)
