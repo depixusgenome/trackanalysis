@@ -89,7 +89,7 @@ class TrackQC:
 
         frame = pd.pivot_table(frame, values = 'bead', columns = 'mostcommonerror', index = 'track')
         # pylint: disable=not-an-iterable
-        setattr(frame, 'columns', [i for i in getattr(frame, 'columns')])
+        setattr(frame, 'columns', list(getattr(frame, 'columns')))
 
         self.table = frame.join(self.table[list(set(self.table.columns)-set(frame.columns))])
         self.table.sort_values('modification', inplace = True)

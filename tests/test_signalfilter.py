@@ -25,8 +25,9 @@ def test_nl_bf_filters():
         arr     = np.zeros(100, dtype = np.float32)
         arr[50] = .1
         args(arr)
-        assert_allclose(truth[:50], arr[:50], atol = 1e-7)
-        assert_allclose(truth[51:], arr[51:], atol = 1e-7)
+        # assert_allclose failed because of underflow ... numpy bug?
+        assert np.max(np.abs(truth[:50] - arr[:50])) < 1e-7
+        assert np.max(np.abs(truth[51:] - arr[51:])) < 1e-7
 
         arr   = np.zeros(100, dtype = np.float32)
         arr[45:55] = 1.

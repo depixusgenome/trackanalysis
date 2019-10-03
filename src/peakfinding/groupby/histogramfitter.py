@@ -149,7 +149,9 @@ class PeakFlagger:
         # inds[0] is for underflows: one of the ids to discard
         # if cnt has anything to discard, it has a size == ids[0]
         if len(cnts) == inds[0]+1:
-            cnts[-1] = 0 # discard counts for events outside peak windows
+            # discard counts for events outside peak windows
+            cnts[-1] = 0  # pylint: disable=unsupported-assignment-operation
+                          #         (bug in pylint with numpy >= 1.17)
         return tags, cnts
 
     @staticmethod

@@ -43,7 +43,7 @@ class Handler:
         self.__fov(state, kwargs)
         self.__data(state, kwargs)
         if isinstance(kwargs.get("tasks", None), str):
-            import taskstore as _ana
+            import taskstore as _ana  # pylint: disable=import-outside-toplevel
             kwargs['tasks'] = _ana.loads(kwargs['tasks'])
 
         state.update(kwargs)
@@ -67,7 +67,7 @@ class Handler:
         data = dict(track.data)  # get the data first because of lazy instantiations
         data.update(track.__getstate__())
         if 'tasks' in data:
-            import taskstore as _ana
+            import taskstore as _ana  # pylint: disable=import-outside-toplevel
             data['tasks'] = _ana.dumps(data['tasks'])
 
         data['fov']          = track.fov.image

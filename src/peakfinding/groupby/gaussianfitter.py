@@ -56,8 +56,7 @@ class ByGaussianMix:
         peaks    = gmm.means_.reshape(1,-1)[0] * slope + bias
         ids      = self.__strip(pos,events.reshape(-1,1),gmm)
 
-        speaks   = sorted([(idx,val) for idx,val in enumerate(peaks)],
-                          key =lambda x:x[1])
+        speaks   = sorted(((idx,val) for idx,val in enumerate(peaks)), key = lambda x: x[1])
 
         sort     = {idy[0] :idx for idx,idy in enumerate(speaks)}
         sort[cast(int,np.iinfo("i4").max)] = cast(int,np.iinfo("i4").max)

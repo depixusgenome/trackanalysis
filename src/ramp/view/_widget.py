@@ -178,7 +178,7 @@ class RampZMagHintsWidget:
             vals["err"]  = (fcn(name, 2) - fcn(name, 0))*.5
         return vals
 
-@dataclass
+@dataclass  # pylint: disable=too-many-instance-attributes
 class RampZMagResultsTheme:
     "RampBeadStatusTheme"
     name:    str             = "ramp.zmageresults"

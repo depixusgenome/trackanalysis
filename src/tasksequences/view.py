@@ -281,7 +281,7 @@ class SequenceHoverMixin:
             + code[ind:]
         )
 
-@dataclass
+@dataclass      # pylint: disable=too-many-instance-attributes
 class SequencePathTheme:
     "SequencePathWidgetTheme"
     name:        str = "sequence.path"

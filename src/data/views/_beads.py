@@ -84,7 +84,7 @@ class Beads(TrackView, ITrackView):
         # mypy does not expect ranges to have attributes
         crng = cast(slice, self.cyclerange())
         if crng.stop < self.track.ncycles:
-            start = self.track.phase.select(crng.start if crng.start else 0, 0)
+            start = self.track.phase.select(crng.start if crng.start is not None else 0, 0)
             return self.track.phase.select(cast(int, crng.stop)+1, 0) - start
         return self.track.nframes
 

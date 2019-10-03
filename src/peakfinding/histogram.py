@@ -232,7 +232,7 @@ class Histogram(PrecisionAlg):
             if weight == 0. or len(pos) == 0:
                 yield np.zeros((lenv,), dtype = 'i8')
                 continue
-            elif weight == 1.:
+            if weight == 1.:
                 cnt = np.bincount(pos, minlength = lenv)
             elif np.isscalar(weight):
                 cnt = np.bincount(pos, minlength = lenv) * weight

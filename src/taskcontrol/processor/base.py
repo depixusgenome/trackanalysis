@@ -212,7 +212,7 @@ def register(proc: Union[None, Type[Processor], Iterable[Type[Processor]]] = Non
         if isinstance(itm, (list, tuple)):
             procs = list(itm)+procs
             continue
-        elif itm is None:
+        if itm is None:
             continue
 
         if force or itm.canregister():

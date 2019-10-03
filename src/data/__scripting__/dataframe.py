@@ -41,6 +41,7 @@ def dataframe(self) -> pd.DataFrame:
 
     return dframe
 
+
 @addto(Cycles)       # type: ignore
 def dataframe(self): # pylint: disable=function-redefined
     """

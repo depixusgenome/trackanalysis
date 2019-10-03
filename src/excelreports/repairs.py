@@ -110,7 +110,7 @@ class UpdateableZipFile(ZipFile):
                             del self._replace[item.filename]
                             continue
                         # If marked for replacement, copy temp_file, instead of old file
-                        elif replacement is not None:
+                        if replacement is not None:
                             del self._replace[item.filename]
                             # Write replacement to archive,
                             # and then close it (deleting the temp file)
@@ -155,6 +155,10 @@ class DataFrame(_DataFrame):
         self._sheet = sheet
         self._args  = args
         self._cols  = cols
+
+    @property
+    def _constructor_expanddim(self):
+        raise NotImplementedError("Not supported for DataFrames!")
 
     def paste(self, filename, key):
         "pastes values into a file"

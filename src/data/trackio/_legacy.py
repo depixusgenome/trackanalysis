@@ -44,7 +44,7 @@ class LegacyTrackIO(TrackIO):
         if all(Path(i).is_dir() for i in trkdirs):
             for trk in (cls.TRKEXT, PickleIO.EXT):
                 end = f'/**/*{trk}'
-                lst = [i for i in chain.from_iterable(globfiles(str(k)+end) for k in trkdirs)]
+                lst = list(chain.from_iterable(globfiles(str(k)+end) for k in trkdirs))
                 if len(lst):
                     yield from iter(lst)
                     break

@@ -60,6 +60,7 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
     _sequencestyle            = dict(color = 'gray')
     _reftask                  = FitToReferenceTask()
     KEYWORDS                  = _PeaksDisplay.KEYWORDS | frozenset(locals())
+
     def __init__(self, items, **opts):
         super().__init__(items, **opts)
         if self._bias is not None or None not in (self._sequence, self._oligos):
@@ -67,7 +68,7 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
 
     def elements(self, evts, **opts):
         "shows overlayed Curve items"
-        if self._reftask and {i for i in evts.keys()} in self._reftask:
+        if self._reftask and set(evts.keys()) in self._reftask:
             evts = FitToReferenceProcessor.apply(evts, **self._reftask.config())
         return super().elements(evts, **opts)
 

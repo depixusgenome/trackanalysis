@@ -184,7 +184,7 @@ class SummaryWidget:
                                         nbeads  = sum(1 for i in track.beads.keys()))
 
 
-@dataclass
+@dataclass  # pylint: disable=too-many-instance-attributes
 class QCHairpinSizeTheme:
     "RampBeadStatusTheme"
     name:         str        = "qc.hairpinsize"

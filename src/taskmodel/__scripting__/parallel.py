@@ -66,7 +66,7 @@ class Parallel:
         if callable(endaction):
             return [cast(Callable, endaction)(i) for i in pool.map(self.run, self.args)]
 
-        res = [i for i in pool.map(self.run, self.args)]
+        res = list(pool.map(self.run, self.args))
         if all(len(i) == 1 for i in res):
             return [i[0] for i in res]
         return res

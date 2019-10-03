@@ -153,7 +153,7 @@ class RampStatsTask(Task):
         )
         info = self.__cyclebaseinfo(frame, key, arr, zmag)
         get  = lambda i, j: RampEventTuple( # type: ignore
-            *info,
+            *info,                          # type: ignore
             self.phases[j], i, dzdt[i], arr[i], zmag[i]
         )
         yield from (get(i, 0) for i in opens)
@@ -176,7 +176,7 @@ class RampStatsTask(Task):
             [:len(dzdt)]
         )
         return RampCycleTuple(                       # type: ignore
-            *self.__cyclebaseinfo(frame, key, arr, zmag),
+            *self.__cyclebaseinfo(frame, key, arr, zmag),  # type: ignore
             *((opens[-1], zmag[opens[-1]]) if len(opens)  else nans),
             *((closes[0], zmag[closes[0]]) if len(closes) else nans)
         )
