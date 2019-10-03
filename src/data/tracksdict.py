@@ -414,7 +414,7 @@ class TracksDict(dict):
         if tracks is not None:
             assert sum(i is None for i in (tracks, grs)) in (0, 1, 2)
             self.scan(tracks, grs,  # type: ignore
-                      match = match, allaxes = allaxes, **scan)
+                      match = match, allaxes = allaxes, **scan)  # type: ignore
     if getattr(update, '__doc__', None):
         # pylint: disable=no-member
         update.__doc__ = (cast(str, update.__doc__)

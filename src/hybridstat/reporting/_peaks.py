@@ -249,9 +249,8 @@ class PeaksSheet(Reporter):
 
         def _get(fmt, val1, val2 = None):
             fmt = self.book.add_format(dict(bg_color = fmt))
-            # pylint: disable=invalid-unary-operand-type
             return (__get(fmt,  val1, True  if val2 is None else  val2),
-                    __get(fmt, -val1, False if val2 is None else -val2))
+                    __get(fmt, -val1, False if val2 is None else -int(val2)))
 
         return _get("#FFFFBF", 2.5, 5.)+_get("#FFC7CE", 5.)
 

@@ -181,7 +181,7 @@ class PeaksStatsOrder(IntEnum):
     silhouette   = auto()
     chi2         = auto()
 
-@dataclass
+@dataclass  # pylint: disable=too-many-instance-attributes
 class PeaksStatsWidgetTheme:
     "PeaksStatsWidgetTheme"
     name:         str = "hybridstat.peaks.stats"
@@ -442,7 +442,7 @@ class CSVExporter:
     def reset(self, *_):
         "reset all"
 
-@dataclass
+@dataclass  # pylint: disable=too-many-instance-attributes
 class PeakIDPathTheme:
     "PeakIDPathTheme"
     name:        str       = "hybridstat.peaks.idpath"

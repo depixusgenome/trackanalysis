@@ -78,7 +78,7 @@ class GBScatterCreator(TaskPlotCreator[HairpinGroupModelAccess, HairpinGroupScat
 
         def _display(items):
             data  = self._data(items)
-            beads = [i for i in sorted(int(i) for i in set(data['events']['bead']))]
+            beads = sorted(int(i) for i in set(data['events']['bead']))
             bead  = self._model.bead
             if bead in beads:
                 beads.remove(bead)

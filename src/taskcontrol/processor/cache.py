@@ -179,7 +179,7 @@ class Cache(Iterable[Processor]):
 
     def cleancopy(self) -> 'Cache':
         "returns a cache with only the processors"
-        return Cache([i.proc for i in self._items])
+        return Cache([CacheItem(i.proc) for i in self._items])
 
     def getcache(self, ide):
         "access to processor's cache"

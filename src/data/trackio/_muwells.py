@@ -257,7 +257,7 @@ class MuWellsFilesIO(TrackIO):
                 meddist = int(np.median(np.diff(inds)))
                 out = np.concatenate(
                     [
-                        [k for k in range(inds[i],inds[i+1]-meddist//2, meddist)]
+                        list(range(inds[i],inds[i+1]-meddist//2, meddist))
                         for i in range(len(inds)-1)
                     ]
                     +[inds[-1:]]

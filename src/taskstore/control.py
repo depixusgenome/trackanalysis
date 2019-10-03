@@ -90,4 +90,4 @@ class ConfigAnaIO(AnaIO):
     @staticmethod
     def instrumenttype(path: str) -> str:
         "return the instrument type"
-        return instrumenttype(super().open(path, ())[0]['tasks'][0])
+        return instrumenttype(super().open(path, ())[0]['tasks'][0])  # type: ignore

@@ -6,7 +6,7 @@ from    bokeh                import layouts
 from    taskview.plots       import PlotView, CACHE_TYPE, TaskPlotCreator
 from    view.base            import stretchout
 from   ._bokehext            import DpxHoverModel
-from   ._model               import CyclesModelAccess, CyclesPlotModel
+from   ._model               import CyclesModelAccess, CyclesPlotModel, CyclesPlotTheme
 from   ._raw                 import RawMixin
 from   ._hist                import HistMixin
 from   ._widget              import WidgetMixin
@@ -18,6 +18,7 @@ class CyclesPlotCreator(  # pylint: disable=too-many-ancestors
     "Displays cycles and their projection"
     _model: CyclesModelAccess
     _hover: DpxHoverModel
+    _theme: CyclesPlotTheme
 
     def __init__(self, ctrl):
         "sets up this plotter's info"

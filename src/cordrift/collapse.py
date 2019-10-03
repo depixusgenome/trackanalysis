@@ -170,7 +170,7 @@ class CollapseToMean(_CollapseAlg):
         key    = lambda i: (-i.start-len(i.values), -len(i.values))
         cnt    = np.array(prof.count, dtype = 'f4')
         edge   = self._edge
-        inner  = slice(edge, None if edge is None else -edge)
+        inner  = slice(edge, None if edge is None else -int(edge))
         diff   = getattr(np, self.measure)
 
         weight = self._weight_function(prof, precision)
@@ -309,7 +309,7 @@ class CollapseByMerging(_CollapseAlg):
 
         vals        = np.copy(rho)
         vals[sl1]  *=  rng1[1] - cls.__delta(rng1, rng2)
-        vals[sl2]  += (rng2[1] - cls.__delta(rng2, rng1)) * (1.-rho[sl2])
+        vals[sl2]  += (rng2[1] - cls.__delta(rng1 = rng2, rng2 = rng1)) * (1.-rho[sl2])
         return start, vals, cnt
 
     def __update_prof(self, prof, inters, rngs):

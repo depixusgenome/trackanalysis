@@ -122,7 +122,7 @@ class JobRunner:
                             del pipes[i]
                             break
 
-                        elif out[0] not in store:
+                        if out[0] not in store:
                             yield out
 
             for inp in pipes:

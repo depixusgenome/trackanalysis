@@ -14,7 +14,7 @@ from .._io            import setupio
 from ..cyclehistplot  import BaseHistPlotCreator
 from ._model          import (ConsensusModelAccess, ConsensusScatterModel,
                               ConsensusScatterTheme, ConsensusHistPlotModel,
-                              ConsensusConfig)
+                              ConsensusConfig, ConsensusHistPlotTheme)
 from ._plot           import setpoolobservers
 from ._widget         import ConsensusPlotWidgets
 
@@ -24,6 +24,7 @@ class ConsensusHistPlotCreator(
     "Creates hist for a consensus bead"
     _plotmodel: ConsensusHistPlotModel
     _model:     ConsensusModelAccess
+    _theme:     ConsensusHistPlotTheme
 
     def _createpeaks(self, itms, out):
         peaks, allpks, factor = self._model.consensuspeaks(itms)

@@ -25,14 +25,14 @@ class IntervalExtension(ABC):
     @classmethod
     def extend(cls, ends, data, precision, window):
         "extends the provided ranges by as much as *window*"
-        if window <= 1 or len(ends) < 1:
+        if window <= 1 or not ends.shape[0]:
             return ends
 
         newmin = cls.__apply(ends, data, precision, -window)
         newmax = cls.__apply(ends, data, precision,  window)
 
         over   = np.nonzero(newmax[:-1] > newmin[1:])[0]
-        if len(over) != 0:
+        if over.shape[0] != 0:
             newmax[over]   = (newmin[over+1]+newmax[over])//2
             newmin[over+1] = newmax[over]
 
@@ -44,7 +44,7 @@ class IntervalExtension(ABC):
         return self.extend(ends, data, precision, self.window)
 
     @staticmethod
-    def _sidedata(inters, data, window, default, imax = None):
+    def _sidedata(inters, data, window, default, imax = None) -> np.ndarray:
         side   = 1 if window > 0 else 0
         inters = np.repeat(inters, 2)
         out    = inters[side::2]

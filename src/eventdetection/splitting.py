@@ -24,7 +24,7 @@ from    ._core  import (samples as _samples,
                         DerivateSplitDetector,
                         ChiSquareSplitDetector,
                         MultiGradeSplitDetector)
-norm = _samples.normal.knownsigma # pylint: disable=invalid-name
+norm = _samples.normal.knownsigma  # pylint: disable=invalid-name
 
 class SplitDetector(PrecisionAlg):
     """
@@ -38,10 +38,11 @@ class SplitDetector(PrecisionAlg):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def __call__(self,
-                 data     : np.ndarray,
-                 precision: Optional[float] = None
-                ) -> np.ndarray:
+    def __call__(
+            self,
+            data:      np.ndarray,
+            precision: Optional[float] = None
+    ) -> np.ndarray:
         nans, tmp = self._init(data)
         if len(tmp) == 0:
             return np.empty((0,2), dtype = 'i4')
@@ -75,20 +76,21 @@ class SplitDetector(PrecisionAlg):
 
     @staticmethod
     def _init(data:np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        nans = None
         if len(data) > 1:
             nans = np.isnan(data)
-            if any(nans):
-                data = data[~nans] # pylint: disable=invalid-unary-operand-type
-
-        return (np.array([]),)*2 if len(data) <= 1 else nans, data
+            if np.any(nans):
+                data = data[~nans]
+            if len(data) > 1:
+                return nans, data
+        return np.array([]), data
 
     @abstractmethod
-    def _boundaries(self,
-                    data      : np.ndarray,
-                    good      : np.ndarray,
-                    precision : float
-                   ) -> np.ndarray:
+    def _boundaries(
+            self,
+            data:      np.ndarray,
+            good:      np.ndarray,
+            precision: float
+    ) -> np.ndarray:
         "returns the indexes where an interval starts or ends"
 
 class GradedSplitDetector(SplitDetector):
@@ -127,17 +129,18 @@ class GradedSplitDetector(SplitDetector):
             inter[:min(erode, imax)]              = 0.
             inter[max(imax+1, len(inter)-erode):] = 0.
 
-    def _boundaries(self,
-                    data      : np.ndarray,
-                    good      : np.ndarray,
-                    precision : float
-                   ) -> np.ndarray:
+    def _boundaries(
+            self,
+            data:      np.ndarray,
+            good:      np.ndarray,
+            precision: float
+    ) -> np.ndarray:
         deltas    = self._flatness(good)
         threshold = self._threshold(data, deltas, precision)
         self._erode(self.erode, deltas, threshold)
         return (deltas > threshold).nonzero()[0]
 
-    def flatness(self, data : np.ndarray, precision: float = None) -> np.ndarray:
+    def flatness(self, data: np.ndarray, precision: float = None) -> np.ndarray:
         """
         Returns the likeliness of an interval being declared.
 
@@ -158,18 +161,22 @@ class GradedSplitDetector(SplitDetector):
         return result
 
     @abstractmethod
-    def _flatness(self, data : np.ndarray) -> np.ndarray:
+    def _flatness(self, data: np.ndarray) -> np.ndarray:
         "Computes a flatness characteristic on all indices"
 
     @abstractmethod
-    def _threshold(self,
-                   data      : np.ndarray,
-                   deltas    : np.ndarray,
-                   precision : Optional[float]
-                  ) -> Optional[float]:
+    def _threshold(
+            self,
+            data:      np.ndarray,
+            deltas:    np.ndarray,
+            precision: Optional[float]
+    ) -> Optional[float]:
         "Computes a threshold on the flatness characteristic"
 
+
 ConfidenceType = Union[None, float, Threshold]
+
+
 class PyDerivateSplitDetector(GradedSplitDetector):
     """
     Detects flat stretches of value
@@ -191,7 +198,7 @@ class PyDerivateSplitDetector(GradedSplitDetector):
         super().__init__(**kwa)
         self._kernel: Tuple[Tuple[int, int, str], np.ndarray] = None
 
-    def _flatness(self, data : np.ndarray) -> np.ndarray:
+    def _flatness(self, data: np.ndarray) -> np.ndarray:
         window = self.window
         if self._kernel is None or self._kernel[0] != (window, self.truncate, self.shape):
             if self.shape == 'square':
@@ -211,13 +218,14 @@ class PyDerivateSplitDetector(GradedSplitDetector):
         delta = correlate1d(data, kern, mode = 'nearest')
         return np.abs(delta)
 
-    def _threshold(self,
-                   data      : np.ndarray,
-                   deltas    : np.ndarray,
-                   precision : Optional[float]
-                  ) -> Optional[float]:
+    def _threshold(
+            self,
+            data:      np.ndarray,
+            deltas:    np.ndarray,
+            precision: Optional[float]
+    ) -> Optional[float]:
         if callable(self.confidence):
-            return self.confidence(data, deltas, precision) # pylint: disable=not-callable
+            return self.confidence(data, deltas, precision)  # pylint: disable=not-callable
 
         if self.confidence is None or cast(float, self.confidence) <= 0.:
             return precision
@@ -237,7 +245,7 @@ class PyChiSquareSplitDetector(GradedSplitDetector):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def _flatness(self, data : np.ndarray) -> np.ndarray:
+    def _flatness(self, data: np.ndarray) -> np.ndarray:
         win = self.window
         tmp = np.concatenate([[data[0]]*(win//2), data, [data[-1]]*(win//2)])
         arr = as_strided(tmp,
@@ -250,15 +258,16 @@ class PyChiSquareSplitDetector(GradedSplitDetector):
         delta      = np.sqrt(np.nansum((arr-mean[None].T)**2, axis = 1)/win)
         return delta
 
-    def _threshold(self,
-                   data      : np.ndarray,
-                   deltas    : np.ndarray,
-                   precision : Optional[float]
-                  ) -> Optional[float]:
+    def _threshold(
+            self,
+            data:      np.ndarray,
+            deltas:    np.ndarray,
+            precision: Optional[float]
+    ) -> Optional[float]:
         if self.confidence is None:
             return precision
         if callable(self.confidence):
-            return self.confidence(data, deltas, precision) # pylint: disable=not-callable
+            return self.confidence(data, deltas, precision)  # pylint: disable=not-callable
         return (precision
                 * chi2.ppf(1.-cast(float,self.confidence), self.window-1)
                 / self.window)
@@ -280,7 +289,7 @@ class MinMaxSplitDetector(GradedSplitDetector):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def _flatness(self, data   : np.ndarray) -> np.ndarray:
+    def _flatness(self, data: np.ndarray) -> np.ndarray:
         window = self.window
         out    = np.empty(len(data), dtype = 'f4')
         if window == 1:
@@ -298,11 +307,12 @@ class MinMaxSplitDetector(GradedSplitDetector):
             out[window:]  -= np.min(dt2d, axis = 1)[:-1]
         return np.abs(out)
 
-    def _threshold(self,
-                   data      : np.ndarray,
-                   _         : np.ndarray,
-                   precision : Optional[float]
-                  ) -> Optional[float]:
+    def _threshold(
+            self,
+            data:      np.ndarray,
+            _:         np.ndarray,
+            precision: Optional[float]
+    ) -> Optional[float]:
         if self.confidence is None or self.confidence <= 0.:
             return precision
         return norm.threshold(True, self.confidence, precision)
@@ -359,8 +369,11 @@ class PyMultiGradeSplitDetector(SplitDetector):
     AGG                              = MultiGradeAggregation
     ITEM                             = MultiGradeItem
     erode                            = 1
-    _detectors: List[MultiGradeItem] = [ITEM(PyDerivateSplitDetector (), AGG.minimum),
-                                        ITEM(PyChiSquareSplitDetector(), AGG.patch)]
+    _detectors: List[MultiGradeItem] = [
+        ITEM(PyDerivateSplitDetector(), AGG.minimum),
+        ITEM(PyChiSquareSplitDetector(), AGG.patch)
+    ]
+
     @initdefaults('detectors')
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -382,7 +395,7 @@ class PyMultiGradeSplitDetector(SplitDetector):
 
         return self._detectors
 
-    def flatness(self, data : np.ndarray, precision: float = None) -> np.ndarray:
+    def flatness(self, data: np.ndarray, precision: float = None) -> np.ndarray:
         """
         Returns the likeliness of an interval being declared.
 
@@ -401,11 +414,12 @@ class PyMultiGradeSplitDetector(SplitDetector):
         result[~nans] = flatness
         return result
 
-    def _boundaries(self,
-                    data      : np.ndarray,
-                    good      : np.ndarray,
-                    precision : float
-                   ) -> np.ndarray:
+    def _boundaries(
+            self,
+            data:      np.ndarray,
+            good:      np.ndarray,
+            precision: float
+    ) -> np.ndarray:
         deltas = self.__fullflatness(data, good, precision)
 
         # pylint: disable=protected-access
@@ -419,10 +433,12 @@ class PyMultiGradeSplitDetector(SplitDetector):
         deltas /= detector._threshold(data, deltas, precision)
         return deltas
 
-    def __fullflatness(self,
-                       data      : np.ndarray,
-                       good      : np.ndarray,
-                       precision : Optional[float]) -> np.ndarray:
+    def __fullflatness(
+            self,
+            data:      np.ndarray,
+            good:      np.ndarray,
+            precision: Optional[float]
+    ) -> np.ndarray:
         "Computes a flatness characteristic on all indices"
         args   = data, good, precision
         deltas = self.__detectorflatness(self.detectors[0].detector, *args)

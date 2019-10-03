@@ -323,7 +323,7 @@ class TrackSimulator:
         dtpe  = EVENTS_DTYPE
         for cyc in self.__cyclephase(cycles, PHASE.measure):
             rng  = np.nonzero(np.diff(cyc))[0]+1
-            evts = [(i, evt) for i, evt in zip(chain((0,), rng), np.split(cyc, rng))]
+            evts = list(zip(chain((0,), rng), np.split(cyc, rng)))
             yield np.array(evts, dtype = dtpe)
 
     def __apply(self, fcn:Callable[...,Any], *args):

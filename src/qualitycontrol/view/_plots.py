@@ -143,7 +143,8 @@ class TServoPlotCreator(DriftControlPlotCreator):
 
 class ExtensionPlotCreator(DriftControlPlotCreator):
     "Shows bead extension temporal series"
-    _theme: ExtensionPlotTheme
+    _theme:  ExtensionPlotTheme
+    _config: DriftControlPlotConfig
 
     def __init__(self, ctrl, **kwa) -> None:
         super().__init__(ctrl,

@@ -3,7 +3,7 @@
 "Model for peaksplot"
 from   copy                     import deepcopy
 from   typing                   import (
-    Set, Optional, Dict, Tuple, Any, Sequence,
+    Set, Optional, Dict, Tuple, Any, Sequence, ClassVar, Type,
     Iterator, cast
 )
 
@@ -246,6 +246,8 @@ class FitToHairpinDisplay:
 
 class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
     "access to the FitToHairpinTask"
+    tasktype:   ClassVar[Type[FitToHairpinTask]]
+
     def __init__(self, mdl):
         super().__init__(mdl)
         self.__defaults        = FitToHairpinConfig()

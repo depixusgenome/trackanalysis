@@ -118,11 +118,11 @@ def savetrack(path  : PATHTYPE, track : Union['Track', Dict[str,'Track']]
         root = Path(path)
         root.mkdir(parents=True, exist_ok=True)
 
-        args = [(key, (root/key).with_suffix(PickleIO.EXT), trk)
-                for key, trk in cast(dict, track).items()]
+        args = ((key, (root/key).with_suffix(PickleIO.EXT), trk)
+                for key, trk in cast(dict, track).items())
         new  = shallowcopy(track)
         with ThreadPoolExecutor(N_SAVE_THREADS) as pool:
-            new.update({i: j for i, j in pool.map(_savetrack, args)})
+            new.update(dict(pool.map(_savetrack, args)))
         return new
 
     return _savetrack((None, path, track))[1]

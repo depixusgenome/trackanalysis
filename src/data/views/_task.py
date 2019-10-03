@@ -72,9 +72,9 @@ class TaskView(TrackView, Generic[Config, Key]):
             if isinstance(i, tuple):
                 if len(i) == 0:
                     continue
-                elif len(i) == 2 and not isellipsis(i[1]):
+                if len(i) == 2 and not isellipsis(i[1]):
                     raise NotImplementedError()
-                elif len(i) > 2 :
+                if len(i) > 2 :
                     raise KeyError(f"Unknown key {i} in {cls}")
                 if np.isscalar(i[0]):
                     yield i[0]

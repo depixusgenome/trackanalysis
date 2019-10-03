@@ -4,9 +4,9 @@ import sys
 from wafbuilder  import PyTesting
 from makescripts import *
 
-require(cxx    = {'msvc'     : 14.0,
-                  'clang++'  : 3.8,
-                  'g++'      : 7.3},
+require(cxx    = {'msvc':    14.0,
+                  'clang++': 3.8,
+                  'g++':     7.3},
         rtime = False)
 
 PYVERS         = (
@@ -21,13 +21,13 @@ require(
 
 require(
     python = {
-        'coverage'    : '4.5.3',
-        'pybind11'    : '2.2.1',
-        'pylint'      : '=2.3.1',
-        'astroid'     : '=2.2.5',
-        'mypy'        : '=0.720',
-        'sphinx'      : '2.1',
-        'pandoc'      : '2.2.3'
+        'coverage': '4.5.3',
+        'pybind11': '2.2.1',
+        'pylint':   '=2.4.2',
+        'astroid':  '=2.3.1',
+        'mypy':     '=0.730',
+        'sphinx':   '2.1',
+        'pandoc':   '2.2.3'
     },
     rtime  = False
 )

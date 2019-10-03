@@ -135,7 +135,7 @@ def process(
         for j in (i if output == 'items' else getattr(i, output)())
     )
 
-class BaseTaskController(Controller):
+class BaseTaskController(Controller):  # pylint: disable=too-many-public-methods
     "Data controller class"
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -160,6 +160,12 @@ class BaseTaskController(Controller):
         if self._procs is None:
             self._procs = register(Processor)
         return self._procs
+
+    def processortype(self, task: Union[Task, Type[Task]]) -> Type[Processor]:
+        "return the type of processor to use"
+        if task is ...:
+            return self.__processors
+        return self.__processors[task if isinstance(task, type) else type(task)]
 
     def task(
             self,

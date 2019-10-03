@@ -230,11 +230,13 @@ class BaseFoVPlotCreator(TaskPlotCreator[TModelType, PlotModelType]):
     def _status(self) -> Dict[str, Set[int]]:
         raise NotImplementedError()
 
-class FoVPlotCreator(BaseFoVPlotCreator[QualityControlModelAccess, # type: ignore
+class FoVPlotCreator(BaseFoVPlotCreator[QualityControlModelAccess,  # type: ignore
                                         FoVPlotModel]):
     "Plots a default bead and its FoV"
     _model:     QualityControlModelAccess
     _plotmodel: FoVPlotModel
+    _theme:     FoVPlotTheme
+
     def _tooltips(self):
         msgs                            = self._model.messages()
         ttips: Dict[BEADKEY, List[str]] = {}
