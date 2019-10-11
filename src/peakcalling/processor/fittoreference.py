@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Matching experimental peaks to hairpins: tasks and processors"
-from   typing                           import (Optional, Iterable, Sequence,
-                                                Dict, Iterator, Tuple, Union,
-                                                NamedTuple, Generator, cast)
+from   copy    import deepcopy
+from   typing  import (
+    Optional, Iterable, Sequence, Dict, Iterator, Tuple, Union, NamedTuple,
+    Generator, Any, cast
+)
+
 import numpy                            as     np
+
 
 from   data.views                       import TaskView
 from   eventdetection.data              import Events
@@ -14,6 +18,7 @@ from   peakfinding.processor.selector   import PeakListArray, PeaksDict
 from   tasksequences                    import StretchFactor
 from   taskcontrol.processor.runner     import run as _runprocessors
 from   taskcontrol.processor.taskview   import TaskViewProcessor
+from   taskcontrol.processor.cache      import Cache
 from   taskmodel                        import Task, Level
 from   utils                            import initdefaults
 from   ..toreference                    import ReferenceFit, ReferencePeaksFit
@@ -110,6 +115,26 @@ class FitToReferenceTask(Task, zattributes = ('fitalg', "~window")):
                   events      = lambda self, val: self.fromevents(val))
     def __init__(self, **kwa):
         super().__init__(**kwa)
+
+    def __delayed_init__(self, _):
+        if isinstance(self.defaultdata, (list, tuple)):
+            self.defaultdata = Cache(self.defaultdata)
+
+    def __getstate__(self) -> Dict[str, Any]:
+        info = dict(self.__dict__)
+        info['defaultdata'] = getattr(
+            self.defaultdata, 'cleancopy', lambda: self.defaultdata
+        )()
+        return deepcopy(info)
+
+    def __eq__(self, other) -> bool:
+        return (
+            self is other
+            or (
+                self.__class__ is other.__class__
+                and all(getattr(self, i) == getattr(other, i) for i in self.__dict__)
+            )
+        )
 
     def __contains__(self, itms):
         if self.defaultdata is not None:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updating list of jobs to run"
-from typing                     import Dict, TYPE_CHECKING
+from typing                     import Dict, TYPE_CHECKING, cast
 
 import asyncio
 
@@ -27,8 +27,13 @@ class TasksModelController:
         holds the information such as task lists, ..., on all FoVs
     """
     _ctrl: 'SuperController'
+    jobs:  JobModel   = cast(JobModel,   property(lambda self: getattr(self, '_jobs')))
+    tasks: TasksModel = cast(TasksModel, property(lambda self: getattr(self, '_tasks')))
 
     def __init__(self):
+        self.eventname:     str = 'peakcalling.view.jobs'
+        self.eventjobstart: str = f'{self.eventname}.start'
+        self.eventjobstop:  str = f'{self.eventname}.stop'
         self._jobs:  JobModel   = JobModel()
         self._tasks: TasksModel = TasksModel()
 
@@ -45,20 +50,22 @@ class TasksModelController:
             if callable(getattr(i, 'observe', None)):
                 i.observe(ctrl)
 
-        @ctrl.display.observe(self._tasks.state)
-        @ctrl.display.hashwith(self._tasks.state)
-        def _onclosetrack(**_):
+        @ctrl.display.observe(self._tasks.tasks.name)
+        @ctrl.display.hashwith(self._jobs.display)
+        def _ontasks(**_):
             ctrl.display.update(self._jobs.display, calls = self._jobs.display.calls+1)
 
         @ctrl.display.observe(self._jobs.display)
-        @ctrl.display.hashwith(self._tasks.state)
+        @ctrl.display.hashwith(self._tasks.tasks)
         def _onchange(**_):
             idval = self._jobs.display.calls
-            procs = list(self._tasks.processors().values())
+            procs = list(self._tasks.processors.values())
 
             async def _run():
-                with ctrl.display("peakcalling.view", args = {}) as sendevt:
-                    JobRunner(self._jobs).run(procs, sendevt, idval)
+                ctrl.display.handle(self.eventjobstart)
+                with ctrl.display(self.eventname, args = {}) as sendevt:
+                    await JobRunner(self._jobs).run(procs, sendevt, idval)
+                ctrl.display.handle(self.eventjobstop)
 
             asyncio.create_task(_run())
 

@@ -4,7 +4,7 @@
 from pathlib     import Path
 from typing      import cast
 from ..testutils import (
-        ResourcePath, getmonkey, DummyPool
+        ResourcePath, getmonkey, DummyPool, integrationmark
 )
 
 def _trackreadertask(fpath):
