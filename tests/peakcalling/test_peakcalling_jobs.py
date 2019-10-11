@@ -7,7 +7,7 @@ from time                           import sleep, time
 from multiprocessing                import current_process
 
 from peakcalling.view._model._jobs  import JobRunner, JobModel
-from peakcalling.view._model._tasks import TasksModel
+from peakcalling.view._model._tasks import TasksModel, _RootCache
 from taskcontrol.taskcontrol        import ProcessorController
 from taskcontrol.processor.track    import TrackReaderProcessor
 from taskmodel.track                import TrackReaderTask
@@ -43,10 +43,12 @@ class _Proc:
     def run(self):
         yield self.data
 
+
 MDL  = JobModel()
 MDL.config.ncpu = 2
 MDL.config.maxkeysperjob = 10
 JOBS = JobRunner(MDL)
+
 
 def test_peakcalling_jobs():
     "test peakcalling JOBS"
@@ -60,11 +62,9 @@ def test_peakcalling_jobs():
     ]
 
     evts = []
-    def _evt(**_):
-        evts.append(_)
 
     asyncio.set_event_loop(asyncio.new_event_loop())
-    asyncio.run(JOBS.run(procs, _evt, None))
+    asyncio.run(JOBS.run(procs, evts.append, None))
 
     assert len(evts) >= 4+3+0+0+2+1+2
     for i in range(4):
@@ -74,7 +74,7 @@ def test_peakcalling_jobs():
     assert set(evts[2]['beads']) == set(range(10, 21))
     assert set(evts[3]['beads']) == set(range(10, 15))
     for i in (0, 3, 4, 5):
-        assert set(procs[i].data.cache) == {i for i in range(21)}
+        assert set(procs[i].data.cache) == set(range(21))
     assert set(procs[1].data.cache) == set()
     assert set(procs[2].data.cache.values()) == {22}
     assert {i for i, j in procs[3].data.cache.items() if j == 33} == set(range(10))
@@ -97,7 +97,7 @@ def test_peakcalling_jobs_cancel1():
 
     asyncio.set_event_loop(asyncio.new_event_loop())
     asyncio.get_event_loop().run_until_complete(
-        asyncio.gather(_wait(), JOBS.run(procs, (lambda **_: None), None))
+        asyncio.gather(_wait(), JOBS.run(procs, (lambda _: None), None))
     )
     assert len(procs[0].data.cache) > 0
     assert len(procs[1].data.cache) == 0
@@ -116,7 +116,7 @@ def test_peakcalling_jobs_cancel2():
 
     asyncio.set_event_loop(asyncio.new_event_loop())
     asyncio.get_event_loop().run_until_complete(
-        asyncio.gather(_wait(), JOBS.run(procs, (lambda **_: None), None))
+        asyncio.gather(_wait(), JOBS.run(procs, (lambda _: None), None))
     )
     assert procs[0].data.cache is None
     assert 0 < len(cache) < 21
@@ -140,6 +140,7 @@ class _Hairpin:
         self.sequences = None
         self.oligos    = None
         self._res      = resolve
+        self.fit       = {'aa': 'bb'}
 
     @staticmethod
     def unique():
@@ -149,6 +150,7 @@ class _Hairpin:
         "dummy"
         if not self._res:
             self.oligos = None
+            self.fit   = {}
         return self
 
 def test_adapt_procs_ref():
@@ -173,6 +175,7 @@ def test_adapt_procs_ref():
 
     for i in procs:
         mdl.tasks.add(i)
+    mdl.dataframes.peaks.measures = {'events': True}
 
     lst = mdl.processors
     assert len(lst) == len(procs)
@@ -220,6 +223,7 @@ def test_adapt_procs_fittohp():
 
     for i in procs:
         mdl.tasks.add(i)
+    mdl.dataframes.fits.measures = {'peaks': {'all': True, 'events': True}}
 
     lst = mdl.processors
     assert len(lst) == len(procs)
@@ -230,7 +234,10 @@ def test_adapt_procs_fittohp():
         assert lst[i.model[0]].model[-1].__class__.__name__ == 'DataFrameTask'
         assert lst[i.model[0]].model[-1].measures == {'peaks': {'all': True, 'events': True}}
         assert lst[i.model[0]].model[1].__class__.__name__ == '_Hairpin'
-        assert lst[i.model[0]].model[1].sequences == 'a'
+        if i.model[0] in (procs[0].model[0], procs[2].model[0]):
+            assert lst[i.model[0]].model[1].sequences is None
+        else:
+            assert lst[i.model[0]].model[1].sequences == 'a'
 
     mdl.state.reference = procs[1].model[0]
 
@@ -242,7 +249,10 @@ def test_adapt_procs_fittohp():
         assert lst[i.model[0]].model[-1].__class__.__name__ == 'DataFrameTask'
         assert lst[i.model[0]].model[-1].measures == {'peaks': {'all': True, 'events': True}}
         assert lst[i.model[0]].model[-2].__class__.__name__ == '_Hairpin'
-        assert lst[i.model[0]].model[-2].sequences == 'a'
+        if i.model[0] in (procs[0].model[0], procs[2].model[0]):
+            assert lst[i.model[0]].model[-2].sequences is None
+        else:
+            assert lst[i.model[0]].model[-2].sequences == 'a'
         if i.model[0] is not mdl.state.reference:
             assert lst[i.model[0]].model[1].__class__.__name__ == '_Ref'
             assert lst[i.model[0]].model[1].defaultdata is lst[mdl.state.reference].data
@@ -252,5 +262,36 @@ def test_adapt_procs_fittohp():
     lst = mdl.processors
     assert len(lst) == 2
 
+def test_lru():
+    tasks = [TrackReaderTask(utpath("big_legacy")), _Ref()]
+    lru = _RootCache(2)
+    info = {}
+    assert info is lru.setdefault(tasks, info)
+    assert info is lru.setdefault(tasks, None)
+    assert info is lru[tasks]
+    assert tasks in lru
+
+    lru[tasks] = cache = {}
+    assert tasks in lru
+    assert info is not lru[tasks]
+    assert cache is lru[tasks]
+
+    tasks = [TrackReaderTask(utpath("big_legacy")), _Ref()]
+    assert cache is lru.setdefault(tasks, None)
+
+    tasks2 = [TrackReaderTask(utpath("big_legacy"))]
+    assert tasks2 not in lru
+    info2  = lru.setdefault(tasks2, None)
+    assert info2 is lru.setdefault(tasks2, None)
+
+    tasks3 = [TrackReaderTask(utpath("big_legacy")), _Ref(), _Hairpin()]
+    lru.setdefault(tasks3, None)
+    assert tasks not in lru
+    assert tasks2  in lru
+
+    del lru[tasks2]
+    assert tasks2  not in lru
+
+
 if __name__ == '__main__':
-    test_peakcalling_jobs()
+    test_lru()

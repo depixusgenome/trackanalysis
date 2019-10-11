@@ -337,6 +337,16 @@ def setupdefaulttask(tasktype: Type[Task], name: str = '', **kwa) -> str:
     "add task to the instruments"
     return ConfigurationDescriptor.setupdefaulttask(tasktype, name, **kwa)
 
+def setupio(ctrl, tasks = None, ioopen = None, iosave = None):
+    "Set-up things if this view is the main one"
+    cnf = ctrl.theme.model("tasks.io", True)
+    if cnf is None:
+        ctrl.theme.add(TaskIOTheme().setup(tasks, ioopen, iosave), False)
+    else:
+        diff = cnf.setup(tasks, ioopen, iosave).diff(cnf)
+        if diff:
+            ctrl.theme.updatedefaults(cnf, **diff)
+
 
 setupdefaulttask(CycleSamplingTask)
 setupdefaulttask(TrackReaderTask)

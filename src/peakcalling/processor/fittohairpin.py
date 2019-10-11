@@ -20,7 +20,7 @@ from   peakfinding.processor       import (
     BaselinePeakProcessor, PeakStatusComputer
 )
 from   peakfinding.processor.dataframe import PeaksDataFrameFactory
-from   sequences                       import splitoligos
+from   sequences                       import splitoligos, read as _read
 from   taskmodel                       import Task, Level
 from   taskcontrol.processor.taskview  import TaskViewProcessor
 from   taskcontrol.processor.dataframe import DataFrameFactory, DataFrameTask
@@ -167,7 +167,12 @@ class FitToHairpinTask(Task, zattributes = ('fit', 'constraints', 'singlestrand'
 
     def resolve(self, path: Union[str, Path, Tuple[Union[str, Path],...]]) -> 'FitToHairpinTask':
         "create a new task using attributes sequences & oligos"
-        if not self.sequences or not self.oligos:
+        if (
+                not self.sequences
+                or not self.oligos
+                or len(self.fit) > 1
+                or (set(self.fit) - {None})
+        ):
             return self
 
         oligos = list(splitoligos(self.oligos, path = path))
@@ -226,11 +231,22 @@ class FitToHairpinTask(Task, zattributes = ('fit', 'constraints', 'singlestrand'
                   cast(Type[PeakMatching], match)() if isinstance(match, type) else
                   cast(PeakMatching, match))
 
-        return cls(fit   = fits,
-                   match = {key: updatecopy(imatch, True,
-                                            peaks      = value.peaks,
-                                            strandsize = value.strandsize)
-                            for key, value in fits.items()})
+        return cls(
+            fit   = fits,
+            match = {
+                key: updatecopy(
+                    imatch, True,
+                    peaks      = value.peaks,
+                    strandsize = value.strandsize
+                )
+                for key, value in fits.items()
+            },
+            oligos    = oligos,
+            sequences = (
+                dict(_read(path)) if isinstance(path, (dict, str, Path)) else
+                None
+            )
+        )
 
 
 PeakEvents      = Iterable[PeakFindingOutput]

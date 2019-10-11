@@ -5,15 +5,19 @@
 from   multiprocessing            import Process, Pipe
 from   multiprocessing.connection import Connection
 from   typing                     import (
-    Dict, Callable, List, Optional, Set, Union, Any, Iterator, Tuple
+    Dict, Callable, List, Optional, Set, Union, Any, Iterator, Tuple,
+    AsyncIterator
 )
 import asyncio
 
 import pandas as pd
 
-from taskcontrol.processor           import ProcessorException
-from taskmodel.processors            import TaskCacheList
+from taskcontrol.processor  import ProcessorException
+from taskmodel.dataframe    import DataFrameTask
+from taskmodel.processors   import TaskCacheList
+from utils.logconfig        import getLogger
 
+LOGS  = getLogger(__name__)
 STORE = Dict[int, Union[Exception, pd.DataFrame]]
 
 class JobConfig:
@@ -49,7 +53,7 @@ class JobRunner(JobModel):
     async def run(
             self,
             processors: List[TaskCacheList],
-            events:     Callable[..., None],
+            events:     Callable[[Dict[str, Any]], None],
             idval:      Optional[int] = None
     ):
         """
@@ -64,38 +68,43 @@ class JobRunner(JobModel):
             a method emitting an event every time it is called
         """
         # freeze current config
-        if idval is None:
-            idval = self.display.calls
+        idcall = self.display.calls if idval is None else idval
 
         ncpu:  int        = self.config.ncpu
         nprocs: List[int] = [ncpu]
 
+        def _evtfcn(procs: TaskCacheList, beads: List[int]):
+            try:
+                events(dict(idval = idcall, taskcache = procs, beads = beads))
+            except Exception as exc:  # pylint: disable=broad-except
+                LOGS.exception(exc)
+
         # create a list allows sending events for all beads already treated
-        jobs: List[Tuple[TaskCacheList, List[int]]] = [
+        jobs: List[Tuple[TaskCacheList, Set[int]]] = [
             (procs, keys)
             for procs in processors
-            for keys in self.__split(idval, events, procs)
+            for keys in self.__split(_evtfcn, procs)
         ]
 
-        async def _watchjob(procs, keys):
+        async def _watchjob(procs: TaskCacheList, keys: Set[int]):
             try:
-                async for beads in self.__startjob(procs, keys, idval):
-                    events(idval = idval, taskcache = procs, beads = beads)
+                async for beads in self.__startjob(procs, keys, idcall):
+                    _evtfcn(procs, beads)
             finally:
                 nprocs[0] += 1
 
         # now iterate throught remaining keys
         for procs, keys in jobs:
-            while self.__keepgoing(idval, nprocs[0] > 0):
+            while self.__keepgoing(idcall, nprocs[0] > 0):
                 await asyncio.sleep(self.config.waittime)
 
-            if not self.__keepgoing(idval):
+            if not self.__keepgoing(idcall):
                 return
 
             nprocs[0] -= 1
             asyncio.create_task(_watchjob(procs, keys))
 
-        while self.__keepgoing(idval, nprocs[0] == ncpu):
+        while self.__keepgoing(idcall, nprocs[0] == ncpu):
             await asyncio.sleep(self.config.waittime)
 
     @staticmethod
@@ -134,10 +143,12 @@ class JobRunner(JobModel):
             procs: TaskCacheList,
             keys:  Set[int],
             idval: int
-    ):
+    ) -> AsyncIterator[List[int]]:
         "run a single job"
-        store: STORE                                  = procs.data.setcachedefault(-1, {})
-        cache: Callable[[], Optional[Dict[int, Any]]] = procs.data.getcache(-1)
+        cache: Callable[[], STORE] = procs.data.getcache(DataFrameTask)
+        store: STORE               = cache()
+        if store is None:
+            return
 
         def _keepgoing(done) -> bool:
             return self.__keepgoing(idval, done) and cache() is not None
@@ -152,7 +163,7 @@ class JobRunner(JobModel):
         while _keepgoing(done):
             await asyncio.sleep(self.config.waittime)
 
-            found = []
+            found: List[int] = []
             while _keepgoing(done or not pipein.poll()):
                 ibead, data = pipein.recv()
                 done        = ibead is None
@@ -170,12 +181,14 @@ class JobRunner(JobModel):
         return not done and idval == self.display.calls
 
     def __split(
-            self, idval: int, events: Callable[..., None], procs: TaskCacheList
-    ) -> Iterator[List[int]]:
+            self,
+            events: Callable[[TaskCacheList, List[int]], None],
+            procs:  TaskCacheList
+    ) -> Iterator[Set[int]]:
         keys  = set(next(iter(procs.run()), {}).keys())
-        cache = procs.data.getcache(-1)()
+        cache = procs.data.getcache(DataFrameTask)()
         if cache:
-            events(idval = idval, taskcache = procs, beads = list(cache))
+            events(procs, list(cache))
             keys -= set(cache)
 
         if keys:
@@ -190,4 +203,4 @@ class JobRunner(JobModel):
                 ix1 = i + min(rem, i)
                 ix2 = min(ix1 + batch + (i < rem), len(lkeys))
                 if ix1 < ix2:
-                    yield lkeys[ix1:ix2]
+                    yield set(lkeys[ix1:ix2])

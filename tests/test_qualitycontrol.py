@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
-from tests.testutils                  import integrationmark
+from tests.testingcore import integrationmark
 
 @integrationmark
 def test_view_messages(bokehaction):
@@ -23,5 +23,5 @@ def test_view_fov(bokehaction):
     ).load('big_legacy')
 
 if __name__ == '__main__':
-    from tests.testutils.bokehtesting import BokehAction
+    from tests.testingcore.bokehtesting import BokehAction
     test_view_messages(BokehAction(None))

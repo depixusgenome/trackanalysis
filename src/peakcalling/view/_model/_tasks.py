@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Updating list of jobs to run"
 from copy                       import deepcopy
-from dataclasses                import dataclass
+from dataclasses                import dataclass, field
 from typing                     import (
     Dict, Union, Type, Optional, ItemsView, List, Iterator, Tuple, cast
 )
@@ -17,15 +17,29 @@ from taskcontrol.processor      import Processor
 from taskmodel.application      import TasksConfig, TasksDisplay
 from taskmodel.dataframe        import DataFrameTask
 from taskmodel                  import RootTask, Task
+from ...processor.__config__    import FitToReferenceTask, FitToHairpinTask
 
 OptProc    = Optional[ProcessorController]
 ProcOrRoot = Union[RootTask, ProcessorController]
 Cache      = Dict[int, Union[Exception, pd.DataFrame]]
 
+@dataclass
+class TaskLRUConfig:
+    """info missing from TasksConfig"""
+    name:    str                         = "peakcalling.view.lru"
+    maxsize: int                         = 5
+
+    def newcache(self) -> '_RootCache':
+        "return new cache"
+        return _RootCache(self.maxsize)
+
 class TasksDict:
     "Deals with keeping a copy of tasks for each track"
     def __init__(self):
+        self.name:  str                                 = 'peakcalling.view.tasksdict'
         self.tasks: Dict[RootTask, ProcessorController] = {}
+        self.cache: Dict[RootTask, _RootCache]          = {}
+        self.lru:   TaskLRUConfig                       = TaskLRUConfig()
 
     def __contains__(self, root: 'ProcOrRoot') -> bool:
         if isinstance(root, ProcessorController) and len(root.model):
@@ -49,45 +63,70 @@ class TasksDict:
 
     def swapmodels(self, ctrl):
         "swap models with those in the controller"
-        self.tasks.clear()
-        for i in ctrl.tasks.tasklist(...):
-            root = next(i, None)
-            if root:
-                self.tasks[root] = self.cleancopy(ctrl.tasks.processors(root))
+        self.lru = ctrl.theme.swapmodels(self.lru)
+        self._reset_tasks(ctrl)
+
+    def _reset_tasks(self, ctrl):
+        tasks = dict()
+        cache = dict()
+        for lst in ctrl.tasks.tasklist(...):
+            root = next(lst, None)
+            if root is None:
+                continue
+
+            if root in self.tasks:
+                tasks[root] = self.tasks[root]
+                cache[root] = self.cache[root]
+            else:
+                tasks[root] = self.cleancopy(ctrl.tasks.processors(root))
+                cache[root] = self.lru.newcache()
+
+        self.tasks = tasks
+        self.cache = cache
 
     def observe(self, ctrl):
         "updates models as needed"
-        ctrl = ctrl.tasks
-
         def _observe(fcn):
-            return ctrl.observe(ctrl.hashwith(self)(fcn))
+
+            @ctrl.tasks.observe(fcn.__name__[3:])
+            @ctrl.tasks.hashwith(self)
+            def _wrapped(**_):
+                ctrl.display.handle(
+                    self.name,
+                    ctrl.display.emitpolicy.outasdict,
+                    dict(tasks = self, change = fcn(**_), action = fcn.__name__[3:])
+                )
 
         @_observe
-        def _onopentrack(**_):
-            for i in ctrl.tasklist(...):
-                root = cast(RootTask, next(i, None))
-                if root not in self.tasks:
-                    self.add(ctrl.processors(root))
+        def _onopentrack(**_) -> dict:
+            old = self.tasks
+            self._reset_tasks(ctrl)
+            return {i: self.tasks[i] for i in  set(self.tasks) - set(old)}
 
         @_observe
-        def _onclosetrack(task, **_):
-            self.tasks.pop(task, None)
+        def _onclosetrack(**_) -> dict:
+            old = self.tasks
+            self._reset_tasks(ctrl)
+            return {i: old[i] for i in  set(old) - set(self.tasks)}
 
         @_observe
-        def _onaddtask(parent, task, **_):
+        def _onaddtask(parent, task, **_) -> Tuple[ProcessorController, Task]:
             self.tasks[parent].add(
                 task,
-                ctrl.processortype(task),
-                ctrl.processors(parent).model.index(task)
+                ctrl.tasks.processortype(task),
+                ctrl.tasks.processors(parent).model.index(task)
             )
+            return self.tasks[parent], task
 
         @_observe
-        def _onupdatetask(parent, task, **_):
+        def _onupdatetask(parent, task, **_) -> Tuple[ProcessorController, Task]:
             self.tasks[parent].update(task)
+            return self.tasks[parent], task
 
         @_observe
-        def _onremovetask(parent, task, **_):
+        def _onremovetask(parent, task, **_) -> Tuple[ProcessorController, Task]:
             self.tasks[parent].remove(task)
+            return self.tasks[parent], task
 
     @staticmethod
     def cleancopy(procs: ProcessorController) -> ProcessorController:
@@ -102,30 +141,24 @@ class TasksDict:
         return new
 
 @dataclass
-class TaskLRUConfig:
+class TasksMeasures:
     """info missing from TasksConfig"""
-    name:    str                         = "peaksview.lru"
-    maxsize: int                         = 5
-    probes:  Union[None, str, List[str]] = "kmer"
-
-    def newcache(self) -> '_RootCache':
-        "return new cache"
-        return _RootCache(self.maxsize)
+    name:  str           = "peakcalling.view.dataframe"
+    peaks: DataFrameTask = cast(DataFrameTask, field(default_factory = DataFrameTask))
+    fits:  DataFrameTask = cast(
+        DataFrameTask,
+        field(default_factory = lambda: DataFrameTask(measures = dict(peaks = True)))
+    )
 
 class TaskState:
     "Deals with oligos, sequences & reference track"
     def __init__(self):
-        self.name:       str                               = 'tasks.cache'
-        self.reference:  Optional[RootTask]                = None
-        self.sequences:  Dict[str, str]                    = {}
-        self.probes:     Dict[RootTask, List[str]]         = {}
-        self.processors: Dict[Type[Task], Type[Processor]] = {}
-        self.cache:      Dict[RootTask, '_RootCache']      = {}
-        self.lru:        TaskLRUConfig                     = TaskLRUConfig()
-
-    def processorcache(self, procs: ProcessorController) -> Cache:
-        "return the processor cache"
-        return self.cache.get(procs.model[0], {}).get(procs, {})
+        self.name:          str                               = 'peakcalling.view.state'
+        self.reference:     Optional[RootTask]                = None
+        self.sequences:     Dict[str, str]                    = {}
+        self.probes:        Dict[RootTask, List[str]]         = {}
+        self.processors:    Dict[Type[Task], Type[Processor]] = {}
+        self.defaultprobes: List[str]                         = ['kmer']
 
     def swapmodels(self, ctrl):
         "swap models with those in the controller"
@@ -135,7 +168,6 @@ class TaskState:
         self.probes     = ctrl.display.get("sequence", "probes",    defaultvalue = {})
         self.sequences  = ctrl.theme.get("sequence", "sequences", defaultvalue = {})
         self.processors = ctrl.tasks.processortype(...)
-        self.lru        = ctrl.theme.swapmodels(self.lru)
 
     def observe(self, ctrl):
         "updates models as needed"
@@ -158,55 +190,48 @@ class TaskState:
             if 'reference' in old:
                 ctrl.update(self, reference = model.reference)
 
-        @ctrl.tasks.observe("opentrack", "closetrack")
-        @ctrl.display.hashwith(self)
-        def _ontrack(**_):
-            roots = {next(i, None) for i in ctrl.cache.tasklist(...)} - {None}
-            ctrl.display.update(
-                self,
-                cache = {
-                    **{
-                        i: j
-                        for i, j in self.cache.items() if i in roots
-                    },
-                    **{
-                        i: self.lru.newcache()
-                        for i    in roots - set(self.cache)
-                    }
-                }
-            )
-
-        @ctrl.tasks.observe("addtask", "updatetask", "removetask")
-        @ctrl.display.hashwith(self)
-        def _ontask(**_):
-            ctrl.display.update(self, cache = dict(self.cache))
-
 class TasksModel:
     "everything related to tasks"
+    tasks:      TasksDict
+    state:      TaskState
+    config:     TasksConfig
+    dataframes: TasksMeasures
 
     def __init__(self, mdl: Optional['TasksModel'] = None):
-        self.tasks:  TasksDict   = TasksDict()   if mdl is None else mdl.tasks
-        self.state:  TaskState   = TaskState()   if mdl is None else mdl.state
-        self.config: TasksConfig = TasksConfig() if mdl is None else mdl.config
+        for  i, j in getattr(TasksModel, '__annotations__').items():
+            setattr(self, i, getattr(mdl, i) if hasattr(mdl, i) else j())
 
     def swapmodels(self, ctrl):
         "swap models with those in the controller"
+        self.state      = ctrl.display.swapmodels(self.state)
+        self.config     = ctrl.theme.swapmodels(self.config)
+        self.dataframes = ctrl.theme.swapmodels(self.dataframes)
         for i in self.__dict__.values():
             if callable(getattr(i, 'swapmodels', None)):
                 i.swapmodels(ctrl)
 
-        self.config = ctrl.theme.swapmodels(self.config)
+    def observe(self, ctrl):
+        "link controller updates to computations"
+        self.tasks.observe(ctrl)
+        self.state.observe(ctrl)
 
     @property
     def processors(self) -> Dict[RootTask, ProcessorController]:
         """return the processors for new jobs"""
         return _Adaptor(self)()
 
-class _Adaptor(TasksModel):
+class _Adaptor:
     "Functor for creating a dictionnary of processors to send to JobRunner"
+    tasks:      TasksDict
+    state:      TaskState
+    config:     TasksConfig
+    dataframes: TasksMeasures
     _copies: Dict[RootTask, ProcessorController]
 
-    def __call__(self):
+    def __init__(self, mdl: TasksModel):
+        self.__dict__.update(mdl.__dict__)
+
+    def __call__(self) -> Dict[RootTask, ProcessorController]:
         self._copies = {i: self.tasks.cleancopy(j) for i, j in self.tasks.items()}
         self.__fittoreference()
         self.__fittohairpin()
@@ -255,36 +280,60 @@ class _Adaptor(TasksModel):
     def __fittoreference(self):
         ref = self._copies.get(self.state.reference, None)
         itr = self.__iter("fittoreference", ref is None)
+
+        task: FitToReferenceTask
         for procs, task in itr:
             task.defaultdata = ref.data
             itr.send(None if ref is procs else task)
 
+    @staticmethod
+    def __resolved(task) -> bool:
+        return len(set(task.fit) - {None}) > 0
+
+    def __hasfits(self) -> bool:
+        tpe = type(self.config.sdi['fittohairpin'])
+        return any(
+            self.__resolved(task.resolve(proc.model[0].path))
+            for proc in self._copies.values() for task in proc.model
+            if isinstance(task, tpe)
+        )
+
     def __fittohairpin(self):
-        tpe   = type(self.config.sdi['fittohairpin'])
-        found = any(isinstance(j, tpe) for i in self._copies.values() for j in i.model)
-        itr   = self.__iter("fittohairpin", not found)
+        itr   = self.__iter("fittohairpin", not self.__hasfits())
+
+        task: FitToHairpinTask
         for procs, task in itr:
-            task.sequences = self.state.sequences
-            task.oligos    = self.state.probes.get(procs.model[0], None)
-            if not task.oligos:
-                task.oligos = self.state.lru.probes
-            task           = task.resolve(procs.model[0].path)
-            itr.send(False if not task.oligos else task)
+            # try to update task attributes until it can be resolved:
+            # until task.fit is not null
+
+            if not self.__resolved(task) and not task.oligos:
+                task.oligos = self.state.probes.get(procs.model[0], None)
+
+            task = task.resolve(procs.model[0].path)
+
+            if not self.__resolved(task) and not task.oligos:
+                task.oligos = self.state.defaultprobes
+                task        = task.resolve(procs.model[0].path)
+
+            if not self.__resolved(task) and not task.sequences:
+                task.sequences = self.state.sequences
+                task           = task.resolve(procs.model[0].path)
+
+            # if unresolved: request the processors to be removed from the list
+            itr.send(False if len(set(task.fit) - {None}) == 0 else task)
 
     def __dataframe(self):
-        tpe   = type(self.config.sdi['fittohairpin'])
-        found = any(isinstance(j, tpe) for i in self._copies.values() for j in i.model)
-        task  = DataFrameTask(measures = (
-            dict(events = True) if not found else dict(peaks = dict(all = True, events = True))
-        ))
+        task  = self.dataframes.fits if self.__hasfits() else self.dataframes.peaks
 
         for procs in self._copies.values():
             procs.add(task, self.state.processors[type(task)])
 
-            cache = self.state.cache.get(procs.model[0], None)
+            cache = self.tasks.cache.get(procs.model[0], None)
             if cache is None:
-                self.state.cache[procs.model[0]] = cache = self.state.lru.newcache()
-            procs.data.setcache(-1, cache.setdefault(procs))
+                self.tasks.cache[procs.model[0]] = cache = self.tasks.lru.newcache()
+            info  = cache.setdefault(procs)
+            procs.data.setcache(DataFrameTask, info)
+            assert procs.data.getcache(DataFrameTask)() is info
 
 class _RootCache(LRUCache):  # pylint: disable=too-many-ancestors
     "Cache for a given root"
@@ -305,7 +354,7 @@ class _RootCache(LRUCache):  # pylint: disable=too-many-ancestors
         return super().__getitem__(self.keytobytes(key))
 
     def __setitem__(self, key: Union[bytes, ProcessorController], values: Cache):
-        super().__setitem__(self.keytobytes(key))
+        super().__setitem__(self.keytobytes(key), values)
 
     def __delitem__(self, key: Union[bytes, ProcessorController]):
         super().__delitem__(self.keytobytes(key))
@@ -325,5 +374,5 @@ class _RootCache(LRUCache):  # pylint: disable=too-many-ancestors
 
         if default is None:
             default = {}
-        super().__setitem__(key, default)
+        super().__setitem__(bit, default)
         return default
