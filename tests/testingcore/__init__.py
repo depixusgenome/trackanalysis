@@ -6,6 +6,7 @@ from typing      import cast
 from ..testutils import (
         ResourcePath, getmonkey, DummyPool, integrationmark
 )
+import tests.testutils
 
 def _trackreadertask(fpath):
     from taskmodel      import TrackReaderTask
@@ -31,4 +32,6 @@ PATHS = dict(small_pickle   = "small_pickle.pk",
              big_selected   = big_selected,
              big_all        = big_all)
 
-path = ResourcePath(None, PATHS) # pylint: disable=invalid-name
+path = utpath = ResourcePath(None, PATHS)   # pylint: disable=invalid-name
+tests.testutils.utpath = path
+tests.testutils.path = path
