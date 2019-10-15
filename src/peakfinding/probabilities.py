@@ -49,20 +49,23 @@
     Moving back to time, with F the frame rate,
     we have (1-p)^{t*F} = exp(t * F ln(1-p)) ⇒ T = 1/(F ln(1-p))
 """
-import  numpy       as     np
-from    scipy.stats import skew as _skew
-from    utils       import initdefaults
-from    .peaksarray import PeaksArray
+from    typing       import ClassVar
+import  numpy        as     np
+from    scipy.stats  import skew as _skew
+from    signalfilter import nanhfsigma
+from    utils        import initdefaults
+from    .peaksarray  import PeaksArray
 
 class Probability:
     "Computes probabilities"
-    minduration   = 5
-    framerate     = 30.
-    nevents       = 0
-    ncycles       = 0
-    ntoolong      = 0
-    totalduration = 0
-    FMAX          = float(np.finfo('f4').max) # type: ignore
+    minduration: int   = 5
+    framerate: float     = 30.
+    nevents: int       = 0
+    ncycles: int       = 0
+    ntoolong: int     = 0
+    totalduration: int = 0
+    FMAX: ClassVar[float] = float(np.finfo('f4').max)  # type: ignore
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -78,7 +81,7 @@ class Probability:
         self.totalduration += last.sum() - sum(i['start'][0] for i in evts)
 
         self.ncycles += len(events)
-        self.ncycles -= (events.discarded if hasattr(events, 'discarded') else # type: ignore
+        self.ncycles -= (events.discarded if hasattr(events, 'discarded') else  # type: ignore
                          sum(getattr(i, 'discarded', 0) for i in events))
 
     @staticmethod
@@ -93,6 +96,12 @@ class Probability:
         return np.NaN if nevts <= 0 else cls.resolution(events)/np.sqrt(nevts)
 
     @staticmethod
+    def peakhfsigma(events: PeaksArray):
+        "returns the hfsigma on the peak"
+        out = [nanhfsigma(np.concatenate(i['data'])) for i in events if len(i)]
+        return np.nanmedian(out) if len(out) else np.NaN
+
+    @staticmethod
     def resolution(events: PeaksArray):
         "returns the resolution"
         stds = [np.average([np.nanmean(j)    for j in i['data']],
@@ -100,7 +109,7 @@ class Probability:
                 for i in events if len(i)]
         return np.nanstd(stds)
 
-    def __call__(self, events : PeaksArray, maxdurs: np.ndarray) -> 'Probability':
+    def __call__(self, events: PeaksArray, maxdurs: np.ndarray) -> 'Probability':
         "Returns an object containing stats related to provided events"
         obj = Probability(minduration = self.minduration,
                           framerate   = self.framerate)
@@ -114,7 +123,7 @@ class Probability:
             return False
 
         val = (self.totalduration-self.ntoolong)/self.nevents
-        return self.minduration < 1.+ val
+        return self.minduration < 1. + val
 
     @property
     def probability(self) -> float:
@@ -122,7 +131,7 @@ class Probability:
         if self.nevents <= self.ntoolong:
             return 0.
 
-        mrho = 1.- self.ntoolong / self.nevents
+        mrho = 1. - self.ntoolong / self.nevents
         tmp  = mrho + self.totalduration/self.nevents
         return 0.  if tmp <= self.minduration else mrho/(tmp-self.minduration)
 
@@ -158,7 +167,7 @@ class Probability:
         if self.nevents <= 0:
             return 0.
 
-        mrho = 1.- self.ntoolong / self.nevents
+        mrho = 1. - self.ntoolong / self.nevents
         tmp  = mrho + self.totalduration / self.nevents
         if tmp <= self.minduration:
             return 0.

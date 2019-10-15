@@ -40,19 +40,19 @@ def test_toref():
                                                                  (arr2, np.unique(arr2)))
         assert_allclose(ret2[1:], i, rtol = 5e-4, atol = 5e-4)
 
-        ret2 = ChiSquareHistogramFit(maxthreshold = .5,
-                                     firstregpeak = 0,
-                                     pivot        = Pivot.top
-                                    ).optimize((arr1, np.unique(arr1)),
-                                               (arr2, np.unique(arr2)))
+        ret2 = ChiSquareHistogramFit(
+            maxthreshold = .5,
+            firstregpeak = 0,
+            pivot        = Pivot.top
+        ).optimize((arr1, np.unique(arr1)), (arr2, np.unique(arr2)))
         assert_allclose(ret2[1:], i, rtol = 5e-4, atol = 5e-4)
 
-        ret2 = ChiSquareHistogramFit(maxthreshold = .5,
-                                     firstregpeak = 0,
-                                     stretch      = Range(1., .08, .02),
-                                     pivot        = Pivot.absolute
-                                    ).optimize((arr1, np.unique(arr1)),
-                                               (arr2, np.unique(arr2)))
+        ret2 = ChiSquareHistogramFit(
+            maxthreshold = .5,
+            firstregpeak = 0,
+            stretch      = Range(1., .08, .02),
+            pivot        = Pivot.absolute
+        ).optimize((arr1, np.unique(arr1)), (arr2, np.unique(arr2)))
         assert_allclose(ret2[1:], i, rtol = 5e-4, atol = 5e-4)
 
 def test_toref_frompeaks():
@@ -118,7 +118,7 @@ def test_ref_peaksgrid_2D():
     for i in product([.96, 1., 1.04], [-.05, 0., .05]):
         seq  = np.array([.01, .02,  .035, .7, .85, .95], dtype = 'f4')
         arr2 = seq/i[0]+i[1]
-        fit.peaks = [seq[:3]/ 8.8e-4, (seq[3:]-.5)/ 8.8e-4]
+        fit.peaks = [seq[:3] / 8.8e-4, (seq[3:]-.5) / 8.8e-4]
         ret  = fit.optimize(arr2)
         ret  = ret[1]*8.8e-4, ret[2][0]
         assert_allclose(ret, i, rtol = 5e-4, atol = 5e-4)
@@ -221,7 +221,7 @@ def test_hairpincost():
              np.array([0., .1,     .5, 1.2, 1.5], dtype = 'f4')/8.8e-4]
 
     beads = [(100, np.array([0., 0.01, .1, .2, .5, 1.], dtype = 'f4') - .88e-4),
-             (101, (truth[1][:-1]*.97-1) *8.8e-4),
+             (101, (truth[1][:-1]*.97-1) * 8.8e-4),
              (110, np.empty((0,), dtype = 'f4'))]
 
     hpins   = {'hp100': GaussianProductFit(peaks = truth[0]),
@@ -259,8 +259,8 @@ def test_constrainedhairpincost():
     truth = [np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/8.8e-4,
              np.array([0., .1,     .5, 1.2, 1.5], dtype = 'f4')/8.8e-4]
 
-    beads = [(100, (truth[0][:-1]*1.03+1.)*8.8e-4),
-             (101, (truth[1][:-1]*.97-1) *8.8e-4),
+    beads = [(100, (truth[0][:-1]*1.03+1.) * 8.8e-4),
+             (101, (truth[1][:-1]*.97-1) * 8.8e-4),
              (110, np.empty((0,), dtype = 'f4'))]
 
     hpins   = {'hp100': GaussianProductFit(peaks = truth[0]),
@@ -343,7 +343,6 @@ def test_rescale():
     assert all(abs(5.-i) < 1e-5 for i in obj[1]['bias'])
     assert all(abs(.2-i) < 1e-5 for i in obj[1]['stretch'])
 
-
     task = FitToHairpinTask()
     assert task.rescale(5.) is not task
 
@@ -378,7 +377,7 @@ def test_hp_task_creation():
         assert isinstance(task.fit.pop(None), type(i))
         assert not task.fit
 
-def test_hp_dataframe():
+def test_hp_dataframe(record):
     "test fit to hp dataframe"
     pair = next(iter(create(
         TrackReaderTask(path = utpath("big_legacy")),
@@ -389,13 +388,23 @@ def test_hp_dataframe():
             oligos   = "4mer",
             fit      = ChiSquareFit()
         ),
-        DataFrameTask(merge = True, measures = dict(peaks = True)),
+        DataFrameTask(merge = True, measures = dict(
+            peaks = dict(missing = True, peakhfsigma = True)
+        )),
     ).run()))
-    assert pair.shape == (102, 27)
+    assert pair.shape == (102, 29)
+    assert 'falseneg' in pair.peaks[1].status.unique()
     assert pair.index.names == ['hpin', 'track', 'bead']
     assert isinstance(pair.peaks.values[0], pd.DataFrame)
     assert 'modification' in pair.columns
     assert hasattr(pair, 'tasklist')
+    assert record["withmissing"].approx(
+        pair.drop(columns = ['peaks', 'cost', 'modification']).iloc[:5],
+        atol = 5e-4
+    )
+    assert record["peakswithmissing"].approx(
+        pair.peaks[1].iloc[:5], atol = 5e-4
+    )
 
     pair = next(iter(create(
         TrackReaderTask(path = utpath("big_legacy")),
@@ -415,4 +424,4 @@ def test_hp_dataframe():
 
 
 if __name__ == '__main__':
-    test_hp_dataframe()
+    test_hp_dataframe(None)

@@ -7,8 +7,10 @@ pytest.register_assert_rewrite("tests.testconfig")
 pytest.register_assert_rewrite("tests.testingcore")
 
 # pylint: disable=wrong-import-position
+from tests.testingcore             import utpath         # noqa
 from tests.testutils.modulecleanup import modulecleanup  # noqa
 from tests.testutils               import needsdisplay   # noqa
+from tests.testutils.recording     import record, pytest_addoption  # noqa
 
 @pytest.fixture(params = [pytest.param("", marks = needsdisplay)])
 def bokehaction(monkeypatch):

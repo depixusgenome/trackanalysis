@@ -76,6 +76,10 @@ class PeaksDataFrameFactory(  # pylint: disable=too-many-instance-attributes
         self.__prob   = peakprobability(frame)
         meas          = dict(task.measures)
         meas.update(kwa)
+        meas.update({i: i for i, j in meas.items() if j is True and 'events' not in i})
+        for i, j in tuple(meas.items()):
+            if j is False:
+                meas.pop(i)
 
         self.__peakstatus = PeakStatusComputer(
             *(meas.get(i, True) for i in ('baseline', 'singlestrand'))
@@ -83,6 +87,12 @@ class PeaksDataFrameFactory(  # pylint: disable=too-many-instance-attributes
         if {self.__peakstatus.baseline, self.__peakstatus.singlestrand} == {None}:
             self.__peakstatus = None
 
+        self.__hfsigma  = (
+            meas['hfsigma'] if isinstance(meas.get('hfsigma', None), str) else
+            'hfsigma'       if meas.get('hfsigma', False) else
+            ''
+        )
+        meas.pop('hfsigma', None)
         self.__events   = meas.pop('events', meas.get('dfevents', None))
         self.__dfevents = meas.pop('dfevents', False) and self.__events
         if self.__events is True:
@@ -156,6 +166,8 @@ class PeaksDataFrameFactory(  # pylint: disable=too-many-instance-attributes
         else:
             counts = np.ones(len(peaks), dtype = 'i4')
 
+        if self.__hfsigma:
+            meas['hfsigma'] = np.full(sum(counts), frame.track.rawprecision(bead), dtype = 'f4')
         if self.__peakstatus:
             status         = self.__peakstatus(frame, bead, apeaks)
             meas['status'] = np.concatenate([

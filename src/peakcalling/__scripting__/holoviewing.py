@@ -24,14 +24,14 @@ from   data.__scripting__           import TracksDict   # pylint: disable=unused
 from   ..processor.fittoreference   import (FitToReferenceProcessor,
                                             FitToReferenceTask,
                                             FitToReferenceDict)
-from   ..processor.fittohairpin     import (BEADKEY,    # pylint: disable=unused-import
-                                            FitToHairpinDict, Distance)
+from   ..processor.fittohairpin     import FitToHairpinDict
+from   .._base                      import Distance
 from   .                            import PeaksTracksDictOperator
 
 displayhook(FitToReferenceDict)
 addproperty(FitToReferenceDict, 'display', _PeaksDisplay)
 
-class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
+class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict):  # type: ignore
     """
     Displays peaks.
 
@@ -114,12 +114,13 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
 class _AutoHP(OligoMappingDisplay):
     "creates a DynamicMap with fitted oligos"
     _labels = True
+
     def __init__(self, itms, **kwa):
         super().__init__(itms, **kwa)
         if isinstance(itms, OligoMappingDisplay):
             self.__pins = None
             self.__fits = None
-            self.__cache: Dict[BEADKEY, Tuple[str, Distance]] = {}
+            self.__cache: Dict[int, Tuple[str, Distance]] = {}
 
     def run(self, bead):
         "creates the display"
@@ -142,7 +143,7 @@ class _AutoHP(OligoMappingDisplay):
         key, dist = cache[bead]
 
         tmp = self(stretch = dist.stretch, bias = dist.bias)
-        crv = tmp.elements(self._items[[bead]], group = key) # pylint: disable=no-member
+        crv = tmp.elements(self._items[[bead]], group = key)  # pylint: disable=no-member
 
         hpc  = self.__pins[key]
         data = np.copy(hpc.data)
@@ -152,19 +153,22 @@ class _AutoHP(OligoMappingDisplay):
         else:
             data[:,1] *= np.nanmax(tmp['events'])
 
-        pos  = lambda x: .8*np.nanmax(x)+.2*np.nanmin(x)
+        def _pos(val):
+            return .8*np.nanmax(val)+.2*np.nanmin(val)
+
         pars = np.round(dist.stretch, 1), np.round(dist.bias, 4)
         if pars[1] < 0:
             txt  = f'{hpc.vdims[0]} = {pars[0]}·({hpc.kdims[0]}+{-pars[1]})'
         else:
             txt  = f'{hpc.vdims[0]} = {pars[0]}·({hpc.kdims[0]}-{pars[1]})'
-        text = hv.Text(pos(data[:,0]), pos(data[:,1]), txt,
+        text = hv.Text(_pos(data[:,0]), _pos(data[:,1]), txt,
                        kdims = hpc.kdims+hpc.vdims)
         return hv.Overlay(crv+[hpc.clone(data = data), text], group = key)
 
 class _ManualHP(OligoMappingDisplay):
     "Fits per HP"
     _labels = True
+
     def __init__(self, itms, **kwa):
         super().__init__(itms, **kwa)
         if isinstance(itms, OligoMappingDisplay):
@@ -203,7 +207,7 @@ class _ManualHP(OligoMappingDisplay):
         values = list(_PeaksDisplay.getredim(self))
         params = tuple((i, getattr(self, '_'+i)) for i in ('stretch', 'bias')
                        if getattr(self, '_'+i) != getattr(self.__class__, '_'+i))
-        rngs   = Tasks.scriptingmodel("fittohairpinrange") # type: ignore
+        rngs   = Tasks.scriptingmodel("fittohairpinrange")  # type: ignore
         if 'rescaling' in getattr(getattr(self._items, 'track', None), 'instrument', ()):
             coeff = float(self._items.track.instrument['rescaling'])
             rngs = {
@@ -221,7 +225,7 @@ class _ManualHP(OligoMappingDisplay):
                       if i not in (k for k, _ in params))
         return values
 
-class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
+class PeaksTracksDictDisplay(_PTDDisplay,  # type: ignore
                              peaks = TracksDict):
     """
     A hv.DynamicMap showing peaks
@@ -264,6 +268,7 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
     _textcolor    = 'green'
     _fit          = False
     KEYWORDS      = _PTDDisplay.KEYWORDS | frozenset(locals())
+
     def __init__(self, items, **opts):
         super().__init__(items, **opts)
         if self._format in ('1d', '2d'):
@@ -374,7 +379,7 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
     def getmethod(self):
         "Returns the method used by the dynamic map"
         return (_ManualRef(self).run if self._format is None and self._fit else
-                _2DRef    (self).run if self._format == '2d'               else
+                _2DRef(self).run     if self._format == '2d'               else
                 super().getmethod())
 
     def getredim(self):
@@ -387,7 +392,7 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
             redim = [i for i in redim if i[0] != 'key']
 
         if self._format is None and self._fit:
-            rngs   = Tasks.scriptingmodel("fittoreferencerange") # type: ignore
+            rngs   = Tasks.scriptingmodel("fittoreferencerange")  # type: ignore
             redim += [(i, slice(*rngs[i])) for i in ('stretch', 'bias')]
         return redim
 
@@ -433,6 +438,7 @@ class _2DRef(PeaksTracksDictDisplay):
 
     def __quadmesh(self, crvs):
         axis  = self.__getx(crvs[0][1].data)
+
         def _inte(other):
             xvals = self.__getx(other.data)
             if xvals.size == 0:
@@ -491,8 +497,10 @@ class _ManualRef(PeaksTracksDictDisplay):
         data[:,0] = (data[:,0]-bias)*stretch
         return itm.clone(data = data)
 
+
 # pylint: disable=bad-continuation
-TracksDict.__doc__ = TracksDict.__doc__.replace("""
+TracksDict.__doc__ = TracksDict.__doc__.replace(
+    """
     * `tracks.peaks` displays peaks per bead and track.""",
     """
     * `tracks.peaks` allows displaying peaks per bead and track. A number of
@@ -506,6 +514,7 @@ TracksDict.__doc__ = TracksDict.__doc__.replace("""
         * `track.peaks(format = '1d') displays all tracks for a given bead on a
         1D histogram.
         * `track.peaks(format = None) displays peaks per track and bead individually.
-    """)
+    """
+)
 
 __all__: List[str] = []

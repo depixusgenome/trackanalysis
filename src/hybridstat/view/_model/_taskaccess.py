@@ -14,11 +14,9 @@ from peakfinding.selector       import PeakSelectorDetails
 from peakfinding.processor      import BaselinePeakProcessor, SingleStrandProcessor
 from peakcalling                import match
 from peakcalling.toreference    import ChiSquareHistogramFit
+from peakcalling.tohairpin      import HairpinFitter, PeakMatching, Range
 from peakcalling.processor.fittoreference   import FitData
-from peakcalling.processor.fittohairpin     import (
-    Constraints, HairpinFitter, PeakMatching, Range,
-    DistanceConstraint, FitBead
-)
+from peakcalling.processor.fittohairpin     import Constraints, DistanceConstraint, FitBead
 from taskcontrol.modelaccess    import TaskAccess
 from taskmodel                  import RootTask, DataSelectionTask
 from utils                      import updatecopy, NoArgs
