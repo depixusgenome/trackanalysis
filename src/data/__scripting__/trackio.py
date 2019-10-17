@@ -26,7 +26,8 @@ class ScriptAnaIO(TrackIO):
         cnf = mdl[0].config()
         rep = lambda x: x
         if sys.platform == 'linux':
-            data = next((i for i in ('/media/biology/data', '/media/data')
+            data = next((i for i in ('/media/biology/data', '/media/samba', '/media/data',
+                                     '/home/depixus/samba-data')
                          if Path(i).exists()), None)
             if data is not None:
                 rep = lambda x: Path(str(x)
