@@ -16,47 +16,51 @@
 </a></td>
 </table>
 
-# Project Goals
+## Installation
 
-* User-friendly, platform agnostic data analysis tools.
-* Scripting, batch *and* GUI modes must both function. Computations whatever the
-mode should be a single piece of code.
-* The documentation should be in the code. The class and function documentation
-is user-oriented. Comments are for the developpers. 
-
-# Installing
-
-The first step will be to install the version control system named git (https://git-scm.com/).
-The second step is to download miniconda (tested) or the the more complete anaconda
-(untested, details in what follows may vary). 
-
-Clone the git repository and it's submodules, then set up the 
-environment and build. **On windows**, the following commandlines will only work if
-miniconda is in the *PATH*: use the *Anaconda Prompt* powershell.
-
+Obtaining the code is done through git
 ```shell
-git clone http:\\GIT-REPO
-python3 waf setup [-e myenv]     # create a conda environmnent with all required 3rd party libraries
-python3 waf configure [-e myenv] [--fulldist] # configure the project using that environment
-python3 waf build                # build the project
-python3 waf test --alltests      # test the project
-python3 waf install              # create a directory with all the required files.
+# copy the directory to your computer: needed only once
+git clone https:://gitlab.picoseq.org/analysis/trackanalysis.git
+cd daqclient
+
+# get the latest code
+git pull
+
+# update the submodules
+git submodule update --init --recursive
 ```
 
-The [-e myevn] item is optional. It can be used to define which conda
-environment to use.  By default, the setting is `-e branch` which uses the git
-branch name as the conda environment name. The latter is usually `master`.
+The python/cpp/javascript environment is managed through the *anaconda* software.
+Install either *miniconda* or *anaconda* then run an *anaconda* shell
+(any will do when using linux). We then rely on the *waf* utility to setup the environment
+and build or install a new distribution.
 
-The *configure* and *setup* steps should be run every time dependencies change.
-The *build* step is required any time sources change. The *test* step runs
-tests situated in *core/tests* and *tests* directories. They will be run by the
-continuous integration tool upon commit but should be run prior to an *push*.
+```shell
+# setup the environment: when working on a branch the environment name is that
+# of the branch. Otherwise, the name is daqclient. This is needed as often
+# as the repository's environment changes
+python waf setup
 
-Running `python waf install` created a directory with all relevant files setup
-for distribution. This includes a python environment if and only if the
-`[--fulldist]` was selected during the configuration step. Note that it's
-possible to reconfigure, using or removing the flag, with the build or test
-steps being needed again.
+# Configure the waf compiler, needed every time the environment changes and before
+# running an 'install' command. One needs add '--fulldist' to get a full installation.
+# Otherwise only a patch is created
+python waf configure
+
+# Compile the files: all necessary files are created in the 'build' directory. This
+# is needed every time the code changes
+python waf build
+
+# Run the tests !!!
+python waf test --alltests --pv
+
+# To create a distribution or a patch, the following will transfer required files
+# in the build/patch_[tagname] or buil/[tagname] directory where [tagname] is the 
+# current git description of the repository. When delivery code to third parties,
+# this description should correspond to the last tag and have neither hash number
+# nor '+' (i.e dirty) at the end of the name.
+python waf install
+```
 
 ## Installing on windows
 
@@ -79,31 +83,16 @@ to work on MSVC community edtion 2019. The following options were checked
 
 ## Known problems
 
-### As of 2019-04-01
-
-#### pyembed error on LINUX
-
-The default python installed by conda might not be compatible with compiling
-native code (*pybind11*) modules. When creating a new environment, `python waf setup`
-will automatically select the correct python version. If installing the
-environment manually, the solution is to look for and install a version of
-python as follows:
+All known problems are dealt with automatically inside the waf script, unless it's
+an environment update. Depending on the python package being updated, these may not
+function correctly. The simple solution is to remove the environment prior to running
+the setup again. To the best of our knowledge, this is an issue only for pylint/astroid
+updates 
 
 ```shell
-conda search -f python -c conda-forge
+conda remove -n trackanalysis --yes
+python waf setup
 ```
-
-It spits out a list of values such as:
-
-    ...
-    python                     3.6.3                hefd0734_2  defaults       
-    python                     3.6.4                         0  conda-forge    
-    python                     3.6.4                hc3d631a_0  defaults       
-    python                     3.6.4                hc3d631a_1  defaults 
-
-The *undocumented* tags in the 3rd column are the relevant piece of information.
-Choose a tag from *conda-forge* (4th column). **On ubuntu 18.04 and 18.10, the
-current working python is python=3.7.0=hfd72cd7_0**.
 
 # Architecture
 
