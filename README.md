@@ -7,14 +7,16 @@
 <img src="http://jupyter.depixus.org:8111/app/rest/builds/buildType:Trackanalysis_Build/statusIcon"/>
 </a></td>
 
-<td>Unit tests <a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_IntegrationTest&guest=1">
-<img src="http://jupyter.depixus.org:8111/app/rest/builds/buildType:Trackanalysis_IntegrationTest/statusIcon"/>
-</a></td>
-
-<td>Integration tests <a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_Test&guest=1">
+<td>Unit tests <a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_Test&guest=1">
 <img src="http://jupyter.depixus.org:8111/app/rest/builds/buildType:Trackanalysis_Test/statusIcon"/>
 </a></td>
+
+<td>Integration tests <a href="http://jupyter.depixus.org:8111/viewType.html?buildTypeId=Trackanalysis_IntegrationTest&guest=1">
+<img src="http://jupyter.depixus.org:8111/app/rest/builds/buildType:Trackanalysis_IntegrationTest/statusIcon"/>
+</a></td>
 </table>
+
+For continuous integration, please visit [TeamCity tests](http://jupyter.depixus.com:8111/project/DAQClient?branch=&buildTypeTab=overview)
 
 ## Installation
 
