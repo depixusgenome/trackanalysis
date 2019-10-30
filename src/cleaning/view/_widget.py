@@ -96,6 +96,9 @@ class CyclesListWidget:
     def addtodoc(self, _, ctrl) -> List[Widget]:
         "creates the widget"
         self.__colors = ctrl.theme.model(self.__model.colors)
+        if self.__colors is None:
+            self.__colors = CleaningPlotModel().theme
+
         cols          = self.__cols()
         self.__widget = DataTable(source         = ColumnDataSource(self.__data()),
                                   columns        = cols,
