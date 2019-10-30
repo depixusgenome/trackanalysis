@@ -51,7 +51,10 @@ There are two sets of points:
       from any binding position.
 
 2. Crosses are for hairpin binding positions: theoretical values.
-   * Green crosses for bindings with close-by blockages (< 10 bases).
+
+   * Green crosses for bindings which have been identified with a blockages (<
+     10 bases): at least one blockage is 10 bases or less away from the binding
+     and no other binding is closer to that blockage
    * Red crosses for other bindings.
 
 
@@ -105,7 +108,8 @@ For the y-axis, the parameters on a per bead base are:
   available for a high frequency noise per blockage.
 * *blockage count* is the number of blockages per bead, excluding those at
   or below the baseline as well as at or above the single strand blockage.
-* *identified (% bindings)* is the percentage of binding position with blockages close by.
+* *identified (% bindings)* is the percentage of binding position with a
+  blockage both close-by and closer that binding position than to any other.
 * *missing (% bindings)* is the percentage of binding positions with no blockages nearby.
 * *unidentified (bp⁻¹)* is the ratio of blockage without binding positions
   nearby over the number of bases in the hairpin.
