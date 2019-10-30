@@ -6,7 +6,7 @@ from   multiprocessing            import Process, Pipe
 from   multiprocessing.connection import Connection
 from   typing                     import (
     Dict, Callable, List, Optional, Set, Union, Any, Iterator, Tuple,
-    AsyncIterator
+    AsyncIterator, ContextManager
 )
 import asyncio
 
@@ -26,14 +26,22 @@ class JobConfig:
         self.name:          str   = "peakcalling.precomputations"
         self.ncpu:          int   = 2
         self.waittime:      float = .1
+        self.stoptime:      float = .3
         self.maxkeysperjob: int   = 10
+        self.multiprocess:  bool  = True
 
 class JobDisplay:
     "Pool live info"
     def __init__(self):
-        self.name:     str                     = "peakcalling.precomputations"
-        self.calls:    int                     = 1
-        self.canstart: bool                    = False
+        self.name:  str = "peakcalling.precomputations"
+        self.calls: int = 1
+
+class JobEventNames:
+    """Deals with emitting job-related events"""
+    def __init__(self, ctrl = None):
+        self.eventname:     str = getattr(ctrl, 'eventname', 'peakcalling.view.jobs')
+        self.eventjobstart: str = getattr(ctrl, 'eventjobstart', f'{self.eventname}.start')
+        self.eventjobstop:  str = getattr(ctrl, 'eventjobstop', f'{self.eventname}.stop')
 
 class JobModel:
     """
@@ -48,8 +56,121 @@ class JobModel:
         self.config  = ctrl.theme.swapmodels(self.config)
         self.display = ctrl.display.swapmodels(self.display)
 
-class JobRunner(JobModel):
+    def launch(
+            self,
+            processors: List[TaskCacheList],
+            emitter:    Optional[JobEventNames] = None
+    ):
+        """
+        Runs jobs synchronously or asynchronously depending on configuration
+
+        Parameters
+        ----------
+
+        processors:
+            a list of TaskCacheList to run
+        emitter:
+            in charge of launching start & end events
+        """
+        return _JobRunner(self).dolaunch(processors, _JobEventEmitter(emitter))
+
+class _JobEventEmitter(JobEventNames):
+    """Deals with emitting job-related events"""
+    _evt: ContextManager
+
+    def __init__(self, ctrl = None):
+        super().__init__(ctrl)
+        self.ctrl  = getattr(ctrl, '_ctrl', ctrl)
+        self.idval = None
+
+    def __call__(self, idval):
+        self.idval = idval
+        return self
+
+    def __enter__(self):
+        "emits a *job starting* event"
+        if self.ctrl:
+            self.ctrl.display.handle(
+                self.eventjobstart,
+                self.ctrl.emitpolicy.outasdict,
+                {'idval': self.idval}
+            )
+            self._evt = self.ctrl.display(self.eventname, args = {})
+            return self._evt.__enter__()
+        return lambda *_, **__: None
+
+    def __exit__(self, *_, **__):
+        if hasattr(self, '_evt'):
+            out = self._evt.__exit__()
+            del self._evt
+            self.ctrl.display.handle(
+                self.eventjobstop,
+                self.ctrl.emitpolicy.outasdict,
+                {'idval': self.idval}
+            )
+            return out
+        return None
+
+class _JobRunner(JobModel):
     "Running jobs on all TaskCacheList"
+    def dolaunch(
+            self,
+            processors: List[TaskCacheList],
+            emitter:    _JobEventEmitter
+    ):
+        """
+        Runs jobs synchronously or asynchronously depending on configuration
+
+        Parameters
+        ----------
+
+        processors:
+            a list of TaskCacheList to run
+        emitter:
+            in charge of launching start & end events
+        """
+        if self.config.multiprocess:
+            idval = self.display.calls
+
+            async def _run():
+                with emitter(idval) as emitup:
+                    await self.run(processors,  emitup, idval)
+                    await asyncio.sleep(self.config.stoptime)
+
+            asyncio.create_task(_run())
+        else:
+            with emitter:
+                self.syncrun(processors)
+
+    def syncrun(self, processors: List[TaskCacheList]):
+        """
+        runs all processors sequenctially
+
+        Parameters
+        ----------
+
+        processors:
+            a list of TaskCacheList to run
+        emitter:
+            in charge of launching start & end events
+        """
+        for procs in processors:
+            frame = next(iter(procs.run()), None)
+            if frame is None:
+                continue
+
+            if callable(getattr(frame, 'bead', None)):
+                raise NotImplementedError()
+
+            store: STORE = procs.data.getcache(DataFrameTask)()
+
+            for keys in self.__split(lambda*_: None, procs):
+                for i in keys:
+                    try:
+                        store[i] = frame[i]
+                    except ProcessorException as exc:
+                        store[i] = exc
+
     async def run(
             self,
             processors: List[TaskCacheList],

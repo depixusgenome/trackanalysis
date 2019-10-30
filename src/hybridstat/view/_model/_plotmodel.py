@@ -58,7 +58,7 @@ class PeaksPlotDisplay(PlotDisplay):
     precompute:      int                   = False
     estimatedbias:   float                 = 0.
     constraintspath: Any                   = None
-    useparams:       bool                  = False
+    useparams:       bool                  = True
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):

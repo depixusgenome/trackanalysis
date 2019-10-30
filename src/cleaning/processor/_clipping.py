@@ -109,6 +109,11 @@ class ClippingErrorMessage(DataCleaningErrorMessage):
 class ClippingExeption(DataCleaningException):
     "a clipping exception"
 
+    @staticmethod
+    def errkey() -> str:
+        "return an indicator of the type of error"
+        return 'clipping'
+
 class ClippingProcessor(Processor[ClippingTask]):
     "Processor for cleaning the data"
     @classmethod

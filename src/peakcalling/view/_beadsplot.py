@@ -1,51 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing one or more FoVs"
-from   abc                     import abstractmethod, ABC
-from   copy                    import copy
-from   functools               import partial
-from   importlib               import import_module
-from   threading               import Lock
-from   typing                  import (
-    Dict, List, Iterator, Tuple, Optional, Union, Set, cast
-)
+from   abc       import abstractmethod
+from   functools import partial
+from   typing    import Dict, List, Iterator, Tuple, Union, Set, cast
 
 import pandas as pd
 import numpy  as np
 
-from   bokeh                   import layouts
-from   bokeh.models            import ColumnDataSource, FactorRange
-from   bokeh.plotting          import figure, Figure
+from   bokeh          import layouts
+from   bokeh.models   import ColumnDataSource, FactorRange, HoverTool
+from   bokeh.plotting import figure, Figure
 
-from   taskmodel               import RootTask
-from   taskmodel.processors    import TaskCacheList
-from   taskmodel.dataframe     import DataFrameTask
-from   taskmodel.application   import setupio
-from   view.colors             import tohex
-from   view.threaded           import ThreadedDisplay, DisplayModel
-from   ._model                 import (
-    BeadsScatterPlotStatus, BeadsScatterPlotConfig, TasksModelController, STORE
-)
-from   ._widgets               import JobsStatusBar, JobsHairpinSelect
+from   view.colors   import tohex
+from   view.threaded import ThreadedDisplay
+from   ._model       import BeadsScatterPlotModel, Processors, COLS
+from   ._threader    import BasePlotter, PlotThreader
+from   ._widgets     import JobsStatusBar, JobsHairpinSelect
 
 
-# make sure all configs are loaded
-def _import():
-    for i in ('cleaning', 'eventdetection', 'peakfinding', 'peakcalling'):
-        import_module(f'{i}.processor.__config__')
-
-
-_import()
-del _import
-
-class BeadsScatterPlotModel(DisplayModel[BeadsScatterPlotStatus, BeadsScatterPlotConfig]):
-    "model for display the FoVs"
-    tasks: TasksModelController
-
-    def __init__(self, **_):
-        super().__init__()
-        self.tasks = TasksModelController()
-
+@PlotThreader.setup
 class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
     "display the current bead"
     _fig:         Figure
@@ -53,10 +27,11 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
     _defaultdata: Dict[str, list]
     _theodata:    ColumnDataSource
 
-    def __init__(self, **_):
+    def __init__(self, widgets = True, **_):
         super().__init__(**_)
-        self._widgets  = (JobsStatusBar(), JobsHairpinSelect())
-        self._threader = _Threader(self)
+        self._widgets = (JobsStatusBar(), JobsHairpinSelect()) if widgets else ()
+
+    _reset = None   # added in _Threader.setup
 
     def swapmodels(self, ctrl):
         "swap with models in the controller"
@@ -65,49 +40,26 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
             if hasattr(i, 'swapmodels'):
                 i.swapmodels(ctrl)
 
-    def ismain(self, ctrl):
-        "Set-up things if this view is the main one"
-
-        setupio(
-            ctrl,
-            (
-                'datacleaning', 'extremumalignment', 'clipping',
-                'eventdetection', 'peakselector', 'singlestrand',
-                'baselinepeakfilter'
-            ),
-            ioopen = (
-                slice(None, -2),
-                'hybridstat.view._io.PeaksConfigGRFilesIO',
-                'hybridstat.view._io.PeaksConfigMuWellsFilesIO',
-                'hybridstat.view._io.PeaksConfigTrackIO',
-            )
-        )
-
     def observe(self, ctrl):
         """observe the controller"""
-        self._model.observe(ctrl)
-
-        ctrl.display.observe(
-            self._model.display,
-            partial(self._threader.mask, ctrl)
-        )
-        ctrl.display.observe(
-            self._model.tasks.eventjobstop,
-            partial(self._threader.mask, ctrl)
-        )
-        ctrl.display.observe(
-            self._model.tasks.eventname,
-            partial(self._threader.update, ctrl)
-        )
-
         for i in self._widgets:
             if hasattr(i, 'observe'):
                 i.observe(ctrl, self._model.tasks)
+
+    def createplot(self) -> BasePlotter:
+        "runs the display"
+        procs = self._model.tasks.processors
+        return (
+            _HairpinPlot if BasePlotter.ishairpin(procs) else _PeaksPlot
+        )(self, procs)
 
     def _addtodoc(self, ctrl, doc):
         "sets the plot up"
         self._addtodoc_data()
         self._addtodoc_fig()
+        if not self._widgets:
+            return [self._fig]
+
         itms      = [i.addtodoc(ctrl, doc)[0] for i in self._widgets]
         mode      = {'sizing_mode': ctrl.theme.get('main', 'sizingmode', 'fixed')}
         brds      = ctrl.theme.get("main", "borders", 5)
@@ -130,21 +82,12 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
             **mode,
         )
 
-    def _reset(self, ctrl, cache):
-        "resets the plot"
-        self._threader.reset(cache)
-
     def _addtodoc_data(self):
+        strycols = ('hairpin', 'status', 'orientation')
         self._defaultdata  = dict(
-            {i: [''] for i in  ('hairpin', 'status')},
+            {i: [''] for i in  strycols},
             color = ['green'],
-            **{
-                i: [0.]
-                for i in  (
-                    'bead', 'hybridisationrate', 'baseposition', 'peakposition',
-                    'closest', 'cost', 'trackid'
-                )
-            },
+            **{i: [0.] for i in set(self._model.theme.datacolumns) - set(strycols)},
             x = [('track1', '0')]
         )
         self._expdata  = ColumnDataSource(self._defaultdata)
@@ -160,110 +103,29 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
             **self._model.theme.figargs,
             x_range          = FactorRange(factors = self._expdata.data['x']),
         )
+
+        hover           = fig.select(HoverTool)[0]
+        hover.tooltips  = self._model.theme.tooltipcolumns
+        hover.renderers = [
+            self.attrs(self._model.theme.blockages).addto(fig, source = self._expdata)
+        ]
         self.attrs(self._model.theme.events).addto(fig, source = self._expdata)
-        self.attrs(self._model.theme.blockages).addto(fig, source = self._expdata)
         self.attrs(self._model.theme.bindings).addto(fig, source = self._theodata)
         self._fig = fig
 
-class _Threader:
-    """
-    In charge of thread safety & deciding whether to reset or update the plots
-    """
-    plot: '_Plot'
+class _Plot(BasePlotter[BeadsScatterPlot]):
+    parent: BeadsScatterPlot
 
-    def __init__(self, view):
-        self.view        = view
-        self.idval: int  = -1
-        self.lock:  Lock = Lock()
+    def __init__(self, mdl: BeadsScatterPlot, procs: Processors):
+        super().__init__(mdl, procs)
+        self._data:    pd.DataFrame         = pd.DataFrame({})
+        self._factors: List[Tuple[str,...]] = []
 
-    def reset(self, cache):
-        "runs the first reset"
-        idval = -2
-        with self.lock:
-            idval = self.idval
-            if hasattr(self, 'plot'):
-                del self.plot
-        self._run(idval, cache)
-
-    def update(self, ctrl, idval, **_):
-        "calls an update"
-        with self.lock:
-            if self.idval != idval and hasattr(self, 'plot'):
-                del self.plot
-            self.idval = idval
-
-            self.view.reset(ctrl, fcn = partial(self._run, idval))
-
-    def mask(self, ctrl, **_):
-        "action on mask"
-        with self.lock:
-            if hasattr(self, 'plot'):
-                del self.plot
-            self.view.reset(ctrl, fcn = partial(self._run, self.idval))
-
-    def _run(self, idval, cache):
-        "runs the display"
-        if self.idval == idval:
-            plot = None
-            cpy  = None
-
-            with self.lock:
-                plot = getattr(self, 'plot', None)
-                if self.idval == idval and plot is None:
-                    procs     = getattr(self.view, '_model').tasks.processors
-                    self.plot = plot = (
-                        _HairpinPlot
-                        if any(
-                            hasattr(j, 'sequences') for i in procs.values() for j in i.model
-                        ) else
-                        _PeaksPlot
-                    )(self.view, procs)
-
-                cpy = copy(plot)
-
-            if self.idval == idval:
-                try:
-                    cpy.reset(cache)
-                except Exception:  # pylint: disable=broad-except
-                    with self.lock:
-                        if hasattr(self, 'plot'):
-                            del self.plot
-                    raise
-                else:
-                    with self.lock:
-                        plot.__dict__.update(cpy.__dict__)
-
-                    if self.idval != idval:
-                        cache.clear()
-
-class _PlotDescr:
-    _name: str
-
-    def __set_name__(self, _, name: str):
-        self._name = name
-
-    def __get__(self, inst, tpe):
-        return self if inst is None else getattr(inst.parent, self._name)
-
-    def __set__(self, inst, val):
-        setattr(inst.parent, self._name, val)
-
-class _Plot(ABC):
-    def __init__(self, mdl: BeadsScatterPlot, procs: Dict[RootTask, TaskCacheList]):
-        self.parent:    BeadsScatterPlot                 = mdl
-        self._procs:    Dict[RootTask, TaskCacheList] = procs
-        self._factors:  List[Tuple[str,...]]          = []
-        self._data:     pd.DataFrame                  = pd.DataFrame({})
-
-    _expdata:     ColumnDataSource   = cast(ColumnDataSource,   _PlotDescr())
-    _defaultdata: Dict[str, list]    = cast(Dict[str, list],    _PlotDescr())
-    _theodata:    ColumnDataSource   = cast(ColumnDataSource,   _PlotDescr())
-    _model:       BeadsScatterPlotModel = cast(BeadsScatterPlotModel, _PlotDescr())
-    _fig:         Figure             = cast(Figure,             _PlotDescr())
-
-    def reset(self, cache):
-        "resets the data"
-        cache.update((self._reset if self._isdefault() else self._update)())
+    _expdata:     ColumnDataSource      = cast(ColumnDataSource,      BasePlotter.attr())
+    _defaultdata: Dict[str, list]       = cast(Dict[str, list],       BasePlotter.attr())
+    _theodata:    ColumnDataSource      = cast(ColumnDataSource,      BasePlotter.attr())
+    _model:       BeadsScatterPlotModel = cast(BeadsScatterPlotModel, BasePlotter.attr())
+    _fig:         Figure                = cast(Figure,                BasePlotter.attr())
 
     def _reset(self):
         "resets the data"
@@ -275,13 +137,18 @@ class _Plot(ABC):
             theo    = {i: j[:0] for i, j in self._theodata.data.items()}
         else:
             factors = self._xfactors(data)
-            exp     = self.__from_df(data)
-            theo    = self.__from_df(self._compute_theodata(data))
+            theo    = self._from_df(self._compute_theodata(data))
+            exp     = self._from_df(self.__set_tags(data))
 
+        self.__simplify_factors(exp, theo, factors)
         yield (self._expdata,      dict(data       = exp))
         yield (self._theodata,     dict(data       = theo))
         yield (self._fig.x_range,  dict(factors    = factors))
         yield (self._fig.yaxis[0], dict(axis_label = self._yaxis()))
+
+    def _isdefault(self) -> bool:
+        "whether the plot should be started anew or updated"
+        return not self._factors
 
     def _update(self):
         "streams the data"
@@ -291,36 +158,48 @@ class _Plot(ABC):
             return
 
         yield (self._fig.x_range, dict(factors = self._xfactors(data)))
-        yield ('_expdata',        partial(self._expdata.stream, self.__from_df(data)))
+        yield (
+            '_expdata',
+            partial(self._expdata.stream, self._from_df(self.__set_tags(data)))
+        )
         theo    = self._compute_theodata(data)
         if theo.shape[0]:
-            yield ('_theodata',   partial(self._theodata.stream, self.__from_df(theo)))
+            yield ('_theodata',   partial(self._theodata.stream, self._from_df(theo)))
 
-    def _isdefault(self) -> bool:
-        return not self._factors
+    def __iter_cache(self) -> Iterator[pd.DataFrame]:
+        itr = self.computations('_data', self._model)
+        for _, info in itr:
+            info = itr.send(info.reset_index())
+            info['x'] = [(info.track.values[0], str(info.bead.values[0]))]*len(info)
+            yield info
 
-    def __iter_cache(self) -> Iterator[Tuple[int, int, pd.DataFrame]]:
-        cur: Set[Tuple[int, int]] = set(
-            () if not self._data.shape[0] else
-            self._data.set_index(['trackid', 'bead']).index.unique()
+    def __simplify_factors(self, exp, theo, factors):
+        cnv = self._model.theme.tracknameconversion(i[-2] for i in self._factors)
+        if not cnv:
+            return
+
+        if len(factors[0]) == 2:
+            exp['x'][:]  = [(cnv.get(str(i), i), j) for i, j in exp['x']]
+            theo['x'][:] = [(cnv.get(str(i), i), j) for i, j in theo['x']]
+            factors[:]   = [(cnv.get(str(i), i), j) for i, j in factors]
+            return
+
+        exp['x'][:]  = [(i, cnv.get(str(j), j), k) for i, j, k in exp['x']]
+        theo['x'][:] = [(i, cnv.get(str(j), j), k) for i, j, k in theo['x']]
+        factors[:]   = [(i, cnv.get(str(j), j), k) for i, j, k in factors]
+        return
+
+    def __set_tags(self, frame):
+        def _tag(name):
+            return lambda x, y = getattr(self._model.theme, name+'tag'): y.get(x, x)
+
+        return frame.assign(
+            **{
+                i: frame[i].apply(_tag(i))
+                for i in frame.columns
+                if hasattr(self._model.theme, i+'tag')
+            }
         )
-        for iproc, proc in enumerate(self._procs.values()):
-            cache: Optional[STORE] = proc.data.getcache(DataFrameTask)()
-            if cache is None or self._model.display.masked(root = proc.model[0]):
-                continue
-
-            for bead,  info in dict(cache).items():
-                if (
-                        not isinstance(info, pd.DataFrame)
-                        or info.shape[0] == 0
-                        or (iproc, bead) in cur
-                        or self._model.display.masked(root = proc.model[0], bead = bead)
-                ):
-                    continue
-
-                info = info.reset_index()
-                name = (f"{iproc}-"+info.track[0], str(bead))
-                yield info.assign(trackid = iproc, x = [name]*len(info))
 
     def __compute_expdata(self) -> Tuple[pd.DataFrame, bool]:
         lst  = [i for i in self._compute_expdata(self.__iter_cache()) if i.shape[0]]
@@ -345,10 +224,6 @@ class _Plot(ABC):
         )
 
         return frame, False
-
-    @staticmethod
-    def __from_df(data) -> Dict[str, np.ndarray]:
-        return {i: j.values for i, j in data.items()}
 
     def _xfactors(self, frame: pd.DataFrame) -> Union[List[str], List[Tuple[str,...]]]:
         frame = (
@@ -419,29 +294,28 @@ class _HairpinPlot(_Plot):
         def _x(info):
             return lambda x, y = info.iloc[0].x: (x, *y)
 
-        hpin = set(self._model.display.hairpins)
+        hpin = self._model.display.hairpins
+        ori  = self._model.display.orientations
+        cols = list(set(self._model.theme.datacolumns) - {'bead', 'cost', 'hairpin'})
         for info in itr:
-            info = (
-                info
-                .groupby(['trackid', 'bead'])
-                .apply(lambda x: x.nsmallest(1, "cost"))
-                .reset_index(drop = True)
-            )
-
-            if hpin:
-                info = info[~info.hpin.apply(hpin.__contains__)]
-
+            info = self.selectbest(hpin, set(), info)
             if info.shape[0] == 0:
                 continue
 
             out  = (
-                info.peaks[0].reset_index()
-                [['hybridisationrate', 'status', 'baseposition', 'peakposition', 'closest']]
+                info.peaks.values[0][cols]
                 .assign(
                     hairpin = info.iloc[0]['hpin'],
-                    **{i: info.iloc[0][i] for i in ('trackid', 'bead', 'cost')}
+                    **{i: info.iloc[0][i] for i in ('trackid', 'bead', 'cost')},
                 )
             )
+            out['blockageresolution'] *= info.stretch.values[0]
+            for i in ori:
+                out = out[out['orientation'] != i]
+                if out.shape[0] == 0:
+                    continue
+
+            self.resetstatus(self._model.theme.closest, out)
             out['x'] = out.hairpin.apply(_x(info))
             yield out
 
@@ -509,10 +383,23 @@ class _PeaksPlot(_Plot):
         return ['trackid', 'bead']
 
     def _compute_expdata(self, itr: Iterator[pd.DataFrame]) -> Iterator[pd.DataFrame]:
+        stretch = self._model.theme.stretch
+        cols    = list({
+            'trackid', 'bead', 'x',
+            *(
+                i for i in self._model.theme.datacolumns
+                if (
+                    i != 'baseposition'
+                    and not next((j.fit for j in COLS if j.key == i), False)
+                )
+            )
+        })
         return (
-            info
-            [['trackid','bead', 'x', 'hybridisationrate', 'status', 'peakposition']]
-            .assign(baseposition = lambda x: x.peakposition * self._model.theme.stretch)
+            info[cols]
+            .assign(
+                baseposition       = lambda x: x.peakposition       * stretch,
+                blockageresolution = lambda x: x.blockageresolution * stretch
+            )
             for info in itr
         )
 

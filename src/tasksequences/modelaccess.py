@@ -128,9 +128,23 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
 
         @ctrl.tasks.observe
         @ctrl.tasks.hashwith(self._tasksdisplay)
-        def _onopentrack(calllater = None, isarchive = False, **_):
-            if not isarchive:
-                calllater.append(lambda: self.setnewprobes("kmer"))
+        def _onopentrack(calllater, isarchive, model, **_):
+            if isarchive or not model or not hasattr(model[0], 'path'):
+                return
+
+            ols = splitoligos("kmer", path = model[0].path)
+            if not ols:
+                return
+
+            if hasattr(self.roottask, 'path') and self.oligos:
+                ols  = sorted(
+                    set(self.oligos)
+                    .difference(splitoligos("kmer", path = self.roottask.path))
+                    .union(ols)
+                )
+
+            if ols:
+                calllater.append(lambda: self.setnewprobes(ols))
 
     @property
     def sequencemodel(self):

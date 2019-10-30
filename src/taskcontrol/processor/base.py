@@ -17,6 +17,10 @@ class ProcessorException(Exception):
     """
     All exceptions related to a problem with the data should derive from this
     """
+    @staticmethod
+    def errkey() -> str:
+        "return an indicator of the type of error"
+        return 'bug'
 
 class TaskTypeDescriptor:
     """

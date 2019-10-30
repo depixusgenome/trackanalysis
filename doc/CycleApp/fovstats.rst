@@ -1,0 +1,210 @@
+.. include:: ../utils.rst
+
+==========
+Statistics
+==========
+
+.. figure:: ../_images/fovstats.png
+
+    Displays showing beads across all tracks (top plot) as well as some statistics on said beads (bottom).
+    The statistics displayed can be selected throught the *advanced* menu.
+
+
+The goal of this tab is to provide a global view across all loaded tracks. The
+beads are displayed on the top plot. This includes the blockage positions
+detected as in the *Peaks* tab as well as hairpin bindinds if these have been
+defined. The statistic are displayed on the bottom.
+
+
+The Plots
+=========
+
+
+Beads Plot
+----------
+
+The top display shows all beads attached to selected tracks and hairpins.
+
+The beads are grouped as follows:
+
+1. By hairpins when those have been defined. The order of the hairpin is
+   defined using the median quality score of beads, with the best hairpin on
+   the left, the worst on the right.
+2. By track: if hairpins are defined, the order is again defined using the
+   median quality score in the group. Note that the track denomination can be
+   changed using the *advanced* menu. In the situation where there is a single
+   track, the chosen denomination might remove the track category.
+3. By bead number: if hairpins are defined, the order is again defined using the
+   quality score.
+
+There are two sets of points:
+
+1. Ovals are for experimental data. The width of the oval is a function of the
+   hybridisation rate. The height of the oval is a function of the peak width. Colors are:
+
+   * Blue ovals for *baseline* or *single strand* blockages.
+   * Green ovals for *normal* blockages when no hairpins have been provided or
+      *identified* blockages when they have. Identification is purely a question
+      of distance to a hairpin binding position: this distance of 10 bases can be
+      redefined using the *advanced* tab.
+   * Red ovals for *non-identified* blockages, i.e. those more than 10 bases away
+      from any binding position.
+
+2. Crosses are for hairpin binding positions: theoretical values.
+   * Green crosses for bindings with close-by blockages (< 10 bases).
+   * Red crosses for other bindings.
+
+
+A number of filters can be applied to beads, blockages or bindings. Using the
+*advanced* menu, one can select which tracks to display, which hairpins, beads
+as well as the binding strand (or orientation).
+
+Statistics Plot
+---------------
+
+The information displayed is either counts are whisker boxes on a given y-axis
+parameter as a function of up to 3 x-axis parameters.
+
+For the x-axis, these parameters are:
+
+* *hairpin* is the hairpin to which the bead was affected.
+* *binding (bp)* is the binding to which a blockage is affected.
+* *strand* is the orientation of the binding to which a blockage is affected.
+* *track group* is defined by the user on a per track basis.
+* *track* is the file to which a hairpin belongs. The exact file denomination
+  can be redefined throught the *advanced* menu.
+* *blockage status* is the status of the blockage. It can be:
+
+   * *< baseline* if the blockage is below the detected baseline,
+   * *baseline* if the blockage is the detected baseline,
+   * *identified* if the blockage is close to a binding position.
+   * *unidentified* if the blockage is far from any a binding position.
+   * *blockage* occurs when hairpins are unavailable in which case this for
+     vanilla blockages.
+   * *single strand* if the blockage is considered to be the extent of the
+     hairpin before it starts closing.
+   * *> single strand* if the blockage is above the detected single strand blockage.
+
+* *bead status* is the status of the bead. Althought categories can be
+  redefined by the user, by default, this can be:
+
+   * *ok* if no errors were triggered when treating this bead,
+   * *empty* if no vanilla blockages were detected on this bead. This happens
+     only if hairpins have been provided.
+   * *bug* if a bug occured while processing the bead. Please report the
+     situation if this occurs.
+   * as well as any of the data cleaning messages one already knows from the
+     *Cleaning* tab.
+
+For the y-axis, the parameters on a per bead base are:
+
+* *count (%)* is for displaying a total number of beads or blockages per
+  x-axis category rather that statistics on a given bead or blockage
+  characteristic.
+* *σ[HF] (bp)* is the high frequency noise per bead. Another parameter is
+  available for a high frequency noise per blockage.
+* *blockage count* is the number of blockages per bead, excluding those at
+  or below the baseline as well as at or above the single strand blockage.
+* *identified (% bindings)* is the percentage of binding position with blockages close by.
+* *missing (% bindings)* is the percentage of binding positions with no blockages nearby.
+* *unidentified (bp⁻¹)* is the ratio of blockage without binding positions
+  nearby over the number of bases in the hairpin.
+* *missing (bp⁻¹)* is the ratio of binding positions with no blockages
+  nearby over the number of bases in the hairpin.
+* *top strand identified (% bindings)* is the same as above but only considering a single orientation.
+* *top strand missing (% bindings)*
+* *bottom strand identified (% bindings)*
+* *bottom strand missing (% bindings)*
+* *stretch (bp/µm)* is the stretch factor required to go from base pairs to µm.
+* *bias (µm)* is the baseline bias required to fit to the hairpin sequence.
+* *strand size (µm)*
+
+For the y-axis, the parameters on a per blockage base are:
+
+* *σ[HF] per blockage (bp)* is the high frequency noise measured using frames
+  in each blockage position individually.
+* *σ[blockage] (bp)*  is the standard deviation over the average position on
+  each blockage event. This is a low frequency noise (≤ cycle duration).
+* *hybridisation rate (%)* is the percentage of cycles with blockage events at
+  a given blockage position (or peak).
+* *binding duration (s)* is the average duration of events within a blockage
+  position.
+* *Δ(binding - blockage) (bp)* is the distance to the closest binding
+  position. Only *identified* blockages are considered.
+
+The Advanced Menu
+=================
+
+.. figure:: ../_images/fovstats_advanced.png
+
+    Modal dialog which allows configuring the statistics displayed.
+
+A number of tabs are presented. Some only appear if hairpin sequences are
+available.
+
+Axes
+----
+
+One can select here:
+
+* categories on the x-axis. A checkbox allows defining wether the category
+  order should be lexical (unchecked) or value base (checked).
+* *Y-axis* allows selecting the characteristic to display on the y-axis. Note
+  that depending on selected x-axis categories, some y-axis options will be
+  disabled.
+* *Count normalisation* is displayed only if *Counts (%)* is selected for the
+  Y-axis. In such a case, the percentage is defined using either *all*
+  categories or those of a given x-axis category.
+* *Track denomination* defines how tracks are labeled:
+
+  * *full* uses the track file name in full, prefixed with the order in which
+    tracks were loaded.
+  * *number* uses the order in which tracks were loaded.
+  * *simple* removes from the track file names all elements in common across
+    all tracks. Elements must be separated by an underscore (_) to be
+    recognized as such. For example "Test033_acc.trk" and "Test033_ggg.trk"
+    will be simplified to "acc" and 'ggg' respectively. These simplified names
+    are prefixed with the order in which tracks were loaded.
+* *Use label colors* will use colors to distinguish x-axis categories. Only the
+  last x-axis category is considered. Not all x-axis categories have colors
+  defined.
+* *Stretch factor* is the stretch to use if no hairpins are available.
+
+Tracks
+------
+
+This tab allows defining:
+
+* the group to which a track may belong.
+* whether the track should be displayed at all.
+* the beads which should *not* be displayed for a given track.
+
+Blockage Status & Bead Status
+-----------------------------
+
+This tab allows redefining the labels for blockage or bead status. Note that
+the same label can be re-used multiple times: one can regroup any number of
+status together.
+
+
+Hairpins
+--------
+
+This tab allows selecting which hairpins to display.
+
+
+Binding Orientation
+-------------------
+
+This tab allows selecting which binding orientations display.
+
+Automated Computations
+======================
+
+The software automatically computes hybridisation positions for all *ok* beads.
+It restarts those computations every time a change is made to settings which
+could affect these positions. This includes settings in the *Cleaning* tab and
+others.
+
+Computations are performed using two cores only. The display refreshes
+automatically as more and more beads are completed.

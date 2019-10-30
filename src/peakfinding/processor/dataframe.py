@@ -170,9 +170,13 @@ class PeaksDataFrameFactory(  # pylint: disable=too-many-instance-attributes
             meas['hfsigma'] = np.full(sum(counts), frame.track.rawprecision(bead), dtype = 'f4')
         if self.__peakstatus:
             status         = self.__peakstatus(frame, bead, apeaks)
-            meas['status'] = np.concatenate([
-                np.full(i, j, dtype = status.dtype) for i, j in zip(counts, status)
-            ])
+            if len(status):
+                meas['status'] = np.concatenate([
+                    np.full(i, j, dtype = status.dtype) for i, j in zip(counts, status)
+                ])
+            else:
+                meas['status'] = []
+
         if self.__calls:
             self.__callmeasure(meas, peaks, counts)
         if self.__aggs:

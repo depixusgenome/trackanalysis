@@ -4,12 +4,13 @@
 from cleaning.view       import CleaningView, BeadCleaningView
 from cyclesplot          import CyclesPlotView
 from fov                 import FoVPlotView
+from peakcalling.view    import FoVPeakCallingView
 from qualitycontrol.view import QualityControlView
 from taskview.tabs       import TabsView, TabsTheme, initsubclass
 
 from .peaksplot          import PeaksPlotView
 from .cyclehistplot      import CycleHistPlotView
-from .hairpingroup       import HairpinGroupPlotView, ConsensusPlotView
+from .hairpingroup       import ConsensusPlotView
 
 PANELS = {
     FoVPlotView:          'fov',
@@ -19,7 +20,7 @@ PANELS = {
     CyclesPlotView:       'cycles',
     PeaksPlotView:        'peaks',
     CycleHistPlotView:    'cyclehist',
-    HairpinGroupPlotView: 'hairpin',
+    FoVPeakCallingView:   'statistics',
     ConsensusPlotView:    'consensus'
 }
 

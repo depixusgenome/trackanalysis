@@ -226,10 +226,13 @@ class BaseTaskController(Controller):  # pylint: disable=too-many-public-methods
             return None
         return self._items[parent].run(tsk, copy = copy, pool = pool)
 
-    def processors(self, parent:RootTask, tsk:Task = None) -> Optional[ProcessorController]:
+    def processors(
+            self, parent:RootTask, tsk:Task = None, copy:bool = True
+    ) -> Optional[ProcessorController]:
         "Returns a processor for a given root and range"
         ctrl = self._items.get(parent, None)
-        return None if ctrl is None else ctrl.keepupto(tsk)
+        assert copy or tsk is None
+        return None if ctrl is None else ctrl.keepupto(tsk) if copy else ctrl
 
     def instrumenttype(self, parent:RootTask) -> str:
         "return the instrument type"
@@ -373,7 +376,7 @@ class TaskController(BaseTaskController):
 
         @ctrl.display.observe
         @ctrl.display.hashwith(self)
-        def _ontasks(old = None, **_):
+        def _ontasks(old, **_):
             if "taskcache" in old and mdl("clear", True) and old['taskcache'].model:
                 ctrl.tasks.cleardata(old['taskcache'].model[0])
 
@@ -397,21 +400,21 @@ class TaskController(BaseTaskController):
             return self.observe(wrapper(fcn))
 
         @observe
-        def _onopentrack(controller = None, model = None, **_):
+        def _onopentrack(controller, model, **_):
             return partial(controller.closetrack, model[0])
 
         @observe
-        def _onclosetrack(controller = None, model = None, **_):
+        def _onclosetrack(controller, model, **_):
             return partial(controller.opentrack, model[0], model)
 
         @observe
-        def _onaddtask(controller = None, parent = None, task = None, **_):
+        def _onaddtask(controller, parent, task, **_):
             return partial(controller.removetask, parent, task)
 
         @observe
-        def _onupdatetask(controller = None, parent = None, task = None, old = None, **_):
+        def _onupdatetask(controller, parent, task, old, **_):
             return partial(controller.updatetask, parent, task, **old)
 
         @observe
-        def _onremovetask(controller = None, parent = None, task = None, old = None, **_):
+        def _onremovetask(controller, parent, task, old, **_):
             return partial(controller.addtask, parent, task, old.index(task))

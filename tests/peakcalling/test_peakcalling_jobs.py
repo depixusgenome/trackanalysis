@@ -6,7 +6,7 @@ import asyncio
 from time                           import sleep, time
 from multiprocessing                import current_process
 
-from peakcalling.view._model._jobs  import JobRunner, JobModel
+from peakcalling.view._model._jobs  import _JobRunner as JobRunner, JobModel
 from peakcalling.view._model._tasks import TasksModel, _RootCache
 from taskcontrol.taskcontrol        import ProcessorController
 from taskcontrol.processor.track    import TrackReaderProcessor
@@ -180,7 +180,7 @@ def test_adapt_procs_ref():
     lst = mdl.processors
     assert len(lst) == len(procs)
     for i in procs:
-        assert len(lst[i.model[0]].model) == 2
+        assert len(lst[i.model[0]].model) == 3
         assert i.model is not lst[i.model[0]].model
         assert lst[i.model[0]].model[-1].__class__.__name__ == 'DataFrameTask'
         assert lst[i.model[0]].model[-1].measures == {'events': True}
@@ -190,13 +190,13 @@ def test_adapt_procs_ref():
     lst = mdl.processors
     assert len(lst) == len(procs)
     for i in procs:
-        assert len(lst[i.model[0]].model) == 2 + (i.model[0] is not mdl.state.reference)
+        assert len(lst[i.model[0]].model) == 3 + (i.model[0] is not mdl.state.reference)
         assert i.model is not lst[i.model[0]].model
         assert lst[i.model[0]].model[-1].__class__.__name__ == 'DataFrameTask'
         assert lst[i.model[0]].model[-1].measures == {'events': True}
         if i.model[0] is not mdl.state.reference:
-            assert lst[i.model[0]].model[1].__class__.__name__ == '_Ref'
-            assert lst[i.model[0]].model[1].defaultdata is lst[mdl.state.reference].data
+            assert lst[i.model[0]].model[2].__class__.__name__ == '_Ref'
+            assert lst[i.model[0]].model[2].defaultdata is lst[mdl.state.reference].data
 
 def test_adapt_procs_fittohp():
     "test processors adaptor remove ref"
@@ -228,23 +228,23 @@ def test_adapt_procs_fittohp():
     lst = mdl.processors
     assert len(lst) == len(procs)
     for i in procs:
-        assert len(lst[i.model[0]].model) == 3
+        assert len(lst[i.model[0]].model) == 4
         assert i.model is not lst[i.model[0]].model
-        assert lst[i.model[0]].model[1].__class__.__name__ == '_Hairpin'
+        assert lst[i.model[0]].model[2].__class__.__name__ == '_Hairpin'
         assert lst[i.model[0]].model[-1].__class__.__name__ == 'DataFrameTask'
         assert lst[i.model[0]].model[-1].measures == {'peaks': {'all': True, 'events': True}}
-        assert lst[i.model[0]].model[1].__class__.__name__ == '_Hairpin'
+        assert lst[i.model[0]].model[2].__class__.__name__ == '_Hairpin'
         if i.model[0] in (procs[0].model[0], procs[2].model[0]):
-            assert lst[i.model[0]].model[1].sequences is None
+            assert lst[i.model[0]].model[2].sequences is None
         else:
-            assert lst[i.model[0]].model[1].sequences == 'a'
+            assert lst[i.model[0]].model[2].sequences == 'a'
 
     mdl.state.reference = procs[1].model[0]
 
     lst = mdl.processors
     assert len(lst) == len(procs)
     for i in procs:
-        assert len(lst[i.model[0]].model) == 3 + (i.model[0] is not mdl.state.reference)
+        assert len(lst[i.model[0]].model) == 4 + (i.model[0] is not mdl.state.reference)
         assert i.model is not lst[i.model[0]].model
         assert lst[i.model[0]].model[-1].__class__.__name__ == 'DataFrameTask'
         assert lst[i.model[0]].model[-1].measures == {'peaks': {'all': True, 'events': True}}
@@ -254,8 +254,8 @@ def test_adapt_procs_fittohp():
         else:
             assert lst[i.model[0]].model[-2].sequences == 'a'
         if i.model[0] is not mdl.state.reference:
-            assert lst[i.model[0]].model[1].__class__.__name__ == '_Ref'
-            assert lst[i.model[0]].model[1].defaultdata is lst[mdl.state.reference].data
+            assert lst[i.model[0]].model[2].__class__.__name__ == '_Ref'
+            assert lst[i.model[0]].model[2].defaultdata is lst[mdl.state.reference].data
 
     for i in (mdl.config.sdi, mdl.config.picotwist):
         i['fittohairpin']   = _Hairpin(resolve = False)
@@ -294,4 +294,4 @@ def test_lru():
 
 
 if __name__ == '__main__':
-    test_lru()
+    test_adapt_procs_ref()

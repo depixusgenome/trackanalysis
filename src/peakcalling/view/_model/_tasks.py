@@ -4,24 +4,28 @@
 from copy                       import deepcopy
 from dataclasses                import dataclass, field
 from typing                     import (
-    Dict, Union, Type, Optional, ItemsView, List, Iterator, Tuple, cast
+    Dict, Union, Type, Optional, ItemsView, List, Iterator, Tuple, KeysView, Any
 )
 
 import zlib
 from   cachetools               import LRUCache
 import pandas as pd
 
-from taskstore                  import dumps, loads
-from taskcontrol.taskcontrol    import ProcessorController
-from taskcontrol.processor      import Processor
-from taskmodel.application      import TasksConfig, TasksDisplay
-from taskmodel.dataframe        import DataFrameTask
-from taskmodel                  import RootTask, Task
-from ...processor.__config__    import FitToReferenceTask, FitToHairpinTask
+from cleaning.beadsubtraction      import FixedBeadDetection
+from cleaning.processor.__config__ import FixedBeadDetectionTask
+from taskstore                     import dumps, loads
+from taskcontrol.taskcontrol       import ProcessorController
+from taskcontrol.processor         import Processor
+from taskcontrol.processor.base    import register
+from taskmodel.application         import TasksConfig, TasksDisplay
+from taskmodel.dataframe           import DataFrameTask
+from taskmodel                     import RootTask, Task
+from ...processor.__config__       import FitToReferenceTask, FitToHairpinTask
 
 OptProc    = Optional[ProcessorController]
 ProcOrRoot = Union[RootTask, ProcessorController]
 Cache      = Dict[int, Union[Exception, pd.DataFrame]]
+Processors = Dict[RootTask, ProcessorController]
 
 @dataclass
 class TaskLRUConfig:
@@ -36,10 +40,10 @@ class TaskLRUConfig:
 class TasksDict:
     "Deals with keeping a copy of tasks for each track"
     def __init__(self):
-        self.name:  str                                 = 'peakcalling.view.tasksdict'
-        self.tasks: Dict[RootTask, ProcessorController] = {}
-        self.cache: Dict[RootTask, _RootCache]          = {}
-        self.lru:   TaskLRUConfig                       = TaskLRUConfig()
+        self.name:  str                        = 'peakcalling.view.tasksdict'
+        self.tasks: Processors                 = {}
+        self.cache: Dict[RootTask, _RootCache] = {}
+        self.lru:   TaskLRUConfig              = TaskLRUConfig()
 
     def __contains__(self, root: 'ProcOrRoot') -> bool:
         if isinstance(root, ProcessorController) and len(root.model):
@@ -57,6 +61,18 @@ class TasksDict:
         "return tasks"
         return self.tasks.items()
 
+    def keys(self) -> KeysView[RootTask]:
+        "return root tasks"
+        return self.tasks.keys()
+
+    def itertask(self, task: Type[Task]) -> Iterator[Tuple[RootTask, Task]]:
+        "iterate over tasks selecting the one provide as argument"
+        yield from (
+            (i.model[0], j)
+            for i in self.tasks.values() for j in i.model
+            if isinstance(j, task)
+        )
+
     def add(self, procs: ProcessorController):
         "add a processorcontroller"
         self.tasks[procs.model[0]] = self.cleancopy(procs)
@@ -66,26 +82,9 @@ class TasksDict:
         self.lru = ctrl.theme.swapmodels(self.lru)
         self._reset_tasks(ctrl)
 
-    def _reset_tasks(self, ctrl):
-        tasks = dict()
-        cache = dict()
-        for lst in ctrl.tasks.tasklist(...):
-            root = next(lst, None)
-            if root is None:
-                continue
-
-            if root in self.tasks:
-                tasks[root] = self.tasks[root]
-                cache[root] = self.cache[root]
-            else:
-                tasks[root] = self.cleancopy(ctrl.tasks.processors(root))
-                cache[root] = self.lru.newcache()
-
-        self.tasks = tasks
-        self.cache = cache
-
     def observe(self, ctrl):
         "updates models as needed"
+
         def _observe(fcn):
 
             @ctrl.tasks.observe(fcn.__name__[3:])
@@ -116,16 +115,19 @@ class TasksDict:
                 ctrl.tasks.processortype(task),
                 ctrl.tasks.processors(parent).model.index(task)
             )
+            self.tasks[parent].data.setcachedefault(0, ctrl.tasks.track(parent))
             return self.tasks[parent], task
 
         @_observe
         def _onupdatetask(parent, task, **_) -> Tuple[ProcessorController, Task]:
             self.tasks[parent].update(task)
+            self.tasks[parent].data.setcachedefault(0, ctrl.tasks.track(parent))
             return self.tasks[parent], task
 
         @_observe
         def _onremovetask(parent, task, **_) -> Tuple[ProcessorController, Task]:
             self.tasks[parent].remove(task)
+            self.tasks[parent].data.setcachedefault(0, ctrl.tasks.track(parent))
             return self.tasks[parent], task
 
     @staticmethod
@@ -140,15 +142,41 @@ class TasksDict:
             new.data.setcachedefault(0, old)
         return new
 
+    def _reset_tasks(self, ctrl):
+        tasks = dict()
+        cache = dict()
+        for lst in ctrl.tasks.tasklist(...):
+            root = next(lst, None)
+            if root is None:
+                continue
+
+            if root in self.tasks:
+                tasks[root] = self.tasks[root]
+                cache[root] = self.cache[root]
+            else:
+                tasks[root] = self.cleancopy(ctrl.tasks.processors(root))
+                cache[root] = self.lru.newcache()
+
+        self.tasks = tasks
+        self.cache = cache
+
+
+_MEASURES: Dict[str, Any] = dict(
+    blockageresolution = 'resolution',
+    blockagehfsigma    = 'peakhfsigma',
+)
+
+
 @dataclass
 class TasksMeasures:
     """info missing from TasksConfig"""
     name:  str           = "peakcalling.view.dataframe"
-    peaks: DataFrameTask = cast(DataFrameTask, field(default_factory = DataFrameTask))
-    fits:  DataFrameTask = cast(
-        DataFrameTask,
-        field(default_factory = lambda: DataFrameTask(measures = dict(peaks = True)))
-    )
+    peaks: DataFrameTask = field(default_factory = lambda: DataFrameTask(
+        measures = dict(**_MEASURES, hfsigma = True)
+    ))
+    fits:  DataFrameTask = field(default_factory = lambda: DataFrameTask(
+        measures = dict(peaks = dict(**_MEASURES, all = True, falseneg = True))
+    ))
 
 class TaskState:
     "Deals with oligos, sequences & reference track"
@@ -157,8 +185,9 @@ class TaskState:
         self.reference:     Optional[RootTask]                = None
         self.sequences:     Dict[str, str]                    = {}
         self.probes:        Dict[RootTask, List[str]]         = {}
-        self.processors:    Dict[Type[Task], Type[Processor]] = {}
+        self.processors:    Dict[Type[Task], Type[Processor]] = register()
         self.defaultprobes: List[str]                         = ['kmer']
+        self.fixed:         FixedBeadDetection                = FixedBeadDetection()
 
     def swapmodels(self, ctrl):
         "swap models with those in the controller"
@@ -168,6 +197,8 @@ class TaskState:
         self.probes     = ctrl.display.get("sequence", "probes",    defaultvalue = {})
         self.sequences  = ctrl.theme.get("sequence", "sequences", defaultvalue = {})
         self.processors = ctrl.tasks.processortype(...)
+        if ctrl.theme.model("fixedbeads") is not None:
+            self.fixed  = ctrl.theme.model("fixedbeads")
 
     def observe(self, ctrl):
         "updates models as needed"
@@ -176,19 +207,26 @@ class TaskState:
         @ctrl.theme.hashwith(self)
         def _onsequences(model, old, **_):
             if 'sequences' in old:
-                ctrl.update(self, sequences = model.sequences)
+                ctrl.display.update(self, sequences = model.sequences)
 
         @ctrl.display.observe("sequence")
         @ctrl.display.hashwith(self)
         def _onprobes(model, old, **_):
             if 'probes' in old:
-                ctrl.update(self, probes = model.probes)
+                ctrl.display.update(self, probes = model.probes)
 
         @ctrl.display.observe("hybridstat.fittoreference")
         @ctrl.display.hashwith(self)
         def _onreference(model, old, **_):
             if 'reference' in old:
-                ctrl.update(self, reference = model.reference)
+                ctrl.display.update(self, reference = model.reference)
+
+        @ctrl.theme.observe("fixedbeads")
+        @ctrl.theme.hashwith(self)
+        def _onfixedbeads(model, **_):
+            ctrl.display.update(
+                self, fixed = FixedBeadDetection(**model.config())
+            )
 
 class TasksModel:
     "everything related to tasks"
@@ -204,8 +242,10 @@ class TasksModel:
     def swapmodels(self, ctrl):
         "swap models with those in the controller"
         self.state      = ctrl.display.swapmodels(self.state)
+        self.tasks      = ctrl.display.swapmodels(self.tasks)
         self.config     = ctrl.theme.swapmodels(self.config)
         self.dataframes = ctrl.theme.swapmodels(self.dataframes)
+
         for i in self.__dict__.values():
             if callable(getattr(i, 'swapmodels', None)):
                 i.swapmodels(ctrl)
@@ -216,7 +256,7 @@ class TasksModel:
         self.state.observe(ctrl)
 
     @property
-    def processors(self) -> Dict[RootTask, ProcessorController]:
+    def processors(self) -> Processors:
         """return the processors for new jobs"""
         return _Adaptor(self)()
 
@@ -226,17 +266,27 @@ class _Adaptor:
     state:      TaskState
     config:     TasksConfig
     dataframes: TasksMeasures
-    _copies: Dict[RootTask, ProcessorController]
+    _copies:    Processors
 
     def __init__(self, mdl: TasksModel):
         self.__dict__.update(mdl.__dict__)
 
-    def __call__(self) -> Dict[RootTask, ProcessorController]:
+    def __call__(self) -> Processors:
         self._copies = {i: self.tasks.cleancopy(j) for i, j in self.tasks.items()}
+        self.__fixedbead()
         self.__fittoreference()
         self.__fittohairpin()
         self.__dataframe()
         return self.__dict__.pop('_copies')
+
+    def __add(self, procs, task):
+        if task:
+            ind = self.config.defaulttaskindex(procs.model, task)
+            procs.add(task, self.state.processors[type(task)], ind)
+
+    def __fixedbead(self):
+        for procs in self._copies.values():
+            self.__add(procs, FixedBeadDetectionTask(**self.state.fixed.config()))
 
     def __iter(
             self,
@@ -269,9 +319,7 @@ class _Adaptor:
             elif ind is not None:
                 procs.remove(ind)
 
-            if task:
-                ind = self.config.defaulttaskindex(procs.model, task)
-                procs.add(task, self.state.processors[type(task)], ind)
+            self.__add(procs, task)
 
             # This yield is only to return to the enclosing loop, right
             # after the send. The loop will then call the next iteration

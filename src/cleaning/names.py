@@ -13,4 +13,5 @@ NAMES: Dict[str, str] = dict(
     phasejump  = 'SDI phase-jumps',
     clipping   = 'z ∉ range(φ₁ → φ₃)',
     alignment  = 'alignment',
+    fixed      = 'fixed'
 )

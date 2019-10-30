@@ -17,18 +17,22 @@ from .tasks                  import Tasks
 
 class Parallel:
     "Runs tasks in parallel"
-    def __init__(self, # pylint: disable=keyword-arg-before-vararg
-                 roots     : Union[TracksDict, Sequence[RootTask]] = None,
-                 *tasks    : Union[Tasks, Task],
-                 processors: Dict[Type[Task], Type[Processor]] = None) -> None:
+    def __init__(
+            self,
+            *tasks:     Union[Tasks, Task],
+            roots:      Union[TracksDict, Sequence[RootTask]] = None,
+            processors: Dict[Type[Task], Type[Processor]] = None
+    ) -> None:
         self.args: List[bytes] = []
         if roots is not None:
             self.extend(roots, *tasks, processors = processors)
 
-    def extend(self,
-               roots     : Union[TracksDict, Sequence[RootTask], Sequence[Track]],
-               *tasks    : Union[Tasks, Task, Processor],
-               processors: Dict[Type[Task], Type[Processor]] = None) -> 'Parallel':
+    def extend(
+            self,
+            roots:      Union[TracksDict, Sequence[RootTask], Sequence[Track]],
+            *tasks:     Union[Tasks, Task, Processor],
+            processors: Dict[Type[Task], Type[Processor]] = None
+    ) -> 'Parallel':
         "adds new jobs"
         lroots = [i if isinstance(i, RootTask) else
                   TrackReaderTask(path = i.path, key  = i.key, axis = i.axis.name)
@@ -39,24 +43,35 @@ class Parallel:
         procs     = (register(Processor if not processors else processors)
                      if not isinstance(processors, dict) else
                      processors)
-        toproc    = lambda i: cast(Processor,
-                                   (i if isinstance(i, Processor) else
-                                    procs[type(i)](i))
-                                  )
-        main      = [toproc(i) for i in Tasks.tasklist(*tasks)]
-        self.args+= [pickle.dumps([toproc(i)]+main) for i in lroots]
+        main      = [
+            cast(Processor, (i if isinstance(i, Processor) else procs[type(i)](i)))
+            for i in Tasks.tasklist(*tasks)
+        ]
+        self.args += [
+            pickle.dumps([
+                cast(Processor, (i if isinstance(i, Processor) else procs[type(i)](i))),
+                *main
+            ])
+            for i in lroots
+        ]
         return self
 
-    def process(self,
-                pool: Union[ProcessPoolExecutor, ThreadPoolExecutor] = None,
-                endaction: Union[str, Callable] = None):
+    def process(
+            self,
+            pool: Union[ProcessPoolExecutor, ThreadPoolExecutor] = None,
+            endaction: Union[str, Callable] = None
+    ):
         "processes the parallel task"
-        if pool is None:
-            pool = ProcessPoolExecutor()
+        pmap = (
+            map                  if len(self.args) == 1  else  # if only 1 arg, do directly
+            getattr(pool, 'map') if hasattr(pool, 'map') else
+            ProcessPoolExecutor().map
+        )
 
         if endaction in (pd.concat, 'concat', 'concatenate'):
+
             lst: List[pd.DataFrame] = []
-            for i in pool.map(self.run, self.args):
+            for i in pmap(self.run, self.args):
                 if isinstance(i, (list, tuple)):
                     lst.extend(j for j in i if j is not None)
                 elif i is not None:
@@ -64,9 +79,9 @@ class Parallel:
             return pd.concat(lst, sort = False)
 
         if callable(endaction):
-            return [cast(Callable, endaction)(i) for i in pool.map(self.run, self.args)]
+            return [cast(Callable, endaction)(i) for i in pmap(self.run, self.args)]
 
-        res = list(pool.map(self.run, self.args))
+        res = list(pmap(self.run, self.args))
         if all(len(i) == 1 for i in res):
             return [i[0] for i in res]
         return res
@@ -83,10 +98,12 @@ class Parallel:
 
         return tuple(_cnv(i) for i in _runprocessors(args))
 
-def parallel(roots     : Union[TracksDict, Sequence[RootTask]],
-             *tasks    : Task,
-             processors: Dict[Type[Task], Type[Processor]]              = None,
-             pool      : Union[ProcessPoolExecutor, ThreadPoolExecutor] = None,
-             endaction : Union[str, Callable]                           = None):
+def parallel(
+        roots:      Union[TracksDict, Sequence[RootTask]],
+        *tasks:     Task,
+        processors: Dict[Type[Task], Type[Processor]]              = None,
+        pool:       Union[ProcessPoolExecutor, ThreadPoolExecutor] = None,
+        endaction:  Union[str, Callable]                           = None
+):
     "Runs tasks in parallel"
     return Parallel(roots, *tasks, processors = processors).process(pool, endaction)

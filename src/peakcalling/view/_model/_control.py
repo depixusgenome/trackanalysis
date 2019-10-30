@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updating list of jobs to run"
-from typing                     import Dict, TYPE_CHECKING, cast
+from typing                     import TYPE_CHECKING, cast
 
-import asyncio
-
-from taskcontrol.taskcontrol    import ProcessorController
-from taskmodel                  import RootTask
-from ._jobs                     import JobModel, JobRunner
-from ._tasks                    import TasksModel
+from ._jobs                     import JobModel, JobEventNames
+from ._tasks                    import TasksModel, Processors
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
     from taskapp.maincontrol  import SuperController  # noqa
 
-class TasksModelController:
+class TasksModelController(JobEventNames):
     """
     Centralises information needed for processing & displaying
     multiple fields of view.
@@ -31,9 +27,7 @@ class TasksModelController:
     tasks: TasksModel = cast(TasksModel, property(lambda self: getattr(self, '_tasks')))
 
     def __init__(self):
-        self.eventname:     str = 'peakcalling.view.jobs'
-        self.eventjobstart: str = f'{self.eventname}.start'
-        self.eventjobstop:  str = f'{self.eventname}.stop'
+        super().__init__()
         self._jobs:  JobModel   = JobModel()
         self._tasks: TasksModel = TasksModel()
 
@@ -50,24 +44,18 @@ class TasksModelController:
             if callable(getattr(i, 'observe', None)):
                 i.observe(ctrl)
 
+        calls = [self._jobs.display.calls]
+
         @ctrl.display.observe(self._tasks.tasks.name)
         @ctrl.display.hashwith(self._jobs.display)
         def _ontasks(**_):
-            ctrl.display.update(self._jobs.display, calls = self._jobs.display.calls+1)
+            calls[0] += 1
+            ctrl.display.update(self._jobs.display, calls = calls[0])
 
         @ctrl.display.observe(self._jobs.display)
-        @ctrl.display.hashwith(self._tasks.tasks)
+        @ctrl.display.hashwith(self._jobs.display)
         def _onchange(**_):
-            idval = self._jobs.display.calls
-            procs = list(self._tasks.processors.values())
-
-            async def _run():
-                ctrl.display.handle(self.eventjobstart)
-                with ctrl.display(self.eventname, args = {}) as sendevt:
-                    await JobRunner(self._jobs).run(procs, sendevt, idval)
-                ctrl.display.handle(self.eventjobstop)
-
-            asyncio.create_task(_run())
+            self._jobs.launch(list(self._tasks.processors.values()), self)
 
     def addto(self, ctrl):
         "add to the controller"
@@ -77,6 +65,6 @@ class TasksModelController:
             self.observe(ctrl)
 
     @property
-    def processors(self) -> Dict[RootTask, ProcessorController]:
+    def processors(self) -> Processors:
         """return the processors for new jobs"""
         return self._tasks.processors

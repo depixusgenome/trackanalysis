@@ -30,5 +30,5 @@ further studies.
    cleaning
    cycles
    peaks
-   hairpingroup
+   fovstats
    consensus
