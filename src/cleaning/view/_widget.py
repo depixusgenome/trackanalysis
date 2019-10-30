@@ -283,7 +283,11 @@ class CleaningFilterWidget:
 
     @property
     def __fixedbeads(self):
-        maxi = self.__model.ctrl.theme.get("cleaning.theme", "maxfixedbeads")
+        if 'cleaning.theme' in self.__model.ctrl.theme:
+            maxi = self.__model.ctrl.theme.get("cleaning.theme", "maxfixedbeads")
+        else:
+            maxi = CleaningPlotModel().theme.maxfixedbeads
+
         lst  = [i[-1] for i in self.__model.availablefixedbeads]
         return intlistsummary(lst, False, maxi)
 
