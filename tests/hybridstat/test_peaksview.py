@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# pylint: disable=redefined-outer-name
+# pylint: disable=redefined-outer-name,too-many-statements,too-many-locals,ungrouped-imports
+# pylint: disable=wrong-import-position,unused-import
 """ Tests views """
 from typing    import cast
 from tempfile  import mktemp, gettempdir
@@ -19,26 +20,27 @@ for _msg_ in (".*html argument of XMLParser.*", ".*Using or importing the ABCs.*
         message  = _msg_
     )
 
-# pylint: disable=wrong-import-position
-from bokeh.plotting           import Figure
-from bokeh.models             import Tabs, FactorRange
-from tornado.gen              import sleep
-from tornado.ioloop           import IOLoop
-from tornado.platform.asyncio import AsyncIOMainLoop
+from bokeh.plotting           import Figure             # noqa: E402
+from bokeh.models             import Tabs, FactorRange  # noqa: E402
+from tornado.gen              import sleep              # noqa: E402
+from tornado.ioloop           import IOLoop             # noqa: E402
+from tornado.platform.asyncio import AsyncIOMainLoop    # noqa: E402
+
 # import openpyxl to deal with deprecation warning
-import openpyxl # pylint: disable:unused-import
+import openpyxl  # noqa: E402,F401
 
-from tests.testutils                     import integrationmark
-from tests.testingcore                   import path as utfilepath
-from view.plots                          import DpxKeyedRow
-from peakfinding.reporting.batch         import createmodels as _pmodels
-from hybridstat.reporting.identification import writeparams
-from hybridstat.reporting.batch          import createmodels as _hmodels
-from hybridstat.view._io                 import ConfigXlsxIO
+from tests.testutils                     import integrationmark           # noqa: E402
+from tests.testingcore                   import path as utfilepath        # noqa: E402
+from view.plots                          import DpxKeyedRow               # noqa: E402
+from peakfinding.reporting.batch         import createmodels as _pmodels  # noqa: E402
+from hybridstat.reporting.identification import writeparams               # noqa: E402
+from hybridstat.reporting.batch          import createmodels as _hmodels  # noqa: E402
+from hybridstat.view._io                 import ConfigXlsxIO              # noqa: E402
+import hybridstat.view._widget as widgetmod                               # noqa: E402
 
-from cleaning.processor                  import BeadSubtractionTask
-from peakcalling.processor.__config__    import FitToHairpinTask
-from peakcalling.tohairpin               import PeakGridFit, ChiSquareFit, Symmetry
+from cleaning.processor                  import BeadSubtractionTask                  # noqa: E402
+from peakcalling.processor.__config__    import FitToHairpinTask                     # noqa: E402
+from peakcalling.tohairpin               import PeakGridFit, ChiSquareFit, Symmetry  # noqa: E402
 CTX.__exit__(None, None, None)
 
 FILTERS = [
@@ -57,7 +59,7 @@ def test_hybridstat_xlsxio():
 
     path  = cast(Path, utfilepath("big_legacy"))
     track = Path(path).parent/"*.trk", utfilepath("CTGT_selection")
-    itr   = _hmodels(dict(track     = track, # type: ignore
+    itr   = _hmodels(dict(track     = track,  # type: ignore
                           sequence  = utfilepath("hairpins.fasta")))
     mdl   = next(itr)
 
@@ -73,6 +75,7 @@ def test_hybridstat_xlsxio():
                       mdl)
 
     cnt = 0
+
     async def _run():
         nonlocal cnt
         for i in range(50):
@@ -111,6 +114,7 @@ def test_peaks_xlsxio():
                           mdl)
 
         cnt = 0
+
         async def _run():
             nonlocal cnt
             for i in range(50):
@@ -125,8 +129,7 @@ def test_peaks_xlsxio():
     finally:
         ConfigXlsxIO.RUNNING = False
 
-def _t_e_s_t_peaks(server, bkact): # pylint: disable=too-many-statements
-    import hybridstat.view._widget as widgetmod
+def _t_e_s_t_peaks(server, bkact):
     filt = server.widget[widgetmod.DpxFitParams]
     src  = server.widget['Peaks:List'].source
     root = server.ctrl.display.get("tasks", "roottask")
@@ -183,6 +186,7 @@ def _t_e_s_t_peaks(server, bkact): # pylint: disable=too-many-statements
 
     out = mktemp()+"_hybridstattest101.xlsx"
     found = [0]
+
     def _startfile(path):
         found[0] = path
     bkact.setattr(widgetmod, 'startfile', _startfile)
@@ -193,10 +197,11 @@ def _t_e_s_t_peaks(server, bkact): # pylint: disable=too-many-statements
     _hascstr(1)
 
 @integrationmark
-def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-locals
+def test_peaksplot_view(bokehaction):  # pylint: disable=too-many-statements
     "test peaksplot"
     vals = [0.]*2
     prev = [1.]*2
+
     def _printrng(old = None, model = None, **_):
         if 'ybounds' in old:
             vals[:2] = [0. if i is None else i for i in model.ybounds]
@@ -236,6 +241,7 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-
         'reduced χ²'
     )
     krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
+
     def _press(val):
         server.press(val, krow)
         for _ in range(5):
@@ -261,26 +267,23 @@ def test_peaksplot(bokehaction): # pylint: disable=too-many-statements,too-many-
     assert len(found) == 2
 
     assert server.selenium['.dpx-peakstatdiv'].text == (
-        'Cycles\n'             '103\n'
-        'Stretch (base/µm)\n'  '1164.062\n'
-        'Bias (µm)\n'          '0.0048\n'
-        'σ[HF] (µm)\n'         '0.0018\n'
-        'σ[Peaks] (µm)\n'      '0.0021 ± 0.0008\n'
-        'Average Skew\n'       '-0.06 ± 0.11\n'
-        'Peak count\n'         '16\n'
-        'Baseline (µm)\n'      '0.009\n'
+        'Cycles\n103\n'
+        'Stretch (base/µm)\n1136.364\n'
+        'Bias (µm)\n0.0180\n'
+        'σ[HF] (µm)\n0.0018\n'
+        'σ[Peaks] (µm)\n0.0021 ± 0.0008\n'
+        'Average Skew\n-0.06 ± 0.11\n'
+        'Peak count\n16\n'
+        'Baseline (µm)\n0.009\n'
         'Singlestrand (µm)\n'
-        'Events per Cycle\n'   '0.2 ± 0.2\n'
-        'Down Time Φ₅ (s)\n'   '7.2\n'
-        'Sites found\n'        '6/6\n'
-        'Silhouette\n'         '1.0\n'
-        'reduced χ²\n'         '1.3'
+        'Events per Cycle\n0.2 ± 0.2\n'
+        'Down Time Φ₅ (s)\n7.2\n'
+        'Sites found\n0/6\n'
+        'Silhouette\n1.0\nreduced χ²'
     )
 
-
-
 @integrationmark
-def test_cyclehistplot(bokehaction): # pylint: disable=too-many-statements,too-many-locals
+def test_cyclehistplot_view(bokehaction):
     "test peaksplot"
     server = bokehaction.start(
         'hybridstat.view.cyclehistplot.CycleHistPlotView',
@@ -291,7 +294,7 @@ def test_cyclehistplot(bokehaction): # pylint: disable=too-many-statements,too-m
     _t_e_s_t_peaks(server, bokehaction)
 
 @integrationmark
-def test_hairpingroup(bokehaction): # pylint: disable=too-many-statements,too-many-locals
+def test_hairpingroup_view(bokehaction):
     "test peaksplot"
     server = bokehaction.start(
         'hybridstat.view.hairpingroup.HairpinGroupPlotView',
@@ -337,7 +340,7 @@ def test_hairpingroup(bokehaction): # pylint: disable=too-many-statements,too-ma
     assert rng.factors == ['4', '2']
 
 @integrationmark
-def test_reference(bokehaction):
+def test_reference_view(bokehaction):
     "test peaksplot"
     server = bokehaction.start(
         'hybridstat.view.peaksplot.PeaksPlotView',
@@ -381,7 +384,7 @@ def test_reference(bokehaction):
     assert store.reference is None
 
 @integrationmark
-def test_hybridstat(bokehaction):
+def test_hybridstat_view(bokehaction):
     "test hybridstat"
     server = bokehaction.start(
         'hybridstat.view.HybridStatView',
@@ -419,7 +422,7 @@ def test_hybridstat(bokehaction):
     server.change(tabs, 'active', indcyc)
 
 @integrationmark
-def test_muwells(bokehaction):
+def test_muwells_view(bokehaction):
     "test hybridstat"
     server = bokehaction.start(
         'hybridstat.view.HybridStatView',
@@ -437,6 +440,7 @@ def test_muwells(bokehaction):
     muwells = dict(server.ctrl.theme.get("tasks", "muwells"))
     muwells['datacleaning'].maxsaturation = 90
     server.ctrl.theme.update("tasks", muwells = muwells)
+
     def _test(dim):
         active   = tabs.active
         for i in range(len(tabs.tabs)-2):
@@ -473,7 +477,7 @@ def test_muwells(bokehaction):
     _test('m)')
 
 @integrationmark
-def test_advancedmenu(bokehaction):
+def test_advancedmenu_view(bokehaction):
     "test advanced menu"
     server = bokehaction.start(
         'hybridstat.view.peaksplot.PeaksPlotView',
@@ -531,7 +535,6 @@ def test_advancedmenu(bokehaction):
 
 
 if __name__ == '__main__':
-    # pylint: disable=ungrouped-imports
     from tests.testingcore.bokehtesting import BokehAction
     with BokehAction(None) as bka:
-        test_reference(bka)
+        test_peaksplot_view(bka)

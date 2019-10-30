@@ -51,6 +51,11 @@ class AlignmentErrorMessage(DataCleaningErrorMessage):
 class AlignmentException(DataCleaningException):
     "an alignment exception"
 
+    @staticmethod
+    def errkey() -> str:
+        "return an indicator of the type of error"
+        return 'alignment'
+
 class ExtremumAlignmentTask(Task, zattributes = ('delta', 'minrelax', 'pull', 'opening')):
     """
     Task for aligning on a given phase.

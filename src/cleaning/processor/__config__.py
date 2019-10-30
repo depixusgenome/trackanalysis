@@ -5,13 +5,17 @@ Default configurations for each task
 """
 from taskmodel.application import setupdefaulttask
 from taskmodel.track       import UndersamplingTask
-from .                     import (BeadSubtractionTask, DataCleaningTask,
-                                   ClippingTask)
+from .                     import (
+    BeadSubtractionTask, DataCleaningTask, ClippingTask, FixedBeadDetectionTask
+)
+
 setupdefaulttask(UndersamplingTask)
 setupdefaulttask(BeadSubtractionTask)
 setupdefaulttask(DataCleaningTask)
-setupdefaulttask(ClippingTask,
-                 picotwist = {'lowfactor': 6,  'highfactor': 1},
-                 muwells   = {'lowfactor': 6,  'highfactor': 1},
-                 sdi       = {'lowfactor': 4,  'highfactor': 0},
-                )
+setupdefaulttask(FixedBeadDetectionTask)
+setupdefaulttask(
+    ClippingTask,
+    picotwist = {'lowfactor': 6,  'highfactor': 1},
+    muwells   = {'lowfactor': 6,  'highfactor': 1},
+    sdi       = {'lowfactor': 4,  'highfactor': 0},
+)

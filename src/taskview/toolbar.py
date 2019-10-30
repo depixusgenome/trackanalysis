@@ -453,7 +453,9 @@ class FileListInput:
                 _setfilelist(model = [ctrl.display.get("tasks", "roottask")])
             elif not stop[0]:
                 with ctrl.action:
-                    ctrl.display.update("tasks", taskcache = ctrl.tasks.processors(lst[inew][1]))
+                    ctrl.display.update(
+                        "tasks", taskcache = ctrl.tasks.processors(lst[inew][1], copy = False)
+                    )
         tbar.on_change('currentfile', _oncurrentfile_cb)
 
         def _ondelfile_cb(attr, old, new):

@@ -7,6 +7,7 @@ from .base  import Task
 TASK_ORDER = ['taskmodel.RootTask',
               'taskmodel.track.UndersamplingTask',
               'taskmodel.track.CycleSamplingTask',
+              'cleaning.processor.FixedBeadDetectionTask',
               'cleaning.processor.BeadSubtractionTask',
               'taskmodel.DataSelectionTask',
               'cleaning.processor.DataCleaningTask',

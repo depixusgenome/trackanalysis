@@ -142,6 +142,10 @@ class DataCleaningException(ProcessorException):
         "return the shorter message"
         return str(self.args[0])  # pylint: disable=unsubscriptable-object
 
+    def errkey(self) -> str:
+        "return an indicator of the type of error"
+        return max(self.args[0].data())[1]  # pylint: disable=unsubscriptable-object
+
 @dataclass
 class CleaningCacheData:
     "the data saved from call to call for each bead"

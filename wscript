@@ -15,7 +15,7 @@ PYVERS         = (
 )
 
 require(
-    python = {'python': PYVERS, 'numpy': '1.14.2', 'pandas': '0.21.0'},
+    python = {'python': PYVERS, 'numpy': '1.14.2', 'pandas': '0.25.1'},
     rtime  = True
 )
 

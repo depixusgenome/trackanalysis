@@ -146,9 +146,11 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
             }
         )
 
-        self.__addfalseneg = sum(
-            meas.get('peaks', {}).pop(i, False) for i in ('falseneg', 'missing')
-        ) > 0
+        self.__addfalseneg = False
+        if isinstance(meas.get('peaks', None), dict):
+            self.__addfalseneg = sum(
+                meas['peaks'].pop(i, False) for i in ('falseneg', 'missing')
+            ) > 0
         self.__keeppeaks = self.__addfalseneg
         if meas.get('peaks', None) is True:
             meas.pop('peaks')
@@ -300,11 +302,12 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
         status[status == ''] = 'falsepos'
 
         closest     = hpinpeaks[inds]
-        orientation = np.full(len(status), "-", dtype = '<U1')
+        orientation = np.full(len(status), "", dtype = '<U1')
 
         if hpin in self._orientations:
             ori = self._orientations[hpin]
-            orientation[np.isin(closest, ori["position"][ori['orientation']])] = "+"
+            orientation[np.isin(closest, ori["position"][ori['orientation']])]  = "+"
+            orientation[np.isin(closest, ori["position"][~ori['orientation']])] = "-"
 
         data = data.assign(
             closest      = closest,

@@ -165,7 +165,13 @@ class SafeDataFrameProcessor(Processor[DataFrameTask]):
     def _merge(cls, task, buffers, frame):
         factory = cls.factory(frame).create(task, buffers, frame)
         frame   = factory.apply(frame)
-        return factory.defaulttransform(frame, pd.concat(cls._merge_list(frame), sort = False))
+        lst     = cls._merge_list(frame)
+        if not lst:
+            data = pd.DataFrame()
+            factory.addtasklist(data)
+            return data
+
+        return factory.defaulttransform(frame, pd.concat(lst, sort = False))
 
     @staticmethod
     def _merge_list(frame):

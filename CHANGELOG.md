@@ -1,4 +1,22 @@
 # CycleApp
+
+## cycles_v7.0
+
+* 2019-10-23330:30:20 +0000  (tag: cycles_v7.0)
+
+### Hairpin Tab
+
+The tab has changed *extensively*:
+
+1. The tab is renamed *Statistics*.
+1. All loaded tracks are now displayed in this tab. This is the only tab with
+   such a behaviour.
+2. The goal of this tab is now to present statistics across all tracks.
+3. The top plot shows all beads, classified by hairpin, track, and bead id in
+   that order.
+4. The bottom plot shows statistics over all tracks. Use the *advanced* button
+   on the right to define which statistics to display.
+
 ## cycles_v6.16
 
 * 2019-09-10 10:30:20 +0000  (tag: cycles_v6.16)
