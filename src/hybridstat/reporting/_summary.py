@@ -253,7 +253,7 @@ class SummarySheet(Reporter):
                           for i in cnf if i.__class__.__name__ == 'BeadSubtractionTask'),
                          [])
             sub   = ('∅' if len(beads) == 0 else beads[0] if len(beads) ==1 else
-                     ''.join(str(i) for i in beads))
+                     ', '.join(str(i) for i in beads))
         else:
             strcf = cnf
             sub   = ''
