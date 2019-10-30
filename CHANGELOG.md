@@ -2,7 +2,7 @@
 
 ## cycles_v7.0
 
-* 2019-10-23330:30:20 +0000  (tag: cycles_v7.0)
+* 2019-10-30 16:10:20 +0000  (tag: cycles_v7.0)
 
 ### Hairpin Tab
 
@@ -19,7 +19,7 @@ The tab has changed *extensively*:
 
 ## cycles_v6.16
 
-* 2019-09-10 10:30:20 +0000  (tag: cycles_v6.16)
+* 2019-09-18 10:35:20 +0000  (tag: cycles_v6.16)
 
 Fixed beads are now subtracted automatically. The oligos are also detected
 automatically using the file name. The expected format is a track file name
