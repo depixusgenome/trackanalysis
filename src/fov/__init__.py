@@ -10,7 +10,6 @@ from bokeh.plotting           import Figure
 
 from control.action           import Action
 from cleaning.names           import NAMES
-from data                     import BEADKEY
 from model.plots              import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from qualitycontrol.view      import QualityControlModelAccess
 from taskcontrol.beadscontrol import DataSelectionBeadController
@@ -238,9 +237,9 @@ class FoVPlotCreator(BaseFoVPlotCreator[QualityControlModelAccess,  # type: igno
     _theme:     FoVPlotTheme
 
     def _tooltips(self):
-        msgs                            = self._model.messages()
-        ttips: Dict[BEADKEY, List[str]] = {}
-        row                             = self._theme.tooltiprow
+        msgs                        = self._model.messages()
+        ttips: Dict[int, List[str]] = {}
+        row                         = self._theme.tooltiprow
         for bead, cyc, tpe, msg  in sorted(zip(msgs['bead'], msgs['cycles'],
                                                msgs['type'], msgs['message']),
                                            key = lambda i: (i[0], -i[1])):

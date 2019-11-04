@@ -10,6 +10,7 @@ from model.plots                         import PlotAttrs, PlotTheme, PlotModel,
 from taskcontrol.modelaccess             import TaskPlotModelAccess, TaskAccess
 from taskmodel                           import RootTask
 from taskmodel.application               import rescalingevent, TasksModel
+from taskmodel.track                     import RawPrecisionTask
 from utils                               import NoArgs, initdefaults
 from ..beadsubtraction                   import FixedBeadDetection, FixedList
 from ..processor.__config__              import (
@@ -105,6 +106,9 @@ class ExtremumAlignmentTaskAccess(TaskAccess, tasktype = ExtremumAlignmentTask):
 
 class ClippingTaskAccess(TaskAccess, tasktype = ClippingTask):
     "access to the ClippingTask"
+
+class RawPrecisionTaskAccess(TaskAccess, tasktype = RawPrecisionTask):
+    "access to the RawPrecisionTask"
 
 class FixedBeadDetectionConfig(FixedBeadDetection):
     """
@@ -223,6 +227,7 @@ class DataCleaningModelAccess(TaskPlotModelAccess):  # pylint: disable=too-many-
         self.fixedbeads    = FixedBeadDetectionModel()
         self.alignment     = ExtremumAlignmentTaskAccess(self)
         self.clipping      = ClippingTaskAccess(self)
+        self.rawprecision  = RawPrecisionTaskAccess(self)
         self.cleaning      = DataCleaningAccess(self)
         self.subtracted    = BeadSubtractionAccess(self)
 

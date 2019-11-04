@@ -3,7 +3,7 @@
 "Matching experimental peaks to hairpins: tasks and processors"
 from typing                       import Sequence, NamedTuple, Iterator, Dict, Union, cast
 from functools                    import partial
-from data.views                   import BEADKEY, TrackView
+from data.views                   import TrackView
 from taskcontrol.processor        import Processor
 from taskcontrol.processor.runner import pooledinput, pooldump
 from peakfinding.peaksarray       import Output as PeakFindingOutput, PeaksArray
@@ -18,7 +18,7 @@ class BeadsByHairpinTask(FitToHairpinTask):
     "Groups beads per hairpin"
 
 class ByHairpinBead(NamedTuple):
-    key        : BEADKEY
+    key        : int
     silhouette : float
     distance   : Distance
     peaks      : PeaksArray

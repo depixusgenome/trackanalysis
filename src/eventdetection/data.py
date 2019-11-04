@@ -9,7 +9,7 @@ from typing           import Iterator, Tuple, Sequence, Optional, cast
 import numpy          as     np
 
 from taskmodel        import PHASE, Level
-from data.views       import ITrackView, Cycles, CYCLEKEY, Beads, BEADKEY
+from data.views       import ITrackView, Cycles, CYCLEKEY, Beads
 from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview, EventsArray
 from .                import EventDetectionConfig
 
@@ -37,6 +37,7 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
     level = Level.event
     first = PHASE.measure
     last  = PHASE.measure
+
     def __init__(self, **kw) -> None:
         super().__init__(**kw)
         EventDetectionConfig.__init__(self, **kw)
@@ -62,7 +63,7 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
         """
         return getattr(self.data, 'beadextension', lambda *_: None)(ibead)
 
-    def phaseposition(self, phase: int, ibead:BEADKEY) -> Optional[float]:
+    def phaseposition(self, phase: int, ibead:int) -> Optional[float]:
         """
         Return the median position for a given phase
         """

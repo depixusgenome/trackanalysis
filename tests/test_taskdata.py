@@ -19,6 +19,8 @@ from   data.trackops    import (
 )
 from   data.tracksdict  import TracksDict
 from   tests.testingcore      import path as utpath
+from   taskcontrol.taskcontrol    import create
+from   taskmodel.track            import RawPrecisionTask
 
 
 # pylint: disable=missing-docstring,protected-access
@@ -46,7 +48,7 @@ def test_beaditerkeys():
     "tests wether keys are well listed"
     track = data.Track(path = utpath("small_legacy"))
     beads = lambda: data.Beads(track = track, data = _MyItem(track.data))
-    vals  = {i for i in range(92)}
+    vals  = set(range(92))
 
     assert len(tuple(beads().keys()))                 == len(vals)
     assert len(tuple(i for i, _ in beads()))          == len(vals)
@@ -54,7 +56,7 @@ def test_beaditerkeys():
     assert len(tuple(beads().selecting(None).keys())) == len(vals)
     assert len(tuple(beads()[:].keys())) == len(vals)
     assert len(tuple(beads()[:2].keys())) == len({0, 1})
-    assert len(tuple(beads()[:2][1:5].keys())) == len({1}) # pylint: disable=unsubscriptable-object
+    assert len(tuple(beads()[:2][1:5].keys())) == len({1})  # pylint: disable=unsubscriptable-object
 
     assert set(beads().keys())                 == vals
     assert set(i for i, _ in beads())          == vals
@@ -62,7 +64,7 @@ def test_beaditerkeys():
     assert set(beads().selecting(None).keys()) == vals
     assert set(beads()[:].keys()) == vals
     assert set(beads()[:2].keys()) == {0, 1}
-    assert set(beads()[:2][1:5].keys()) == {1} # pylint: disable=unsubscriptable-object
+    assert set(beads()[:2][1:5].keys()) == {1}  # pylint: disable=unsubscriptable-object
     assert isinstance(beads()[0],   np.ndarray)
 
     sel = track.beads
@@ -91,19 +93,18 @@ def test_cycles_iterkeys():
     assert len(tuple(cycs()[:1,0].keys()))         == len({i for i in cids(0) if i[0] == 0})
     assert len(tuple(cycs()[0,...].keys()))        == len(bids(0))
     assert len(tuple(cycs()[0,:].keys()))          == len(bids(0))
-    assert len(tuple(cycs()[0,2:5].keys()))        == len({i for i in bids(0) if 2<= i[1] < 5})
+    assert len(tuple(cycs()[0,2:5].keys()))        == len({i for i in bids(0) if 2 <= i[1] < 5})
 
-    assert set  (cycs().selecting(0).keys())     == bids(0)
+    assert set(cycs().selecting(0).keys())     == bids(0)
     assert tuple(cycs().selecting((0,0)).keys()) == ((0,0),)
-    assert set  (cycs()[:,0].keys())             == cids(0)
-    assert set  (cycs()[...,0].keys())           == cids(0)
-    assert set  (cycs()[...,0][1,...].keys())    == {(1,0)}
-    assert set  (cycs()[:1,0].keys())            == {i for i in cids(0) if i[0] == 0}
-    assert set  (cycs()[0,...].keys())           == bids(0)
-    assert set  (cycs()[0,:].keys())             == bids(0)
-    assert set  (cycs()[0,2:5].keys())           == {i for i in bids(0) if 2<= i[1] < 5}
-    assert set(i[0] for i in (cycs()
-                              .selecting([(0,...)]).keys())) == {0}
+    assert set(cycs()[:,0].keys())             == cids(0)
+    assert set(cycs()[...,0].keys())           == cids(0)
+    assert set(cycs()[...,0][1,...].keys())    == {(1,0)}
+    assert set(cycs()[:1,0].keys())            == {i for i in cids(0) if i[0] == 0}
+    assert set(cycs()[0,...].keys())           == bids(0)
+    assert set(cycs()[0,:].keys())             == bids(0)
+    assert set(cycs()[0,2:5].keys())           == {i for i in bids(0) if 2 <= i[1] < 5}
+    assert set(i[0] for i in cycs().selecting([(0,...)]).keys()) == {0}
 
     assert (tuple(cycs()
                   .selecting((0,all))
@@ -223,7 +224,7 @@ def test_loadgrdir():
             paths = (paths[:1]  # type: ignore
                      + tuple(str(i) for i in Path(cast(str, paths[1])).iterdir()
                              if i.suffix == '.gr'))
-            paths = paths[5:] + paths[:5] # type:ignore
+            paths = paths[5:] + paths[:5]  # type:ignore
         track = data.Track(path = paths)
         keys  = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
                  24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
@@ -262,8 +263,7 @@ def test_scancgr():
     assert (pairs, grs) == ((), ())
 
     truth = sorted(
-        list(Path(directory).glob("*.trk"))+
-        list(Path(directory).glob("*/*.trk"))
+        [*Path(directory).glob("*.trk"), *Path(directory).glob("*/*.trk")]
     )
     assert sorted(trks) == truth
 
@@ -288,8 +288,8 @@ def test_muwells(tmp_path):
     assert abs(output['experimentallength'][0] - 31.720950927734293) < 1e-5
     assert output['framerate'] > 100.
     assert len(output['zmag']) == len(output[0])
-    assert output['Tsample'][0].max() >  len(output[0]) * .75 # greater than the 30Hz framerate
-    assert output['vcap'][0].max() >  len(output[0]) * .75 # greater than the 30Hz framerate
+    assert output['Tsample'][0].max() > len(output[0]) * .75   # greater than the 30Hz framerate
+    assert output['vcap'][0].max() > len(output[0]) * .75   # greater than the 30Hz framerate
 
     with open(utpath("muwells/W6N46_HPB20190107_OR134689_cycle_1.9-2.10_TC10m.txt")) as istr:
         with open(tmp_path/"lio.txt", "w") as ostr:
@@ -299,7 +299,6 @@ def test_muwells(tmp_path):
                 istr.readline()
             for _ in range(output['phases'][4,5], output['phases'][-5,2]):
                 print(istr.readline().strip(), file = ostr)
-
 
     paths = MuWellsFilesIO.check((
         utpath("muwells/W6N46_HPB20190107_W2_OR134689_cycle_1.9-2.10_TC10m.trk"),
@@ -312,13 +311,13 @@ def test_allleaves():
     'tests pairing of track files and gr-files in the absence of cgr'
     trkpath    = str(Path(cast(str, utpath("big_legacy"))).parent/'*.trk')
     print(trkpath)
-    grpath     =  str(Path(cast(str, utpath("big_grlegacy")))/'*.gr')
+    grpath     = str(Path(cast(str, utpath("big_grlegacy")))/'*.gr')
     print(grpath)
     good,_1,_2 = LegacyGRFilesIO.scan(trkpath,
                                       grpath,
                                       cgrdir="",
                                       allleaves = True)
-    assert len(good)==1
+    assert len(good) == 1
     trks = [str(path[0]) for path in good]
     assert utpath("big_legacy") in trks
 
@@ -354,7 +353,7 @@ def test_trktopk():
     assert new.phases is trk.phases
 
     trk = data.Track(path = fname)
-    trk.data # pylint: disable=pointless-statement
+    trk.data   # pylint: disable=pointless-statement
     for key, val in trk._data.items():
         assert_equal(new._data[key], val)
     assert new.framerate == trk.framerate
@@ -479,8 +478,8 @@ def test_concatenate():
     size1, size2 = [next(iter(x.data.values())).size for x  in (trk1, trk2)]
     trk  = concatenatetracks(trk1, trk2)
 
-    assert set(trk.data.keys())==(set(trk1.data.keys())|set(trk2.data.keys()))
-    assert all((trk.secondaries.frames[1:]-trk.secondaries.frames[:-1])==1)
+    assert set(trk.data.keys()) == (set(trk1.data.keys()) | set(trk2.data.keys()))
+    assert all((trk.secondaries.frames[1:]-trk.secondaries.frames[:-1]) == 1)
     assert all(np.isnan(trk.data[0][-size2:]))
     assert all(~np.isnan(trk.data[0][:size1]))
 
@@ -507,10 +506,40 @@ def test_clone():
     assert all(i is j for i, j in zip(trk1._secondaries.values(), trk2._secondaries.values()))
     assert trk1.fov.image is trk2.fov.image
 
-def test_beadextension():
+def test_beadstats():
     "test bead extension"
-    trk1 = Track(path = utpath("big_legacy"))
-    assert abs(trk1.beadextension(0) - 0.951788546331226) < 1e-5
+    trk1 = Track(path = utpath("big_legacy"), rawprecisions = 'normalized')
+    assert trk1.rawprecision().keyword() == "normalized"
+    trk1.rawprecision("range")
+    assert trk1.rawprecision().keyword() == "range"
+    trk1.load()
+    assert trk1.rawprecision().keyword() == "range"
+
+    trk1 = Track(path = utpath("big_legacy"), rawprecisions = 'range')
+    assert trk1.rawprecision().keyword() == "range"
+    trk1.rawprecision("normalized")
+    assert trk1.rawprecision().keyword() == "normalized"
+    trk1.load()
+    assert trk1.rawprecision().keyword() == "normalized"
+    trk1.rawprecision("range")
+    assert trk1.rawprecision().keyword() == "range"
+
+    assert trk1.rawprecision().keyword() == 'range'
+    assert trk1.rawprecision().keyword() == 'range'
+    assert abs(trk1.beadextension(0) - 0.9517850436270237) < 1e-5
+    assert abs(trk1.phaseposition(1, 0) + 0.10020114) < 1e-5
+
+    assert abs(trk1.rawprecision(0) - 0.001809247420169413) < 1e-5
+    assert abs(trk1.rawprecision(0, None) - 0.001809247420169413) < 1e-5
+    assert abs(trk1.rawprecision(0, {1: .5, 3: .5})              - 0.0018562973127700388) < 1e-5
+    assert abs(trk1.rawprecision(0) - 0.001809247420169413) < 1e-5
+    assert abs(trk1.rawprecision(0, (1, 5))                      - 0.001809247420169413) < 1e-5
+    assert abs(trk1.rawprecision(0) - 0.001809247420169413) < 1e-5
+    assert abs(trk1.rawprecision(0, {1: 1/3., 3: 1/3., 5: 1/3.}) - 0.0018470539168144264) < 1e-5
+    assert abs(trk1.rawprecision(0) - 0.001809247420169413) < 1e-5
+
+    trk1.rawprecision("normalized")
+    assert abs(trk1.rawprecision(0) - 0.0018470539168144264) < 1e-5
 
 def test_resampling():
     "test resampling"
@@ -525,12 +554,11 @@ def test_resampling():
     assert_equal(under.secondaries.tsample['index'], track.secondaries.tsample['index']//3)
     assert track.ncycles    == under.ncycles
     assert track.nframes//3+1 == under.nframes
-    assert len(track._rawprecisions)
-    assert len(under._rawprecisions) == 0
+    assert len(track._rawprecisions.cache)
+    assert len(under._rawprecisions.cache) == 0
     assert under.path is None
     assert under.framerate == track.framerate/3
     assert under.fov       is track.fov
-
 
     under = undersample(track, 3, 'mean')
     assert_equal(under.beads[0], np.nanmean(track.beads[0][:50289].reshape((-1,3)), axis = 1))
@@ -547,7 +575,6 @@ def test_resampling():
     beads = track.beads.withaction(lambda _, i: (i[0], i[1]*2))
     under = undersample(beads, 3, cycles = range(0,1))
     phases = track.phases-track.phases[0,0]
-    #assert_equal(under.beads[0], track.beads[0][:phases[1,0]:3]*2)
 
     beads = track.beads.withaction(lambda _, i: (i[0], i[1]*2))
     under = undersample(beads, 3, cycles = range(10, 200))
@@ -575,5 +602,21 @@ def test_phasemanipulator():
     assert_equal(pma.duration(..., 3), track.phases[:,4]-track.phases[:,3])
     assert_equal(pma.duration(..., range(3)), track.phases[:,3]-track.phases[:,0])
 
+def test_rawprecisiontask():
+    "test raw precision task"
+    for i in ('range', 'normalized'):
+        # test that track is opened with the correct raw precision computer
+        tsk = RawPrecisionTask(computer = i)
+        trk = next(iter(create(utpath("big_all"), tsk).run())).track
+        assert trk.rawprecision().keyword() == i
+
+        # test that track is copied whenever the requested raw precision
+        # computer is different from the original one
+        tsk.computer = 'range' if i == 'normalized' else 'normalized'
+        trk2 = next(iter(create(utpath("big_all"), tsk).run())).track
+        assert trk.rawprecision().keyword() == i
+        assert trk2.rawprecision().keyword() == tsk.computer
+
+
 if __name__ == '__main__':
-    test_tracksdict_creation()
+    test_rawprecisiontask()

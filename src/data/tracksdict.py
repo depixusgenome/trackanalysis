@@ -12,7 +12,7 @@ from copy               import copy as shallowcopy
 import re
 
 from taskstore          import LocalPatch
-from .views             import isellipsis, BEADKEY
+from .views             import isellipsis
 from .track             import Track
 from .trackio           import LegacyGRFilesIO, LegacyTrackIO, PATHTYPES
 
@@ -420,13 +420,13 @@ class TracksDict(dict):
         update.__doc__ = (cast(str, update.__doc__)
                           + cast(str, scan.__doc__)[cast(str, scan.__doc__).find('#')-5:])
 
-    def commonbeads(self, *keys) -> List[BEADKEY]:
+    def commonbeads(self, *keys) -> List[int]:
         "returns the intersection of all beads in requested tracks (all by default)"
         if len(keys) == 0:
             keys = tuple(self.keys())
 
         fcn = lambda key: set(cast(Track, self[key]).beads.keys())  # noqa
-        beads: Optional[Set[BEADKEY]] = None
+        beads: Optional[Set[int]] = None
         with ThreadPoolExecutor(self._NTHREADS) as pool:
             for cur in pool.map(fcn, keys):
                 beads = cur if beads is None else (cur & beads)
@@ -439,7 +439,7 @@ class TracksDict(dict):
             keys = tuple(self.keys())
 
         fcn = lambda key: set(cast(Track, self[key]).beads.keys())  # noqa
-        beads: Set[BEADKEY] = set()
+        beads: Set[int] = set()
         with ThreadPoolExecutor(self._NTHREADS) as pool:
             for cur in pool.map(fcn, keys):
                 beads.update(cur)

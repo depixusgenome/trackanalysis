@@ -4,7 +4,6 @@
 from   typing                         import Tuple, List, Optional, Sequence
 from   copy                           import copy
 
-from   data                           import BEADKEY
 from   cleaning.processor             import DataCleaningException
 from   peakfinding.selector           import PeakSelectorDetails
 from   peakfinding.processor          import (PeakSelectorProcessor, PeakSelectorTask,
@@ -89,7 +88,7 @@ class GuiFitToReferenceDict(FitToReferenceDict): # pylint: disable=too-many-ance
         self.config             = copy(self.config)
         self.config.defaultdata = True
 
-    def optimize(self, key: BEADKEY, data):
+    def optimize(self, key: int, data):
         "computes results for one key"
         params = self.cache[0].get(key, None)
         if params is None:
@@ -101,7 +100,7 @@ class GuiFitToReferenceDict(FitToReferenceDict): # pylint: disable=too-many-ance
 
 class GuiFitToReferenceProcessor(TaskViewProcessor[FitToReferenceTask,
                                                    GuiFitToReferenceDict,
-                                                   BEADKEY]):
+                                                   int]):
     "Changes the Z axis to fit the reference"
     def __init__(self, store, **kwa):
         super().__init__(**kwa)
@@ -143,7 +142,7 @@ def runbead(ctrl, bead, refcache):
                     cache[bead] = out
     return out
 
-def runrefbead(self, ref: RootTask, bead: BEADKEY
+def runrefbead(self, ref: RootTask, bead: int
               ) -> Tuple[Sequence, Optional[PeakSelectorDetails]]:
     "runs the reference bead with specific processors"
     dtlstore: List[PeakSelectorDetails] = []

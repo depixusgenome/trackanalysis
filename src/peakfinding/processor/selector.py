@@ -6,7 +6,7 @@ Deals with tasks & processors for finding peaks
 
 from   typing                         import Optional
 
-from   data.views                     import BEADKEY, TaskView, Beads
+from   data.views                     import TaskView, Beads
 from   taskcontrol.processor.taskview import TaskViewProcessor
 from   taskmodel                      import Level, Task
 from   ..peaksarray                   import PeakListArray
@@ -37,7 +37,7 @@ class PeakSelectorTask(PeakSelector, Task):
         PeakSelector.__init__(self, **kwa)
 
 Output = PeakListArray
-class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]): # pylint: disable=too-many-ancestors
+class PeaksDict(TaskView[PeakSelectorTask,int]): # pylint: disable=too-many-ancestors
     """
     * `withmeasure` allows computing whatever one wants on events in a peak. One
     or two functions should be provided:
@@ -107,7 +107,7 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]): # pylint: disable=too-many-
         """
         return getattr(self.data, 'beadextension', lambda *_: None)(ibead)
 
-    def phaseposition(self, phase: int, ibead:BEADKEY) -> Optional[float]:
+    def phaseposition(self, phase: int, ibead:int) -> Optional[float]:
         """
         Return the median position for a given phase
         """
@@ -125,5 +125,5 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]): # pylint: disable=too-many-
     def _precision(self, ibead: int, precision: Optional[float]):
         return self.config.getprecision(precision, getattr(self.data, 'track', None), ibead)
 
-class PeakSelectorProcessor(TaskViewProcessor[PeakSelectorTask, PeaksDict, BEADKEY]):
+class PeakSelectorProcessor(TaskViewProcessor[PeakSelectorTask, PeaksDict, int]):
     "Groups events per peak"

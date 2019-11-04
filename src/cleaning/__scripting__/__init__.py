@@ -13,7 +13,7 @@ from   typing                           import (Dict, Optional, Iterator, List, 
 import numpy                            as     np
 import pandas                           as     pd
 
-from   data.views                       import BEADKEY, Beads, Cycles
+from   data.views                       import Beads, Cycles
 from   data.trackops                    import dropbeads
 from   data.__scripting__.track         import Track
 from   data.__scripting__.tracksdict    import TracksDict
@@ -83,8 +83,8 @@ class TrackCleaningScript:
         self.track = track
 
     def process(self,
-                beads: Sequence[BEADKEY] = None,
-                **kwa) -> Dict[BEADKEY, Optional[DataCleaningErrorMessage]]:
+                beads: Sequence[int] = None,
+                **kwa) -> Dict[int, Optional[DataCleaningErrorMessage]]:
         "returns a dictionnary of cleaning results"
         get  = lambda x: x if x is None else x.args[0]  # noqa
 
@@ -107,16 +107,16 @@ class TrackCleaningScript:
         return {info[0]: get(DataCleaningProcessor.compute(itms, info, **kwa))
                 for info in cast(Iterator, itms)}
 
-    def good(self, beads: Sequence[BEADKEY] = None, **kwa) -> List[BEADKEY]:
+    def good(self, beads: Sequence[int] = None, **kwa) -> List[int]:
         "returns beads without warnings"
         return [i for i, j in self.process(beads, **kwa).items() if j is None]
 
-    def bad(self, beads: Sequence[BEADKEY] = None, **kwa) -> List[BEADKEY]:
+    def bad(self, beads: Sequence[int] = None, **kwa) -> List[int]:
         "returns beads with warnings"
         return [i for i, j in self.process(beads, **kwa).items() if j is not None]
 
     def fixed(self,
-              beads: Sequence[BEADKEY] = None,
+              beads: Sequence[int] = None,
               output  = 'beads',
               **kwa) -> List[int]:
         "a list of potential fixed beads"
@@ -127,7 +127,7 @@ class TrackCleaningScript:
                 [i[-1] for i in alg(data)])
 
     def messages(self,  # pylint: disable = too-many-locals
-                 beads: Sequence[BEADKEY] = None,
+                 beads: Sequence[int] = None,
                  forceclean               = False,
                  **kwa) -> pd.DataFrame:
         "returns beads and warnings where applicable"
@@ -167,7 +167,7 @@ class TrackCleaningScript:
                              'cycles':       np.array(cycs, dtype = 'i4'),
                              'message':      msgs}).set_index(['bead', 'key'])
 
-    def dataframe(self, beads: Sequence[BEADKEY] = None, **kwa) -> Optional[pd.DataFrame]:
+    def dataframe(self, beads: Sequence[int] = None, **kwa) -> Optional[pd.DataFrame]:
         """
         return a dataframe with all test values
         """
@@ -294,12 +294,12 @@ class TracksDictCleaningScript:
         self.tracks = tracks
 
     def process(self,
-                beads: Sequence[BEADKEY] = None,
-                **kwa) -> Tuple[Set[BEADKEY], Set[BEADKEY]]:
+                beads: Sequence[int] = None,
+                **kwa) -> Tuple[Set[int], Set[int]]:
         "returns beads without warnings"
-        good: Set[BEADKEY] = set(self.tracks.commonbeads())
-        bad:  Set[BEADKEY] = (set(self.tracks.availablebeads()) - good)
-        cur:  Set[BEADKEY] = (bad | good) if beads is None else set(beads)
+        good: Set[int] = set(self.tracks.commonbeads())
+        bad:  Set[int] = (set(self.tracks.availablebeads()) - good)
+        cur:  Set[int] = (bad | good) if beads is None else set(beads)
         for track in self.tracks.values():
             tmp = (set(track.beads.keys())-bad) & cur
             if tmp:
@@ -333,23 +333,23 @@ class TracksDictCleaningScript:
         return pd.concat(items)
 
     def messages(self,
-                 beads: Sequence[BEADKEY] = None,
+                 beads: Sequence[int] = None,
                  forceclean               = False,
                  **kwa) -> pd.DataFrame:
         "returns beads and warnings where applicable"
         return self.__compute('messages', beads, forceclean, kwa)
 
-    def dataframe(self, beads: Sequence[BEADKEY] = None, **kwa) -> Optional[pd.DataFrame]:
+    def dataframe(self, beads: Sequence[int] = None, **kwa) -> Optional[pd.DataFrame]:
         """
         return a dataframe with all test values
         """
         return self.__compute('dataframe', beads, kwa)
 
-    def good(self, **kwa) -> List[BEADKEY]:
+    def good(self, **kwa) -> List[int]:
         "returns beads without warnings"
         return sorted(self.process(**kwa)[1])
 
-    def bad(self, **kwa) -> List[BEADKEY]:
+    def bad(self, **kwa) -> List[int]:
         "returns beads with warnings"
         return sorted(self.process(**kwa)[0])
 

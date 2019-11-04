@@ -53,8 +53,27 @@ frequency) fluctuations. This is done by:
 #. taking the median of these values over all cycles. This last median means
    that |NOISE| is not affected by a few missbehaving cycles.
 
+This can be measured independently using one or a selection of phases.
+Depending on the user's settings this is either:
+
+#. *frame-wise* uses phases 1 throught 5 included.
+#. *phase-wise* measures the |NOISE| in phases 1, 3 and 5 independently and
+   returns their average.
+
+The reason for these two options is historical. The default *frame-wise*
+measurement is currently in use until the effect of the second one can be
+ascertained. The *frame-wise* measurement suffers from the following:
+   
+#. Transition phases 2 and 4 contribute. This is not ideal since the main
+   movements during these phases are expected whereas the |NOISE| is supposed
+   to measure random noise.
+#. The exact value of |Noise| will vary from experiment to experiment for a
+   same bead depending on the relative duration of phases from 1 to 5 in each
+   experiment. A better measure of the noise would be intrinsic to the bead
+   rather than experiment dependant.
+
 In the situation when the framerate is higher than 30Hz, that of the optical
-instruments, the signal is downsampled appropriatly. In practice, this should
+instruments, the signal is downsampled appropriately. In practice, this should
 only affect the micro-wells data.
 
 A Size Indicator, |DZ|
@@ -79,7 +98,7 @@ Beads are defined as fixed if:
 
 #. Their high frequency noise is low, :math:`0.1 \mathrm{nm} < \sigma[HF] < 6 \mathrm{nm}`.
 #. Their extension :math:`\Delta z < 35 \mathrm{nm}`.
-#. The number of drops in phase 5 :math:`\(\sum\frac{dz}{dt} < 10 \mathrm{nm}\) <`
+#. The number of drops in phase 5 :math:`(\sum\frac{dz}{dt} < 10 \mathrm{nm}) <`
    number of cycles.
 #. Their stability from cycle to cycle, measured as defined below must be less
    than :math:`10 \mathrm{nm}`. This stability roughly means that no more than
@@ -293,7 +312,15 @@ The last 3 elements allow discarding cycles by defining:
 Cleaning
 --------
 
-The first 8 elements are repeats of inputs available in the main window. The
+The first element allows choosing the exact strategy for measuring the |NOISE|.
+See the setion on |NOISE| for more details. In short:
+
+* *frame-wise* is the current default. As stated earlier, it suffers from many drawbacks.
+* *phase-wise* is under investigation but is expected to be less dependant on
+  experimental settings and better correlated to intrinsic bead
+  characteristics.
+
+The next 8 elements are repeats of inputs available in the main window. The
 advantage of having them here is simply to have their default value indicated
 again. The following are additionnal:
 

@@ -1,5 +1,16 @@
 # CycleApp
 
+## cycles_v7.1
+
+* 2019-10-23330:30:20 +0000  (tag: cycles_v7.0)
+
+### Cleaning Tab
+
+A new strategy is defined for measuring the high-frequency noise. Still under
+investigation, it is expected to better measure instrinsic bead characteristics
+and be less affected by experimental settings. This strategy can be selected
+through the advanced menu.
+
 ## cycles_v7.0
 
 * 2019-10-30 16:10:20 +0000  (tag: cycles_v7.0)

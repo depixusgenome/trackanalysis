@@ -10,7 +10,7 @@ from   functools          import partial
 import numpy                  as np
 
 from   data.track            import Track
-from   data.views            import Beads, Cycles, BEADKEY, TrackView
+from   data.views            import Beads, Cycles, TrackView
 from   taskcontrol.processor import Processor
 from   taskmodel             import Task, PHASE, Level
 from   utils                 import initdefaults
@@ -64,7 +64,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
     """
     Find the peak corresponding to a single strand DNA and remove it
     """
-    def closingindex(self, frame:_Track, beadid:BEADKEY) -> List[int]:
+    def closingindex(self, frame:_Track, beadid:int) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has no break"
         delta   = self.task.delta
 
@@ -77,7 +77,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         return np.array([_greater(i) for i in self.__ramp(frame, beadid).values()],
                         dtype = 'i4')
 
-    def nonclosingramps(self, frame:_Track, beadid:BEADKEY) -> List[int]:
+    def nonclosingramps(self, frame:_Track, beadid:int) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has no break"
         delta   = self.task.delta
 
@@ -87,7 +87,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
             return len(arr) and np.all(arr > delta)
         return [i[1] for i, j in self.__ramp(frame, beadid) if _greater(j)]
 
-    def closingramps(self, frame: _Track, beadid:BEADKEY) -> List[int]:
+    def closingramps(self, frame: _Track, beadid:int) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has a break"
         delta  = self.task.delta
 
@@ -109,7 +109,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         good  = lambda evt: len(evt) and evt[0][0] < start  # noqa
         return [[i for i in cycles if good(peak[i])] for _, peak in peaks]
 
-    def index(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[int]:
+    def index(self, frame:_Track, beadid:int, peaks:'PeakListArray') -> Optional[int]:
         "Removes the single strand peak if detected"
         if not hasattr(frame, 'phaseposition') or not hasattr(peaks, '__len__'):
             # can occur in tests
@@ -117,7 +117,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         itr = self.__index(frame, beadid, peaks)
         return len(peaks) if itr is None else next(itr, len(peaks)-1)+1
 
-    def detected(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[bool]:
+    def detected(self, frame:_Track, beadid:int, peaks:'PeakListArray') -> Optional[bool]:
         """
         Return whether a singlestrand peak was detected or None when the
         information is unavailable.
@@ -132,7 +132,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         itr  = self.__index(frame, beadid, peaks)
         return None if itr is None else (next(itr, None) is not None)
 
-    def remove(self, frame:_Track, info:'Output') -> Tuple[BEADKEY, np.ndarray]:
+    def remove(self, frame:_Track, info:'Output') -> Tuple[int, np.ndarray]:
         """
         Removes the single strand peak if detected
         """
@@ -153,7 +153,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         "updates frames"
         args.apply(self.apply(**self.config()))
 
-    def __ramp(self, frame: _Track, beadid:BEADKEY) -> Cycles:
+    def __ramp(self, frame: _Track, beadid:int) -> Cycles:
         "return the cycle indexes for which `PHASE.rampdown` has no break"
         if isinstance(frame, Track):
             beads = cast(Track, frame).beads
@@ -210,7 +210,7 @@ class BaselinePeakTask(Task, zattributes = ('maxdisttozero',)):
 
 class BaselinePeakProcessor(Processor[BaselinePeakTask]):
     "Find the peak corresponding to the baseline"
-    def index(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[int]:
+    def index(self, frame:_Track, beadid:int, peaks:'PeakListArray') -> Optional[int]:
         "Removes the single strand peak if detected"
         if not hasattr(frame, 'phaseposition') or not hasattr(peaks, '__len__'):
             # can occur in tests
@@ -238,13 +238,13 @@ class BaselinePeakProcessor(Processor[BaselinePeakTask]):
                 return ind
         return None
 
-    def detected(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[bool]:
+    def detected(self, frame:_Track, beadid:int, peaks:'PeakListArray') -> Optional[bool]:
         "whether there is a singlestrand peak"
         if not hasattr(frame, 'phaseposition'):
             return None
         return self.index(frame, beadid, peaks) is not None
 
-    def remove(self, frame:_Track, info:'Output') -> Tuple[BEADKEY, np.ndarray]:
+    def remove(self, frame:_Track, info:'Output') -> Tuple[int, np.ndarray]:
         "Removes the baseline peak if detected"
         peaks = _topeakarray(info[1])
         ind   = self.index(frame, info[0], peaks)
@@ -269,15 +269,15 @@ class BaselinePeakFilterTask(BaselinePeakTask):
 
 class BaselinePeakFilterProcessor(Processor[BaselinePeakFilterTask]):
     "Find the peak corresponding to the baseline"
-    def index(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> Optional[int]:
+    def index(self, frame:_Track, beadid:int, peaks:'PeakListArray') -> Optional[int]:
         "Removes the single strand peak if detected"
         return BaselinePeakProcessor(task = self.task).index(frame, beadid, peaks)
 
-    def detected(self, frame:_Track, beadid:BEADKEY, peaks:'PeakListArray') -> bool:
+    def detected(self, frame:_Track, beadid:int, peaks:'PeakListArray') -> bool:
         "whether there is a singlestrand peak"
         return self.index(frame, beadid, peaks) is not None
 
-    def remove(self, frame:_Track, info:'Output') -> Tuple[BEADKEY, np.ndarray]:
+    def remove(self, frame:_Track, info:'Output') -> Tuple[int, np.ndarray]:
         "Removes the baseline peak if detected"
         peaks = _topeakarray(info[1])
         ind   = BaselinePeakProcessor(self.task).index(frame, info[0], peaks)

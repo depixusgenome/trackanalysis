@@ -7,6 +7,7 @@ class BeadCleaningPlotCreator(CleaningPlotCreator):
     "Building the graph of cycles"
     def __init__(self, ctrl, **kwa):
         plotmodel = CleaningPlotModel()
+        plotmodel.theme.name         = "cleaning.bead"
         plotmodel.display.name       = "cleaning.bead"
         plotmodel.theme.name         = "cleaning.bead"
         plotmodel.theme.lines.alpha  = 1.

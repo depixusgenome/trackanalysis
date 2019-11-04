@@ -6,7 +6,6 @@ from   functools            import partial
 
 import numpy                as     np
 
-from   data.views            import BEADKEY
 from   signalfilter          import rawprecision
 from   taskmodel             import Task, Level
 from   taskcontrol.processor import Processor
@@ -49,8 +48,8 @@ class PeakCorrelationAlignmentProcessor(Processor[PeakCorrelationAlignmentTask])
         "applies the task to a frame or returns a function that does so"
         if toframe is None:
             return partial(cls.apply, **cnf)
-        cache: Dict[BEADKEY, np.ndarray] = dict()
-        tsk                              = PeakCorrelationAlignment(**cnf)
+        cache: Dict[int, np.ndarray] = dict()
+        tsk                          = PeakCorrelationAlignment(**cnf)
         return toframe.new().withaction(partial(cls._action, tsk, cache))
 
     def run(self, args):

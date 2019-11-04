@@ -40,7 +40,6 @@ def nanmediandeviation(arr: np.ndarray, ranges = None) -> float:
         arr = np.float32(arr) # type: ignore
     return _nanmediandeviation(arr, ranges)
 
-BEADKEY   = Union[str,int]
 DATATYPE  = Union[Sequence[Sequence[np.ndarray]],
                   Sequence[np.ndarray],
                   np.ndarray,
@@ -59,7 +58,7 @@ class PrecisionAlg(ARescaler):
     def getprecision(self, # pylint: disable=too-many-branches
                      precision:PRECISION = None,
                      data     :DATATYPE  = tuple(),
-                     beadid   :BEADKEY   = None) -> float:
+                     beadid   :int       = None) -> float:
         """
         Returns the precision, possibly extracted from the data.  Raises
         AttributeError if the precision was neither set nor could be extracted
@@ -116,9 +115,9 @@ class PrecisionAlg(ARescaler):
         "Obtain the raw precision for a number of beads"
 
     @staticmethod
-    def rawprecision(track, ibead, first = None, last = None):
+    def rawprecision(track, ibead, *args, **kwa):
         "Obtain the raw precision for a given bead"
-        return getattr(track, 'track', track).rawprecision(ibead, first, last)
+        return getattr(track, 'track', track).rawprecision(ibead, *args,  **kwa)
 
 class CppPrecisionAlg(Rescaler):
     "Implements precision extraction from data: use only in case of Metaclass conflict"
@@ -132,7 +131,7 @@ class CppPrecisionAlg(Rescaler):
     def getprecision(self, # pylint: disable=too-many-branches
                      precision:PRECISION = None,
                      data     :DATATYPE  = tuple(),
-                     beadid   :BEADKEY   = None) -> float:
+                     beadid   :int       = None) -> float:
         """
         Returns the precision, possibly extracted from the data.  Raises
         AttributeError if the precision was neither set nor could be extracted
@@ -190,6 +189,6 @@ class CppPrecisionAlg(Rescaler):
         "Obtain the raw precision for a number of beads"
 
     @staticmethod
-    def rawprecision(track, ibead, first = None, last = None):
+    def rawprecision(track, ibead, *args, **kwa):
         "Obtain the raw precision for a given bead"
-        return getattr(track, 'track', track).rawprecision(ibead, first, last)
+        return getattr(track, 'track', track).rawprecision(ibead, *args,  **kwa)

@@ -47,16 +47,25 @@ class TrackReaderProcessor(Processor[_tasks.TrackReaderTask]):
 
     def run(self, args:'Runner'):
         "updates frames"
-        task  = cast(_tasks.TrackReaderTask, self.task)
-        attr  = 'cycles' if task.levelou is Level.cycle else 'beads'
+        task   = cast(_tasks.TrackReaderTask, self.task)
+        attr   = 'cycles' if task.levelou is Level.cycle else 'beads'
+        rpcomp = next(
+            (i for i in args.data.model if isinstance(i, _tasks.RawPrecisionTask)),
+            _tasks.RawPrecisionTask
+        ).computer
         if isinstance(task.path, dict):
             trk = args.data.setcachedefault(self, TracksDict())
             trk.update(task.path)
         else:
-            trk = args.data.setcachedefault(self,
-                                            Track(path = task.path,
-                                                  key  = task.key,
-                                                  axis = task.axis))
+            trk = args.data.setcachedefault(
+                self,
+                Track(
+                    path          = task.path,
+                    key           = task.key,
+                    axis          = task.axis,
+                    rawprecisions = rpcomp
+                )
+            )
 
         und = next(
             (i for i in args.data.model if isinstance(i, _tasks.UndersamplingTask)),
@@ -107,6 +116,25 @@ class UndersamplingProcessor(Processor[_tasks.UndersamplingTask]):
     @classmethod
     def _apply(cls, kwa: Dict[str, Any], beads:Beads):
         return cls.apply(_tasks.UndersamplingTask(**kwa), beads.track)
+
+class RawPrecisionProcessor(Processor[_tasks.RawPrecisionTask]):
+    """
+    Resample the track
+    """
+
+    @classmethod
+    def apply(cls, tpe: str, itm: Beads) -> Beads:
+        "create a new track"
+        if itm.track.rawprecision() == tpe:
+            return itm
+
+        itm.track = itm.track.shallowcopy()
+        itm.track.rawprecision(tpe)
+        return itm
+
+    def run(self, args):
+        "updates frames"
+        args.apply(partial(self.apply, self.task.computer), levels = self.levels)
 
 class CycleCreatorProcessor(Processor[_tasks.CycleCreatorTask]):
     "Generates output from a _tasks.CycleCreatorTask"

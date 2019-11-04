@@ -385,6 +385,8 @@ class CleaningWidgets:
 
             ## Cleaning
 
+            σ[HF]     %(rawprecision.computer)|range:frame-wise|normalized:phase-wise|
+
             ### Data cleaning
             |z| <                                   %(cleaning.maxabsvalue).1F
             |dz/dt| <                               %(cleaning.maxderivate).3F

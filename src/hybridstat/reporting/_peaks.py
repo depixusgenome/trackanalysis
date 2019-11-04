@@ -12,7 +12,6 @@ from xlsxwriter.utility     import xl_col_to_name
 import numpy as np
 
 from excelreports.creation      import column_method as _column_method, sheet_class, Columns
-from data.views                 import BEADKEY
 from peakfinding.probabilities  import Probability
 from ._base                     import Reporter, HasLengthPeak, Group, Bead
 
@@ -43,7 +42,7 @@ class Probabilities(HasLengthPeak):
         super().__init__(base.config)
         self._proba  = Probability(framerate   = base.config.track.framerate,
                                    minduration = base.config.minduration)
-        self._values: Dict[Tuple[BEADKEY,int], Probability] = dict()
+        self._values: Dict[Tuple[int,int], Probability] = dict()
         self._ends   = base.config.track.durations
 
     def __cache(self, bead:Bead, ipk:int) -> Probability:
