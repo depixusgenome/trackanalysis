@@ -5,4 +5,4 @@ Base track file data.
 """
 from .track         import Track
 from .tracksdict    import TracksDict
-from .views         import Beads, Cycles, TrackView, createTrackView, BEADKEY, CYCLEKEY
+from .views         import Beads, Cycles, TrackView, createTrackView, CYCLEKEY

@@ -4,29 +4,32 @@
 Base track file data.
 """
 from    typing      import (
-    Type, Optional, Union, Dict, Tuple, Any, List, ClassVar,
-    Sequence, Iterator, Iterable, overload, cast
+    Type, Optional, Union, Dict, Tuple, Any, List,
+    Sequence, Iterable, Iterator, cast, overload
 )
-from   datetime     import datetime
-from   pathlib      import Path
-from    copy        import deepcopy
+from    datetime    import datetime
+from    pathlib     import Path
+from    copy        import deepcopy, copy
 from    enum        import Enum
 import  numpy       as     np
 
-from    signalfilter    import nanhfsigma, PrecisionAlg
 from    taskmodel       import levelprop, Level, InstrumentType
 from    taskmodel.level import PHASE
-from    utils           import initdefaults
-from   .views           import Beads, Cycles, BEADKEY, isellipsis, TrackView
+from    utils           import initdefaults, NoArgs
+from   .views           import Beads, Cycles, isellipsis, TrackView
 from   .trackio         import opentrack, PATHTYPES, instrumentinfo
+from   .beadstats       import (
+    RawPrecisionCache  as _RawPrecisionCache,
+    beadextension as _beadextension,
+    phaseposition as _phaseposition,
+)
 
 IDTYPE       = Union[None, int, range]  # missing Ellipsys as mypy won't accept it
 PIDTYPE      = Union[IDTYPE, slice, Sequence[int]]
 
-DATA         = Dict[BEADKEY, np.ndarray]
-BEADS        = Dict[BEADKEY, 'Bead']
+DATA         = Dict[int, np.ndarray]
+BEADS        = Dict[int, 'Bead']
 DIMENSIONS   = Tuple[Tuple[float, float], Tuple[float, float]]
-_PRECISIONS  = Dict[BEADKEY, float]
 
 
 def _doc(tpe: type) -> str:
@@ -551,8 +554,12 @@ class Track:
 
     @initdefaults('key',
                   **{i: '_' for i in locals() if i != 'key' and i[0] != '_'})
-    def __init__(self, **_):
-        self._rawprecisions: _PRECISIONS = {}
+    def __init__(self, **kwa):
+        self._rawprecisions: _RawPrecisionCache = _RawPrecisionCache()
+        if 'rawprecisions' in kwa and isinstance(kwa['rawprecisions'], _RawPrecisionCache):
+            self._rawprecisions = kwa['rawprecisions']
+        elif 'rawprecisions' in kwa:
+            self._rawprecisions.computer = kwa['rawprecisions']
 
     ncycles  = cast(int,                 property(lambda self: len(self.phases)))
     nphases  = cast(int,                 property(lambda self: self.phases.shape[1]))
@@ -566,7 +573,7 @@ class Track:
         self.load()
         return cast(DATA, self._data)
 
-    def setdata(self, data: Optional[Dict[BEADKEY, np.ndarray]]):
+    def setdata(self, data: Optional[Dict[int, np.ndarray]]):
         "sets the dataframe"
         if data is None:
             self.unload()
@@ -602,6 +609,51 @@ class Track:
         kwa.setdefault('parents', (self.key,) if self.key else (self.path,))
         kwa.setdefault('track',   self)
         return viewtype(**kwa)
+
+    @overload       # noqa: F811
+    def rawprecision(
+            self,
+            ibead:  int,
+            phases: Union[None, Dict[int, float], Tuple[int, int]],
+    ):
+        "Obtain the raw precision for a given bead"
+
+    @overload       # noqa: F811
+    def rawprecision(self, computertype: str) -> None:
+        "Set the raw precision computer"
+
+    @overload       # noqa: F811
+    def rawprecision(self) -> str:
+        "Obtain the raw precision computer"
+
+    @overload       # noqa: F811
+    def rawprecision(
+            self,
+            ibead:  Optional[Iterable[int]],
+            phases: Union[None, Dict[int, float], Tuple[int, int]],
+    ) -> Iterator[Tuple[int,float]]:
+        "Obtain the raw precision for a number of beads"
+
+    def rawprecision(self, ibead = NoArgs, phases = None):   # noqa: F811
+        "Obtain the raw precision for a number of beads"
+        if ibead is NoArgs:
+            return self._rawprecisions.computer
+        if isinstance(ibead, (type, str)):
+            self._rawprecisions.computer = ibead
+            return None
+        return self._rawprecisions.get(self, ibead, phases)
+
+    if __doc__ is not None:
+        setattr(rawprecision, '__doc__', getattr(_RawPrecisionCache.get, '__doc__', None))
+
+    beadextension = _beadextension
+    phaseposition = _phaseposition
+
+    def shallowcopy(self):
+        "make a shallow copy of the track: different containers but for the true data"
+        cpy = self.__class__()
+        cpy.__dict__.update({i: copy(j) for i, j in self.__dict__.items()})
+        return cpy
 
     def __getstate__(self):
         keys = set(_lazies()+('_path', '_axis'))
@@ -661,103 +713,6 @@ class Track:
     _phases:          np.ndarray           = np.empty((0,9), dtype = 'i4')
     _data:            Optional[DATA]       = None  # type: ignore
     _secondaries:     Optional[DATA]       = None
-    _rawprecisions:   Dict[BEADKEY, float] = {}
+    _rawprecisions:   _RawPrecisionCache   = _RawPrecisionCache()
     _path:            Optional[PATHTYPES]  = None
     _axis:            Axis                 = Axis.Zaxis
-    _RAWPRECION_RATE: ClassVar[float]      = 10.
-
-    @overload   # noqa: F811
-    def rawprecision(
-            self,
-            ibead:  int,
-            first:  Optional[int] = None,
-            second: Optional[int] = None
-    ) -> float:
-        "Obtain the raw precision for a given bead"
-
-    @overload   # noqa: F811
-    def rawprecision(
-            self,
-            ibead:  Optional[Iterable[int]],
-            first:  Optional[int] = None,
-            second: Optional[int] = None
-    ) -> Iterator[Tuple[int,float]]:
-        "Obtain the raw precision for a number of beads"
-
-    def rawprecision(self, ibead, first = None, last = None):  # noqa: F811
-        """
-        Obtain the raw precision for a given bead
-
-        Parameters
-        ----------
-        ibead:
-            An integer, sequence of integers or Ellipsis indicating for which bead
-            to return results.
-        first:
-            The first phase to consider for computing the precision. This is 1 by default.
-        last:
-            The last phase (not included) to consider for computing the precision.
-            to return results. This is 6 by default.
-
-        Returns
-        -------
-        The raw precision for the bead(s).
-        """
-        val = (
-            self._rawprecisions.get(ibead, None) if first is None and last is None else
-            None
-        )
-
-        if val is None:
-            phase    = self.phase[...]
-            rate     = max(1, int(self.framerate/self._RAWPRECION_RATE+.5))
-            phfirst  = (
-                self.phases[:,phase.initial if first is None else first] - self.phases[0,0]
-            )
-            phlast   = (
-                self.phases[:,phase.measure+1 if last is None else last] - self.phases[0,0]
-            )
-            beads    = self.beads
-
-            def _rp(data) -> float:
-                return max(
-                    PrecisionAlg.MINPRECISION,
-                    nanhfsigma(beads[data], zip(phfirst, phlast), rate)
-                )
-
-            if np.isscalar(ibead):
-                val = _rp(ibead)
-                if first is None and last is None:
-                    self._rawprecisions[ibead] = val
-            else:
-                ibead = set(beads.keys()) if ibead is None or ibead is Ellipsis else set(ibead)
-                if first is None and last is None:
-                    if len(ibead-set(self._rawprecisions)) > 0:
-                        self._rawprecisions.update(
-                            (i, _rp(i)) for i in ibead-set(self._rawprecisions)
-                        )
-                    return iter((i, self._rawprecisions[i]) for i in ibead)
-                return ((i, _rp(i)) for i in ibead)
-
-        return val
-
-    def beadextension(self, ibead: Union[BEADKEY, np.ndarray], rng = (5., 95.)) -> float:
-        """
-        Return the median bead extension (phase 3 - phase 1)
-        """
-        phase = self.phase[...]
-        inds  = [phase.initial, phase.pull+1]
-        arr   = ibead if isinstance(ibead, np.ndarray) else self.data[ibead]
-        bead  = np.split(arr, self.phases[:, inds].ravel() - self.phases[0,0])[1::2]
-        vals  = [np.diff(np.nanpercentile(i, rng))[0] for i in bead if np.any(np.isfinite(i))]
-        return np.nanmedian(vals) if len(vals) else np.NaN
-
-    def phaseposition(self, phase: int, ibead: Union[BEADKEY, np.ndarray]) -> float:
-        """
-        Return the median position for a given phase
-        """
-        inds = [phase, phase+1]
-        arr  = ibead if isinstance(ibead, np.ndarray) else self.data[ibead]
-        bead = np.split(arr, self.phases[:, inds].ravel() - self.phases[0,0])[1::2]
-        vals = [np.nanmedian(i) for i in bead if np.any(np.isfinite(i))]
-        return np.nanmedian(vals) if len(vals) else np.NaN

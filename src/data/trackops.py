@@ -13,7 +13,7 @@ import  pandas      as     pd
 
 from   .track       import Track
 from   .tracksdict  import TracksDict
-from   .views       import BEADKEY, Beads
+from   .views       import Beads
 
 TRACKS = TypeVar('TRACKS', Track, TracksDict)
 
@@ -23,7 +23,7 @@ def _applytodict(fcn, trk, args, kwa) -> TracksDict:
         cpy[i] = fcn(j, *args, **kwa)
     return cpy
 
-def dropbeads(trk:TRACKS, *beads:BEADKEY) -> TRACKS:
+def dropbeads(trk:TRACKS, *beads:int) -> TRACKS:
     "returns a track without the given beads"
     if isinstance(trk, TracksDict):
         return _applytodict(dropbeads, trk, beads, {})
@@ -41,7 +41,7 @@ def dropbeads(trk:TRACKS, *beads:BEADKEY) -> TRACKS:
     setattr(cpy, '_secondaries', dict(getattr(trk, '_secondaries')))
     return cpy
 
-def renamebeads(trk:TRACKS, *beads:Tuple[BEADKEY, BEADKEY]) -> TRACKS:
+def renamebeads(trk:TRACKS, *beads:Tuple[int, int]) -> TRACKS:
     "returns a track without the given beads"
     if isinstance(trk, TracksDict):
         return _applytodict(renamebeads, trk, beads, {})
@@ -55,7 +55,7 @@ def renamebeads(trk:TRACKS, *beads:Tuple[BEADKEY, BEADKEY]) -> TRACKS:
     cpy.fov.beads = {rep.get(i, i): j for i, j in trk.fov.beads.items()}
     return cpy
 
-def selectbeads(trk:TRACKS, *beads:BEADKEY) -> TRACKS:
+def selectbeads(trk:TRACKS, *beads:int) -> TRACKS:
     "returns a track without the given beads"
     if isinstance(trk, TracksDict):
         return _applytodict(selectbeads, trk, beads, {})
@@ -64,7 +64,7 @@ def selectbeads(trk:TRACKS, *beads:BEADKEY) -> TRACKS:
         beads = tuple(beads[0])
     return dropbeads(trk, *(set(trk.beads.keys()) - set(beads)))
 
-def selectcycles(trk:Union[TRACKS, Beads], indexes:Union[slice, range, List[int]])-> TRACKS:
+def selectcycles(trk:Union[TRACKS, Beads], indexes:Union[slice, range, List[int]]) -> TRACKS:
     """
     Returns a copy of a Track or TracksDict instance with only a limited number
     of its cycles.
@@ -139,7 +139,7 @@ def selectcycles(trk:Union[TRACKS, Beads], indexes:Union[slice, range, List[int]
 
     return out
 
-def concatenatetracks(trk:TRACKS, *tracks:TRACKS)-> TRACKS:
+def concatenatetracks(trk:TRACKS, *tracks:TRACKS) -> TRACKS:
     """
     Concatenates two Tracks into a single one
 
@@ -159,9 +159,9 @@ def concatenatetracks(trk:TRACKS, *tracks:TRACKS)-> TRACKS:
         sz1    = trk1.secondaries.frames.size
         for idx,val in enumerate(beads):
             if val in trk1.data.keys():
-                values[idx,:sz1]=trk1.data[val]
+                values[idx,:sz1] = trk1.data[val]
             if val in trk2.data.keys():
-                values[idx, sz1:]=trk2.data[val]
+                values[idx, sz1:] = trk2.data[val]
 
         data      = {j:values[i] for i,j in enumerate(beads)}
         track     = trk1.__getstate__()
@@ -185,7 +185,7 @@ def concatenatetracks(trk:TRACKS, *tracks:TRACKS)-> TRACKS:
         trk = _concatenate(trk, other)
     return trk
 
-def clone(trk:TRACKS)-> TRACKS:
+def clone(trk:TRACKS) -> TRACKS:
     """
     Deeper shallow copy of the track.
 
@@ -294,13 +294,17 @@ def undersample(
     out = Track(**track)
     if '_modificationdate' in track:
         setattr(out, '_modificationdate', track['_modificationdate'])
-    setattr(out, '_rawprecisions',  {})
+
+    rprec          = type(getattr(root, '_rawprecisions'))()
+    rprec.computer = getattr(root, '_rawprecisions').computer
+    setattr(out, '_rawprecisions',  rprec)
     setattr(out, '_lazydata_',      False)
     return out
 
 def dataframe(track:Track) -> pd.DataFrame:
     "create a dataframe of the track"
     temps = 'tsink', 'tsample', 'tservo'
+
     def _temp(name):
         data = getattr(track.secondaries, name)
         arr  = np.full(track.nframes, np.NaN, dtype = 'f4')

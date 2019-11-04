@@ -21,7 +21,7 @@ from   utils.attrdefaults      import addattributes
 
 from   ..trackio               import savetrack
 from   ..views                 import TrackView, Cycles, Beads
-from   ..track                 import Track, LazyProperty, BEADKEY, isellipsis
+from   ..track                 import Track, LazyProperty, isellipsis
 from   ..trackops              import (selectbeads, dropbeads, selectcycles,
                                        concatenatetracks, renamebeads, clone,
                                        dataframe)
@@ -62,7 +62,7 @@ class TrackOperations:
     def __add__(self, other):
         return self.concatenate(getattr(other, '_trk', other))
 
-    def drop(self, *beads: BEADKEY) -> Track:
+    def drop(self, *beads: int) -> Track:
         """
         Drops beads
         """
@@ -96,7 +96,7 @@ class TrackOperations:
         """
         return self.__getitem__((beads, cycles))
 
-    def __setitem__(self, key: BEADKEY, val: BEADKEY) -> Track:
+    def __setitem__(self, key: int, val: int) -> Track:
         if isinstance(key, (list, tuple)):
             return renamebeads(self._trk, *zip(key, val))
         return renamebeads(self._trk, (key, val))
@@ -194,7 +194,7 @@ class _TrackMixin:
         setattr(prop, '__doc__', getattr(prop, '__doc__') + f"\n{Tasks.__cleaning__.__doc__}")
         del prop
 
-    def astracksdict(self, *beads:BEADKEY) -> TracksDict:
+    def astracksdict(self, *beads:int) -> TracksDict:
         """
         Converts this to a `TracksDict` object, with one bead per track.
 

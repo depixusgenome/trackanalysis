@@ -6,7 +6,7 @@ Deals with tasks & processors for finding peaks
 from   typing                         import Optional, cast
 
 from   data                           import Track
-from   data.views                     import BEADKEY, TaskView
+from   data.views                     import TaskView
 from   taskmodel                      import Level, Task, PHASE
 from   taskcontrol.processor.taskview import TaskViewProcessor
 from   ..peaksarray                   import PeakListArray
@@ -37,7 +37,7 @@ class PeakProjectorTask(PeakProjector, Task):
         PeakProjector.__init__(self, **kwa)
 
 Output = PeakListArray
-class PeakProjectorDict(TaskView[PeakProjectorTask,BEADKEY]): # pylint: disable=too-many-ancestors
+class PeakProjectorDict(TaskView[PeakProjectorTask,int]):  # pylint: disable=too-many-ancestors
     "Groups bead frames into peaks"
     if __doc__:
         from .selector import PeaksDict
@@ -63,7 +63,7 @@ class PeakProjectorDict(TaskView[PeakProjectorTask,BEADKEY]): # pylint: disable=
         """
         return getattr(self.data, 'beadextension', lambda *_: None)(ibead)
 
-    def phaseposition(self, phase: int, ibead:BEADKEY) -> Optional[float]:
+    def phaseposition(self, phase: int, ibead:int) -> Optional[float]:
         """
         Return the median position for a given phase
         """
@@ -72,5 +72,5 @@ class PeakProjectorDict(TaskView[PeakProjectorTask,BEADKEY]): # pylint: disable=
     def _precision(self, ibead: int, precision: Optional[float]):
         return self.config.getprecision(precision, getattr(self.data, 'track', None), ibead)
 
-class PeakProjectorProcessor(TaskViewProcessor[PeakProjectorTask, PeakProjectorDict, BEADKEY]):
+class PeakProjectorProcessor(TaskViewProcessor[PeakProjectorTask, PeakProjectorDict, int]):
     "Groups bead frames into peaks"

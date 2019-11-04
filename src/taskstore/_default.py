@@ -84,7 +84,11 @@ def _v9(data:dict) -> dict:
     )
     return data
 
-__TASKS__        = Patches(_v0task, _v1, _v2, _v3, _v4tasks, _v5, _v6, _v7, _v8, _v9)
+def _v10(data:dict) -> dict:
+    modifyclasses(data, "data.Track", dict(_rawprecisions = DELETE, rawprecisions = DELETE))
+    return data
+
+__TASKS__        = Patches(_v0task, _v1, _v2, _v3, _v4tasks, _v5, _v6, _v7, _v8, _v9, _v10)
 PATCHES['tasks'] = __TASKS__
 
 def _v0cnf(data:dict) -> dict:
@@ -97,5 +101,5 @@ def _v9cnf(data:dict) -> dict:
     modifykeys(data, "theme.cyclehist.plot.hist",   "figsize",  CNT, lambda _: [600, 597, 'fixed'])
     return data
 
-__CONFIGS__       = Patches(_v0cnf, _v1, _v2, _v3, _v5, _v6, _v7, _v8, _v9cnf, _v9)
+__CONFIGS__       = Patches(_v0cnf, _v1, _v2, _v3, _v5, _v6, _v7, _v8, _v9cnf, _v9, _v10)
 PATCHES['config'] = __CONFIGS__

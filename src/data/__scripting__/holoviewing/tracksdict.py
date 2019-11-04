@@ -10,7 +10,7 @@ from   concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 from   utils.holoviewing  import (addto, displayhook, addproperty, hv,
                                   BasicDisplay, dropdown as _dropdown)
-from   ...views           import isellipsis, BEADKEY
+from   ...views           import isellipsis
 from   ...tracksdict      import TracksDict
 
 _TDOC = (
@@ -46,7 +46,7 @@ class TracksDictDisplay(BasicDisplay,
             Thus zooming and spanning is independant.
             * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
     """
-    _beads:     Optional[List[BEADKEY]] = None
+    _beads:     Optional[List[int]]     = None
     _keys:      Optional[List[str]]     = None
     _name:      Optional[str]           = None
     _overlay:   Optional[str]           = None

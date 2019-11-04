@@ -7,7 +7,7 @@ from   typing import (
 from   copy             import copy as shallowcopy
 import numpy            as     np
 from   taskmodel.level  import PHASE, PhaseArg, Phase
-from   ._dict           import BEADKEY, isellipsis, isint
+from   ._dict           import isellipsis, isint
 from   ._view           import TrackView, ITrackView, Level
 
 class Beads(TrackView, ITrackView):
@@ -88,14 +88,14 @@ class Beads(TrackView, ITrackView):
             return self.track.phase.select(cast(int, crng.stop)+1, 0) - start
         return self.track.nframes
 
-    def beadextension(self, ibead:BEADKEY) -> Optional[float]:
+    def beadextension(self, ibead:int) -> Optional[float]:
         """
         Return the median bead extension (phase 3 - phase 1)
         """
         arr = self[ibead] if ibead in self.keys() else None
         return None if arr is None else self.track.beadextension(arr) # type: ignore
 
-    def phaseposition(self, phase: int, ibead:BEADKEY) -> Optional[float]:
+    def phaseposition(self, phase: int, ibead:int) -> Optional[float]:
         """
         Return the median position for a given phase
         """
@@ -140,7 +140,7 @@ class Beads(TrackView, ITrackView):
         "returns whether the key is one for a bead"
         return isint(key)
 
-    def _keys(self, sel:Optional[Sequence]) -> Iterator[BEADKEY]:
+    def _keys(self, sel:Optional[Sequence]) -> Iterator[int]:
         if isinstance(self.data, Beads):
             if sel is None:
                 yield from self.data.keys(None)
@@ -149,7 +149,7 @@ class Beads(TrackView, ITrackView):
         else:
             yield from super()._keys(sel)
 
-    def _iter(self, sel = None) -> Iterator[Tuple[BEADKEY, np.ndarray]]:
+    def _iter(self, sel = None) -> Iterator[Tuple[int, np.ndarray]]:
         if isinstance(self.data, Beads) and self.cycles is None:
             beads = cast(Beads, self.data)
             if sel is None:
@@ -192,8 +192,8 @@ class Beads(TrackView, ITrackView):
 
     if TYPE_CHECKING:
         def keys(self,
-                 sel      :Optional[Sequence] = None) -> Iterator[BEADKEY]:
+                 sel      :Optional[Sequence] = None) -> Iterator[int]:
             yield from super().keys(sel)
 
-        def __iter__(self) -> Iterator[Tuple[BEADKEY, np.ndarray]]:
+        def __iter__(self) -> Iterator[Tuple[int, np.ndarray]]:
             yield from super().__iter__()

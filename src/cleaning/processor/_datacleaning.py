@@ -10,7 +10,6 @@ from    typing       import (
 
 import  numpy             as     np
 
-from    data.views              import BEADKEY
 from    taskcontrol.processor   import Processor, ProcessorException
 from    taskmodel               import Task, Level, PHASE, InstrumentType
 from    utils                   import initdefaults
@@ -64,7 +63,7 @@ class DataCleaningErrorMessage:
     "creates the error message upon request"
     def __init__(self, stats, cnf:Dict[str,Any],  # pylint: disable=too-many-arguments
                  tasktype:Type[DataCleaningTask],
-                 beadid: BEADKEY,
+                 beadid:  int,
                  parents: tuple,
                  ncycles: int = 0) -> None:
         self.stats    = stats

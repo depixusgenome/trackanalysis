@@ -4,11 +4,12 @@
 Default configurations for each task
 """
 from taskmodel.application import setupdefaulttask
-from taskmodel.track       import UndersamplingTask
+from taskmodel.track       import UndersamplingTask, RawPrecisionTask
 from .                     import (
     BeadSubtractionTask, DataCleaningTask, ClippingTask, FixedBeadDetectionTask
 )
 
+setupdefaulttask(RawPrecisionTask)
 setupdefaulttask(UndersamplingTask)
 setupdefaulttask(BeadSubtractionTask)
 setupdefaulttask(DataCleaningTask)

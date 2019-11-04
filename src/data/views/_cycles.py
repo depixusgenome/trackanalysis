@@ -10,7 +10,7 @@ import numpy  as     np
 
 from   taskmodel.level import PHASE, PhaseArg, Phase
 from   utils           import initdefaults, isfunction
-from   ._dict          import BEADKEY, CYCLEKEY, isellipsis
+from   ._dict          import CYCLEKEY, isellipsis
 from   ._view          import TrackView, ITrackView, Level
 
 _none  = type('_none', (), {})
@@ -81,7 +81,7 @@ class Cycles(TrackView, ITrackView):
         "whether the data keys are directly cycle keys"
         self._direct = i
 
-    def beadextension(self, ibead:BEADKEY) -> Optional[float]:
+    def beadextension(self, ibead:int) -> Optional[float]:
         """
         Return the median bead extension (phase 3 - phase 1)
         """
@@ -91,7 +91,7 @@ class Cycles(TrackView, ITrackView):
         arr  = data[ibead] if ibead in data else None
         return None if arr is None else self.track.beadextension(arr) # type: ignore
 
-    def phaseposition(self, phase: int, ibead:BEADKEY) -> Optional[float]:
+    def phaseposition(self, phase: int, ibead:int) -> Optional[float]:
         """
         Return the median position for a given phase
         """
@@ -119,7 +119,7 @@ class Cycles(TrackView, ITrackView):
                 yield from ((thisid, cid) for cid in allcycles)
 
             else:
-                bid: BEADKEY = thisid[0]
+                bid: int = thisid[0]
                 tmp: Any     = thisid[1]
                 if isellipsis(bid) and isellipsis(tmp):
                     yield from ((col, cid) for col in beads for cid in allcycles)
@@ -142,7 +142,7 @@ class Cycles(TrackView, ITrackView):
             elif np.isscalar(thisid):
                 yield from (i for i in keys if i[0] == thisid)
             else:
-                bid, tmp = thisid[0], thisid[1] # type: BEADKEY, Any
+                bid, tmp = thisid[0], thisid[1] # type: int, Any
                 if isellipsis(bid) and isellipsis(tmp):
                     yield from keys
                 elif isellipsis(bid):
@@ -169,7 +169,7 @@ class Cycles(TrackView, ITrackView):
         first   = 0                  if self.first is None else self.first
         last    = self.track.nphases if self.last  is None else self.last+1
         phase   = self.track.phase.select(..., (first, last))
-        data: Dict[BEADKEY, np.ndarray] = {}
+        data: Dict[int, np.ndarray] = {}
         def _getdata(bid:int, cid:int):
             bead = data.get(bid, None)
             if bead is None:

@@ -5,7 +5,6 @@ from   functools                import partial
 from   typing                   import List, Dict, Set, Tuple, Iterator, Any
 import asyncio
 
-from   data                     import BEADKEY
 from   cleaning.view            import DataCleaningModelAccess
 from   cleaning.processor       import (
     DataCleaningProcessor, ClippingProcessor, ClippingTask
@@ -146,7 +145,7 @@ class QualityControlModelAccess(DataCleaningModelAccess):
 
             asyncio.create_task(_compute())
 
-    def badbeads(self) -> Set[BEADKEY]:
+    def badbeads(self) -> Set[int]:
         "returns bead ids with messages"
         if self.rawtrack is None:
             return set()

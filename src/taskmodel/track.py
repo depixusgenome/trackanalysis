@@ -102,6 +102,17 @@ class UndersamplingTask(Task):
         )
     )
 
+class RawPrecisionTask(Task):
+    """
+    Set the means by which raw precisions are computed
+    """
+    level:    Level = Level.bead
+    computer: str   = 'range'
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
+
 class CycleCreatorTask(Task):
     "Iterate over cycles and beads"
     levelin              = Level.bead

@@ -20,8 +20,7 @@ def isellipsis(vals):
     "checks whether the argument can be understood as an ellipsis"
     return (not isinstance(vals, np.ndarray)) and vals in _m_ALL
 
-BEADKEY  = int
-CYCLEKEY = Tuple[BEADKEY,int]
+CYCLEKEY = Tuple[int, int]
 ISelf    = TypeVar('ISelf', bound = 'ITrackView')
 
 class ITrackView:

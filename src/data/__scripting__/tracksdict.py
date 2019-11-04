@@ -21,7 +21,6 @@ from   utils.decoration                 import addto, addproperty
 from   utils.attrdefaults               import setdefault, deepcopy
 
 from   ..track                          import Track
-from   ..views                          import BEADKEY
 from   ..trackio                        import savetrack, PATHTYPE, Handler
 from   ..trackops                       import clone
 from   ..tracksdict                     import TracksDict as _TracksDict
@@ -378,11 +377,11 @@ class TracksDictOperator:
     """
     Allows applying operations to a specific portion of the tracksdict
     """
-    _beads:     Optional[List[BEADKEY]] = None
-    _keys:      Optional[List[str]]     = None
-    _reference: Optional[str]           = None
-    _items:     Optional[TracksDict]    = None
-    KEYWORDS:   FrozenSet[str]          = frozenset(locals()) - {'_items'}
+    _beads:     Optional[List[int]]  = None
+    _keys:      Optional[List[str]]  = None
+    _reference: Optional[str]        = None
+    _items:     Optional[TracksDict] = None
+    KEYWORDS:   FrozenSet[str]       = frozenset(locals()) - {'_items'}
 
     def __init__(self, items, **opts):
         if all(hasattr(items, i) for i in ('_beads', '_keys', '_reference', '_items')):

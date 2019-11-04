@@ -10,7 +10,7 @@ import warnings
 import numpy                        as     np
 import pandas                       as     pd
 
-from   data.views                   import Cycles, Beads, BEADKEY
+from   data.views                   import Cycles, Beads
 from   signalfilter                 import nanhfsigma
 from   utils                        import initdefaults
 from   taskmodel                    import PhaseArg, PhaseRange
@@ -157,7 +157,7 @@ def aggtype(name:str) -> AggType:
             SubtractAverageSignal)()
 
 
-FixedData = Tuple[float, float, float, BEADKEY]
+FixedData = Tuple[float, float, float, int]
 FixedList = List[FixedData]
 
 
