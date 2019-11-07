@@ -26,6 +26,7 @@ _EVT  = 'peakcalling.view.jobs.stop'
 class _Fig:
     extra_x_ranges = {'beadcount': 'beadcount'}
     x_range        = 'x_range'
+    y_range        = type('y_range', (), {'start': 0, 'end': 1})
     yaxis          = ['yaxis']
     xaxis          = ['xaxistop', 'xaxisbottom']
 
@@ -146,6 +147,13 @@ def _addhp(server):
         rendered = _EVT
     )
 
+def _export(fov, tmp_path):
+    tmp_path = tmp_path.with_suffix(".xlsx")
+    if tmp_path.exists():
+        tmp_path.unlink()
+    assert fov.export(str(tmp_path))
+    assert tmp_path.exists()
+
 @integrationmark
 def test_beadsplot(bokehaction):
     "test the view"
@@ -194,14 +202,17 @@ def test_beadsplot(bokehaction):
         )
     ]
 
-def test_statsplot_info_simple():
+def test_statsplot_info_simple(tmp_path):
     "test the view without the view"
     # pylint: disable=protected-access
     fov, mdl = _Fig.create()
 
     # testing for when there is nothing to plot
     for cls in _BeadStatusPlot, _PeaksPlot, _HairpinPlot:
-        assert dict(cls(fov, mdl.tasks.processors)._reset())['x_range']['factors'] == ['']
+        assert (
+            dict(cls(fov, mdl.tasks.processors)._reset())['x_range']['factors']
+            == [('',)*3]
+        )
 
     def _change(tpe, xaxis = None, **kwa):
         if xaxis:
@@ -216,18 +227,18 @@ def test_statsplot_info_simple():
 
     def _checkbsfact(tpe: bool):
         cache   = _change(tpe, xaxis = ['track', 'beadstatus'], yaxis = 'bead')
-        factors = [(i, j.replace('\u2063', '')) for i, j in cache['x_range']['factors']]
+        factors = [(i, j, k.replace('\u2063', '')) for i, j, k in cache['x_range']['factors']]
         vals    = ['ok', '% good', 'non-closing', 'Δz', 'σ[HF]', '∑|dz|']
+
         if not tpe:
             vals.insert(4, 'no blockages')
-        assert factors == list(zip(
-            repeat(''),
-            vals
-        ))
+        assert factors == list(zip(repeat(""), repeat(""), vals))
 
     def _check(tpe):
         mdl.tasks.jobs.launch(list(mdl.tasks.processors.values()))
         _checkbsfact(tpe)
+        if tpe:
+            _export(fov, tmp_path)
 
         cache = _change(tpe, yaxis = 'hybridisationrate', xaxis = ['track'])
         source = cache['_stats']['data']
@@ -238,19 +249,19 @@ def test_statsplot_info_simple():
             assert_allclose(source[i], j,  rtol = 5e-1, atol = 5e-1)
 
         cache   = _change(tpe, yaxis = 'hybridisationrate', xaxis = ['track', 'status'])
-        factors = [(i, j.replace('\u2063', '')) for i, j in cache['x_range']['factors']]
+        factors = [(i, j, k.replace('\u2063', '')) for i, j, k in cache['x_range']['factors']]
         if tpe:
             assert factors == list(zip(
-                repeat(''),
-                ['baseline', 'blockage', 'single strand', '> single strand']
+                repeat(''), repeat(''),
+                ['baseline', 'blockage', 'single strand', '> single strand'],
             ))
         else:
             assert factors == list(zip(
-                repeat(''),
+                repeat(''), repeat(''),
                 [
                     'baseline', 'identified', 'missing', 'unidentified',
                     'single strand', '> single strand'
-                ]
+                ],
             ))
 
     _check(True)
@@ -265,13 +276,15 @@ def test_statsplot_info_simple():
 
     _check(False)
 
-def test_statsplot_info_hpins():
+def test_statsplot_info_hpins(tmp_path):
     "test the view"
     # pylint: disable=protected-access
     fov, mdl = _Fig.create(beads = list(range(5)),     withhp = True)
     _Fig.newtasks(mdl, beads = list(range(5, 10)), withhp = True)
 
     mdl.tasks.jobs.launch(list(mdl.tasks.processors.values()))
+
+    _export(fov, tmp_path)
 
     def _change(xaxis = None, **kwa):
         if xaxis:
@@ -286,64 +299,70 @@ def test_statsplot_info_hpins():
     cache = _change(yaxis = 'averageduration', xaxis = ['status'])
     assert cache['yaxis']['axis_label'] == "binding duration (s)"
     assert cache['x_range']['factors'] == [
-        '\u2063baseline',
-        '\u2063\u2063identified',
-        '\u2063\u2063\u2063missing',
-        '\u2063\u2063\u2063\u2063unidentified',
-        '\u2063\u2063\u2063\u2063\u2063\u2063single strand',
-        '\u2063\u2063\u2063\u2063\u2063\u2063\u2063> single strand'
+        ('\u2063baseline', '', ''),
+        ('\u2063\u2063identified', '', ''),
+        ('\u2063\u2063\u2063missing', '', ''),
+        ('\u2063\u2063\u2063\u2063unidentified', '', ''),
+        ('\u2063\u2063\u2063\u2063\u2063\u2063single strand', '', ''),
+        ('\u2063\u2063\u2063\u2063\u2063\u2063\u2063> single strand', '', '')
     ]
 
     cache = _change(yaxis = 'bead', xaxis = ['hairpin'])
     assert cache['yaxis']['axis_label'] == "count (%)"
-    assert cache['x_range']['factors'] == ['GF1', 'GF4', 'GF2', 'GF3']
+    assert cache['x_range']['factors'] == list(zip(
+        ['GF1', 'GF4', 'GF2', 'GF3'], repeat(""), repeat(""),
+    ))
 
     mdl.display.hairpins = {'GF2', 'GF3'}
     cache = _change()
     assert cache['yaxis']['axis_label'] == "count (%)"
-    assert cache['x_range']['factors'] == ['GF1', 'GF4']
+    assert cache['x_range']['factors'] == list(zip(['GF1', 'GF4'], repeat(""), repeat("")))
 
     mdl.display.hairpins = {}
     cache = _change(yaxis = "distance", xaxis = ["closest"])
     assert cache['yaxis']['axis_label'] == "Δ(binding - blockage) (bp)"
-    assert cache['x_range']['factors'] == [
-        '38.0', '46.0', '151.0', '157.0', '222.0', '258.0', '274.0', '294.0',
-        '347.0', '357.0', '379.0', '393.0', '503.0', '540.0', '569.0', '576.0',
-        '631.0', '659.0', '704.0', '738.0', '754.0', '784.0', '791.0', '795.0',
-        '800.0'
-    ]
+    assert cache['x_range']['factors'] == list(zip(
+        [
+            '38.0', '46.0', '151.0', '157.0', '222.0', '258.0', '274.0', '294.0',
+            '347.0', '357.0', '379.0', '393.0', '503.0', '540.0', '569.0', '576.0',
+            '631.0', '659.0', '704.0', '738.0', '754.0', '784.0', '791.0', '795.0',
+            '800.0'
+        ],
+        repeat(""), repeat(""),
+    ))
 
     mdl.display.hairpins = {'GF2', 'GF3'}
     cache = _change(yaxis = "distance", xaxis = ["hairpin", "closest"])
     assert cache['yaxis']['axis_label'] == "Δ(binding - blockage) (bp)"
     assert cache['x_range']['factors'] == [
-        ('GF1', '157.0'), ('GF1', '258.0'), ('GF1', '393.0'), ('GF1', '503.0'),
-        ('GF1', '704.0'), ('GF1', '795.0'), ('GF4', '38.0'),  ('GF4', '294.0'),
-        ('GF4', '347.0'), ('GF4', '569.0'), ('GF4', '738.0'), ('GF4', '791.0')
+        ('GF4', '', '38.0'),  ('GF4', '', '294.0'), ('GF4', '', '347.0'), ('GF4', '', '569.0'),
+        ('GF4', '', '738.0'), ('GF4', '', '791.0'),
+        ('GF1', '', '157.0'), ('GF1', '', '258.0'), ('GF1', '', '393.0'), ('GF1', '', '503.0'),
+        ('GF1', '', '704.0'), ('GF1', '', '795.0'),
     ]
 
     mdl.display.hairpins = {'GF2', 'GF3', 'GF4'}
     cache = _change(yaxis = "bead", xaxis = ["closest", "orientation"])
     assert cache['yaxis']['axis_label'] == 'count (%)'
     assert cache['x_range']['factors'] == [
-        ('157.0', '+'), ('258.0', '+'), ('393.0', '\u2063-'), ('503.0', '\u2063-'),
-        ('704.0', '+'), ('795.0', '\u2063-')
+        ('157.0', '', '+'), ('258.0', '', '+'),     ('393.0', '', '\u2063-'),
+        ('503.0', '','\u2063-'), ('704.0', '', '+'), ('795.0', '', '\u2063-')
     ]
 
     cache = _change(yaxis = "bead", xaxis = ["orientation", "closest"])
     assert cache['yaxis']['axis_label'] == 'count (%)'
     assert cache['x_range']['factors'] == [
-        ('+', '157.0'), ('+', '258.0'), ('+', '704.0'),
-        ('\u2063-', '393.0'), ('\u2063-', '503.0'), ('\u2063-', '795.0')
+        ('+', '', '157.0'), ('+', '', '258.0'), ('+', '', '704.0'),
+        ('\u2063-', '', '393.0'), ('\u2063-', '', '503.0'), ('\u2063-', '', '795.0')
     ]
 
     cache = _change(yaxis = "fn", xaxis = ["hairpin"])
     assert cache['yaxis']['axis_label'] == 'missing (% bindings)'
-    assert cache['x_range']['factors'] == ['GF1']
+    assert cache['x_range']['factors'] == [('GF1', '', '')]
 
     cache = _change(yaxis = "fnperbp", xaxis = ["orientation"])
     assert cache['yaxis']['axis_label'] == 'missing (bp⁻¹)'
-    assert cache['x_range']['factors'] == ['+', '\u2063-']
+    assert cache['x_range']['factors'] == [('+', '', ''), ('\u2063-', '', '')]
 
 @integrationmark
 def test_statsplot_view_simple(bokehaction):
@@ -358,12 +377,13 @@ def test_statsplot_view_simple(bokehaction):
         )
 
     def _checkbsfact(tpe: bool):
-        factors = [(i, j.replace('\u2063', '')) for i, j in fig.x_range.factors]
+        factors = [(i, j, k.replace('\u2063', '')) for i, j, k in fig.x_range.factors]
         vals    = ['ok', '% good', 'non-closing', 'Δz', 'σ[HF]', '∑|dz|']
         if not tpe:
             vals.insert(4, 'no blockages')
         assert factors == list(zip(
             repeat('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec'),
+            repeat(""),
             vals
         ))
 
@@ -379,15 +399,17 @@ def test_statsplot_view_simple(bokehaction):
             assert_allclose(source[i], j,  rtol = 5e-1, atol = 5e-1)
 
         _change(yaxis = 'hybridisationrate', xaxis = ['track', 'status'])
-        factors = [(i, j.replace('\u2063', '')) for i, j in fig.x_range.factors]
+        factors = [(i, j, k.replace('\u2063', '')) for i, j, k in fig.x_range.factors]
         if tpe:
             assert factors == list(zip(
                 repeat('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec'),
+                repeat(""),
                 ['baseline', 'blockage', 'single strand', '> single strand']
             ))
         else:
             assert factors == list(zip(
                 repeat('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec'),
+                repeat(""),
                 [
                     'baseline', 'identified', 'missing', 'unidentified',
                     'single strand', '> single strand'
@@ -426,11 +448,11 @@ def test_statsplot_view_peaks1(bokehaction):
 
     assert fig.yaxis[0].axis_label == "count (%)"
     assert fig.x_range.factors == [
-        ('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', 'ok'),
-        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', 'ok'),
-        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '\u2063% good'),
-        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '\u2063non-closing'),
-        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '\u2063∑|dz|')
+        ('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', 'ok'),
+        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', 'ok'),
+        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', '\u2063% good'),
+        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', '\u2063non-closing'),
+        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', '\u2063∑|dz|')
     ]
 
     modal = server.selenium.modal("//span[@class='icon-dpx-cog']", True)
@@ -441,17 +463,19 @@ def test_statsplot_view_peaks1(bokehaction):
     server.wait()
     assert fig.yaxis[0].axis_label == "count (%)"
     assert fig.x_range.factors == [
-        ('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', 'ok'),
-        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', 'ok'),
-        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '\u2063bad'),
-        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '\u2063∑|dz|')
+        ('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', 'ok'),
+        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', 'ok'),
+        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', '\u2063bad'),
+        ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', '\u2063∑|dz|')
     ]
 
     with modal:
         modal.select("//select[@name='xinfo[0].name']", "tracktag")
     server.wait()
     assert fig.yaxis[0].axis_label == "count (%)"
-    assert fig.x_range.factors == [('none', 'ok'), ('none', '\u2063bad'), ('none', '\u2063∑|dz|')]
+    assert fig.x_range.factors == [
+        ('none', '', 'ok'), ('none', '', '\u2063bad'), ('none', '', '\u2063∑|dz|')
+    ]
 
     with modal:
         modal.select("//select[@name='xinfo[0].name']", "status")
@@ -460,21 +484,21 @@ def test_statsplot_view_peaks1(bokehaction):
     server.wait()
 
     assert fig.x_range.factors == [
-        '\u2063baseline',
-        '\u2063\u2063\u2063\u2063\u2063blockage',
-        '\u2063\u2063\u2063\u2063\u2063\u2063single strand',
-        '\u2063\u2063\u2063\u2063\u2063\u2063\u2063> single strand'
+        ('\u2063baseline', '', ''),
+        ('\u2063\u2063\u2063\u2063\u2063blockage', '', ''),
+        ('\u2063\u2063\u2063\u2063\u2063\u2063single strand', '', ''),
+        ('\u2063\u2063\u2063\u2063\u2063\u2063\u2063> single strand', '', '')
     ]
     assert fig.yaxis[0].axis_label == "binding duration (s)"
 
     _addhp(server)
     assert fig.yaxis[0].axis_label == "binding duration (s)"
     assert fig.x_range.factors == [
-        '\u2063baseline',
-        '\u2063\u2063identified',
-        '\u2063\u2063\u2063missing',
-        '\u2063\u2063\u2063\u2063unidentified',
-        '\u2063\u2063\u2063\u2063\u2063\u2063single strand'
+        ('\u2063baseline', '', ''),
+        ('\u2063\u2063identified', '', ''),
+        ('\u2063\u2063\u2063missing', '', ''),
+        ('\u2063\u2063\u2063\u2063unidentified', '', ''),
+        ('\u2063\u2063\u2063\u2063\u2063\u2063single strand', '', '')
     ]
 
 @integrationmark
@@ -491,8 +515,8 @@ def test_statsplot_view_peaks2(fovstatspeaks):
     server.wait()
 
     assert fig.yaxis[0].axis_label == "count (%)"
-    assert set(fig.x_range.factors) == {'aaa', 'bbb'}
-    assert fig.extra_x_ranges['beadcount'].factors == ['5', '2']
+    assert set(fig.x_range.factors) == {('aaa', '', ''), ('bbb', '', '')}
+    assert fig.extra_x_ranges['beadcount'].factors == [('', '', '5'), ('\u2063', '', '2\u2063')]
 
     with modal:
         modal.tab("Tracks")
@@ -500,8 +524,8 @@ def test_statsplot_view_peaks2(fovstatspeaks):
     server.wait()
 
     assert fig.yaxis[0].axis_label == "count (%)"
-    assert set(fig.x_range.factors) == {'aaa', 'bbb'}
-    assert fig.extra_x_ranges['beadcount'].factors == ['3', '2']
+    assert set(fig.x_range.factors) == {('aaa', '', ''), ('bbb', '', '')}
+    assert fig.extra_x_ranges['beadcount'].factors == [("", "", '3'), ("\u2063", "", '2\u2063')]
 
 @integrationmark
 def test_statsplot_view_hpins1(fovstatshairpin):
@@ -515,11 +539,11 @@ def test_statsplot_view_hpins1(fovstatshairpin):
 
     assert fig.yaxis[0].axis_label == "binding duration (s)"
     assert fig.x_range.factors == [
-        '\u2063baseline',
-        '\u2063\u2063identified',
-        '\u2063\u2063\u2063missing',
-        '\u2063\u2063\u2063\u2063unidentified',
-        '\u2063\u2063\u2063\u2063\u2063\u2063single strand'
+        ('\u2063baseline', '', ''),
+        ('\u2063\u2063identified', '', ''),
+        ('\u2063\u2063\u2063missing', '', ''),
+        ('\u2063\u2063\u2063\u2063unidentified', '', ''),
+        ('\u2063\u2063\u2063\u2063\u2063\u2063single strand', '', '')
     ]
 
 @integrationmark
@@ -533,7 +557,9 @@ def test_statsplot_view_hpins2(fovstatshairpin):
     server.wait()
 
     assert fig.yaxis[0].axis_label == "count (%)"
-    assert fig.x_range.factors == ['GF4', 'GF1', 'GF2', 'GF3']
+    assert fig.x_range.factors == list(zip(
+        ['GF4', 'GF1', 'GF2', 'GF3'], repeat(""), repeat(""),
+    ))
 
     with modal:
         modal.tab("Hairpins")
@@ -545,7 +571,7 @@ def test_statsplot_view_hpins2(fovstatshairpin):
     server.wait()
 
     assert fig.yaxis[0].axis_label == "count (%)"
-    assert fig.x_range.factors == ['GF4', 'GF1']
+    assert fig.x_range.factors == list(zip(['GF4', 'GF1'], repeat(""), repeat("")))
 
 @integrationmark
 def test_statsplot_view_hpins3(fovstatshairpin):
@@ -559,12 +585,15 @@ def test_statsplot_view_hpins3(fovstatshairpin):
     server.wait()
 
     assert fig.yaxis[0].axis_label == "Δ(binding - blockage) (bp)"
-    assert fig.x_range.factors == [
-        '38.0', '46.0', '151.0', '157.0', '222.0', '258.0', '274.0', '294.0',
-        '347.0', '357.0', '379.0', '393.0', '503.0', '540.0', '569.0', '576.0',
-        '631.0', '659.0', '704.0', '738.0', '754.0', '784.0', '791.0', '795.0',
-        '800.0'
-    ]
+    assert fig.x_range.factors == list(zip(
+        [
+            '38.0', '46.0', '151.0', '157.0', '222.0', '258.0', '274.0', '294.0',
+            '347.0', '357.0', '379.0', '393.0', '503.0', '540.0', '569.0', '576.0',
+            '631.0', '659.0', '704.0', '738.0', '754.0', '784.0', '791.0', '795.0',
+            '800.0'
+        ],
+        repeat(""), repeat(""),
+    ))
 
 @integrationmark
 def test_statsplot_view_hpins4(fovstatshairpin):
@@ -585,8 +614,8 @@ def test_statsplot_view_hpins4(fovstatshairpin):
 
     assert fig.yaxis[0].axis_label == "count (%)"
     assert fig.x_range.factors == [
-        ('157.0', '+'), ('258.0', '+'), ('393.0', '\u2063-'), ('503.0', '\u2063-'),
-        ('704.0', '+'), ('795.0', '\u2063-')
+        ('157.0', '', '+'), ('258.0', '', '+'), ('393.0', '', '\u2063-'),
+        ('503.0', '', '\u2063-'), ('704.0', '', '+'), ('795.0', '', '\u2063-')
     ]
 
 @integrationmark
@@ -606,8 +635,8 @@ def test_statsplot_view_hpins5(fovstatshairpin):
     server.wait()
     assert fig.yaxis[0].axis_label == "count (%)"
     assert fig.x_range.factors == [
-        ('+', '157.0'), ('+', '258.0'), ('+', '704.0'),
-        ('\u2063-', '393.0'), ('\u2063-', '503.0'), ('\u2063-', '795.0')
+        ('+', '', '157.0'), ('+', '', '258.0'), ('+', '', '704.0'),
+        ('\u2063-', '', '393.0'), ('\u2063-', '', '503.0'), ('\u2063-', '', '795.0')
     ]
 
 @integrationmark
@@ -626,7 +655,7 @@ def test_statsplot_view_hpins6(fovstatshairpin):
             )
     server.wait()
     assert fig.yaxis[0].axis_label == "missing (% bindings)"
-    assert fig.x_range.factors == ['GF1', 'GF4']
+    assert fig.x_range.factors == list(zip(['GF1', 'GF4'], repeat(""), repeat("")))
 
     with modal:
         modal.select("//select[@name='xinfo[0].name']", "orientation")
@@ -634,11 +663,13 @@ def test_statsplot_view_hpins6(fovstatshairpin):
         modal.select("//select[@name='yaxis']", "fnperbp")
 
     assert fig.yaxis[0].axis_label == 'missing (bp⁻¹)'
-    assert fig.x_range.factors == ['+', '\u2063-']
+    assert fig.x_range.factors == list(zip(['+', '\u2063-'], repeat(""), repeat("")))
 
 
 if __name__ == '__main__':
-    # test_statsplot_info_hpins()
+    from pathlib import Path
+    test_statsplot_info_hpins(Path("/tmp/yyy"))
+    test_statsplot_info_simple(Path("/tmp/xxx"))
     from tests.testingcore.bokehtesting import BokehAction
     with BokehAction(None) as bka:
-        test_statsplot_view_hpins6(_fovstatshairpin(bka))
+        test_beadsplot(bka)

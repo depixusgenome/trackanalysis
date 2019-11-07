@@ -281,6 +281,7 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
 
     def __base_df(self, frame, res) -> pd.DataFrame:
         data = pd.DataFrame(self.__peaks.dictionary(frame, (res.key, res.events)))
+        data.sort_values('peakposition', inplace = True)
         data['status'] = (
             PeakStatusComputer(frame.config.baseline, frame.config.singlestrand)
             (frame, res.key, res.events)
@@ -344,6 +345,7 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
                     for i, j in data.items()
                 },
                 eventcount   = 0,
+                closest      = miss,
                 orientation  = symb,
                 status       = 'falseneg',
                 peakposition = miss/dist[1] + dist[2],

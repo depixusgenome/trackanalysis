@@ -1,4 +1,4 @@
 require('cpp', python_nlopt = '2.4.2', rtime = True)
 require('cxx', ('boost_preprocessor',), '1.70', False)
-require(python = dict(cachetools = '3.1.1'))
+require(python = dict(cachetools = '3.1.1', diskcache = '4.0.0'))
 make(use = ["nlopt", "BOOST"])

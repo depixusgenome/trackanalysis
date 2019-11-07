@@ -2,7 +2,7 @@
 
 ## cycles_v7.1
 
-* 2019-10-23330:30:20 +0000  (tag: cycles_v7.0)
+* 2019-11-06 16:10:20 +0000  (tag: cycles_v7.1)
 
 ### Cleaning Tab
 
@@ -10,6 +10,19 @@ A new strategy is defined for measuring the high-frequency noise. Still under
 investigation, it is expected to better measure instrinsic bead characteristics
 and be less affected by experimental settings. This strategy can be selected
 through the advanced menu.
+
+### Statistics Tab
+
+Statistics over multiple fields of view are now stored to the disk and recalled
+rather than recomputed upon restarting the application. The storage is
+self-managed, using a hard limit of 100 Mb and discarding any month-old data.
+
+The data used for creating the lower plot can be exported to excel using the *save* button on top of the plot. The excel file will contain four sheets: 
+
+* *Bead status* is the list of all non-subtracted beads with their status: fixed, ...
+* *Bead stats* is a number of statistics on each bead without error.
+* *Peak stats* is a number of statistics on each blockage for each bead without error as well as each missing binding position.
+* *Tracks* contains the settings, version number, ...,  when the file was created. 
 
 ## cycles_v7.0
 

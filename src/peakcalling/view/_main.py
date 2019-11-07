@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Main view"
+from copy            import deepcopy
 from typing          import Any
 from bokeh           import layouts
 from view.base       import BokehView, stretchout
 from view.threaded   import DisplayState
 from utils.logconfig import getLogger
 from ._beadsplot     import BeadsScatterPlot
+from ._model         import BasePlotConfig
 from ._statsplot     import FoVStatsPlot
-from ._widgets       import JobsStatusBar, PeakcallingPlotWidget
+from ._widgets       import JobsStatusBar, PeakcallingPlotWidget, CSVExporter
 from ._threader      import ismain
 
 LOGS = getLogger(__name__)
@@ -45,6 +47,7 @@ class FoVPeakCallingView(BokehView):
             FoVStatsPlot(widgets = False),
             PeakcallingPlotWidget(),
             JobsStatusBar(),
+            CSVExporter(),
         ]
 
     @property
@@ -83,13 +86,28 @@ class FoVPeakCallingView(BokehView):
         self._items[1].observe(ctrl)
         self._items[3].observe(ctrl, getattr(self._items[0], '_model').tasks)
 
+        attrs = set(BasePlotConfig().__dict__)
+
+        @ctrl.theme.observe(self._items[1].gettheme())
+        def _onconfig(old, **_):
+            if set(old) & attrs:
+                ctrl.theme.update(
+                    self._items[0].gettheme(),
+                    **{
+                        i: deepcopy(getattr(self._items[1].gettheme(), i))
+                        for i in set(old) & attrs
+                    }
+                )
+
     def isactive(self, *_1, **_2) -> bool:
         "whether the state is set to active"
         return self.state == DisplayState.active
 
     def addtodoc(self, ctrl, doc):
         "sets the plot up"
-        itms   = [i.addtodoc(ctrl, doc)[0] for i in self._items]
+        itms   = [i.addtodoc(ctrl, doc)[0] for i in self._items[:-1]]
+        itms.extend(self._items[-1].addtodoc(self._items[1], ctrl, doc))
+
         mode   = self.defaultsizingmode()
         sizes  = self.defaulttabsize(ctrl)
         brds   = ctrl.theme.get("main", "borders", 5)

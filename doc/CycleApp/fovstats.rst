@@ -62,6 +62,7 @@ A number of filters can be applied to beads, blockages or bindings. Using the
 *advanced* menu, one can select which tracks to display, which hairpins, beads
 as well as the binding strand (or orientation).
 
+
 Statistics Plot
 ---------------
 
@@ -122,6 +123,9 @@ For the y-axis, the parameters on a per bead base are:
 * *stretch (bp/µm)* is the stretch factor required to go from base pairs to µm.
 * *bias (µm)* is the baseline bias required to fit to the hairpin sequence.
 * *strand size (µm)*
+* *z (µm)* is the average z position measured on each blockage. Note that
+  *missing* blockages have a *z (µm)* value. We use the *missing* status use
+  *stretch* and *bias* to estimate it back from the *binding (bp)* position.
 
 For the y-axis, the parameters on a per blockage base are:
 
@@ -135,6 +139,23 @@ For the y-axis, the parameters on a per blockage base are:
   position.
 * *Δ(binding - blockage) (bp)* is the distance to the closest binding
   position. Only *identified* blockages are considered.
+
+Exporting to xlsx
+=================
+
+It's possible to save the data for the statistics plot into an xlsx file.
+Press the *save* button above the statistics plot in order to do so.
+
+The xlsx file will contain four sheets:
+
+* *Bead status* provides indications on the status of beads: whether they are
+  fixed, or have errors, ...
+* *Bead stats* shows statistics per bead.
+* *Peak stats* shows statistics per peak. This may contain information already
+  present in the *bead stats* sheet. It also contains one line per missing binding position in a bead. The blockage status is then *missing* and the information on that line is relevant to the theoretical sequence binding position rather than an experimental bead blockage position.
+* *Tracks* provides with explicit information on how the data was produced, the
+  software version, etc ... It's for bookkeeping rather than perusal.
+
 
 The Advanced Menu
 =================
@@ -202,6 +223,29 @@ Binding Orientation
 
 This tab allows selecting which binding orientations display.
 
+Disk Cache
+----------
+
+This tab allows setting the disk cache management settings. Disk cache is used
+for permanently storing computations for a given field of view *and* settings
+(fixed beads, ...). Thus computations from a previous day can be recalled
+rather than recomputed, which would be slower.
+
+The storage is managed using the following criteria:
+
+* *maximum size* is the maximum size of all stored computations. The least used
+  computations will be deleted first. Setting a value of 0 Mb will delete the
+  permanent storage as well as disable this feature.
+* *Expires in* defines the number of days before the computations are removed
+  from permanent storage.
+* *Reset* can be used to restart computations from scratch for all current
+  fields of view.
+
+Note that the application's version number (major & minor numbers only) are
+stored as well: computations will occur again should either change. The patch
+number will not have such an effect unless decided otherwise by the
+data-analysis team.
+
 Automated Computations
 ======================
 
@@ -210,5 +254,8 @@ It restarts those computations every time a change is made to settings which
 could affect these positions. This includes settings in the *Cleaning* tab and
 others.
 
-Computations are performed using two cores only. The display refreshes
-automatically as more and more beads are completed.
+Computations are performed using four cores only. The display refreshes
+automatically as more and more beads are completed. Results are cached to the
+disk. This means that computations from previous days remain accessible as long
+as the settings are exactly the same. This storage is self-managed as indicated
+previously.

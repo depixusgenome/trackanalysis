@@ -33,6 +33,10 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
 
     _reset = None   # added in _Threader.setup
 
+    def gettheme(self):
+        "get the model theme"
+        return self._model.theme
+
     def swapmodels(self, ctrl):
         "swap with models in the controller"
         super().swapmodels(ctrl)

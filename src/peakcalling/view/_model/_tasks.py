@@ -4,7 +4,7 @@
 from copy                       import deepcopy
 from dataclasses                import dataclass, field
 from typing                     import (
-    Dict, Union, Type, Optional, ItemsView, List, Iterator, Tuple, KeysView, Any
+    Dict, Union, Iterable, Type, Optional, ItemsView, List, Iterator, Tuple, KeysView, Any
 )
 
 import zlib
@@ -26,6 +26,23 @@ OptProc    = Optional[ProcessorController]
 ProcOrRoot = Union[RootTask, ProcessorController]
 Cache      = Dict[int, Union[Exception, pd.DataFrame]]
 Processors = Dict[RootTask, ProcessorController]
+RAW        = False
+
+def keytobytes(tasks: Union[bytes, ProcessorController], raw: bool = RAW) -> bytes:
+    "convert to bytes"
+    if isinstance(tasks, bytes):
+        return tasks
+    info = dumps(
+        getattr(tasks, 'model', tasks),
+        ensure_ascii = False,
+        sort_keys    = True,
+    ).encode('utf-8')
+    return info if raw else zlib.compress(info)
+
+def keyfrombytes(tasks: bytes, raw: bool = RAW) -> List[Task]:
+    "convert from bytes"
+    return loads((tasks if raw else zlib.decompress(tasks)).decode('utf-8'))
+
 
 @dataclass
 class TaskLRUConfig:
@@ -76,6 +93,11 @@ class TasksDict:
     def add(self, procs: ProcessorController):
         "add a processorcontroller"
         self.tasks[procs.model[0]] = self.cleancopy(procs)
+
+    def clear(self, procs: Union[Iterable[ProcessorController], ProcessorController]):
+        "clear the lru"
+        for i in (procs,) if isinstance(procs, ProcessorController) else procs:
+            self.cache[i.model[0]] = self.lru.newcache()
 
     def swapmodels(self, ctrl):
         "swap models with those in the controller"
@@ -385,17 +407,8 @@ class _Adaptor:
 
 class _RootCache(LRUCache):  # pylint: disable=too-many-ancestors
     "Cache for a given root"
-    @staticmethod
-    def keytobytes(tasks: Union[bytes, ProcessorController]) -> bytes:
-        "convert to bytes"
-        if isinstance(tasks, bytes):
-            return tasks
-        return zlib.compress(dumps(getattr(tasks, 'model', tasks)).encode('utf-8'))
-
-    @staticmethod
-    def keyfrombytes(tasks: bytes) -> List[Task]:
-        "convert from bytes"
-        return loads(zlib.decompress(tasks).decode('utf-8'))
+    keytobytes   = staticmethod(keytobytes)
+    keyfrombytes = staticmethod(keyfrombytes)
 
     # pylint: disable=signature-differs
     def __getitem__(self, key: Union[bytes, ProcessorController]) -> Cache:

@@ -64,10 +64,12 @@ class BasePlotter(Generic[Parent]):
         return info
 
     @staticmethod
-    def resetstatus(dist: int, info: pd.DataFrame):
+    def resetstatus(dist: int, info: pd.DataFrame) -> pd.DataFrame:
         """resets the status acording to the distance provided"""
         info.loc[info.status == 'truepos',      'status'] = 'falsepos'
         info.loc[np.abs(info.distance) < dist,  'status'] = 'truepos'
+        info.loc[~info.status.isin(['truepos', 'falseneg']), 'closest'] = np.NaN
+        return info
 
     def computations(  # pylint: disable=too-many-locals
             self,
@@ -125,6 +127,11 @@ class BasePlotter(Generic[Parent]):
             else:
                 assert i not in cache
                 cache[i] = j
+
+    @staticmethod
+    def getdata() -> Dict[str, pd.DataFrame]:
+        "return the data to export to xlsx"
+        return {}
 
     @staticmethod
     def _from_df(data) -> Dict[str, np.ndarray]:

@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Display the status of running jobs"
+import asyncio
 from copy                import deepcopy
 from contextlib          import contextmanager
 from dataclasses         import dataclass
 from functools           import partial
 from itertools           import chain
+from pathlib             import Path
 from typing              import Dict, List, Set, Union, Any
-from bokeh.models        import Div, Select, Button
+from bokeh.models        import Div, Select, Button, CustomAction, CustomJS
 from bokeh.document      import Document
 
 from data.trackops       import trackname
@@ -15,7 +17,9 @@ from modaldialog         import dialog
 from modaldialog.builder import tohtml
 from taskmodel           import RootTask
 from view.fonticon       import FontIcon
+from view.dialog         import FileDialog
 from utils.logconfig     import getLogger
+from utils.gui           import startfile
 from ..processor         import FitToHairpinTask
 from ._model             import (
     TasksModelController, BeadsScatterPlotStatus, AxisConfig, FoVStatsPlotModel,
@@ -229,8 +233,11 @@ class PeakcallingPlotModel:     # pylint: disable=too-many-instance-attributes
             for i in mdl.theme.orientationtag.keys()
         ]
         self.norm: str = next(
-            (str(i) for i in self.xinfo if not i.norm and i.key != 'xxx'), '0'
+            (str(i) for i in self.xinfo if not i.norm and i.name != 'xxx'), '0'
         )
+        self.cacheduration: int  = mdl.tasks.diskcache.duration // 86400    # duration in days
+        self.cachesize:     int  = mdl.tasks.diskcache.maxsize  // 1000000  # size in Mb
+        self.cachereset:    bool = False
 
     reset = __init__
 
@@ -238,8 +245,9 @@ class PeakcallingPlotModel:     # pylint: disable=too-many-instance-attributes
             self, right: 'PeakcallingPlotModel', model: FoVStatsPlotModel
     ) -> Dict[str, Dict[str, Any]]:
         "return a dictionnary of changed items"
-        diff: Dict[str, Dict[str, Any]] = {'display': {}, 'theme': {}}
+        diff: Dict[str, Dict[str, Any]] = {'display': {}, 'theme': {}, 'diskcache': {}}
         for i, j, k in chain(
+                self.__diff_diskcache(right),
                 self.__diff_axes(right),
                 self.__diff_tracks(right),
                 self.__diff_hairpins(right),
@@ -259,17 +267,25 @@ class PeakcallingPlotModel:     # pylint: disable=too-many-instance-attributes
             if getattr(self, i) != getattr(right, i):
                 yield ('theme', i, getattr(right, i))
 
+    def __diff_diskcache(self, right: 'PeakcallingPlotModel'):
+        if self.cachesize != right.cachesize:
+            yield ('diskcache', 'maxsize', right.cachesize * 1000000)
+        if self.cacheduration != right.cacheduration:
+            yield ('diskcache', 'duration', right.cacheduration * 86400)
+        if self.cachereset != right.cachereset:
+            yield ('diskcache', 'reset', right.cachereset)
+
     def __diff_axes(self, right: 'PeakcallingPlotModel'):
         cpy = deepcopy(right.xinfo)
         for i, j in enumerate(cpy):
             j.norm = right.norm == '0' or right.norm != str(i+1)
 
-        if any(i.__dict__ != j.__dict__ for i, j in zip(self.xinfo, right.xinfo)):
+        if any(i.__dict__ != j.__dict__ for i, j in zip(self.xinfo, cpy)):
             out = (
                 'theme', 'xinfo',
                 [
-                    j for i, j  in enumerate(right.xinfo)
-                    if j.name != 'xxx' and j.name not in {k.name for k in right.xinfo[:i]}
+                    j for i, j  in enumerate(cpy)
+                    if j.name != 'xxx' and j.name not in {k.name for k in cpy[:i]}
                 ]
             )
             yield out
@@ -462,6 +478,91 @@ class _JSWidgetVericicator:
             el4.parentElement.parentElement.style.display = yaxis.selectedIndex == 0 ? null: "none";
         """
 
+
+class SaveFileDialog(FileDialog):
+    "A file dialog that adds a default save path"
+    def __init__(self, ctrl):
+        super().__init__(ctrl, storage = "save")
+
+        def _defaultpath(ext, bopen):
+            assert not bopen
+            pot = [i for i in self.storedpaths(ctrl, "load", ext) if i.exists()]
+            ope = next((i for i in pot if i.suffix not in ('', '.gr')), None)
+            if ope is None:
+                ope = self.firstexistingpath(pot)
+
+            pot = self.storedpaths(ctrl, "save", ext)
+            sav = self.firstexistingparent(pot)
+
+            if ope is None:
+                return sav
+
+            if sav is None:
+                if Path(ope).is_dir():
+                    return ope
+                sav = Path(ope).with_suffix(ext[0][1])
+            else:
+                psa = Path(sav)
+                if psa.suffix == '':
+                    sav = (psa/Path(ope).stem).with_suffix(ext[0][1])
+                else:
+                    sav = (psa.parent/Path(ope).stem).with_suffix(psa.suffix)
+
+            self.defaultextension = sav.suffix[1:] if sav.suffix != '' else None
+            return str(sav)
+
+        self.store     = self.access[1]
+        self.access    = _defaultpath, None
+        self.filetypes = "xlsx:*.xlsx"
+        self.title     = "Export stats data to excel"
+
+class CSVExporter:
+    "exports all to csv"
+    @classmethod
+    def addtodoc(cls, mainview, ctrl, doc) -> List[Div]:
+        "creates the widget"
+        dlg = SaveFileDialog(ctrl)
+        div = Div(text = "", width = 0, height = 0)
+
+        figure = mainview.getfigure()
+        figure.tools = (
+            figure.tools
+            + [
+                CustomAction(
+                    action_tooltip = dlg.title,
+                    callback       = CustomJS(
+                        code = 'div.text = div.text + " ";',
+                        args = dict(div = div)
+                    )
+                )
+            ]
+        )
+
+        def _cb(attr, old, new):
+            if new != "":
+                div.text = ""
+                asyncio.create_task(cls._run(dlg, mainview, ctrl, doc))
+
+        div.on_change("text", _cb)
+        return [div]
+
+    def reset(self, *_):
+        "reset all"
+
+    @staticmethod
+    async def _run(dlg: SaveFileDialog, mainview, ctrl, doc):
+        paths = await mainview.threadmethod(dlg.save)
+        if paths is None:
+            return
+
+        @doc.add_next_tick_callback
+        def _toolbarsave():
+            with ctrl.action:
+                dlg.store(paths, False)  # pylint: disable=not-callable
+                path = paths if isinstance(paths, (str, Path)) else paths[0]
+                if mainview.export(path) and Path(path).exists():
+                    startfile(path)
+
 class PeakcallingPlotWidget:
     "Configure the plot"
     _widget:  Button
@@ -514,6 +615,7 @@ class PeakcallingPlotWidget:
             return
 
         with ctrl.action:
+            self._model.tasks.updatediskcache(ctrl, **diff.pop('diskcache'))
             for i, j in diff.items():
                 getattr(ctrl, i).update(getattr(self._model, i), **j)
 
@@ -532,6 +634,8 @@ class PeakcallingPlotWidget:
             {self._body_hairpins(current)}
 
             {self._body_orientations(current)}
+
+            {self._body_diskcache()}
         """.replace("ㄩ", "#")
 
     def _body_axes(self, current):
@@ -629,4 +733,16 @@ class PeakcallingPlotWidget:
             !!    Group name    Selected    Discarded beads
             """
             + "".join(line.format(i = i, j = trackname(j)) for i, j in enumerate(current.roots))
+        )
+
+    @staticmethod
+    def _body_diskcache():
+        return (
+            """
+            ㄩㄩ Disk Cache
+
+            Max cache size (Mb)         %(cachesize)D
+            Expires in (days)           %(cacheduration)D
+            Reset                       %(cachereset)b
+            """
         )
