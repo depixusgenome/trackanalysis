@@ -3,7 +3,7 @@
 "Shows FoV stats"
 from   abc                     import abstractmethod
 from   typing                  import (
-    Dict, List, Tuple, Generator, ClassVar, Set, FrozenSet
+    Dict, List, Tuple, Generator, ClassVar, Set, FrozenSet, Any
 )
 import re
 
@@ -12,14 +12,16 @@ import numpy  as np
 
 from   bokeh                   import layouts
 from   bokeh.models            import (
-    ColumnDataSource, FactorRange, CategoricalAxis, DataRange1d
+    ColumnDataSource, FactorRange, CategoricalAxis, Range1d
 )
 from   bokeh.plotting          import figure, Figure
 
+import version
 from   data.trackops           import trackname
 from   view.colors             import tohex
 from   view.threaded           import ThreadedDisplay
 from   taskcontrol.processor   import ProcessorException
+from   taskstore               import dumps
 from   ._model                 import FoVStatsPlotModel, INVISIBLE, COLS
 from   ._widgets               import JobsStatusBar, JobsHairpinSelect, PeakcallingPlotWidget
 from   ._threader              import BasePlotter, PlotThreader
@@ -37,6 +39,86 @@ def boxtop(val):
     "the 3rd quartile"
     return np.nanpercentile(val, 75)
 
+
+class XlsxReport:
+    "export to xlsx"
+    @classmethod
+    def export(cls, plotter, path) -> bool:
+        "export to xlsx"
+        info = cls.dataframes(plotter)
+        # pylint: disable=abstract-class-instantiated
+        with pd.ExcelWriter(str(path), mode='w') as writer:
+            for j, k in info:
+                j.to_excel(writer, index = False, **k)
+
+        return True
+
+    @classmethod
+    def dataframes(cls, plotter):
+        "return the figure"
+        mdl     = getattr(plotter, '_model')
+        plotfcn = getattr(plotter, '_createplot')
+        procs   = mdl.tasks.processors.values()
+
+        info    = cls._export_plot(mdl, plotfcn(True), procs, {'bead': 'Bead status'})
+        info.extend(cls._export_plot(mdl, plotfcn(False), procs, {}))
+        info.extend(cls._export_git())
+        info.extend(cls._export_tracks(procs))
+        return info
+
+    @staticmethod
+    def _export_git() -> List[Tuple[pd.DataFrame, Dict[str, Any]]]:
+        itms = [
+            ("GIT Version:",      version.version()),
+            ("GIT Hash:",         version.lasthash()),
+            ("GIT Date:",         version.hashdate())
+        ]
+        return [(
+            pd.DataFrame(dict(
+                key   = [i for i, _ in itms],
+                value = [j for _, j in itms],
+            )),
+            dict(header = False, sheet_name = "Tracks")
+        )]
+
+    @staticmethod
+    def _export_tracks(processors) -> List[Tuple[pd.DataFrame, Dict[str, Any]]]:
+        tracks = pd.DataFrame(dict(
+            trackid = list(range(len(processors))),
+            track   = [trackname(i.model[0]) for i in processors],
+            tasks   = [
+                dumps(j.model, ensure_ascii = False, indent = 4, sort_keys = True)
+                for j in processors
+            ]
+        ))
+        return [(
+            tracks, dict(startrow = 5, sheet_name = "Tracks", freeze_panes = (5, len(tracks)))
+        )]
+
+    @staticmethod
+    def _export_plot(
+            mdl, plot, processors, sheetnames
+    ) -> List[Tuple[pd.DataFrame, Dict[str, Any]]]:
+        plot.compute()
+        tracks = np.array([trackname(i.model[0]) for i in processors])
+        cnv    = dict(mdl.theme.xaxistag, **mdl.theme.yaxistag)
+        cnv.pop('bead')
+
+        info: List[Tuple[pd.DataFrame, Dict[str, Any]]] = []
+        for name in ('bead', 'peak'):
+            sheet = getattr(plot, f'_{name}', None)
+            if not isinstance(sheet, pd.DataFrame):
+                continue
+
+            info.append((
+                sheet.assign(track = tracks[sheet.trackid.values]),
+                dict(
+                    header       = [cnv.get(k, k) for k in sheet.columns],
+                    sheet_name   = sheetnames.get(name, f"{name.capitalize()} stats"),
+                    freeze_panes = (1, len(sheet))
+                )
+            ))
+        return info
 
 @PlotThreader.setup
 class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
@@ -67,12 +149,13 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
 
     _reset = None   # added in _Threader.setup
 
+    def gettheme(self):
+        "get the model theme"
+        return self._model.theme
+
     def createplot(self) -> BasePlotter:
         "runs the display"
-        procs = self._model.tasks.processors
-        if getattr(_BeadStatusPlot, '_NAME') in self._model.theme.xaxis:
-            return _BeadStatusPlot(self, procs)
-        return (_HairpinPlot if BasePlotter.ishairpin(procs) else _PeaksPlot)(self, procs)
+        return self._createplot(getattr(_BeadStatusPlot, '_NAME') in self._model.theme.xaxis)
 
     def swapmodels(self, ctrl):
         "swap with models in the controller"
@@ -105,6 +188,14 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
         def _onaxes(old, **_):
             if theme.intersection(old):
                 getattr(self, '_threader').renew(ctrl, 'reset', True)
+
+    def getfigure(self) -> Figure:
+        "return the figure"
+        return self._fig
+
+    def export(self, path) -> bool:
+        "return the figure"
+        return XlsxReport.export(self, path)
 
     def _addtodoc(self, ctrl, doc):
         "sets the plot up"
@@ -144,7 +235,7 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
         fig = figure(
             **self._model.theme.figargs,
             x_range = FactorRange(factors = self._defaults['x']),
-            y_range = DataRange1d(bounds = (0, None), start = 0),
+            y_range = Range1d()
         )
         self._fig = fig
 
@@ -167,6 +258,15 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
         self._fig.extra_x_ranges = {'beadcount': FactorRange(factors = ['0'])}
         self._fig.add_layout(self._topaxis, 'above')
 
+    def _createplot(self, beadstatus: bool) -> BasePlotter:
+        "runs the display"
+        procs = self._model.tasks.processors
+        return (
+            _BeadStatusPlot if beadstatus                   else
+            _HairpinPlot    if BasePlotter.ishairpin(procs) else
+            _PeaksPlot
+        )(self, procs)
+
 class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
     parent:    FoVStatsPlot
 
@@ -179,7 +279,7 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
 
     def _reset(self):
         "resets the data"
-        self._compute()
+        self.compute()
         xaxis, yaxis, info = self._select()
         if info.shape[0] == 0:
             stats                         = self._defaults
@@ -205,6 +305,8 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
         yield (self._stats,        dict(data       = stats))
         yield (self._points,       dict(data       = points))
         yield (self._fig.yaxis[0], dict(axis_label = self._model.theme.yaxistag[yaxis]))
+
+        yield (self._fig.y_range, self.__yrange(stats, points))
         yield (
             self._fig.xaxis[1],
             dict(axis_label = ' - '.join(self._model.theme.xaxistag[i] for i in xaxis))
@@ -271,38 +373,35 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
         pass
 
     @abstractmethod
-    def _compute(self):
-        pass
+    def compute(self):
+        "compute base dataframes"
 
     def __bottomfactors(self, xaxis, *dfs) -> np.ndarray:
+        "fixes grouping of displayed statistics to 3"
         for stats in dfs:
             stats['x'] = tmp = np.array(list(stats['x']), dtype = np.str_)
-            if len(tmp.shape) > 1:
-                stats['x']    = np.zeros(len(tmp), dtype = np.object_)
-                stats['x'][:] = [tuple(i) for i in tmp]
+            if len(tmp.shape) == 1:
+                stats['x'] = tmp = np.hstack((tmp[:, None],) + (np.zeros_like(tmp)[:, None],) * 2)
+            elif tmp.shape[1] < 3:
+                stats['x'] = tmp = np.hstack((
+                    tmp[:,0][:, None], np.zeros_like(tmp[:,0])[:,None], tmp[:,1][:, None]
+                ))
+
+            stats['x']    = np.zeros(len(tmp), dtype = np.object_)
+            stats['x'][:] = [tuple(i) for i in tmp]
 
         ind = next((i for i, j in enumerate(xaxis) if j == 'track'), None)
         if ind is not None:
-            if len(xaxis) == 1:
-                tmp = set()
-                for stats in dfs:
-                    tmp.update(stats['x'])
+            tmp = set()
+            for stats in dfs:
+                tmp.update(i[ind] for i in stats['x'])
 
-                cnv = {np.str_(i): j for i, j in self._model.theme.tracknameconversion(tmp).items()}
-                if cnv:
-                    for stats in dfs:
-                        stats['x'][:] = [cnv.get(i, i) for i in stats['x']]
-            else:
-                tmp = set()
+            cnv = {np.str_(i): j for i, j in self._model.theme.tracknameconversion(tmp).items()}
+            if cnv:
                 for stats in dfs:
-                    tmp.update(i[ind] for i in stats['x'])
-
-                cnv = {np.str_(i): j for i, j in self._model.theme.tracknameconversion(tmp).items()}
-                if cnv:
-                    for stats in dfs:
-                        stats['x'][:] = [
-                            (*i[:ind], cnv.get(i[ind], i[ind]), *i[ind+1:]) for i in stats['x']
-                        ]
+                    stats['x'][:] = [
+                        (*i[:ind], cnv.get(i[ind], i[ind]), *i[ind+1:]) for i in stats['x']
+                    ]
         return dfs[0]['x'] if len(dfs) else np.empty(0)
 
     @staticmethod
@@ -314,17 +413,50 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
         if len(bottom) == 0:
             return []
 
-        out:  List[str]      = []
-        done: Dict[str, int] = {i: 0 for i in items}
-        for i in items:
-            out.append(i+"\u2063"*done[i])
-            done[i] += 1
-
-        if isinstance(bottom[0], str):
-            return out
-        return [(*j[:-1], i) for i, j in zip(out, bottom)]
+        arr = np.vstack([
+            *(np.array([i[ind] for i in bottom]) for ind in range(len(bottom[0])-1)),
+            np.array([j+'\u2063'*i for i, j in enumerate(items)])
+        ]).T
+        for ind in range(arr.shape[1]-1):
+            vect = arr[:, ind]
+            for i, j in enumerate(np.unique(vect)):
+                vect[vect == j] = i*'\u2063'
+        return [tuple(i) for i in arr]
 
     __NB = re.compile(r"^\d\+-.*")
+
+    def __yrange(self, stats: pd.DataFrame, points: pd.DataFrame):
+        start = np.nanmin(np.concatenate([
+            points['y'], stats['bottom'], stats['boxcenter'] - stats['boxheight'] * .5
+        ]))
+        end  = np.nanmax(np.concatenate([
+            points['y'], stats['top'], stats['boxcenter'] + stats['boxheight'] * .5
+        ]))
+        rng   = (end - start) * 0.05
+        if start != 0.:
+            start -= rng
+        if end != 100.:
+            end += rng
+
+        info = dict(
+            reset_start = start,
+            reset_end   = end,
+            start       = (
+                start if self._fig.y_range.start >= end else
+                max(self._fig.y_range.start, start)
+            ),
+            end        = (
+                end if self._fig.y_range.end <= start else
+                max(self._fig.y_range.end, end)
+            )
+        )
+
+        if (
+                (self._fig.y_range.end - self._fig.y_range.start) < rng * .3
+                or (self._fig.y_range.end - self._fig.y_range.start) * .3 > rng
+        ):
+            info.update(start = start, end = end)
+        return info
 
     def __colors(self, xaxis, stats: pd.DataFrame):
         cnf    = self._model.theme
@@ -499,7 +631,8 @@ class _HairpinPlot(_WhiskerBoxPlot):
         yaxis = self._model.theme.yaxis
         return self._find_df(xaxis, yaxis)
 
-    def _compute(self):
+    def compute(self):
+        "compute base dataframes"
         perpeakdf:   List[pd.DataFrame] = [self._peak] if hasattr(self, '_peak') else []
         perbeaddf:   List[pd.DataFrame] = [self._bead] if hasattr(self, '_bead') else []
         perpeakcols: List[str]          = list({
@@ -519,9 +652,12 @@ class _HairpinPlot(_WhiskerBoxPlot):
                 perbeaddf.append(info[perbeadcols])
                 perpeakdf.append(
                     self._compute_update(
-                        (
-                            info.peaks.values[0][perpeakcols]
-                            .assign(**{i: info[i].values[0] for i in perbeadcols})
+                        self.resetstatus(
+                            self._model.theme.closest,
+                            (
+                                info.peaks.values[0][perpeakcols]
+                                .assign(**{i: info[i].values[0] for i in perbeadcols})
+                            )
                         ),
                         info.stretch.values[0]
                     )
@@ -540,11 +676,10 @@ class _HairpinPlot(_WhiskerBoxPlot):
             return
 
         self._peak = self._peak.assign(**dict.fromkeys(
-            (
-                *(f'f{i}perbd' for i in 'pn'),
-                *(j+i for i in ('tp', 'fn') for j in ('', 'top', 'bottom'))
-            ),
-            0.0
+            (f'f{i}perbp' for i in 'pn'), 0.0
+        ))
+        self._bead = self._bead.assign(**dict.fromkeys(
+            (j+i for i in ('tp', 'fn') for j in ('', 'top', 'bottom')), 0.0
         ))
 
         self._peak.set_index(['trackid', 'bead'], inplace = True)
@@ -604,7 +739,8 @@ class _PeaksPlot(_WhiskerBoxPlot):
             yaxis = 'hybridisationrate'
         return self._find_df(xaxis, yaxis)
 
-    def _compute(self):
+    def compute(self):
+        "compute base dataframes"
         cols: List[str] = list({
             i.key for i in COLS if i.raw and not i.fit and i.key != 'nblockages'
         })
@@ -645,7 +781,8 @@ class _BeadStatusPlot(_WhiskerBoxPlot):
         xaxis = [i for i in self._model.theme.xaxis if i in self._XAXIS]
         return self._find_df(xaxis, self._YAXIS)
 
-    def _compute(self):
+    def compute(self):
+        "compute base dataframes"
         out: List[pd.DataFrame] = [self._bead] if hasattr(self, '_bead') else []
 
         itr = self._computations('_bead', (Exception, pd.DataFrame), False)

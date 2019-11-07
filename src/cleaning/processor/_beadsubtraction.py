@@ -4,6 +4,7 @@
 from   typing                       import (
     List, Iterable, Union, Dict, Optional, Tuple, cast
 )
+from   copy                         import copy as shallowcopy
 from   functools                    import partial
 from   itertools                    import repeat
 
@@ -88,7 +89,17 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
         task  = self.task
 
         next(iter(frame.keys()))  # unlazyfy # type: ignore
-        data = cast(Dict, frame.data)
+
+        # Discard the FixedBeadDetectionProcessor from the
+        # frame as it will created an exception which is
+        # meaningless in this context
+        frame              = shallowcopy(frame)
+        frame.data         = shallowcopy(frame.data)
+        frame.data.actions = [
+            i for i in frame.data.actions if 'FixedBeadDetectionProcessor' not in str(i)
+        ]
+        data               = cast(Dict, frame.data)
+
         itr  = (cast(Iterable[int], task.beads) if key is None else
                 cast(Iterable[int], list(zip(task.beads, repeat(key)))))
         if len(task.beads) == 0:

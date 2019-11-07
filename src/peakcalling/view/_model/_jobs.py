@@ -72,16 +72,17 @@ class JobModel:
         emitter:
             in charge of launching start & end events
         """
-        return _JobRunner(self).dolaunch(processors, _JobEventEmitter(emitter))
+        return _JobRunner(self).dolaunch(processors, _JobEventEmitter(emitter, processors))
 
 class _JobEventEmitter(JobEventNames):
     """Deals with emitting job-related events"""
     _evt: ContextManager
 
-    def __init__(self, ctrl = None):
+    def __init__(self, ctrl = None, processors: Optional[List[TaskCacheList]] = None):
         super().__init__(ctrl)
-        self.ctrl  = getattr(ctrl, '_ctrl', ctrl)
-        self.idval = None
+        self.ctrl       = getattr(ctrl, '_ctrl', ctrl)
+        self.idval      = None
+        self.processors = list(processors) if processors else []
 
     def __call__(self, idval):
         self.idval = idval
@@ -93,7 +94,7 @@ class _JobEventEmitter(JobEventNames):
             self.ctrl.display.handle(
                 self.eventjobstart,
                 self.ctrl.emitpolicy.outasdict,
-                {'idval': self.idval}
+                {'idval': self.idval, 'processors': list(self.processors)}
             )
             self._evt = self.ctrl.display(self.eventname, args = {})
             return self._evt.__enter__()
@@ -106,7 +107,7 @@ class _JobEventEmitter(JobEventNames):
             self.ctrl.display.handle(
                 self.eventjobstop,
                 self.ctrl.emitpolicy.outasdict,
-                {'idval': self.idval}
+                {'idval': self.idval, 'processors': list(self.processors)}
             )
             return out
         return None
