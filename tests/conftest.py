@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Imported by pytest: adds 2 fixtures"
+from   pathlib import Path
 import pytest
 
 pytest.register_assert_rewrite("tests.testconfig")
@@ -11,6 +12,13 @@ from tests.testingcore             import utpath         # noqa
 from tests.testutils.modulecleanup import modulecleanup  # noqa
 from tests.testutils               import needsdisplay   # noqa
 from tests.testutils.recording     import record, pytest_addoption  # noqa
+
+def pytest_collection_modifyitems(items):
+    "sort tests such that integration tests come last and scripting last of all"
+    items.sort(key = lambda x: (
+        int('integration' not in x.keywords.keys())
+        + 2*int('scripting' in Path(str(x.fspath)).parts if x.fspath else 0)
+    ))
 
 @pytest.fixture(params = [pytest.param("", marks = needsdisplay)])
 def bokehaction(monkeypatch):

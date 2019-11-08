@@ -30,6 +30,7 @@ def appversion() -> int:
 
     if '-' in strvers:
         strvers = strvers[:strvers.find('-')]
+    strvers = strvers.replace('+', '')
 
     return sum(int(i if i else 0)*j for i, j in zip(strvers.split('.'), (1000, 1)))
 
