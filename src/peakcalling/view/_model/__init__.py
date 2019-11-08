@@ -6,7 +6,8 @@ from ._control   import TasksModelController
 from ._jobs      import STORE
 from ._columns   import COLS, INVISIBLE, getcolumn
 from ._beadsplot import (
-    BasePlotConfig, BeadsScatterPlotStatus, BeadsScatterPlotConfig, BeadsScatterPlotModel
+    BasePlotConfig, BeadsScatterPlotStatus, BeadsScatterPlotConfig, BeadsScatterPlotModel,
+    BeadsPlotTheme
 )
 from ._statsplot import FoVStatsPlotModel, AxisConfig
-from ._tasks     import Processors, TasksDict
+from ._tasks     import Processors, TasksDict, keytobytes, keyfrombytes

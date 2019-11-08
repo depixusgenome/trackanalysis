@@ -9,7 +9,7 @@ import  numpy     as     np
 
 # pylint: disable=import-error,no-name-in-module
 from    legacy    import fov as readfov
-from    ._base    import TrackIO, globfiles, PATHTYPES
+from    ._base    import TrackIO, globfiles, PATHTYPES, TrackIOError
 if TYPE_CHECKING:
     from    ._base import Track
 
@@ -99,7 +99,7 @@ class Handler:
         """
         Checks that a path exists without actually opening the track.
 
-        It raises an IOError in case the provided path does not exist or
+        It raises an TrackIOError in case the provided path does not exist or
         cannot be handled.
 
         Upon success, it returns a handler with the correct protocol for this path.
@@ -110,7 +110,7 @@ class Handler:
 
         if isinstance(paths, (str, Path)):
             if not Path(paths).exists():
-                raise IOError("Could not find path: " + str(paths), "warning")
+                raise TrackIOError("Could not find path: " + str(paths), "warning")
         else:
             paths = tuple(str(i) for i in paths)
             if getattr(getattr(track,"axis", None), 'value', 'Z')[0] != "Z":
@@ -118,10 +118,10 @@ class Handler:
             for i in paths:
                 if '*' in i:
                     if next(globfiles(i), None) is None:
-                        raise IOError("Path yields no file: " + i, "warning")
+                        raise TrackIOError("Path yields no file: " + i, "warning")
 
                 elif not Path(i).exists():
-                    raise IOError("Could not find path: " + i, "warning")
+                    raise TrackIOError("Could not find path: " + i, "warning")
 
         for caller in _CALLERS():
             tmp = caller.check(paths, **opts)
@@ -129,7 +129,7 @@ class Handler:
                 res = cls(tmp, caller)
                 break
         else:
-            raise IOError("Unknown file format in: {}".format(paths), "warning")
+            raise TrackIOError("Unknown file format in: {}".format(paths), "warning")
 
         return res
 
@@ -189,7 +189,7 @@ def checkpath(track, **opts) -> Handler:
     """
     Checks that a path exists without actually opening the track.
 
-    It raises an IOError in case the provided path does not exist or
+    It raises an TrackIOError in case the provided path does not exist or
     cannot be handled.
 
     Upon success, it returns a handler with the correct protocol for this path.

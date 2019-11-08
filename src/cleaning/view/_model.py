@@ -5,6 +5,7 @@ from typing                         import List, Dict, Tuple, Any
 import numpy as np
 
 # pylint: disable=unused-import
+from data.trackops                       import trackname
 from eventdetection.processor.__config__ import ExtremumAlignmentTask
 from model.plots                         import PlotAttrs, PlotTheme, PlotModel, PlotDisplay
 from taskcontrol.modelaccess             import TaskPlotModelAccess, TaskAccess
@@ -172,25 +173,43 @@ class FixedBeadDetectionModel:
 
         @ctrl.tasks.observe
         @ctrl.tasks.hashwith(self.store)
-        def _onopentrack(calllater = None, isarchive = False, **_):
-            if not self.config.automate or isarchive:
-                return
+        def _onopeningtracks(controller, models, **_):
+            cls  = BeadSubtractionTask
+            info = dict(self.store.data)
 
-            @calllater.append
-            def _addsubtracted(*_1, **_2):
-                _onchangeconfig()
-                root  = self.tasksmodel.display.roottask
-                assert root is not None
+            for i, (isarchive, proc) in enumerate(models):
+                name = trackname(proc.model[0])
 
-                beads = [i[-1] for i in self.store.data.get(root, ())]
-                ctrl.tasks.addtask(
-                    root,
-                    BeadSubtractionTask(beads = beads),
-                    index = self.tasksmodel.config.defaulttaskindex(
-                        self.tasksmodel.display.tasklist,
-                        BeadSubtractionTask,
+                if isarchive or not self.config.automate:
+                    continue
+
+                track               = next(iter(proc.run())).track
+                info[proc.model[0]] = self.config(track.beads)
+                if not len(info[proc.model[0]]):
+                    ctrl.display.update(
+                        "message",
+                        message = (
+                            f"No fixed beads to subtract: {name} [{i}/{len(models)}]",
+                            "normal"
+                        )
+                    )
+                    continue
+
+                ctrl.display.update(
+                    "message",
+                    message = (
+                        f"Subtracting fixed beads: {name} [{i}/{len(models)}]",
+                        "normal"
                     )
                 )
+                proc.add(
+                    cls(beads = [i[-1] for i in info[proc.model[0]]]),
+                    controller.processortype(cls),
+                    index = self.tasksmodel.config.defaulttaskindex(proc.model, cls)
+                )
+
+            if len(info) != len(self.store.data):
+                ctrl.display.update(self.store, data = info)
 
         @ctrl.theme.observe(self.tasksmodel.config)
         @ctrl.display.observe(self.tasksmodel.display)

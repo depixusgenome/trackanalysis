@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Task IO module"
-from typing                import Union, Iterable, Tuple, Dict, cast
+from typing                import Union, Iterable, Tuple, Dict, List, cast
 from pathlib               import Path
 from itertools             import chain
 from functools             import partial
@@ -10,7 +10,7 @@ from copy                  import deepcopy
 from control.decentralized import Indirection
 from data.trackio          import instrumenttype, MuWellsFilesIO
 from data.tracksdict       import TracksDict
-from taskmodel             import TrackReaderTask
+from taskmodel             import TrackReaderTask, Task
 from taskmodel.application import TasksConfig, TasksDisplay, TaskIOTheme
 from utils.logconfig       import getLogger
 LOGS     = getLogger(__name__)
@@ -50,6 +50,7 @@ def topath(path:Union[PathType, Iterable[PathType]]) -> Tuple[Path, ...]:
 class TrackIO(TaskIO):
     "Deals with reading a track file"
     EXT: Tuple[str, ...] = ('trk',)
+
     def open(self, path:OpenType, model:tuple):
         "opens a track file"
         if len(model):
@@ -67,6 +68,7 @@ class ConfigTrackIO(TrackIO):
     "Adds an alignment to the tracks per default"
     _config = Indirection()
     _io     = Indirection()
+
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
         self._ctrl   = ctrl
@@ -95,6 +97,7 @@ class _GrFilesIOMixin:
     EXT: Tuple[str, ...] = TrackIO.EXT+('gr',)
     CGR                  = '.cgr'
     _display             = Indirection()
+
     def __init__(self, ctrl):
         self._ctrl    = ctrl
         self._display = TasksDisplay()
@@ -127,6 +130,7 @@ class _GrFilesIOMixin:
 class GrFilesIO(TrackIO, _GrFilesIOMixin):
     "Adds an alignment to the tracks per default"
     EXT = _GrFilesIOMixin.EXT
+
     def __init__(self, *_):
         TrackIO.__init__(self, *_)
         _GrFilesIOMixin.__init__(self, *_)
@@ -141,6 +145,7 @@ class GrFilesIO(TrackIO, _GrFilesIOMixin):
 class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
     "Adds an alignment to the tracks per default"
     EXT = _GrFilesIOMixin.EXT
+
     def __init__(self, *_):
         ConfigTrackIO.__init__(self, *_)
         _GrFilesIOMixin.__init__(self, *_)
@@ -155,6 +160,7 @@ class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
 class ConfigMuWellsFilesIO(ConfigTrackIO):
     "Adds an alignment to the tracks per default"
     EXT = ('txt',)
+
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
         ctrl.theme.add(MuWellsFilesIO.DEFAULT)
@@ -212,14 +218,32 @@ class ConfigMuWellsFilesIO(ConfigTrackIO):
 
         return super().open(trks+lias, _)
 
-def openmodels(openers, task, tasks):
+def openmodels(
+        openers, task, tasks, ext: str = '**/*.trk', ignore = 'ramp'
+) -> List[Tuple[bool, Tuple[Task,...]]]:
     "opens all models"
+    if (
+            isinstance(task, (str, Path)) and Path(task).is_dir()
+            and not any(Path(task).glob("*.cgr"))
+            and not any(Path(task).glob("*.gr"))
+    ):
+        task = {i.stem: str(i) for i in Path(task).glob(ext) if ignore not in i.stem}
+
+    elif (
+            isinstance(task, (list, tuple))
+            and not any(Path(i).suffix == f'.{GrFilesIO.EXT[-1]}' for i in task)
+    ):
+        task = {Path(i).stem: str(i) for i in task}
+
     if isinstance(task, dict):
-        models = [] # type: list
+        models: list = []
         for trk in TracksDict(**cast(dict, task)).values():
-            for mdl in openmodels(openers, trk.path, tasks):
+            for isarch, mdl in openmodels(openers, trk.path, tasks):
                 trk.path = mdl[0].path
-                models.append((type(mdl[0])(trk, copy = mdl[0].copy),) + mdl[1:])
+                models.append((
+                    isarch,
+                    (type(mdl[0])(trk, copy = mdl[0].copy),) + mdl[1:]
+                ))
         if len(models) == 0:
             raise IOError(f"Couldn't open: {task}", 'warning')
         return models
@@ -227,7 +251,7 @@ def openmodels(openers, task, tasks):
     for obj in openers:
         models = obj.open(task, tasks)
         if models is not None:
-            return models
+            return [(isarchive(task), i) for i in models]
 
     path = getattr(task, 'path', task)
     if path is None or (isinstance(path, (list, tuple))) and len(path) == 0:
@@ -239,3 +263,13 @@ def openmodels(openers, task, tasks):
         msg  = f"Couldn't open: {Path(str(path)).name}"
 
     raise IOError(msg, 'warning')
+
+def isarchive(task, archiveext = ('.xlsx', '.ana')) -> bool:
+    "whether the argument is an archive path"
+    return (
+        isinstance(task, (Path, str, tuple, list))
+        and any(
+            str(task if isinstance(task, (Path, str)) else task[-1]).endswith(i)
+            for i in archiveext
+        )
+    )

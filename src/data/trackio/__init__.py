@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=arguments-differ
 "Loading and save tracks"
-from ._base     import PATHTYPE, PATHTYPES, TrackIO
+from ._base     import PATHTYPE, PATHTYPES, TrackIO, TrackIOError
 from ._pickle   import PickleIO, savetrack
 from ._legacy   import LegacyTrackIO
 from ._legacygr import LegacyGRFilesIO

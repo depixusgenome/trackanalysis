@@ -13,20 +13,25 @@ through the advanced menu.
 
 ### Statistics Tab
 
-Statistics over multiple fields of view are now stored to the disk and recalled
-rather than recomputed upon restarting the application. The storage is
-self-managed, using a hard limit of 100 Mb and discarding any month-old data.
+Statistics over multiple fields of view are now stored to the disk.  The
+storage is self-managed, using a hard limit of 100 Mb and discarding any
+month-old data. The *Storage* button allows loading stats from within the cache
+as well as deleting them individually. **Beware** to check the right column for
+the right action!
 
-The data used for creating the lower plot can be exported to excel using the *save* button on top of the plot. The excel file will contain four sheets: 
+The data used for creating the lower plot can be exported to excel using the
+*save* button on top of the plot. The excel file will contain four sheets: 
 
 * *Bead status* is the list of all non-subtracted beads with their status: fixed, ...
-* *Bead stats* is a number of statistics on each bead without error.
-* *Peak stats* is a number of statistics on each blockage for each bead without error as well as each missing binding position.
+* *Bead statistics* is a number of statistics on each bead without error.
+* *Peak statistics* is a number of statistics on each blockage for each bead without
+  error as well as each missing binding position.
 * *Tracks* contains the settings, version number, ...,  when the file was created. 
+
 
 ## cycles_v7.0
 
-* 2019-10-30 16:10:20 +0000  (tag: cycles_v7.0)
+* 2019-10-30 16:07:58 +0100  (tag: cycles_v7.0)
 
 ### Hairpin Tab
 

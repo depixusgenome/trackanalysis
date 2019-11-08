@@ -109,7 +109,7 @@ class TaskPlotModelAccess(PlotModelAccess):
         "the current instrument type"
         track = self.rawtrack
         return (
-            self._tasksdisplay.instrument if track is None else
+            self._tasksconfig.instrument if track is None else
             track.instrument['type'].name
         )
 

@@ -665,11 +665,25 @@ def test_statsplot_view_hpins6(fovstatshairpin):
     assert fig.yaxis[0].axis_label == 'missing (bp⁻¹)'
     assert fig.x_range.factors == list(zip(['+', '\u2063-'], repeat(""), repeat("")))
 
+@integrationmark
+def test_diskcache_view(bokehaction):
+    "test the view"
+    server, fig = _server(bokehaction, 'FoVStatsPlot', evt = True)
+    server.cmd(lambda: None, rendered = _EVT)
+    modal = server.selenium.modal("//span[@class='icon-dpx-download2']", True)
+    sz    = len(fig.renderers[0].data_source.data['boxheight'])
+    assert sz > 0
+    with modal:
+        modal["//input[@name='items[0].loaded']"].click()
+    server.wait()
+    assert len(fig.renderers[0].data_source.data['boxheight']) == 1
+    with modal:
+        modal["//input[@name='items[0].loaded']"].click()
+    server.wait()
+    assert len(fig.renderers[0].data_source.data['boxheight']) == sz
+
 
 if __name__ == '__main__':
-    from pathlib import Path
-    test_statsplot_info_hpins(Path("/tmp/yyy"))
-    test_statsplot_info_simple(Path("/tmp/xxx"))
     from tests.testingcore.bokehtesting import BokehAction
     with BokehAction(None) as bka:
-        test_beadsplot(bka)
+        test_diskcache_view(bka)

@@ -11,7 +11,7 @@ from    concurrent.futures import ThreadPoolExecutor
 from    copy               import copy as shallowcopy
 from    pathlib            import Path
 import  pickle
-from    ._base             import TrackIO, PATHTYPE, PATHTYPES, DictType
+from    ._base             import TrackIO, PATHTYPE, PATHTYPES, DictType, TrackIOError
 if TYPE_CHECKING:
     from    ._base         import Track
 
@@ -92,7 +92,7 @@ def _savetrack(args):
         try:
             PickleIO.save(args[1], args[2])
         except Exception as exc:
-            raise IOError(f"Could not save {args[2].path} [{args[2].key}]") from exc
+            raise TrackIOError(f"Could not save {args[2].path} [{args[2].key}]") from exc
     else:
         PickleIO.save(args[1], args[2])
     new = type(args[2]).__new__(type(args[2])) # type: ignore

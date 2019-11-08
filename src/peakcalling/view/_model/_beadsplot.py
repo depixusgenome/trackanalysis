@@ -4,8 +4,10 @@
 from dataclasses   import dataclass, field
 from typing        import Dict, Any, Set, Tuple, Union, Optional, Iterable, List
 
+import numpy as np
+
 from cleaning.names import NAMES as _ExceptionNames
-from model.plots          import PlotAttrs, defaultfigsize
+from model.plots          import PlotAttrs, defaultfigsize, PlotTheme
 from taskmodel            import RootTask
 from taskmodel.processors import TaskCacheList
 from tasksequences        import StretchFactor
@@ -15,6 +17,51 @@ from ._columns            import getcolumn, INVISIBLE
 
 NAME: str = 'peakcalling.view.beads'
 
+
+class BeadsPlotTheme(PlotTheme):
+    "plot theme"
+    def __init__(self, name):
+        super().__init__(name = name)
+        self.boundsdelta = .3
+
+    def newbounds(self, curr, arr, force):
+        "Sets the range boundaries"
+        if len(arr) == 0:
+            return dict(start        = 0., end          = 1.,
+                        max_interval = 1., min_interval = 1.,
+                        reset_start  = 0., reset_end    = 1.)
+
+        vmin = np.nanmin(arr)
+        if np.isnan(vmin):
+            vmin = 0.
+
+        vmax = np.nanmax(arr)
+        if np.isnan(vmax):
+            vmax = vmin + 1.
+
+        rng = max(1e-5, (vmax-vmin))
+        rng = rng*self.overshoot*.5
+        if vmax != 0.:
+            vmin -= rng
+        if vmax != 100.:
+            vmax += rng
+
+        info = dict(
+            max_interval = rng*(1.+self.boundsovershoot),
+            min_interval = rng*self.overshoot,
+            start        = vmin if curr.start >= vmax else max(curr.start, vmin),
+            end          = vmax if curr.end <= vmin else max(curr.end, vmax),
+            reset_start  = vmin,
+            reset_end    = vmax
+        )
+
+        if (
+                force
+                or (curr.end - curr.start) < rng * self.boundsdelta
+                or (curr.end - curr.start) * self.boundsdelta > rng
+        ):
+            info.update(start = vmin, end = vmax)
+        return info
 
 @dataclass  # pylint: disable=too-many-instance-attributes
 class BasePlotConfig:

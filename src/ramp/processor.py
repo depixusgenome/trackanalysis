@@ -11,6 +11,7 @@ import pandas            as pd
 
 from   data                  import Track
 from   data.views            import Cycles, Beads
+from   data.trackio          import TrackIOError
 from   data.trackops         import trackname
 from   signalfilter          import nanhfsigma
 from   taskcontrol.processor import Processor, ProcessorException
@@ -188,7 +189,7 @@ class RampStatsTask(Task):
             for i in cycles.keys():
                 try:
                     yield from self.eventstats(cycles, i, cycles[i])
-                except ProcessorException:
+                except (TrackIOError, ProcessorException):
                     continue
         else:
             for i in cycles.keys():

@@ -3,7 +3,7 @@
 # pylint: disable=missing-docstring,protected-access
 "testing peakcalling DiskCache"
 from pathlib import Path
-from peakcalling.view._model._diskcache  import DiskCacheConfig
+from peakcalling.view._model._diskcache  import DiskCacheConfig, VERSION, VERSION_KEY, DiskCache
 from taskcontrol.taskcontrol        import create
 from taskmodel.track                import UndersamplingTask, TrackReaderTask
 from taskmodel.dataframe            import DataFrameTask
@@ -19,6 +19,7 @@ def test_diskcache_insert(tmp_path):
         procs.data.setcache(DataFrameTask, {'index': i})
 
     cnf = DiskCacheConfig(path = str(tmp_path/"cache"))
+    cnf.clear()
     cnf.insert(tasks, 10001)
     assert cnf.get(tasks[0], 10001)['index'] == 0
     assert cnf.get(tasks[1], 10001)['index'] == 1
@@ -61,7 +62,9 @@ def test_diskcache_clear(tmp_path):
     assert Path(cnf.path).exists()
 
     cnf.clear(complete = True)
-    assert not Path(cnf.path).exists()
+    with DiskCache(cnf.path) as cache:
+        assert sum(1 for _ in cache.iterkeys()) == 1
+        assert cache.get(VERSION_KEY) == VERSION
 
     for i, procs in enumerate(tasks):
         procs.data.setcache(DataFrameTask, {'index': -1})
@@ -86,5 +89,5 @@ def test_diskcache_clear(tmp_path):
 if __name__ == '__main__':
     from shutil  import rmtree
     rmtree(Path("/tmp/discache"), ignore_errors = True)
-    test_diskcache_clear(Path("/tmp/discache"))
+    test_diskcache_insert(Path("/tmp/discache"))
     rmtree(Path("/tmp/discache"), ignore_errors = True)

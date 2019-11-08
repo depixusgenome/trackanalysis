@@ -28,7 +28,7 @@ NAME   = "CyclesApp"
 class HybridStatTheme(TabsTheme):
     "HybridStatTheme"
     def __init__(self):
-        super().__init__("cleaning", PANELS)
+        super().__init__("statistics", PANELS)
 
 @initsubclass("HybridStat:Tabs", PANELS, (CleaningView, PeaksPlotView))
 class HybridStatView(TabsView[HybridStatTheme]):

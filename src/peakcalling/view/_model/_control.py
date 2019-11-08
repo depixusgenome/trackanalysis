@@ -64,18 +64,24 @@ class TasksModelController(JobEventNames):
             self.swapmodels(ctrl)
             self.observe(ctrl)
 
-    def updatediskcache(self, ctrl, reset = False, **kwa):
+    def updatediskcache(self, ctrl, reset = False, processors = None, **kwa):
         "update the disk cache config"
         old = self.diskcache.maxsize
         if kwa:
             ctrl.theme.update(self.diskcache, **kwa)
 
+        if processors is None:
+            processors = []
+
         if reset:
             procs = list(self.processors.values())
-            if self.diskcache.maxsize != 0:
-                self.diskcache.clear(processors = procs)
+            processors.extend(procs)
+
             for i in procs:
                 self._tasks.tasks.clear(i)
+
+        if processors and self.diskcache.maxsize > 0:
+            self.diskcache.clear(processors = processors)
 
         if reset or (kwa.get('maxsize', 0) > 0 and old == 0):
             self._relaunch(ctrl)

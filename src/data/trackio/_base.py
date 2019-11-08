@@ -62,3 +62,11 @@ class TrackIO(ABC):
     @abstractmethod
     def instrumentinfo(path:str) -> Dict[str, Any]:
         "return the instrument type"
+
+class TrackIOError(IOError):
+    "IO Error created in this module"
+
+    @staticmethod
+    def errkey() -> str:
+        "a key for gui"
+        return "io"
