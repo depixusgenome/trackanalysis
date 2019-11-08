@@ -262,10 +262,9 @@ class BaseTaskController(Controller):  # pylint: disable=too-many-public-methods
             task = cast(RootTask, tasks[0])
 
         lst: List[Tuple[bool, Tuple[Task,...]]] = (
-            openmodels(self._openers, task, tasks) if not isinstance(task, RootTask) else
-            [(False, (task,))] if len(tasks) == 0    else
-            [(True, tasks)]    if tasks[0] is task   else
-            []
+            [(True,  tasks)]   if len(tasks)                 else
+            [(False, (task,))] if isinstance(task, RootTask) else
+            openmodels(self._openers, task, tasks)
         )
         ctrls: List[Tuple[bool, ProcessorController]] = [
             (isarch, create(elem, processors = self.__processors))
