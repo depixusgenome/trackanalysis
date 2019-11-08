@@ -12,6 +12,7 @@ import asyncio
 
 import pandas as pd
 
+from data.trackio           import TrackIOError
 from taskcontrol.processor  import ProcessorException
 from taskmodel.dataframe    import DataFrameTask
 from taskmodel.processors   import TaskCacheList
@@ -145,7 +146,7 @@ class _JobRunner(JobModel):
 
     def syncrun(self, processors: List[TaskCacheList]):
         """
-        runs all processors sequenctially
+        runs all processors sequentially
 
         Parameters
         ----------
@@ -169,7 +170,7 @@ class _JobRunner(JobModel):
                 for i in keys:
                     try:
                         store[i] = frame[i]
-                    except ProcessorException as exc:
+                    except (TrackIOError, ProcessorException) as exc:
                         store[i] = exc
 
     async def run(
@@ -307,11 +308,16 @@ class _JobRunner(JobModel):
             events: Callable[[TaskCacheList, List[int]], None],
             procs:  TaskCacheList
     ) -> Iterator[Set[int]]:
-        keys  = set(next(iter(procs.run()), {}).keys())
         cache = procs.data.getcache(DataFrameTask)()
+
+        try:
+            keys = set(next(iter(procs.run()), {}).keys())
+        except TrackIOError:
+            keys = set(cache if cache else ())
+
         if cache:
-            events(procs, list(cache))
             keys -= set(cache)
+            events(procs, list(cache))
 
         if keys:
             lkeys = sorted(keys)

@@ -13,7 +13,7 @@ import  numpy              as     np
 
 # pylint: disable=import-error,no-name-in-module
 from    legacy             import readgr, instrumenttype  as _legacyinstrumenttype
-from    ._base             import TrackIO, PATHTYPE, PATHTYPES, globfiles
+from    ._base             import TrackIO, PATHTYPE, PATHTYPES, globfiles, TrackIOError
 from    ._legacy           import LegacyTrackIO
 
 class LegacyGRFilesIO(TrackIO):
@@ -49,7 +49,7 @@ class LegacyGRFilesIO(TrackIO):
                 return cls.__findtrk(fname, allpaths[1])
 
             if not allpaths[0].exists():
-                raise IOError("Could not find path: " + str(allpaths[0]), "warning")
+                raise TrackIOError("Could not find path: " + str(allpaths[0]), "warning")
 
             return allpaths
 
@@ -70,13 +70,16 @@ class LegacyGRFilesIO(TrackIO):
         "opens the directory"
         output = LegacyTrackIO.open(paths[0], **kwa)
         if output is None:
-            raise IOError(f"Could not open track '{paths[0]}'.\n"
-                          "This could be because of a *root* mounted samba path")
+            raise TrackIOError(
+                f"Could not open track '{paths[0]}'.\n"
+                "This could be because of a *root* mounted samba path"
+            )
         remove = set(i for i in output if isinstance(i, int))
 
         if len(paths) == 2 and Path(paths[1]).is_dir():
-            itr : Iterator[Path] = iter(i for i in Path(paths[1]).iterdir()
-                                        if 'z(t)bd' in i.stem.lower())
+            itr: Iterator[Path] = iter(
+                i for i in Path(paths[1]).iterdir() if 'z(t)bd' in i.stem.lower()
+            )
         else:
             itr = (Path(i) for i in paths[1:])
 
@@ -90,7 +93,7 @@ class LegacyGRFilesIO(TrackIO):
             if grpath.suffix == cls.GREXT:
                 remove.discard(cls.__update(str(grpath), output))
 
-        output = backup # this only affects axis != 'Z'
+        output = backup  # this only affects axis != 'Z'
         for key in remove:
             output.pop(key)
         return output
@@ -99,7 +102,7 @@ class LegacyGRFilesIO(TrackIO):
     def __findgrs(cls, paths, opts):
         grdir  = opts.get('cgrdir', cls.__GRDIR)
         ext    = (cls.GREXT,)
-        err    = lambda j: IOError(j+'\n -'+ '\n -'.join(str(i) for i in paths), 'warning')
+        err    = lambda j: TrackIOError(j+'\n -' + '\n -'.join(str(i) for i in paths), 'warning')
         hasgr  = lambda i: (i.is_dir()
                             and (i.name == grdir
                                  or any(j.suffix in ext for j in i.iterdir())))
@@ -129,12 +132,12 @@ class LegacyGRFilesIO(TrackIO):
         cgr  = next((i for i in Path(grs).iterdir() if i.suffix == cls.CGREXT),
                     None)
         if cgr is None:
-            raise IOError(f"No {cls.CGREXT} files in directory\n- {grs}", "warning")
+            raise TrackIOError(f"No {cls.CGREXT} files in directory\n- {grs}", "warning")
 
         pot = cgr.with_suffix(cls.TRKEXT).name
         trk = next((i for i in globfiles(fname) if i.name == pot), None)
         if trk is None:
-            raise IOError(f"Could not find {pot} in {fname}", "warning")
+            raise TrackIOError(f"Could not find {pot} in {fname}", "warning")
         return trk, grs
 
     @classmethod
@@ -144,15 +147,15 @@ class LegacyGRFilesIO(TrackIO):
         tit    = cls.__TITLE.match(grdict['title'].decode("utf8", "replace"))
 
         if tit is None:
-            raise IOError("Could not match title in " + path, "warning")
+            raise TrackIOError("Could not match title in " + path, "warning")
 
         beadid = int(tit.group("id"))
         if beadid not in output:
-            raise IOError("Could not find bead "+str(beadid)+" in " + path, "warning")
+            raise TrackIOError("Could not find bead "+str(beadid)+" in " + path, "warning")
 
         phases = [int(i) for i in tit.group("phases").split(',') if len(i.strip())]
         if set(np.diff(phases)) != {1}:
-            raise IOError("Phases must be sequencial in "+ path, "warning")
+            raise TrackIOError("Phases must be sequencial in " + path, "warning")
 
         starts  = output['phases'][:, phases[0]] - output['phases'][0,0]
         bead    = output[beadid]
@@ -168,11 +171,11 @@ class LegacyGRFilesIO(TrackIO):
             if cyc >= len(starts):
                 continue
 
-            inds = np.int32(vals[0]+.1+starts[cyc]) # type: ignore
+            inds = np.int32(vals[0]+.1+starts[cyc])  # type: ignore
             try:
                 bead[inds] = vals[1]
             except IndexError as err:
-                raise IOError(f"updating {path} raised {err.__str__}")
+                raise TrackIOError(f"updating {path} raised {err.__str__}")
         return beadid
 
     @classmethod
@@ -221,11 +224,12 @@ class LegacyGRFilesIO(TrackIO):
         return res
 
     @classmethod
-    def scan(cls,
-             trkdirs: Union[str, Sequence[str]],
-             grdirs:  Union[str, Sequence[str]],
-             **opts
-            ) -> Tuple[Tuple[PATHTYPES,...], Tuple[PATHTYPES,...], Tuple[PATHTYPES,...]]:
+    def scan(
+            cls,
+            trkdirs: Union[str, Sequence[str]],
+            grdirs:  Union[str, Sequence[str]],
+            **opts
+    ) -> Tuple[Tuple[PATHTYPES,...], Tuple[PATHTYPES,...], Tuple[PATHTYPES,...]]:
         """
         Scans for pairs
 

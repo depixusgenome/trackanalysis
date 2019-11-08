@@ -7,10 +7,11 @@ from bokeh           import layouts
 from view.base       import BokehView, stretchout
 from view.threaded   import DisplayState
 from utils.logconfig import getLogger
+from modaldialog     import dialogisrunning
 from ._beadsplot     import BeadsScatterPlot
 from ._model         import BasePlotConfig
 from ._statsplot     import FoVStatsPlot
-from ._widgets       import JobsStatusBar, PeakcallingPlotWidget, CSVExporter
+from ._widgets       import JobsStatusBar, PeakcallingPlotWidget, StorageExplorer, CSVExporter
 from ._threader      import ismain
 
 LOGS = getLogger(__name__)
@@ -28,6 +29,7 @@ class _StateDescriptor:
     @classmethod
     def setdefault(cls, inst, value):
         "sets the default value"
+        value = DisplayState(getattr(value, 'value', str(value)))
         for i in getattr(inst, '_items'):
             if hasattr(i, '_state'):
                 setattr(i, '_state', value)
@@ -46,6 +48,7 @@ class FoVPeakCallingView(BokehView):
             BeadsScatterPlot(widgets = False),
             FoVStatsPlot(widgets = False),
             PeakcallingPlotWidget(),
+            StorageExplorer(),
             JobsStatusBar(),
             CSVExporter(),
         ]
@@ -84,7 +87,7 @@ class FoVPeakCallingView(BokehView):
         self._ctrl = ctrl
         self._items[0].observe(ctrl)
         self._items[1].observe(ctrl)
-        self._items[3].observe(ctrl, getattr(self._items[0], '_model').tasks)
+        self._items[4].observe(ctrl, getattr(self._items[0], '_model').tasks)
 
         attrs = set(BasePlotConfig().__dict__)
 
@@ -102,6 +105,19 @@ class FoVPeakCallingView(BokehView):
     def isactive(self, *_1, **_2) -> bool:
         "whether the state is set to active"
         return self.state == DisplayState.active
+
+    def addtodoc_oneshot(self, ctrl, doc):
+        "when to display this tab"
+
+        @ctrl.display.observe
+        def _onscriptsdone(calllater, **_):
+
+            @calllater.append
+            def _call():
+                if not dialogisrunning(doc):
+                    self._items[3].run(ctrl, doc)
+
+        return ("tasks", "opentrack")
 
     def addtodoc(self, ctrl, doc):
         "sets the plot up"

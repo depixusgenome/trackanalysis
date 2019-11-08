@@ -20,10 +20,11 @@ import version
 from   data.trackops           import trackname
 from   view.colors             import tohex
 from   view.threaded           import ThreadedDisplay
-from   taskcontrol.processor   import ProcessorException
 from   taskstore               import dumps
-from   ._model                 import FoVStatsPlotModel, INVISIBLE, COLS
-from   ._widgets               import JobsStatusBar, JobsHairpinSelect, PeakcallingPlotWidget
+from   ._model                 import FoVStatsPlotModel, INVISIBLE, COLS, BeadsPlotTheme
+from   ._widgets               import (
+    JobsStatusBar, JobsHairpinSelect, PeakcallingPlotWidget, StorageExplorer
+)
 from   ._threader              import BasePlotter, PlotThreader
 
 _DATA  = Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]
@@ -114,7 +115,7 @@ class XlsxReport:
                 sheet.assign(track = tracks[sheet.trackid.values]),
                 dict(
                     header       = [cnv.get(k, k) for k in sheet.columns],
-                    sheet_name   = sheetnames.get(name, f"{name.capitalize()} stats"),
+                    sheet_name   = sheetnames.get(name, f"{name.capitalize()} statistics"),
                     freeze_panes = (1, len(sheet))
                 )
             ))
@@ -137,9 +138,10 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
 
     def __init__(self, widgets = True, **_):
         super().__init__(**_)
-        self._widgets  = (
-            (JobsStatusBar(), JobsHairpinSelect(), PeakcallingPlotWidget()) if widgets else
-            ()
+        self._plottheme = BeadsPlotTheme("peakcalling.view.beads.plot.theme")
+        self._widgets   = (
+            () if not widgets else
+            (JobsStatusBar(), JobsHairpinSelect(), PeakcallingPlotWidget(), StorageExplorer())
         )
         self._defaults = dict(
             {i: np.array(['']) for i in  _XCOLS | self._DATAXCOLS},
@@ -160,6 +162,7 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
     def swapmodels(self, ctrl):
         "swap with models in the controller"
         super().swapmodels(ctrl)
+        self._plottheme = ctrl.theme.swapmodels(self._plottheme)
         for i in self._widgets:
             if hasattr(i, 'swapmodels'):
                 i.swapmodels(ctrl)
@@ -270,12 +273,13 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
 class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
     parent:    FoVStatsPlot
 
-    _stats:    ColumnDataSource  = BasePlotter.attr()
-    _points:   ColumnDataSource  = BasePlotter.attr()
-    _defaults: Dict[str, list]   = BasePlotter.attr()
-    _model:    FoVStatsPlotModel = BasePlotter.attr()
-    _fig:      Figure            = BasePlotter.attr()
-    _topaxis:  CategoricalAxis   = BasePlotter.attr()
+    _stats:     ColumnDataSource  = BasePlotter.attr()
+    _points:    ColumnDataSource  = BasePlotter.attr()
+    _defaults:  Dict[str, list]   = BasePlotter.attr()
+    _model:     FoVStatsPlotModel = BasePlotter.attr()
+    _fig:       Figure            = BasePlotter.attr()
+    _topaxis:   CategoricalAxis   = BasePlotter.attr()
+    _plottheme: BeadsPlotTheme    = BasePlotter.attr()
 
     def _reset(self):
         "resets the data"
@@ -426,37 +430,12 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
     __NB = re.compile(r"^\d\+-.*")
 
     def __yrange(self, stats: pd.DataFrame, points: pd.DataFrame):
-        start = np.nanmin(np.concatenate([
-            points['y'], stats['bottom'], stats['boxcenter'] - stats['boxheight'] * .5
-        ]))
-        end  = np.nanmax(np.concatenate([
-            points['y'], stats['top'], stats['boxcenter'] + stats['boxheight'] * .5
-        ]))
-        rng   = (end - start) * 0.05
-        if start != 0.:
-            start -= rng
-        if end != 100.:
-            end += rng
+        vals = np.concatenate([
+            points['y'], stats['bottom'], stats['boxcenter'] - stats['boxheight'] * .5,
+            points['y'], stats['top'], stats['boxcenter'] + stats['boxheight'] * .5,
+        ])
 
-        info = dict(
-            reset_start = start,
-            reset_end   = end,
-            start       = (
-                start if self._fig.y_range.start >= end else
-                max(self._fig.y_range.start, start)
-            ),
-            end        = (
-                end if self._fig.y_range.end <= start else
-                max(self._fig.y_range.end, end)
-            )
-        )
-
-        if (
-                (self._fig.y_range.end - self._fig.y_range.start) < rng * .3
-                or (self._fig.y_range.end - self._fig.y_range.start) * .3 > rng
-        ):
-            info.update(start = start, end = end)
-        return info
+        return self._plottheme.newbounds(self._fig.y_range, vals, True)
 
     def __colors(self, xaxis, stats: pd.DataFrame):
         cnf    = self._model.theme
@@ -790,7 +769,7 @@ class _BeadStatusPlot(_WhiskerBoxPlot):
             data = pd.DataFrame({
                 'track': [trackname(proc.model[0])],
                 self._NAME: (
-                    info.errkey() if isinstance(info, ProcessorException) else
+                    info.errkey() if isinstance(info, Exception) else
                     'bug'         if not isinstance(info, pd.DataFrame) else
                     'ok'          if info.shape[0] else
                     'empty'

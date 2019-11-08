@@ -3,18 +3,18 @@
 "View module showing one or more FoVs"
 from   abc       import abstractmethod
 from   functools import partial
-from   typing    import Dict, List, Iterator, Tuple, Union, Set, cast
+from   typing    import Dict, List, Iterator, Tuple, Union, Set
 
 import pandas as pd
 import numpy  as np
 
 from   bokeh          import layouts
-from   bokeh.models   import ColumnDataSource, FactorRange, HoverTool
+from   bokeh.models   import ColumnDataSource, FactorRange, HoverTool, Range1d
 from   bokeh.plotting import figure, Figure
 
 from   view.colors   import tohex
 from   view.threaded import ThreadedDisplay
-from   ._model       import BeadsScatterPlotModel, Processors, COLS
+from   ._model       import BeadsScatterPlotModel, Processors, COLS, BeadsPlotTheme
 from   ._threader    import BasePlotter, PlotThreader
 from   ._widgets     import JobsStatusBar, JobsHairpinSelect
 
@@ -29,7 +29,8 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
 
     def __init__(self, widgets = True, **_):
         super().__init__(**_)
-        self._widgets = (JobsStatusBar(), JobsHairpinSelect()) if widgets else ()
+        self._widgets   = (JobsStatusBar(), JobsHairpinSelect()) if widgets else ()
+        self._plottheme = BeadsPlotTheme("peakcalling.view.beads.plot.theme")
 
     _reset = None   # added in _Threader.setup
 
@@ -40,6 +41,7 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
     def swapmodels(self, ctrl):
         "swap with models in the controller"
         super().swapmodels(ctrl)
+        self._plottheme = ctrl.theme.swapmodels(self._plottheme)
         for i in self._widgets:
             if hasattr(i, 'swapmodels'):
                 i.swapmodels(ctrl)
@@ -105,7 +107,8 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
         "build a figure"
         fig = figure(
             **self._model.theme.figargs,
-            x_range          = FactorRange(factors = self._expdata.data['x']),
+            x_range = FactorRange(factors = self._expdata.data['x']),
+            y_range = Range1d()
         )
 
         hover           = fig.select(HoverTool)[0]
@@ -125,11 +128,12 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
         self._data:    pd.DataFrame         = pd.DataFrame({})
         self._factors: List[Tuple[str,...]] = []
 
-    _expdata:     ColumnDataSource      = cast(ColumnDataSource,      BasePlotter.attr())
-    _defaultdata: Dict[str, list]       = cast(Dict[str, list],       BasePlotter.attr())
-    _theodata:    ColumnDataSource      = cast(ColumnDataSource,      BasePlotter.attr())
-    _model:       BeadsScatterPlotModel = cast(BeadsScatterPlotModel, BasePlotter.attr())
-    _fig:         Figure                = cast(Figure,                BasePlotter.attr())
+    _expdata:     ColumnDataSource      = BasePlotter.attr()
+    _defaultdata: Dict[str, list]       = BasePlotter.attr()
+    _theodata:    ColumnDataSource      = BasePlotter.attr()
+    _model:       BeadsScatterPlotModel = BasePlotter.attr()
+    _plottheme:   BeadsPlotTheme        = BasePlotter.attr()
+    _fig:         Figure                = BasePlotter.attr()
 
     def _reset(self):
         "resets the data"
@@ -145,6 +149,7 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
             exp     = self._from_df(self.__set_tags(data))
 
         self.__simplify_factors(exp, theo, factors)
+        yield (self._fig.y_range, self.__yrange(data, theo, True))
         yield (self._expdata,      dict(data       = exp))
         yield (self._theodata,     dict(data       = theo))
         yield (self._fig.x_range,  dict(factors    = factors))
@@ -169,6 +174,14 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
         theo    = self._compute_theodata(data)
         if theo.shape[0]:
             yield ('_theodata',   partial(self._theodata.stream, self._from_df(theo)))
+        yield (self._fig.y_range, self.__yrange(data, theo, False))
+
+    def __yrange(self, data, theo, force: bool) -> Dict[str, float]:
+        vals = np.concatenate([
+            data['baseposition'], theo['bindingposition'],
+            [self._fig.y_range.start, self._fig.y_range.end] if not force else []
+        ])
+        return self._plottheme.newbounds(self._fig.y_range, vals, force)
 
     def __iter_cache(self) -> Iterator[pd.DataFrame]:
         itr = self.computations('_data', self._model)

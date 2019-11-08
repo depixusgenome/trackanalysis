@@ -228,7 +228,7 @@ def setpoolobservers(self, ctrl, mdl, statename):
         if self.isactive() and 'state' in old:
             ctrl.display.update(JobDisplay(), canstart = True)
 
-    name = HairpinGroupScatterTheme().name
+    dflt = HairpinGroupScatterTheme()
     curr = [False, lambda: False]
 
     def _cached_plot_reset(cache):
@@ -251,7 +251,10 @@ def setpoolobservers(self, ctrl, mdl, statename):
 
         if not curr[0] and hasattr(self, "_doc"):
             curr[0] = True
-            tout    = ctrl.theme.get(name, "displaytimeout")
+            tout    = (
+                ctrl.theme.get(dflt, "displaytimeout") if dflt in ctrl.theme else
+                dflt.displaytimeout
+            )
             doc     = getattr(self, "_doc")
             doc.add_timeout_callback(lambda: _reset(check), 1e3*tout)
 

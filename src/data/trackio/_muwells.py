@@ -10,7 +10,7 @@ from    scipy.interpolate        import interp1d
 import  pandas                   as     pd
 from    legacy                   import readtrack  # pylint: disable=no-name-in-module
 from    utils                    import initdefaults
-from    ._base                   import TrackIO, PATHTYPE, PATHTYPES
+from    ._base                   import TrackIO, PATHTYPE, PATHTYPES, TrackIOError
 
 class LIAFilesIOConfiguration:
     "model for opening LIA files"
@@ -106,8 +106,10 @@ class MuWellsFilesIO(TrackIO):
 
         output = readtrack(str(paths[0]), clipcycles = False)
         if output is None:
-            raise IOError(f"Could not open track '{paths[0]}'.\n"
-                          "This could be because of a *root* mounted samba path")
+            raise TrackIOError(
+                f"Could not open track '{paths[0]}'.\n"
+                "This could be because of a *root* mounted samba path"
+            )
 
         output              = {
             i: j
@@ -124,7 +126,7 @@ class MuWellsFilesIO(TrackIO):
                 cls.__update(output, i, str(liapath), cnf)
 
         if not any(isinstance(i, int) for i in output):
-            raise IOError("Could not add µwells data to the current track")
+            raise TrackIOError("Could not add µwells data to the current track")
 
         cls.__correctsecondaries(output)
         return output
@@ -191,7 +193,7 @@ class MuWellsFilesIO(TrackIO):
         last   = int(phases[-1,-1]+np.median(phases[1:,0]-phases[:-1,-1])+.5)
         phases = np.round(phases + .5).astype('i4')
         if np.any(np.diff(phases.ravel()) <= 0):
-            raise IOError("Could not synchronize the files: incorrect phases", "warning")
+            raise TrackIOError("Could not synchronize the files: incorrect phases", "warning")
 
         arr    = frames[tuple(frames)[1]].values.astype('f4')
         if '(V)' in frames.columns[1]:
@@ -219,7 +221,7 @@ class MuWellsFilesIO(TrackIO):
             return framerate
 
         msg = f"Framerate ({framerate}) differs from previous by {delta}"
-        raise IOError(msg)
+        raise TrackIOError(msg)
 
     @classmethod
     def __extractdiffpeaks(cls, trk, frames, cnf):
@@ -271,7 +273,7 @@ class MuWellsFilesIO(TrackIO):
         frames[name] = -frames[name]
         inds2        = _extract()
         if inds2 is None and inds1 is None:
-            raise IOError("Could not extract peak threshold")
+            raise TrackIOError("Could not extract peak threshold")
         if inds2 is not None and (inds1 is None or len(inds1) < len(inds2)):
             return inds2
         frames[name] = -frames[name]

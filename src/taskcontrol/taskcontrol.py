@@ -261,33 +261,33 @@ class BaseTaskController(Controller):  # pylint: disable=too-many-public-methods
         if task is None:
             task = cast(RootTask, tasks[0])
 
-        isarchive = False
-        if not isinstance(task, RootTask):
-            isarchive = (
-                (
-                    isinstance(task, (Path, str))
-                    and any(str(task).endswith(i) for i in ('.xlsx', '.ana'))
-                ) or (
-                    isinstance(task, (tuple, list))
-                    and any(str(j).endswith(i) for i in ('.xlsx', '.ana') for j in task)
-                )
+        lst: List[Tuple[bool, Tuple[Task,...]]] = (
+            openmodels(self._openers, task, tasks) if not isinstance(task, RootTask) else
+            [(False, (task,))] if len(tasks) == 0    else
+            [(True, tasks)]    if tasks[0] is task   else
+            []
+        )
+        ctrls: List[Tuple[bool, ProcessorController]] = [
+            (isarch, create(elem, processors = self.__processors))
+            for isarch, elem in lst
+        ]
+
+        if ctrls:
+            self.handle(
+                "openingtracks",
+                self.emitpolicy.outasdict,
+                {'controller': self, 'models': ctrls}
             )
-            lst = openmodels(self._openers, task, tasks)
-            for elem in lst[:-1]:
-                ctrl = create(elem, processors = self.__processors)
-                self._items[cast(RootTask, elem[0])] = ctrl
-            task, tasks  = lst[-1][0], lst[-1]
 
-        elif len(tasks) == 0:
-            tasks     = (task,)
+        if not ctrls:
+            raise NoEmission()
 
-        elif tasks[0] is not task:
-            raise ValueError("model[0] ≠ root")
-
-        ctrl = create(*tasks, processors = self.__processors)
-        self._items[cast(RootTask, task)] = ctrl
+        self._items.update({cast(RootTask, ctrl.model[0]): ctrl for _, ctrl in ctrls})
         return dict(
-            controller = self, model = tasks, isarchive = isarchive, taskcache = ctrl
+            controller = self,
+            model      = ctrls[-1][1].model,
+            isarchive  = ctrls[-1][0],
+            taskcache  = ctrls[-1][1]
         )
 
     @Controller.emit
