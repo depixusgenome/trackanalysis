@@ -154,9 +154,9 @@ def test_cyclesplot2(bokehaction):
 
     server.press('Shift-Delete')
     server.wait()
-    server.change('Cycles:DriftWidget', 'value', [0], rendered = True)
+    server.change('Cycles:DriftWidget', 'active', [0], rendered = True)
 
 
 if __name__ == '__main__':
-    from tests.testutils.bokehtesting import BokehAction  # noqa  # pylint: disable=ungrouped-imports
-    test_cyclesplot(BokehAction(None))
+    from tests.testingcore.bokehtesting import BokehAction  # noqa  # pylint: disable=ungrouped-imports
+    test_cyclesplot2(BokehAction(None))

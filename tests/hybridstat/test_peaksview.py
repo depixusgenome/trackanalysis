@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name,too-many-statements,too-many-locals,ungrouped-imports
-# pylint: disable=wrong-import-position,unused-import
+# pylint: disable=wrong-import-position,unused-import,import-outside-toplevel
 """ Tests views """
 from typing    import cast
 from tempfile  import mktemp, gettempdir
@@ -11,37 +11,20 @@ import warnings
 import asyncio
 import numpy as np
 import selenium.common.exceptions
-CTX = warnings.catch_warnings()
-CTX.__enter__()
-for _msg_ in (".*html argument of XMLParser.*", ".*Using or importing the ABCs.*"):
-    warnings.filterwarnings(
-        'ignore',
-        category = DeprecationWarning,
-        message  = _msg_
-    )
-
-from bokeh.plotting           import Figure             # noqa: E402
-from bokeh.models             import Tabs, FactorRange  # noqa: E402
-from tornado.gen              import sleep              # noqa: E402
-from tornado.ioloop           import IOLoop             # noqa: E402
-from tornado.platform.asyncio import AsyncIOMainLoop    # noqa: E402
-
-# import openpyxl to deal with deprecation warning
-import openpyxl  # noqa: E402,F401
-
 from tests.testutils                     import integrationmark           # noqa: E402
-from tests.testingcore                   import path as utfilepath        # noqa: E402
-from view.plots                          import DpxKeyedRow               # noqa: E402
-from peakfinding.reporting.batch         import createmodels as _pmodels  # noqa: E402
-from hybridstat.reporting.identification import writeparams               # noqa: E402
-from hybridstat.reporting.batch          import createmodels as _hmodels  # noqa: E402
-from hybridstat.view._io                 import ConfigXlsxIO              # noqa: E402
-import hybridstat.view._widget as widgetmod                               # noqa: E402
+with warnings.catch_warnings():
+    for _msg_ in (".*html argument of XMLParser.*", ".*Using or importing the ABCs.*"):
+        warnings.filterwarnings(
+            'ignore',
+            category = DeprecationWarning,
+            message  = _msg_
+        )
 
-from cleaning.processor                  import BeadSubtractionTask                  # noqa: E402
-from peakcalling.processor.__config__    import FitToHairpinTask                     # noqa: E402
-from peakcalling.tohairpin               import PeakGridFit, ChiSquareFit, Symmetry  # noqa: E402
-CTX.__exit__(None, None, None)
+    from bokeh.plotting           import Figure             # noqa: E402
+    from bokeh.models             import Tabs, FactorRange  # noqa: E402
+
+    # import openpyxl to deal with deprecation warning
+    import openpyxl  # noqa: E402,F401
 
 FILTERS = [
     (FutureWarning,      ".*elementwise comparison failed;.*"),
@@ -54,6 +37,13 @@ FILTERS = [
 @integrationmark
 def test_hybridstat_xlsxio():
     "tests xlxs production"
+    from tornado.ioloop           import IOLoop             # noqa: E402
+    from tornado.platform.asyncio import AsyncIOMainLoop    # noqa: E402
+
+    from tests.testingcore                   import path as utfilepath        # noqa: E402
+    from hybridstat.reporting.batch          import createmodels as _hmodels  # noqa: E402
+    from hybridstat.view._io                 import ConfigXlsxIO              # noqa: E402
+
     asyncio.set_event_loop(asyncio.new_event_loop())
     AsyncIOMainLoop().make_current()
 
@@ -82,7 +72,7 @@ def test_hybridstat_xlsxio():
             if ConfigXlsxIO.RUNNING is False:
                 break
             cnt = i
-            await sleep(.5)
+            await asyncio.sleep(.5)
 
     try:
         IOLoop.current().run_sync(_run)
@@ -94,6 +84,12 @@ def test_hybridstat_xlsxio():
 @integrationmark
 def test_peaks_xlsxio():
     "tests xlxs production"
+    from tornado.ioloop           import IOLoop
+    from tornado.platform.asyncio import AsyncIOMainLoop
+    from tests.testingcore            import path as utfilepath
+    from peakfinding.reporting.batch  import createmodels as _pmodels
+    from hybridstat.view._io          import ConfigXlsxIO
+
     try:
         asyncio.set_event_loop(asyncio.new_event_loop())
         AsyncIOMainLoop().make_current()
@@ -121,7 +117,7 @@ def test_peaks_xlsxio():
                 if ConfigXlsxIO.RUNNING is False:
                     break
                 cnt = i
-                await sleep(.5)
+                await asyncio.sleep(.5)
 
         IOLoop.current().run_sync(_run)
         assert Path(out).exists()
@@ -130,6 +126,9 @@ def test_peaks_xlsxio():
         ConfigXlsxIO.RUNNING = False
 
 def _t_e_s_t_peaks(server, bkact):
+    import hybridstat.view._widget as widgetmod      # noqa: E402
+    from peakcalling.processor.__config__    import FitToHairpinTask
+    from hybridstat.reporting.identification import writeparams               # noqa: E402
     filt = server.widget[widgetmod.DpxFitParams]
     src  = server.widget['Peaks:List'].source
     root = server.ctrl.display.get("tasks", "roottask")
@@ -240,6 +239,7 @@ def test_peaksplot_view(bokehaction):  # pylint: disable=too-many-statements
         'Silhouette\n'
         'reduced χ²'
     )
+    from view.plots import DpxKeyedRow
     krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
 
     def _press(val):
@@ -479,6 +479,9 @@ def test_muwells_view(bokehaction):
 @integrationmark
 def test_advancedmenu_view(bokehaction):
     "test advanced menu"
+    from cleaning.processor                  import BeadSubtractionTask
+    from peakcalling.processor.__config__    import FitToHairpinTask
+    from peakcalling.tohairpin               import PeakGridFit, ChiSquareFit, Symmetry
     server = bokehaction.start(
         'hybridstat.view.peaksplot.PeaksPlotView',
         'taskapp.toolbar',
