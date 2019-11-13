@@ -23,6 +23,10 @@ from   tests.testingcore        import path as utpath
 
 _EVT  = 'peakcalling.view.jobs.stop'
 
+@pytest.fixture(scope="session")
+def cache_dir(tmpdir_factory):
+    return tmpdir_factory.mktemp("diskcache_dir")
+
 class _Fig:
     extra_x_ranges = {'beadcount': 'beadcount'}
     x_range        = 'x_range'
@@ -63,7 +67,7 @@ class _Fig:
 
         mdl.tasks.tasks.tasks.add(create(lst))
 
-def _server(bokehaction, name, evt = _EVT):
+def _server(bokehaction, cache_dir, name, evt = _EVT):
     # pylint: disable=protected-access,unused-import,import-outside-toplevel
     filters = [
         (FutureWarning,      ".*elementwise comparison failed;.*"),
@@ -85,6 +89,9 @@ def _server(bokehaction, name, evt = _EVT):
         filters = filters,
         runtime = 'selenium'
     )
+
+    server.ctrl.theme.model("peakcalling.diskcache").path = str(cache_dir)
+
     for i in ('beads', 'stats'):
         if f'peakcalling.view.{i}' in server.ctrl.theme:
             server.ctrl.theme.model(f'peakcalling.view.{i}').tracknames = "full"
@@ -97,9 +104,9 @@ def _server(bokehaction, name, evt = _EVT):
     server.load('big_legacy', rendered = evt)
     return server, fig
 
-def _fovstatspeaks(bokehaction):
+def _fovstatspeaks(bokehaction, cache_dir):
     "creates a server with 2 fovs"
-    server, fig = _server(bokehaction, 'FoVStatsPlot', evt = True)
+    server, fig = _server(bokehaction, cache_dir, 'FoVStatsPlot', evt = True)
 
     def _cmd():
         bdctrl = DataSelectionBeadController(server.ctrl)
@@ -122,21 +129,21 @@ def _fovstatspeaks(bokehaction):
     modal = server.selenium.modal("//span[@class='icon-dpx-cog']", True)
     return (server, fig, modal)
 
-def _fovstatshairpin(bokehaction):
+def _fovstatshairpin(bokehaction, cache_dir):
     "creates a server with 2 fovs"
-    server, fig, modal = _fovstatspeaks(bokehaction)
+    server, fig, modal = _fovstatspeaks(bokehaction, cache_dir)
     _addhp(server)
     return server, fig, modal
 
 @pytest.fixture
-def fovstatspeaks(bokehaction):
+def fovstatspeaks(bokehaction, cache_dir):
     "creates a server with 2 fovs"
-    return _fovstatspeaks(bokehaction)
+    return _fovstatspeaks(bokehaction, cache_dir)
 
 @pytest.fixture
-def fovstatshairpin(bokehaction):
+def fovstatshairpin(bokehaction, cache_dir):
     "creates a server with 2 fovs"
-    return _fovstatshairpin(bokehaction)
+    return _fovstatshairpin(bokehaction, cache_dir)
 
 def _addhp(server):
     server.cmd(
@@ -155,9 +162,9 @@ def _export(fov, tmp_path):
     assert tmp_path.exists()
 
 @integrationmark
-def test_beadsplot(bokehaction):
+def test_beadsplot(bokehaction, cache_dir):
     "test the view"
-    server, fig = _server(bokehaction, 'BeadsScatterPlot')
+    server, fig = _server(bokehaction, cache_dir, 'BeadsScatterPlot')
 
     assert fig.x_range.factors == list(zip(
         repeat('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec'),
@@ -365,7 +372,7 @@ def test_statsplot_info_hpins(tmp_path):
     assert cache['x_range']['factors'] == [('+', '', ''), ('\u2063-', '', '')]
 
 @integrationmark
-def test_statsplot_view_simple(bokehaction):
+def test_statsplot_view_simple(bokehaction, cache_dir):
     "test the view"
 
     def _change(rendered = True, xaxis = None, **kwa):
@@ -419,15 +426,15 @@ def test_statsplot_view_simple(bokehaction):
         _change(xaxis = ['track', 'beadstatus'], yaxis = 'bead', rendered = True)
         _checkbsfact(tpe)
 
-    server, fig = _server(bokehaction, 'FoVStatsPlot')
+    server, fig = _server(bokehaction, cache_dir, 'FoVStatsPlot')
     _check(True)
     _addhp(server)
     _check(False)
 
 @integrationmark
-def test_statsplot_view_peaks1(bokehaction):
+def test_statsplot_view_peaks1(bokehaction, cache_dir):
     "test the view"
-    server, fig = _server(bokehaction, 'FoVStatsPlot', evt = True)
+    server, fig = _server(bokehaction, cache_dir, 'FoVStatsPlot', evt = True)
 
     def _cmd():
         bdctrl = DataSelectionBeadController(server.ctrl)
@@ -666,9 +673,9 @@ def test_statsplot_view_hpins6(fovstatshairpin):
     assert fig.x_range.factors == list(zip(['+', '\u2063-'], repeat(""), repeat("")))
 
 @integrationmark
-def test_diskcache_view(bokehaction):
+def test_diskcache_view(bokehaction, cache_dir):
     "test the view"
-    server, fig = _server(bokehaction, 'FoVStatsPlot', evt = True)
+    server, fig = _server(bokehaction, cache_dir, 'FoVStatsPlot', evt = True)
     server.cmd(lambda: None, rendered = _EVT)
     modal = server.selenium.modal("//span[@class='icon-dpx-download2']", True)
     sz    = len(fig.renderers[0].data_source.data['boxheight'])
