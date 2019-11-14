@@ -141,8 +141,10 @@ class _JobRunner(JobModel):
 
             asyncio.create_task(_run())
         else:
+            LOGS.info("Starting SYNCH jobs")
             with emitter:
                 self.syncrun(processors)
+            LOGS.info("SYNCH jobs done")
 
     def syncrun(self, processors: List[TaskCacheList]):
         """
@@ -217,6 +219,7 @@ class _JobRunner(JobModel):
                 nprocs[0] += 1
 
         # now iterate throught remaining keys
+        LOGS.info("%d jobs running in %d separate processes", len(jobs), ncpu)
         for procs, keys in jobs:
             while self.__keepgoing(idcall, nprocs[0] > 0):
                 await asyncio.sleep(self.config.waittime)
@@ -316,17 +319,23 @@ class _JobRunner(JobModel):
             keys = set(cache if cache else ())
 
         if cache:
+            LOGS.debug("%s has %d processed keys", procs.model[0].path, len(keys - set(cache)))
+
             keys -= set(cache)
             events(procs, list(cache))
 
         if keys:
             lkeys = sorted(keys)
             njobs = max(1, len(lkeys) // self.config.maxkeysperjob)
+
             if (len(lkeys) % self.config.maxkeysperjob) > njobs:
                 njobs += 1
 
             batch = len(lkeys) // njobs
             rem   = len(lkeys) % batch
+
+            LOGS.debug("%s requires %d jobs", procs.model[0].path, len(lkeys)//batch+1)
+
             for i in range(0, len(lkeys), batch):
                 ix1 = i + min(rem, i)
                 ix2 = min(ix1 + batch + (i < rem), len(lkeys))
