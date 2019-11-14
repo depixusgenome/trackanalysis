@@ -124,7 +124,7 @@ class DiskCacheConfig:
             if disk.get(VERSION_KEY) == VERSION:
                 for i in disk.iterkeys():
                     if i.startswith(PREFIX):
-                        cur, tag = disk.get(i, tag = version)
+                        cur, tag = disk.get(i, tag = True)
                         if tag == version:
                             yield (i[len(PREFIX):], fcn(i, cur))
 
