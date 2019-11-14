@@ -16,8 +16,9 @@ from tests.testutils.recording     import record, pytest_addoption  # noqa
 def pytest_collection_modifyitems(items):
     "sort tests such that integration tests come last and scripting last of all"
     items.sort(key = lambda x: (
-        int('integration' not in x.keywords.keys())
-        + 2*int('scripting' in Path(str(x.fspath)).parts if x.fspath else 0)
+        int(x.name != 'test_hybridstat_view[]')
+        + 2*int('integration' not in x.keywords.keys())*2
+        + 4*int('scripting' in Path(str(x.fspath)).parts if x.fspath else 0)
     ))
 
 @pytest.fixture(params = [pytest.param("", marks = needsdisplay)])
