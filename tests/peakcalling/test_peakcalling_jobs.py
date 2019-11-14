@@ -33,9 +33,13 @@ class _Cache:
         sleep(0.02)
         return current_process().pid, time()
 
+class _Track:
+    path = "path"
+
 class _Proc:
     def __init__(self, info, cache):
-        self.data = _Cache(info, cache)
+        self.data  = _Cache(info, cache)
+        self.model = [_Track]
 
     def cleancopy(self):
         return self
