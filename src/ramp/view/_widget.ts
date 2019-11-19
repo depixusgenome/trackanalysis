@@ -31,7 +31,7 @@ export class DpxRampView extends WidgetView {
 
     render(): void {
         super.render()
-        let dbal: string = 'data-balloon="'
+        let dbal: string = 'aria-label="'
         let pos:  string = '" data-balloon-length="medium" data-balloon-pos="right"'
         let ttips: string[] = [
             dbal+'beads with a small range of values are defined as fixed'+pos,

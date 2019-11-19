@@ -18,7 +18,7 @@ import pandas  as pd
 from   taskcontrol.taskcontrol import ProcessorController
 from   taskmodel.application   import setupio
 from   taskmodel.dataframe     import DataFrameTask
-from   ._model                 import Processors, BasePlotConfig, STORE
+from   ..model                 import Processors, BasePlotConfig, STORE
 
 Parent   = TypeVar("Parent")
 Model    = TypeVar("Model")
@@ -66,9 +66,10 @@ class BasePlotter(Generic[Parent]):
     @staticmethod
     def resetstatus(dist: int, info: pd.DataFrame) -> pd.DataFrame:
         """resets the status acording to the distance provided"""
-        info.loc[info.status == 'truepos',      'status'] = 'falsepos'
-        info.loc[np.abs(info.distance) < dist,  'status'] = 'truepos'
-        info.loc[~info.status.isin(['truepos', 'falseneg']), 'closest'] = np.NaN
+        tpos = info.status.isin(['truepos', 'falseneg'])
+        info.loc[info.status == 'truepos',              'status']  = 'falsepos'
+        info.loc[tpos & (np.abs(info.distance) < dist), 'status']  = 'truepos'
+        info.loc[~tpos,                                 'closest'] = np.NaN
         return info
 
     def computations(  # pylint: disable=too-many-locals
@@ -86,7 +87,9 @@ class BasePlotter(Generic[Parent]):
             cur = set()
 
         tracktag = getattr(model.display, 'tracktag', None)
-        for iproc, proc in enumerate(self._procs.values()):
+        roots    = [id(i) for i in model.tasks.roots]
+        for proc in self._procs.values():
+            iproc: int             = hash(proc.model[0])
             cache: Optional[STORE] = proc.data.getcache(DataFrameTask)()
             if not cache or (len(self._procs) > 1 and model.display.masked(root = proc)):
                 continue
@@ -101,9 +104,14 @@ class BasePlotter(Generic[Parent]):
                 ):
                     continue
 
+                if isinstance(info, pd.DataFrame):
+                    info = model.display.filter(info)
+                    if reqlen and not info.shape[0]:
+                        continue
+
                 info = yield (proc, info)
                 if info is not None:
-                    info['track']    = f'{iproc}-' + info['track']
+                    info['track']    = f'{roots.index(id(proc.model[0]))}-' + info['track']
                     info['trackid']  = iproc
                     info['bead']     = ibead
                     if tracktag is not None:
@@ -247,10 +255,12 @@ class PlotThreader(ABC):
 
             threader = getattr(self, '_threader')
 
+            attrdisp = {'hairpins', 'beads', 'roots', 'orientations', 'ranges'}
+
             @ctrl.display.observe(model.display)
             @ctrl.display.hashwith(self)
             def _onmask(old, **_):
-                if set(old) & {'hairpins', 'beads', 'roots', 'orientations'}:
+                if attrdisp.intersection(old):
                     threader.renew(ctrl, delplot = True)
 
             attrs = {'xinfo', 'yaxis'}

@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# pylint: disable=redefined-outer-name
+# pylint: disable=redefined-outer-name,unused-argument,protected-access
 "test peakcalling views"
-import os
-import warnings
 from   itertools                import repeat
-import pytest
 from   numpy.testing            import assert_allclose
+import numpy as np
 from   cleaning.processor       import DataCleaningTask, ClippingTask
 from   eventdetection.processor import ExtremumAlignmentTask, EventDetectionTask
 from   peakfinding.processor    import PeakSelectorTask
 from   peakcalling.processor    import FitToHairpinTask
-from   peakcalling.view         import AxisConfig, FoVStatsPlot
-from   peakcalling.view._statsplot import (     # pylint: disable=protected-access
+from   peakcalling.model        import AxisConfig, Slice
+from   peakcalling.view         import FoVStatsPlot
+from   peakcalling.view._statsplot import (
     _BeadStatusPlot, _HairpinPlot, _PeaksPlot
 )
 from   taskmodel.track          import TrackReaderTask, DataSelectionTask
@@ -21,11 +20,25 @@ from   taskcontrol.beadscontrol import DataSelectionBeadController
 from   tests.testutils          import integrationmark
 from   tests.testingcore        import path as utpath
 
-_EVT  = 'peakcalling.view.jobs.stop'
+def _check_validity(fig, name = 'count (%)'):
+    if isinstance(fig, dict):
+        assert fig['yaxis']['axis_label'] == name
+        stats = fig['_stats']['data']
+    else:
+        assert fig.yaxis[0].axis_label == name
+        stats = fig.renderers[0].data_source.data
 
-@pytest.fixture(scope="session")
-def cache_dir(tmpdir_factory):
-    return tmpdir_factory.mktemp("diskcache_dir")
+    if name == "count (%)":
+        for i in ('bottom', 'top'):
+            assert np.isfinite(stats[i]).sum() == 0
+        assert_allclose(stats['boxcenter']*2., stats['boxheight'], atol = 1e-5, rtol = 1e-5)
+        return
+
+    for i in ('bottom', 'top'):
+        assert np.isnan(stats[i]).sum() == 0
+
+    assert np.all(stats['bottom'] <= stats['boxcenter'])
+    assert np.all(stats['top']    >= stats['boxcenter'])
 
 class _Fig:
     extra_x_ranges = {'beadcount': 'beadcount'}
@@ -67,93 +80,6 @@ class _Fig:
 
         mdl.tasks.tasks.tasks.add(create(lst))
 
-def _server(bokehaction, cache_dir, name, evt = _EVT):
-    # pylint: disable=protected-access,unused-import,import-outside-toplevel
-    filters = [
-        (FutureWarning,      ".*elementwise comparison failed;.*"),
-        (RuntimeWarning,     ".*All-NaN slice encountered.*"),
-        (DeprecationWarning, ".*elementwise comparison failed;.*"),
-        (DeprecationWarning, '.*Using or importing the ABCs from.*'),
-        (DeprecationWarning, '.*the html argument of XMLParser.*'),
-        (DeprecationWarning, '.*defusedxml.lxml is no longer supported and .*'),
-    ]
-
-    with warnings.catch_warnings():
-        for i, j in filters:
-            warnings.filterwarnings('ignore', category = i, message = j)
-        import hybridstat.view._io  # noqa
-
-    server = bokehaction.start(
-        f'peakcalling.view.{name}',
-        'taskapp.toolbar',
-        filters = filters,
-        runtime = 'selenium'
-    )
-
-    server.ctrl.theme.model("peakcalling.diskcache").path = str(cache_dir)
-
-    for i in ('beads', 'stats'):
-        if f'peakcalling.view.{i}' in server.ctrl.theme:
-            server.ctrl.theme.model(f'peakcalling.view.{i}').tracknames = "full"
-
-    server.ctrl.theme.model("peakcalling.precomputations").multiprocess = (
-        'TEAMCITY_PROJECT_NAME' not in os.environ
-    )
-
-    fig = getattr(getattr(server.view.views[0], '_mainview'), '_fig')
-    server.load('big_legacy', rendered = evt)
-    return server, fig
-
-def _fovstatspeaks(bokehaction, cache_dir):
-    "creates a server with 2 fovs"
-    server, fig = _server(bokehaction, cache_dir, 'FoVStatsPlot', evt = True)
-
-    def _cmd():
-        bdctrl = DataSelectionBeadController(server.ctrl)
-        avail  = list(bdctrl.availablebeads)
-        with server.ctrl.action:
-            bdctrl.setdiscarded(server.ctrl, set(avail[5:]))
-
-    server.cmd(_cmd, rendered = _EVT)
-
-    def _cmd2():
-        bdctrl = DataSelectionBeadController(server.ctrl)
-        avail  = list(bdctrl.availablebeads)
-        with server.ctrl.action:
-            bdctrl.setdiscarded(server.ctrl, set(avail[:5]+avail[10:]))
-
-    server.load('big_legacy', rendered = True)
-    server.cmd(_cmd2, rendered = _EVT)
-    assert fig.yaxis[0].axis_label == "count (%)"
-
-    modal = server.selenium.modal("//span[@class='icon-dpx-cog']", True)
-    return (server, fig, modal)
-
-def _fovstatshairpin(bokehaction, cache_dir):
-    "creates a server with 2 fovs"
-    server, fig, modal = _fovstatspeaks(bokehaction, cache_dir)
-    _addhp(server)
-    return server, fig, modal
-
-@pytest.fixture
-def fovstatspeaks(bokehaction, cache_dir):
-    "creates a server with 2 fovs"
-    return _fovstatspeaks(bokehaction, cache_dir)
-
-@pytest.fixture
-def fovstatshairpin(bokehaction, cache_dir):
-    "creates a server with 2 fovs"
-    return _fovstatshairpin(bokehaction, cache_dir)
-
-def _addhp(server):
-    server.cmd(
-        lambda: server.ctrl.tasks.addtask(
-            next(next(server.ctrl.tasks.tasklist(...))),
-            FitToHairpinTask(sequences = utpath("hairpins.fasta"), oligos = "kmer")
-        ),
-        rendered = _EVT
-    )
-
 def _export(fov, tmp_path):
     tmp_path = tmp_path.with_suffix(".xlsx")
     if tmp_path.exists():
@@ -161,57 +87,8 @@ def _export(fov, tmp_path):
     assert fov.export(str(tmp_path))
     assert tmp_path.exists()
 
-@integrationmark
-def test_beadsplot(bokehaction, cache_dir):
-    "test the view"
-    server, fig = _server(bokehaction, cache_dir, 'BeadsScatterPlot')
-
-    assert fig.x_range.factors == list(zip(
-        repeat('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec'),
-        [
-            '0', '1', '2', '3', '4', '7', '8', '12', '13', '14', '17', '18', '23',
-            '24', '25', '27', '33', '34', '35', '37'
-        ]
-    ))
-
-    _addhp(server)
-
-    assert fig.x_range.factors == [
-        (j, i, k)
-        for i, (j, k) in zip(
-            repeat('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec'),
-            [
-                ('GF1', '14'), ('GF1', '33'), ('GF1', '1'), ('GF1', '7'), ('GF1', '34'),
-                ('GF1', '12'), ('GF1', '35'),
-                ('GF3', '27'), ('GF3', '13'), ('GF3', '3'), ('GF3', '17'), ('GF3', '37'),
-                ('GF3', '23'), ('GF3', '18'),
-                ('GF2', '25'), ('GF2', '2'),
-                ('GF4', '0'), ('GF4', '4'), ('GF4', '24')
-            ]
-        )
-    ]
-
-    server.cmd(
-        lambda: server.ctrl.display.update(
-            'peakcalling.view.beads', hairpins = {'015', 'GF2', 'GF3', 'GF4'}
-        ),
-        rendered = True
-    )
-
-    assert fig.x_range.factors == [
-        (j, i, k)
-        for i, (j, k) in zip(
-            repeat('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec'),
-            [
-                ('GF1', '14'), ('GF1', '33'), ('GF1', '1'), ('GF1', '7'), ('GF1', '34'),
-                ('GF1', '12'), ('GF1', '35'),
-            ]
-        )
-    ]
-
-def test_statsplot_info_simple(tmp_path):
+def test_statsplot_info_simple(diskcaching, tmp_path):
     "test the view without the view"
-    # pylint: disable=protected-access
     fov, mdl = _Fig.create()
 
     # testing for when there is nothing to plot
@@ -258,17 +135,10 @@ def test_statsplot_info_simple(tmp_path):
         cache   = _change(tpe, yaxis = 'hybridisationrate', xaxis = ['track', 'status'])
         factors = [(i, j, k.replace('\u2063', '')) for i, j, k in cache['x_range']['factors']]
         if tpe:
-            assert factors == list(zip(
-                repeat(''), repeat(''),
-                ['baseline', 'blockage', 'single strand', '> single strand'],
-            ))
+            assert factors == list(zip(repeat(''), repeat(''), ['baseline', 'blockage']))
         else:
             assert factors == list(zip(
-                repeat(''), repeat(''),
-                [
-                    'baseline', 'identified', 'missing', 'unidentified',
-                    'single strand', '> single strand'
-                ],
+                repeat(''), repeat(''), ['baseline', 'identified', 'unidentified']
             ))
 
     _check(True)
@@ -283,9 +153,8 @@ def test_statsplot_info_simple(tmp_path):
 
     _check(False)
 
-def test_statsplot_info_hpins(tmp_path):
+def test_statsplot_info_hpins(diskcaching, tmp_path):
     "test the view"
-    # pylint: disable=protected-access
     fov, mdl = _Fig.create(beads = list(range(5)),     withhp = True)
     _Fig.newtasks(mdl, beads = list(range(5, 10)), withhp = True)
 
@@ -308,10 +177,7 @@ def test_statsplot_info_hpins(tmp_path):
     assert cache['x_range']['factors'] == [
         ('\u2063baseline', '', ''),
         ('\u2063\u2063identified', '', ''),
-        ('\u2063\u2063\u2063missing', '', ''),
         ('\u2063\u2063\u2063\u2063unidentified', '', ''),
-        ('\u2063\u2063\u2063\u2063\u2063\u2063single strand', '', ''),
-        ('\u2063\u2063\u2063\u2063\u2063\u2063\u2063> single strand', '', '')
     ]
 
     cache = _change(yaxis = 'bead', xaxis = ['hairpin'])
@@ -332,8 +198,7 @@ def test_statsplot_info_hpins(tmp_path):
         [
             '38.0', '46.0', '151.0', '157.0', '222.0', '258.0', '274.0', '294.0',
             '347.0', '357.0', '379.0', '393.0', '503.0', '540.0', '569.0', '576.0',
-            '631.0', '659.0', '704.0', '738.0', '754.0', '784.0', '791.0', '795.0',
-            '800.0'
+            '659.0', '704.0', '738.0', '754.0', '784.0', '791.0', '795.0', '800.0'
         ],
         repeat(""), repeat(""),
     ))
@@ -371,8 +236,79 @@ def test_statsplot_info_hpins(tmp_path):
     assert cache['yaxis']['axis_label'] == 'missing (bp⁻¹)'
     assert cache['x_range']['factors'] == [('+', '', ''), ('\u2063-', '', '')]
 
+def test_statsplot_info_fnperbp(diskcaching):
+    "test the view"
+    fov, mdl = _Fig.create(beads = [1, 7, 14, 33, 12], withhp = True)
+    mdl.tasks.jobs.launch(list(mdl.tasks.processors.values()))
+
+    mdl.theme.__dict__.update(
+        xinfo = [AxisConfig("hairpin"), AxisConfig("closest")],
+        yaxis = "fnperbp"
+    )
+    cache = dict(_HairpinPlot(fov, mdl.tasks.processors)._reset())
+    assert cache['x_range']['factors'] == list(zip(
+        repeat('GF1'), repeat(""), ['157.0', '258.0', '393.0', '503.0', '704.0', '795.0']
+    ))
+
+    stats = cache['_stats']['data']
+    for i in ('bottom', 'top'):
+        assert np.isnan(stats[i]).sum() == 0
+
+    assert np.all(stats['bottom'] <= stats['boxcenter'])
+    assert np.all(stats['top']    >= stats['boxcenter'])
+
+def test_statsplot_info_filter(diskcaching):
+    "test the view"
+    beads, mdl = _Fig.create(beads = [1, 7, 14, 33, 12], withhp = True)
+    mdl.tasks.jobs.launch(list(mdl.tasks.processors.values()))
+
+    mdl.theme.__dict__.update(
+        xinfo = [AxisConfig("hairpin"), AxisConfig("closest")],
+        yaxis = "fnperbp"
+    )
+
+    cache = dict(_HairpinPlot(beads, mdl.tasks.processors)._reset())
+    assert cache['x_range']['factors'] == list(zip(
+        repeat('GF1'), repeat(""), ['157.0', '258.0', '393.0', '503.0', '704.0', '795.0']
+    ))
+
+    mdl.display.ranges[('peaks', 'baseposition')] = Slice(200, 400)
+    cache = dict(_HairpinPlot(beads, mdl.tasks.processors)._reset())
+    assert cache['x_range']['factors'] == list(zip(
+        repeat('GF1'), repeat(""), ['258.0', '393.0']
+    ))
+
+def test_statsplot_info_hpins1(diskcaching):
+    "test the view"
+    fov, mdl = _Fig.create(withhp = True)
+    mdl.tasks.jobs.launch(list(mdl.tasks.processors.values()))
+    mdl.theme.__dict__.update(xinfo = [AxisConfig("status")], yaxis = "averageduration")
+    cache = dict(_HairpinPlot(fov, mdl.tasks.processors)._reset())
+    _check_validity(cache, "binding duration (s)")
+    assert cache['x_range']['factors'] == [
+        ('\u2063baseline', '', ''),
+        ('\u2063\u2063identified', '', ''),
+        ('\u2063\u2063\u2063\u2063unidentified', '', ''),
+    ]
+
+def test_statsplot_info_hpins3(diskcaching):
+    "test the view"
+    fov, mdl = _Fig.create(withhp = True)
+    mdl.tasks.jobs.launch(list(mdl.tasks.processors.values()))
+    mdl.theme.__dict__.update(xinfo = [AxisConfig("closest")], yaxis = "distance")
+    cache = dict(_HairpinPlot(fov, mdl.tasks.processors)._reset())
+    _check_validity(cache, "Δ(binding - blockage) (bp)")
+    assert cache['x_range']['factors'] == list(zip(
+        [
+            '38.0', '46.0', '151.0', '157.0', '222.0', '258.0', '274.0', '294.0',
+            '347.0', '357.0', '379.0', '393.0', '503.0', '540.0', '569.0', '576.0',
+            '659.0', '704.0', '738.0', '754.0', '784.0', '791.0', '795.0', '800.0'
+        ],
+        repeat(""), repeat(""),
+    ))
+
 @integrationmark
-def test_statsplot_view_simple(bokehaction, cache_dir):
+def test_statsplot_view_simple(pkviewserver):
     "test the view"
 
     def _change(rendered = True, xaxis = None, **kwa):
@@ -411,30 +347,27 @@ def test_statsplot_view_simple(bokehaction, cache_dir):
             assert factors == list(zip(
                 repeat('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec'),
                 repeat(""),
-                ['baseline', 'blockage', 'single strand', '> single strand']
+                ['baseline', 'blockage']
             ))
         else:
             assert factors == list(zip(
                 repeat('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec'),
                 repeat(""),
-                [
-                    'baseline', 'identified', 'missing', 'unidentified',
-                    'single strand', '> single strand'
-                ]
+                ['baseline', 'identified', 'unidentified']
             ))
 
         _change(xaxis = ['track', 'beadstatus'], yaxis = 'bead', rendered = True)
         _checkbsfact(tpe)
 
-    server, fig = _server(bokehaction, cache_dir, 'FoVStatsPlot')
+    server, fig = pkviewserver()
     _check(True)
-    _addhp(server)
+    server.addhp()
     _check(False)
 
 @integrationmark
-def test_statsplot_view_peaks1(bokehaction, cache_dir):
+def test_statsplot_view_peaks1(pkviewserver):
     "test the view"
-    server, fig = _server(bokehaction, cache_dir, 'FoVStatsPlot', evt = True)
+    server, fig = pkviewserver(evt = True)
 
     def _cmd():
         bdctrl = DataSelectionBeadController(server.ctrl)
@@ -442,7 +375,7 @@ def test_statsplot_view_peaks1(bokehaction, cache_dir):
         with server.ctrl.action:
             bdctrl.setdiscarded(server.ctrl, set(avail[5:]))
 
-    server.cmd(_cmd, rendered = _EVT)
+    server.cmd(_cmd, rendered = pkviewserver.EVT)
 
     def _cmd2():
         bdctrl = DataSelectionBeadController(server.ctrl)
@@ -451,9 +384,9 @@ def test_statsplot_view_peaks1(bokehaction, cache_dir):
             bdctrl.setdiscarded(server.ctrl, set(avail[:5]+avail[10:]))
 
     server.load('big_legacy', rendered = True)
-    server.cmd(_cmd2, rendered = _EVT)
+    server.cmd(_cmd2, rendered = pkviewserver.EVT)
 
-    assert fig.yaxis[0].axis_label == "count (%)"
+    _check_validity(fig)
     assert fig.x_range.factors == [
         ('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', 'ok'),
         ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', 'ok'),
@@ -462,13 +395,13 @@ def test_statsplot_view_peaks1(bokehaction, cache_dir):
         ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', '\u2063∑|dz|')
     ]
 
-    modal = server.selenium.modal("//span[@class='icon-dpx-cog']", True)
+    modal = server.selenium.modal("//span[@class='icon-dpx-stats-bars']", True)
     with modal:
         modal.tab("Bead Status")
         for i in (5, 6):  # '% good', 'non-closing'
             modal[f'//input[@name="beadstatustag[{i}]"]'] = "bad"
     server.wait()
-    assert fig.yaxis[0].axis_label == "count (%)"
+    _check_validity(fig)
     assert fig.x_range.factors == [
         ('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', 'ok'),
         ('1-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec', '', 'ok'),
@@ -479,7 +412,7 @@ def test_statsplot_view_peaks1(bokehaction, cache_dir):
     with modal:
         modal.select("//select[@name='xinfo[0].name']", "tracktag")
     server.wait()
-    assert fig.yaxis[0].axis_label == "count (%)"
+    _check_validity(fig)
     assert fig.x_range.factors == [
         ('none', '', 'ok'), ('none', '', '\u2063bad'), ('none', '', '\u2063∑|dz|')
     ]
@@ -492,20 +425,16 @@ def test_statsplot_view_peaks1(bokehaction, cache_dir):
 
     assert fig.x_range.factors == [
         ('\u2063baseline', '', ''),
-        ('\u2063\u2063\u2063\u2063\u2063blockage', '', ''),
-        ('\u2063\u2063\u2063\u2063\u2063\u2063single strand', '', ''),
-        ('\u2063\u2063\u2063\u2063\u2063\u2063\u2063> single strand', '', '')
+        ('\u2063\u2063\u2063\u2063\u2063blockage', '', '')
     ]
-    assert fig.yaxis[0].axis_label == "binding duration (s)"
+    _check_validity(fig, "binding duration (s)")
 
-    _addhp(server)
-    assert fig.yaxis[0].axis_label == "binding duration (s)"
+    server.addhp()
+    _check_validity(fig, "binding duration (s)")
     assert fig.x_range.factors == [
         ('\u2063baseline', '', ''),
         ('\u2063\u2063identified', '', ''),
-        ('\u2063\u2063\u2063missing', '', ''),
         ('\u2063\u2063\u2063\u2063unidentified', '', ''),
-        ('\u2063\u2063\u2063\u2063\u2063\u2063single strand', '', '')
     ]
 
 @integrationmark
@@ -521,7 +450,7 @@ def test_statsplot_view_peaks2(fovstatspeaks):
         modal["//input[@name='tracktag[1]']"] = "bbb"
     server.wait()
 
-    assert fig.yaxis[0].axis_label == "count (%)"
+    _check_validity(fig)
     assert set(fig.x_range.factors) == {('aaa', '', ''), ('bbb', '', '')}
     assert fig.extra_x_ranges['beadcount'].factors == [('', '', '5'), ('\u2063', '', '2\u2063')]
 
@@ -530,28 +459,9 @@ def test_statsplot_view_peaks2(fovstatspeaks):
         modal["//input[@name='beadmask[0]']"] = "0, 1"
     server.wait()
 
-    assert fig.yaxis[0].axis_label == "count (%)"
+    _check_validity(fig)
     assert set(fig.x_range.factors) == {('aaa', '', ''), ('bbb', '', '')}
     assert fig.extra_x_ranges['beadcount'].factors == [("", "", '3'), ("\u2063", "", '2\u2063')]
-
-@integrationmark
-def test_statsplot_view_hpins1(fovstatshairpin):
-    "test the view"
-    server, fig, modal = fovstatshairpin
-    with modal:
-        modal.select("//select[@name='xinfo[0].name']", "status")
-        modal.select("//select[@name='xinfo[1].name']", "xxx")
-        modal.select("//select[@name='yaxis']", "averageduration")
-    server.wait()
-
-    assert fig.yaxis[0].axis_label == "binding duration (s)"
-    assert fig.x_range.factors == [
-        ('\u2063baseline', '', ''),
-        ('\u2063\u2063identified', '', ''),
-        ('\u2063\u2063\u2063missing', '', ''),
-        ('\u2063\u2063\u2063\u2063unidentified', '', ''),
-        ('\u2063\u2063\u2063\u2063\u2063\u2063single strand', '', '')
-    ]
 
 @integrationmark
 def test_statsplot_view_hpins2(fovstatshairpin):
@@ -563,7 +473,7 @@ def test_statsplot_view_hpins2(fovstatshairpin):
         modal.select("//select[@name='xinfo[1].name']", "xxx")
     server.wait()
 
-    assert fig.yaxis[0].axis_label == "count (%)"
+    _check_validity(fig)
     assert fig.x_range.factors == list(zip(
         ['GF4', 'GF1', 'GF2', 'GF3'], repeat(""), repeat(""),
     ))
@@ -577,30 +487,8 @@ def test_statsplot_view_hpins2(fovstatshairpin):
             )
     server.wait()
 
-    assert fig.yaxis[0].axis_label == "count (%)"
+    _check_validity(fig)
     assert fig.x_range.factors == list(zip(['GF4', 'GF1'], repeat(""), repeat("")))
-
-@integrationmark
-def test_statsplot_view_hpins3(fovstatshairpin):
-    "test the view"
-    server, fig, modal = fovstatshairpin
-    with modal:
-        modal.select("//select[@name='xinfo[0].name']", "closest")
-        modal.select("//select[@name='xinfo[1].name']", "xxx")
-        modal.select("//select[@name='xinfo[2].name']", "xxx")
-        modal.select("//select[@name='yaxis']", "distance")
-    server.wait()
-
-    assert fig.yaxis[0].axis_label == "Δ(binding - blockage) (bp)"
-    assert fig.x_range.factors == list(zip(
-        [
-            '38.0', '46.0', '151.0', '157.0', '222.0', '258.0', '274.0', '294.0',
-            '347.0', '357.0', '379.0', '393.0', '503.0', '540.0', '569.0', '576.0',
-            '631.0', '659.0', '704.0', '738.0', '754.0', '784.0', '791.0', '795.0',
-            '800.0'
-        ],
-        repeat(""), repeat(""),
-    ))
 
 @integrationmark
 def test_statsplot_view_hpins4(fovstatshairpin):
@@ -619,7 +507,7 @@ def test_statsplot_view_hpins4(fovstatshairpin):
             )
     server.wait()
 
-    assert fig.yaxis[0].axis_label == "count (%)"
+    _check_validity(fig)
     assert fig.x_range.factors == [
         ('157.0', '', '+'), ('258.0', '', '+'), ('393.0', '', '\u2063-'),
         ('503.0', '', '\u2063-'), ('704.0', '', '+'), ('795.0', '', '\u2063-')
@@ -640,7 +528,7 @@ def test_statsplot_view_hpins5(fovstatshairpin):
                 modal[f"//input[@name='hairpinsel[{i}]']"]
             )
     server.wait()
-    assert fig.yaxis[0].axis_label == "count (%)"
+    _check_validity(fig)
     assert fig.x_range.factors == [
         ('+', '', '157.0'), ('+', '', '258.0'), ('+', '', '704.0'),
         ('\u2063-', '', '393.0'), ('\u2063-', '', '503.0'), ('\u2063-', '', '795.0')
@@ -661,7 +549,7 @@ def test_statsplot_view_hpins6(fovstatshairpin):
                 modal[f"//input[@name='hairpinsel[{i}]']"]
             )
     server.wait()
-    assert fig.yaxis[0].axis_label == "missing (% bindings)"
+    _check_validity(fig, "missing (% bindings)")
     assert fig.x_range.factors == list(zip(['GF1', 'GF4'], repeat(""), repeat("")))
 
     with modal:
@@ -669,28 +557,36 @@ def test_statsplot_view_hpins6(fovstatshairpin):
         modal.select("//select[@name='xinfo[1].name']", "xxx")
         modal.select("//select[@name='yaxis']", "fnperbp")
 
-    assert fig.yaxis[0].axis_label == 'missing (bp⁻¹)'
+    _check_validity(fig, 'missing (bp⁻¹)')
     assert fig.x_range.factors == list(zip(['+', '\u2063-'], repeat(""), repeat("")))
 
 @integrationmark
-def test_diskcache_view(bokehaction, cache_dir):
+def test_statsplot_view_hpins7(pkviewserver):
     "test the view"
-    server, fig = _server(bokehaction, cache_dir, 'FoVStatsPlot', evt = True)
-    server.cmd(lambda: None, rendered = _EVT)
-    modal = server.selenium.modal("//span[@class='icon-dpx-download2']", True)
-    sz    = len(fig.renderers[0].data_source.data['boxheight'])
-    assert sz > 0
+    server, fig = pkviewserver()
+    server.addhp()
+    modal       = server.selenium.modal("//span[@class='icon-dpx-stats-bars']", True)
     with modal:
-        modal["//input[@name='items[0].loaded']"].click()
+        modal.select("//select[@name='xinfo[0].name']", "hairpin")
+        modal.select("//select[@name='xinfo[1].name']", "closest")
+        modal.select("//select[@name='yaxis']", "fnperbp")
+        modal.tab("Hairpins")
+        for i in (0, 2, 3, 4):
+            modal.driver.execute_script(
+                f"arguments[0].removeAttribute('checked')",
+                modal[f"//input[@name='hairpinsel[{i}]']"]
+            )
     server.wait()
-    assert len(fig.renderers[0].data_source.data['boxheight']) == 1
-    with modal:
-        modal["//input[@name='items[0].loaded']"].click()
-    server.wait()
-    assert len(fig.renderers[0].data_source.data['boxheight']) == sz
+    _check_validity(fig, 'missing (bp⁻¹)')
 
 
 if __name__ == '__main__':
+    from pathlib import Path
+    from importlib import import_module
     from tests.testingcore.bokehtesting import BokehAction
     with BokehAction(None) as bka:
-        test_diskcache_view(bka)
+        test_statsplot_view_peaks2(
+            getattr(
+                import_module("tests.peakcalling.conftest"), '_fovstatspeaks'
+            )(bka, Path("/tmp/disk_dir"), "")
+        )

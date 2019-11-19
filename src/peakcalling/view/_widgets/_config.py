@@ -8,20 +8,29 @@ from typing              import Dict, List, Any
 from data.trackops       import trackname
 from modaldialog.button  import ModalDialogButton, DialogButtonConfig
 from taskmodel           import RootTask
-from .._model             import (
-    AxisConfig, FoVStatsPlotModel, COLS, INVISIBLE
+from ...model            import (
+    AxisConfig, FoVStatsPlotModel, getcolumn, BinnedZ, COLS, Slice, INVISIBLE
 )
 from ._jobsstatus        import hairpinnames
+
+_FILTER_CNV = [
+    (("peaks", "peakposition"), 'pkfilter'),
+    (("peaks", "baseposition"), 'bpfilter'),
+    (("peaks", "closest"),      'bindfilter'),
+]
+
 
 class PeakcallingPlotConfig(DialogButtonConfig):
     "configure axes choice"
     def __init__(self):
-        super().__init__('peakcalling.view.axes', 'Plots')
+        super().__init__('peakcalling.view.axes', 'Plotting', icon = 'stats-bars')
         self.none: str = "none"
 
 class PeakcallingPlotModel:     # pylint: disable=too-many-instance-attributes
     "configure xaxis choice"
     def __init__(self, mdl: FoVStatsPlotModel, cnf: PeakcallingPlotConfig):
+        self.binnedz:        BinnedZ = deepcopy(mdl.theme.binnedz)
+        self.binnedbp:       BinnedZ = deepcopy(mdl.theme.binnedbp)
         self.closest:        int     = mdl.theme.closest
         self.stretch:        float   = round(mdl.theme.stretch, 2)
         self.uselabelcolors: bool    = mdl.theme.uselabelcolors
@@ -46,8 +55,10 @@ class PeakcallingPlotModel:     # pylint: disable=too-many-instance-attributes
             for i in mdl.theme.orientationtag.keys()
         ]
         self.norm: str = next(
-            (str(i) for i in self.xinfo if not i.norm and i.name != 'xxx'), '0'
+            (str(i+1) for i, j in enumerate(self.xinfo) if not j.norm and j.name != 'xxx'), '0'
         )
+
+        self.__dict__.update({j: mdl.display.ranges.get(i, Slice()) for i, j in _FILTER_CNV})
 
     reset = __init__
 
@@ -58,6 +69,7 @@ class PeakcallingPlotModel:     # pylint: disable=too-many-instance-attributes
         diff: Dict[str, Dict[str, Any]] = {'display': {}, 'theme': {}}
         for i, j, k in chain(
                 self.__diff_axes(right),
+                self.__diff_filters(right),
                 self.__diff_tracks(right),
                 self.__diff_hairpins(right),
                 self.__diff_orientation(right, model),
@@ -72,9 +84,19 @@ class PeakcallingPlotModel:     # pylint: disable=too-many-instance-attributes
         for i in ('closest', 'stretch', 'uselabelcolors'):
             if abs(getattr(self, i) - getattr(right, i)) > 1e-2:
                 yield ('theme', i, getattr(right, i))
-        for i in ('tracknames',):
+
+        right.binnedz.reset(.1)
+        right.binnedbp.reset(10)
+        for i in ('tracknames', 'binnedz', 'binnedbp'):
             if getattr(self, i) != getattr(right, i):
                 yield ('theme', i, getattr(right, i))
+
+    def __diff_filters(self, right: 'PeakcallingPlotModel'):
+        empty  = Slice()
+        dleft  = {i: getattr(self,  j) for i, j in _FILTER_CNV if i and i != empty}
+        dright = {i: getattr(right, j) for i, j in _FILTER_CNV if i and i != empty}
+        if dleft != dright:
+            yield ('display', 'ranges', dright)
 
     def __diff_axes(self, right: 'PeakcallingPlotModel'):
         cpy = deepcopy(right.xinfo)
@@ -143,12 +165,13 @@ class PeakcallingPlotModel:     # pylint: disable=too-many-instance-attributes
                 {j for i, j in zip(right.tracksel, right.roots) if not i}
             )
 
+        right.beadmask = [i or [] for i in right.beadmask]
         if any(i != j for i, j in zip(self.beadmask, right.beadmask)):
             yield (
                 'display', 'beads',
                 {
                     i: k
-                    for i, j, k in zip(right.roots, self.beadmask, right.beadmask)
+                    for i, j, k in zip(right.roots, self.beadmask, right.beadmask or [])
                     if j != k
                 }
             )
@@ -296,21 +319,16 @@ class PeakcallingPlotWidget(ModalDialogButton[PeakcallingPlotConfig, Peakcalling
             getattr(ctrl, i).update(getattr(self._model, i), **j)
 
     def _body(self, current):
-        return f"""
-            ㄩ Plot Configuration
-
-            {self._body_axes(current)}
-
-            {self._body_tracks(current)}
-
-            {self._body_tags('Blockage', 'statustag')}
-
-            {self._body_tags('Bead', 'beadstatustag')}
-
-            {self._body_hairpins(current)}
-
-            {self._body_orientations(current)}
-        """.replace("ㄩ", "#")
+        return (
+            """# Plot Configuration
+            """
+            + self._body_axes(current)
+            + self._body_tracks(current)
+            + self._body_blockage()
+            + self._body_tags('Bead', 'beadstatustag')
+            + self._body_hairpins(current)
+            + self._body_orientations(current)
+        ).replace("ㄩ", "#")
 
     def _body_axes(self, current):
         cols   = {i.key: i for i in COLS if i.label}
@@ -347,6 +365,18 @@ class PeakcallingPlotWidget(ModalDialogButton[PeakcallingPlotConfig, Peakcalling
             {_JSWidgetVericicator(xaxis, yaxis)()}
         """.strip()
 
+    def _body_blockage(self):
+        return self._body_tags('Blockage', 'statustag').replace(
+            'Status\n',
+            f"""Status & Z
+            {getcolumn('binnedz').label} bin width     %(binnedz.width).2F
+
+            ** Mask data not within the following range:**
+            %(pkfilter.start).3of  ≤ {getcolumn('peakposition').label} ≤  %(pkfilter.stop).3of
+
+            """
+        )
+
     def _body_tags(self, title: str, attr: str):
         vals = getattr(self._model.theme, attr).values()
         line = f"""
@@ -354,8 +384,7 @@ class PeakcallingPlotWidget(ModalDialogButton[PeakcallingPlotConfig, Peakcalling
         return (
             f"""
             ㄩㄩ {title.capitalize()} Status
-            <b> Rename and regroup labels</b>
-            """
+            ** Rename and regroup labels**"""
             + "".join(line.format(i = i) for i in enumerate(vals))
         )
 
@@ -365,14 +394,18 @@ class PeakcallingPlotWidget(ModalDialogButton[PeakcallingPlotConfig, Peakcalling
             return ""
 
         line = """
-            {i[1]: <20}    %(hairpinsel[{i[0]}])b"""
+            %(hairpinsel[{i[0]}])b   {i[1]: <20}"""
         return (
-            """
+            f"""
             ㄩㄩ Hairpins
-            True positives: Δ|blockage - binding| <    %(closest)D
+            {getcolumn('binnedbp').label} bin width                %(binnedbp.width)D
+            {getcolumn('closest').label}: Δ|blockage - binding| <  %(closest)D
 
-            <b> Check which hairpins to consider</b>
-            """
+            ** Mask data not within the following ranges:**
+            %(bpfilter.start)od    ≤ {getcolumn('baseposition').label} ≤  %(bpfilter.stop)od
+            %(bindfilter.start)oD  ≤ {getcolumn('closest').label} ≤       %(bindfilter.stop)oD
+
+            ** Check which hairpins to display**"""
             + "".join(line.format(i = i) for i in enumerate(current.hairpins))
         )
 
@@ -381,12 +414,11 @@ class PeakcallingPlotWidget(ModalDialogButton[PeakcallingPlotConfig, Peakcalling
             return ""
 
         line = """
-            {i[1]: <20}    %(orientationsel[{i[0]}])b"""
+            %(orientationsel[{i[0]}])b   {i[1]: <20}"""
         return (
             """
             ㄩㄩ Binding Orientation
-            <b> Check which binding orientations to consider</b>
-            """
+            ** Check which binding orientations to display**"""
             + "".join(
                 line.format(i = i)
                 for i in enumerate(self._model.theme.orientationtag.values())
@@ -399,12 +431,11 @@ class PeakcallingPlotWidget(ModalDialogButton[PeakcallingPlotConfig, Peakcalling
             return ""
 
         line = """
-            {i}-{j: <20}    %(tracktag[{i}])250s    %(tracksel[{i}])b     %(beadmask[{i}])csvd"""
+            %(tracksel[{i}])b  {i}-{j: <20}  %(tracktag[{i}])250s  %(beadmask[{i}])ocsvd"""
         return (
             """
             ㄩㄩ Tracks
 
-            !!    Group name    Selected    Discarded beads
-            """
+            !!    <b>Group</b>  <b>Discarded beads</b>"""
             + "".join(line.format(i = i, j = trackname(j)) for i, j in enumerate(current.roots))
         )

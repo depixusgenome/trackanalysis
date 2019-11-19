@@ -65,7 +65,7 @@ export class DpxToolbarView extends WidgetView {
         else
             str = `<button type='button' id='dpx-tb-${name}' `+
                 `class='${freeze} bk bk-btn bk-btn-default' `+
-                  `data-balloon='${ttip}' `+
+                  `aria-label='${ttip}' `+
                     'data-balloon-length="medium" data-balloon-pos="right">'+
                   label+'</button>'
         return str

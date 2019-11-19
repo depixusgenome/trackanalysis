@@ -8,3 +8,4 @@ from ._jobsstatus import (
 from ._config     import PeakcallingPlotConfig, PeakcallingPlotWidget
 from ._exporter   import CSVExporter
 from ._explorer   import StorageExplorerConfig, StorageExplorer
+from ._main       import MasterWidget

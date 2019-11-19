@@ -45,7 +45,7 @@ export class DpxFitParamsView extends WidgetView {
 
     render(): void {
         super.render()
-        const dbal  : string   =  'data-balloon="'
+        const dbal  : string   =  'aria-label="'
         const pos   : string   = '" data-balloon-length="medium" data-balloon-pos="right"'
         const ttips : string[] = [
             dbal+'Force a stretch value (base/µm)'+pos,

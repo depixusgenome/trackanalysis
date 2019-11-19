@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Display the status of running jobs"
-from dataclasses         import dataclass
+from dataclasses         import dataclass, field
 from functools           import partial
 from typing              import Dict, List, Set, Union
 from bokeh.models        import Div, Select
@@ -11,7 +11,7 @@ from data.trackio        import TrackIOError
 from taskmodel           import RootTask
 from taskmodel.dataframe import DataFrameTask
 from ...processor        import FitToHairpinTask
-from .._model            import TasksModelController, BeadsScatterPlotStatus
+from ...model            import TasksModelController, BeadsScatterPlotStatus
 
 def hairpinnames(self: TasksModelController) -> Set[str]:
     "return the hairpins currently used by the processors"
@@ -22,7 +22,7 @@ def hairpinnames(self: TasksModelController) -> Set[str]:
                 items.update(set(task.fit) - {None})
     return items
 
-@dataclass
+@dataclass   # pylint: disable=too-many-instance-attributes
 class JobsStatusBarConfig:
     "The config for the status bar"
     name:      str = 'peakcalling.view.statusbar'
@@ -30,7 +30,35 @@ class JobsStatusBarConfig:
     height:    int = 28
     html:      str = '<table>{}</table>'
     sep:       str = ''
-    fmt:       str = '<tr><td><b>{key}:</b></td><td>{i: 5d}</td><td>/ {j: 5d}</td></tr>'
+    okfmt:     str = (
+        "<tr aria-label='{error}' data-balloon-pos='left' data-balloon-length='medium'>"
+        "<td><b>{self.index}:</b></td>"
+        "<td>{self.current:d}</td>"
+        "<td>&nbsp;/&nbsp;{self.total:d}</td>"
+        "</tr>"
+    )
+    kofmt:     str = okfmt.replace('>', ' style="color:red;">', 1)
+
+    msg: Dict[str, str] = field(default_factory = lambda: {
+        "fixed":     "This is a bug",
+        "ref":       "This is a bug",
+        "dataframe": "This is a bug",
+        "hairpin":   "Missing hairpins or oligos"
+    })
+
+@dataclass
+class _Info:
+    index:   int
+    total:   int = 0
+    error:   str = ""
+    current: int = 0
+
+    def format(self, cnf: JobsStatusBarConfig) -> str:
+        "return the line for this node"
+        return (cnf.kofmt if self.error else cnf.okfmt).format(
+            self  = self,
+            error = cnf.msg.get(self.error, self.error)
+        )
 
 class JobsStatusBar:
     "A status bar indicating the running jobs"
@@ -38,9 +66,9 @@ class JobsStatusBar:
     _doc:    Document
 
     def __init__(self, **kwa):
-        self._config: JobsStatusBarConfig       = JobsStatusBarConfig(**kwa)
-        self._vals:   Dict[RootTask, List[int]] = {}
-        self._idval:  int                       = -1
+        self._config: JobsStatusBarConfig   = JobsStatusBarConfig(**kwa)
+        self._vals:   Dict[RootTask, _Info] = {}
+        self._idval:  int                   = -1
 
     def swapmodels(self, ctrl):
         "swap with models in the controller"
@@ -69,31 +97,23 @@ class JobsStatusBar:
             self._doc.add_next_tick_callback(lambda: self._widget.update(text = txt))
 
     def _text(self) -> str:
-        itr = ((key, i, j) for key, (i, j) in self._vals.items() if key is not None)
-        txt = self._config.fmt
-        if '{key}' in txt:
-            keys = {j: i for i, j in enumerate(self._vals.keys())}
-            itms = (txt.format(key = keys[key], i = i, j = j) for key, i, j in itr)
-        else:
-            itms = (txt.format(i = i, j = j) for key, i, j in itr)
-        return self._config.html.format(self._config.sep.join(itms)).replace(' ', '&nbsp;')
+        itms = (j.format(self._config) for i, j in self._vals.items() if i is not None)
+        return self._config.html.format(self._config.sep.join(itms))
 
     def _onstop(self, idval, **_):
         if idval == self._idval:
             for i in self._vals.values():
-                i[0] = i[1]
+                i.current = i.total
             self._reset()
 
     def _onstart(  # pylint: disable=too-many-arguments
-            self, ctrl, model, idval, processors, calllater, **_
+            self, ctrl, model, idval, processors, missing, roots, calllater, **_
     ):
         if idval != model.jobs.display.calls:
             return
 
         @calllater.append
         def _later():
-            self._idval = None
-            self._vals.clear()
 
             def _keycnt(proc):
                 try:
@@ -106,7 +126,12 @@ class JobsStatusBar:
                         return len(cache)
                 return 0
 
-            self._vals.update({j.model[0]: [0, _keycnt(j)] for j in processors})
+            self._idval = None
+            self._vals.clear()
+            self._vals.update({i: _Info(roots.index(i), 0, j) for i, j in missing.items()})
+            self._vals.update({
+                j.model[0]: _Info(roots.index(j.model[0]), _keycnt(j)) for j in processors
+            })
             self._idval = idval
 
             self._reset()
@@ -119,7 +144,7 @@ class JobsStatusBar:
             **_
     ):
         if self._idval == idval:
-            self._vals[taskcache.model[0]][0] += len(beads)
+            self._vals[taskcache.model[0]].current += len(beads)
             self._reset()
 
 @dataclass

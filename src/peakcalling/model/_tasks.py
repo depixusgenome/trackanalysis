@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Updating list of jobs to run"
 from copy                       import deepcopy
+from collections                import OrderedDict
 from dataclasses                import dataclass, field
 from typing                     import (
     Dict, Union, Iterable, Type, Optional, ItemsView, List, Iterator, Tuple, KeysView, Any
@@ -13,6 +14,7 @@ import pandas as pd
 
 from cleaning.beadsubtraction      import FixedBeadDetection
 from cleaning.processor.__config__ import FixedBeadDetectionTask
+from data.trackio                  import TrackIOError
 from taskstore                     import dumps, loads
 from taskcontrol.taskcontrol       import ProcessorController
 from taskcontrol.processor         import Processor
@@ -20,7 +22,7 @@ from taskcontrol.processor.base    import register
 from taskmodel.application         import TasksConfig, TasksDisplay
 from taskmodel.dataframe           import DataFrameTask
 from taskmodel                     import RootTask, Task
-from ...processor.__config__       import FitToReferenceTask, FitToHairpinTask
+from ..processor.__config__        import FitToReferenceTask, FitToHairpinTask
 
 OptProc    = Optional[ProcessorController]
 ProcOrRoot = Union[RootTask, ProcessorController]
@@ -165,7 +167,7 @@ class TasksDict:
         return new
 
     def _reset_tasks(self, ctrl):
-        tasks = dict()
+        tasks = OrderedDict()
         cache = dict()
         for lst in ctrl.tasks.tasklist(...):
             root = next(lst, None)
@@ -200,11 +202,12 @@ class TasksMeasures:
         measures = dict(peaks = dict(**_MEASURES, all = True, falseneg = True))
     ))
 
-class TaskState:
+class TaskState:        # pylint: disable=too-many-instance-attributes
     "Deals with oligos, sequences & reference track"
     def __init__(self):
         self.name:          str                               = 'peakcalling.view.state'
         self.reference:     Optional[RootTask]                = None
+        self.seqpath:       Optional[str]                     = None
         self.sequences:     Dict[str, str]                    = {}
         self.probes:        Dict[RootTask, List[str]]         = {}
         self.processors:    Dict[Type[Task], Type[Processor]] = register()
@@ -216,7 +219,8 @@ class TaskState:
         self.reference = ctrl.display.get(
             "hybridstat.fittoreference", "reference", defaultvalue = None
         )
-        self.probes     = ctrl.display.get("sequence", "probes",    defaultvalue = {})
+        self.probes     = ctrl.display.get("sequence", "probes",  defaultvalue = {})
+        self.seqpath    = ctrl.theme.get("sequence", "path",      defaultvalue = None)
         self.sequences  = ctrl.theme.get("sequence", "sequences", defaultvalue = {})
         self.processors = ctrl.tasks.processortype(...)
         if ctrl.theme.model("fixedbeads") is not None:
@@ -228,8 +232,13 @@ class TaskState:
         @ctrl.theme.observe("sequence")
         @ctrl.theme.hashwith(self)
         def _onsequences(model, old, **_):
+            itms = {}
             if 'sequences' in old:
-                ctrl.display.update(self, sequences = model.sequences)
+                itms['sequences'] = model.sequences
+            if 'path' in old:
+                itms['seqpath'] = model.path
+            if itms:
+                ctrl.display.update(self, **itms)
 
         @ctrl.display.observe("sequence")
         @ctrl.display.hashwith(self)
@@ -278,9 +287,19 @@ class TasksModel:
         self.state.observe(ctrl)
 
     @property
+    def roots(self) -> Iterator[RootTask]:
+        "return root tasks"
+        return iter(self.tasks.tasks.keys())
+
+    @property
     def processors(self) -> Processors:
         """return the processors for new jobs"""
-        return _Adaptor(self)()
+        return _Adaptor(self)(False)
+
+    @property
+    def missingprocessors(self) -> Dict[RootTask, str]:
+        """return the processors for new jobs"""
+        return _Adaptor(self)(True)
 
 class _Adaptor:
     "Functor for creating a dictionnary of processors to send to JobRunner"
@@ -293,13 +312,26 @@ class _Adaptor:
     def __init__(self, mdl: TasksModel):
         self.__dict__.update(mdl.__dict__)
 
-    def __call__(self) -> Processors:
+    def __call__(self, withmissing = False) -> Processors:
         self._copies = {i: self.tasks.cleancopy(j) for i, j in self.tasks.items()}
+
+        missing: Dict[RootTask, str] = {}
+        initial                      = dict(self._copies)
+
         self.__fixedbead()
+        missing.update({i: "fixed" for i in set(initial) - set(missing) - set(self._copies)})
+
         self.__fittoreference()
+        missing.update({i: "ref" for i in set(initial) - set(missing) - set(self._copies)})
+
         self.__fittohairpin()
+        missing.update({i: "hairpin" for i in set(initial) - set(missing) - set(self._copies)})
+
         self.__dataframe()
-        return self.__dict__.pop('_copies')
+        missing.update({i: "dataframe" for i in set(initial) - set(missing) - set(self._copies)})
+
+        out = self.__dict__.pop('_copies')
+        return missing if withmissing else out
 
     def __add(self, procs, task):
         if task:
@@ -327,8 +359,13 @@ class _Adaptor:
                 continue
 
             if ind is None:
-                track = TasksDisplay(taskcache = procs).track
-                dflts = getattr(self.config, track.instrument['type'].name)
+                try:
+                    track = TasksDisplay(taskcache = procs).track
+                    dflts = getattr(self.config, track.instrument['type'].name)
+                except TrackIOError:
+                    procs.remove(ind)
+                    continue
+
                 task  = deepcopy(dflts[taskname])
             else:
                 task  = deepcopy(procs.model[ind])
@@ -373,24 +410,9 @@ class _Adaptor:
 
         task: FitToHairpinTask
         for procs, task in itr:
-            # try to update task attributes until it can be resolved:
-            # until task.fit is not null
-
-            if not self.__resolved(task) and not task.oligos:
-                task.oligos = self.state.probes.get(procs.model[0], None)
-
+            # if cannot resolve task: remove
             task = task.resolve(procs.model[0].path)
-
-            if not self.__resolved(task) and not task.oligos:
-                task.oligos = self.state.defaultprobes
-                task        = task.resolve(procs.model[0].path)
-
-            if not self.__resolved(task) and not task.sequences:
-                task.sequences = self.state.sequences
-                task           = task.resolve(procs.model[0].path)
-
-            # if unresolved: request the processors to be removed from the list
-            itr.send(False if len(set(task.fit) - {None}) == 0 else task)
+            itr.send(task if self.__resolved(task) else False)
 
     def __dataframe(self):
         task  = self.dataframes.fits if self.__hasfits() else self.dataframes.peaks

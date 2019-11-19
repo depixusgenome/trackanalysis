@@ -65,7 +65,7 @@ export class DpxCleaningView extends WidgetView {
 
     render(): void {
         super.render()
-        const dbal  = 'data-balloon="'
+        const dbal  = 'aria-label="'
         const pos   = '" data-balloon-length="medium" data-balloon-pos="right"'
         let   ttips = [
             dbal+'Average of listed bead is subtracted from other beads'+pos,

@@ -21,10 +21,8 @@ from   data.trackops           import trackname
 from   view.colors             import tohex
 from   view.threaded           import ThreadedDisplay
 from   taskstore               import dumps
-from   ._model                 import FoVStatsPlotModel, INVISIBLE, COLS, BeadsPlotTheme
-from   ._widgets               import (
-    JobsStatusBar, JobsHairpinSelect, PeakcallingPlotWidget, StorageExplorer
-)
+from   ..model                 import FoVStatsPlotModel, INVISIBLE, COLS, BeadsPlotTheme
+from   ._widgets               import MasterWidget
 from   ._threader              import BasePlotter, PlotThreader
 
 _DATA  = Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]
@@ -39,7 +37,6 @@ def boxbottom(val):
 def boxtop(val):
     "the 3rd quartile"
     return np.nanpercentile(val, 75)
-
 
 class XlsxReport:
     "export to xlsx"
@@ -101,8 +98,9 @@ class XlsxReport:
             mdl, plot, processors, sheetnames
     ) -> List[Tuple[pd.DataFrame, Dict[str, Any]]]:
         plot.compute()
-        tracks = np.array([trackname(i.model[0]) for i in processors])
-        cnv    = dict(mdl.theme.xaxistag, **mdl.theme.yaxistag)
+        tracks   = {hash(i.model[0]): trackname(i.model[0]) for i in processors}
+        trackids = {hash(j.model[0]): i for i, j  in enumerate(processors)}
+        cnv      = dict(mdl.theme.xaxistag, **mdl.theme.yaxistag)
         cnv.pop('bead')
 
         info: List[Tuple[pd.DataFrame, Dict[str, Any]]] = []
@@ -112,7 +110,13 @@ class XlsxReport:
                 continue
 
             info.append((
-                sheet.assign(track = tracks[sheet.trackid.values]),
+                (
+                    sheet
+                    .assign(
+                        track   = sheet.trackid.apply(tracks.__getitem__),
+                        trackid = sheet.trackid.apply(trackids.__getitem__)
+                    )
+                ),
                 dict(
                     header       = [cnv.get(k, k) for k in sheet.columns],
                     sheet_name   = sheetnames.get(name, f"{name.capitalize()} statistics"),
@@ -139,11 +143,8 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
     def __init__(self, widgets = True, **_):
         super().__init__(**_)
         self._plottheme = BeadsPlotTheme("peakcalling.view.beads.plot.theme")
-        self._widgets   = (
-            () if not widgets else
-            (JobsStatusBar(), JobsHairpinSelect(), PeakcallingPlotWidget(), StorageExplorer())
-        )
-        self._defaults = dict(
+        self._widgets   = () if not widgets else (MasterWidget(),)
+        self._defaults  = dict(
             {i: np.array(['']) for i in  _XCOLS | self._DATAXCOLS},
             **{f'{j}': np.array([0.]) for j in self._DATAYCOLS},
         )
@@ -155,6 +156,10 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
         "get the model theme"
         return self._model.theme
 
+    def getdisplay(self):
+        "get the model display"
+        return self._model.display
+
     def createplot(self) -> BasePlotter:
         "runs the display"
         return self._createplot(getattr(_BeadStatusPlot, '_NAME') in self._model.theme.xaxis)
@@ -163,6 +168,7 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
         "swap with models in the controller"
         super().swapmodels(ctrl)
         self._plottheme = ctrl.theme.swapmodels(self._plottheme)
+
         for i in self._widgets:
             if hasattr(i, 'swapmodels'):
                 i.swapmodels(ctrl)
@@ -171,7 +177,7 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
         """observe the controller"""
         for i in self._widgets:
             if hasattr(i, 'observe'):
-                i.observe(ctrl, self._model.tasks)
+                i.observe(ctrl)
 
         @ctrl.display.observe(self._model.display)
         def _ontracktags(old, **_):
@@ -179,7 +185,7 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
                 getattr(self, '_threader').renew(ctrl, 'reset', True)
 
         theme = frozenset({
-            'xinfo', 'yaxis', 'uselabelcolors',
+            'xinfo', 'yaxis', 'uselabelcolors', 'binnedz', 'binnedbp',
             *(
                 f"{i}{j}"
                 for i in ('status', 'beadstatus', 'orientation')
@@ -207,7 +213,7 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
         if not self._widgets:
             return [self._fig]
 
-        itms      = [i.addtodoc(ctrl, doc)[0] for i in self._widgets]
+        itms      = [i.addtodoc(self, ctrl, doc)[0] for i in self._widgets]
         mode      = {'sizing_mode': ctrl.theme.get('main', 'sizingmode', 'fixed')}
         brds      = ctrl.theme.get("main", "borders", 5)
         width     = sum(i.width  for i in itms) + brds
@@ -323,6 +329,17 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
 
     def _computations(self, attr, tpe = pd.DataFrame, reqlen = True, **kwa):
         return super().computations(attr, self._model, tpe, reqlen, **kwa)
+
+    @staticmethod
+    def _compute_binnedz(mdl, peak, orig:str = 'peakposition', label: str = 'binnedz'):
+        med  = np.round(peak[orig].median(), mdl.precision)
+        arr  = peak[orig].values
+
+        vals = np.round(arr/mdl.step - med - .5) * mdl.step + med
+        if mdl.width < mdl.step:
+            vals[np.abs(vals - arr) > mdl.width] = np.NaN
+        # convert to f8 as otherwise labels are too long
+        peak[label] = np.round(vals.astype('f8'), mdl.precision)
 
     def _compute_update(self, data, stretch):
 
@@ -520,7 +537,7 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
             self, info: pd.DataFrame, xaxis: List[str], yaxis: str
     ) -> _DATA:
         keys   = dict(level = list(range(len(xaxis))))
-        data   = info.set_index(xaxis)[yaxis].rename('y').to_frame()
+        data   = info.set_index(xaxis)[yaxis].rename('y').to_frame().dropna()
         stats  = data.groupby(**keys).y.agg(['median', boxbottom, boxtop])
         self.__beadscount(stats, info, xaxis, yaxis)
 
@@ -534,14 +551,28 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
 
         stats['boxcenter'] = (stats.pop('boxbottom') + stats.pop('boxtop'))*.5
         stats['boxheight'] = spread / self._model.theme.spread
-        stats['bottom']    = data[data.y > data.bottomlimit].groupby(**keys).y.min()
-        stats['top']       = data[data.y < data.toplimit].groupby(**keys).y.max()
         stats['x']         = list(stats.index)
 
-        points = pd.concat([
-            data[['y']][data.y <= data.bottomlimit],
-            data[['y']][data.y >= data.toplimit],
-        ]).join(stats['x'].to_frame())
+        for col in ('bottom', 'top'):
+            comp       = np.greater if col == 'bottom' else np.less
+            stats[col] = getattr(
+                data[comp(data.y, getattr(data, f'{col}limit'))].groupby(**keys).y,
+                ('min' if col == 'bottom' else 'max')
+            )()
+
+            limit = stats['boxcenter'] + stats['boxheight'] * (-.5 if col == "bottom" else .5)
+            repl                 = np.isnan(stats[col])
+            stats.loc[repl, col] = limit[repl]
+            repl                 = comp(stats[col], limit)
+            stats.loc[repl, col] = limit[repl]
+
+        points = pd.concat(
+            [
+                data[['y']][data.y <= data.bottomlimit],
+                data[['y']][data.y >= data.toplimit],
+            ],
+            sort         = False,
+        ).join(stats['x'].to_frame())
 
         stats.reset_index(drop = True, inplace = True)
         points.reset_index(drop = True, inplace = True)
@@ -571,16 +602,12 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
             )
         )
 
-        lvls                = (
+        lvls                = sorted(
             set(range(len(xaxis)))
             - set(self._model.theme.getxaxisinfo('norm', xaxis))
         )
         stats['boxheight'] *= (
-            100
-            / (
-                stats['boxheight'].sum() if not lvls else
-                data.groupby(level = sorted(lvls)).boxheight.count()
-            )
+            100 / (stats.groupby(level = lvls) if lvls else stats).boxheight.sum()
         )
         stats['boxcenter'] = stats['boxheight'] * .5
 
@@ -644,7 +671,11 @@ class _HairpinPlot(_WhiskerBoxPlot):
 
         for i, j in (('_peak', perpeakdf), ('_bead', perbeaddf)):
             if j:
-                setattr(self, i, j[0] if len(j) == 1 else pd.concat(j, sort = False))
+                setattr(
+                    self,
+                    i,
+                    j[0] if len(j) == 1 else pd.concat(j, sort = False, ignore_index = True)
+                )
             elif hasattr(self, i):
                 delattr(self, i)
 
@@ -654,6 +685,10 @@ class _HairpinPlot(_WhiskerBoxPlot):
         if not hasattr(self, '_bead'):
             return
 
+        self._compute_binnedz(self._model.theme.binnedz, self._peak)
+        self._compute_binnedz(
+            self._model.theme.binnedbp, self._peak, 'baseposition', 'binnedbp'
+        )
         self._peak = self._peak.assign(**dict.fromkeys(
             (f'f{i}perbp' for i in 'pn'), 0.0
         ))
@@ -672,7 +707,7 @@ class _HairpinPlot(_WhiskerBoxPlot):
             dframe.loc[values.index, col] = values / norm.loc[values.index]
 
         for strand, prefix in (('', ''), ('+', 'top'), ('-', 'bottom')):
-            pks = self._peak
+            pks = self._peak[~self._peak.closest.isna()]
             if strand != '':
                 pks = pks[pks.orientation == strand]
 
@@ -732,8 +767,10 @@ class _PeaksPlot(_WhiskerBoxPlot):
 
         if lst:
             self._peak = (
-                lst[0] if len(lst) == 1 else pd.concat(lst, sort = False)
+                lst[0] if len(lst) == 1 else pd.concat(lst, sort = False, ignore_index = True)
             )
+            self._compute_binnedz(self._model.theme.binnedz, self._peak)
+
             tag:  str  = self._model.theme.statustag['']
             self._bead = (
                 self._peak
@@ -778,4 +815,7 @@ class _BeadStatusPlot(_WhiskerBoxPlot):
             out.append(self._compute_update(itr.send(data), 1.))
 
         if out:
-            self._bead = pd.concat(out) if len(out) > 1 else out[0]
+            self._bead = (
+                pd.concat(out, sort = False, ignore_index = True)
+                if len(out) > 1 else out[0]
+            )

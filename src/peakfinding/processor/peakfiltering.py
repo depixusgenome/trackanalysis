@@ -42,11 +42,12 @@ class SingleStrandTask(Task, zattributes = ('delta',)):
     :param percentage: the min ratio of events in the single-strand peak
     detected as non-closing.
     """
-    level:      Level = Level.peak
-    phase:      int   = PHASE.rampdown  # phase
-    eventstart: int   = 5
-    delta:      float = -0.015
-    percentage: int   = 50
+    level:         Level = Level.peak
+    phase:         int   = PHASE.rampdown  # phase
+    eventstart:    int   = 5
+    delta:         float = -0.015
+    percentage:    int   = 50
+    minframes:     int   = 10
 
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
@@ -80,8 +81,11 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
     def nonclosingramps(self, frame:_Track, beadid:int) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has no break"
         delta   = self.task.delta
+        minlen  = self.task.minframes
 
         def _greater(arr):
+            if arr.size < minlen:
+                return False
             arr = np.diff(arr)
             arr = arr[np.isfinite(arr)]
             return len(arr) and np.all(arr > delta)
@@ -90,8 +94,11 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
     def closingramps(self, frame: _Track, beadid:int) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has a break"
         delta  = self.task.delta
+        minlen = self.task.minframes
 
         def _lesser(arr):
+            if arr.size < minlen:
+                return False
             arr = np.diff(arr)
             arr = arr[np.isfinite(arr)]
             return len(arr) and np.any(arr <= delta)

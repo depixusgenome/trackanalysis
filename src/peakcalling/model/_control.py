@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updating list of jobs to run"
-from typing      import TYPE_CHECKING, cast
+from typing      import Iterator, TYPE_CHECKING, cast
 
+from taskmodel   import RootTask
 from ._jobs      import JobModel, JobEventNames
 from ._tasks     import TasksModel, Processors
 from ._diskcache import DiskCacheController, DiskCache
@@ -34,6 +35,11 @@ class TasksModelController(JobEventNames):
         self._tasks: TasksModel          = TasksModel()
         self._disk:  DiskCacheController = DiskCacheController(self._jobs)
 
+    @property
+    def roots(self) -> Iterator[RootTask]:
+        "ordered iteration over roots"
+        return self.tasks.roots
+
     def swapmodels(self, ctrl):
         "swap models with those in the controller"
         for i in self.__dict__.values():
@@ -55,7 +61,12 @@ class TasksModelController(JobEventNames):
         @ctrl.display.observe(self._jobs.display)
         @ctrl.display.hashwith(self._jobs.display)
         def _onchange(**_):
-            self._jobs.launch(list(self._tasks.processors.values()), self)
+            self._jobs.launch(
+                list(self._tasks.processors.values()),
+                self,
+                roots   = list(self.roots),
+                missing = self._tasks.missingprocessors
+            )
 
     def addto(self, ctrl):
         "add to the controller"
@@ -64,8 +75,11 @@ class TasksModelController(JobEventNames):
             self.swapmodels(ctrl)
             self.observe(ctrl)
 
-    def updatediskcache(self, ctrl, reset = False, processors = None, **kwa):
+    def updatediskcache(self, ctrl, reset = False, processors = None, ncpu = None, **kwa):
         "update the disk cache config"
+        if ncpu is not None:
+            ctrl.theme.update(self.jobs.config, ncpu = ncpu)
+
         old = self.diskcache.maxsize
         if kwa:
             ctrl.theme.update(self.diskcache, **kwa)

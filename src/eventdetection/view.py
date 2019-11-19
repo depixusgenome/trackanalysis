@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Widgets for configuration"
 
-from    typing                  import Tuple, List, TypeVar, Generic
+from    typing                  import Tuple, List, TypeVar, Dict, Optional, Generic
 from    bokeh.models            import (RadioButtonGroup, CheckboxGroup, Widget,
                                         Paragraph)
 
@@ -11,12 +11,19 @@ from    utils                   import initdefaults
 from    utils.inspection        import templateattribute
 from    .processor              import AlignmentTactic
 
+ALIGN_LABELS: Dict[Optional[AlignmentTactic], str] = {
+    None: 'ø',
+    AlignmentTactic.pull: 'best',
+    AlignmentTactic.onlyinitial: 'Φ1',
+    AlignmentTactic.onlypull: 'Φ3'
+}
+
 class WidgetTheme:
     "WidgetTheme"
     name:   str       = "alignment"
     width:  int       = 100
     height: int       = 48
-    labels: List[str] = ['ø', 'best', 'Φ1', 'Φ3']
+    labels: List[str] = list(ALIGN_LABELS.values())
     title:  str       = 'css:dpx-alignment-widget'
 
     @initdefaults(frozenset(locals()))
@@ -71,8 +78,8 @@ class BaseWidget(Generic[ButtonT, ]):
 
 class AlignmentWidget(BaseWidget[RadioButtonGroup]):
     "Allows aligning the cycles on a given phase"
-    __ORDER = (None, AlignmentTactic.pull, AlignmentTactic.onlyinitial,
-               AlignmentTactic.onlypull)
+    __ORDER = tuple(ALIGN_LABELS)
+
     def _onclick_cb(self, value):
         "action to be performed when buttons are clicked"
         self._task.update(phase = self.__ORDER[value], disabled = value == 0)
@@ -84,9 +91,9 @@ class AlignmentWidget(BaseWidget[RadioButtonGroup]):
 
 class AlignmentModalDescriptor:
     "for use with modal dialogs"
-    __ORDER = (None, AlignmentTactic.pull, AlignmentTactic.onlyinitial,
-               AlignmentTactic.onlypull)
-    __NAMES = 'ø','best', 'Φ1', 'Φ3'
+    __ORDER = tuple(ALIGN_LABELS)
+    __NAMES = tuple(ALIGN_LABELS.values())
+
     def __init__(self, *_):
         self._name = '_alignment'
 
@@ -103,7 +110,7 @@ class AlignmentModalDescriptor:
         vals = '|'.join(f'{i}:{j}' for i, j in enumerate(self.__NAMES))
         return ('Cycle alignment', f' %({self._name})|{vals}|')
 
-    def getdefault(self,inst)->int:
+    def getdefault(self,inst) -> int:
         "returns default peak finder"
         val = getattr(getattr(inst, '_model').alignment.defaultconfigtask, 'phase', None)
         return self.__ORDER.index(val)

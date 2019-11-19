@@ -9,10 +9,8 @@ from shutil               import rmtree
 from typing               import Iterable, List, Optional, ClassVar, Union
 from diskcache            import Cache as DiskCache
 import version as _version
-from data.trackops        import trackname
 from taskmodel.processors import TaskCacheList
 from taskmodel.dataframe  import DataFrameTask
-from ...processor         import FitToHairpinTask
 from ._jobs               import JobEventNames
 from ._tasks              import keytobytes, keyfrombytes
 
@@ -76,24 +74,23 @@ class DiskCacheConfig:
                 return
 
             for itm in (items,) if isinstance(items, TaskCacheList) else items:
-                key  = keytobytes(itm.model)
-                cur  = disk.get(key, tag = True)
+                key   = keytobytes(itm.model)
+                cur   = disk.get(key, tag = True)
+                track = itm.data.getcache(0)()
                 if cur[0] is None or cur[1] != version:
-                    track = itm.data.getcache(0)()
                     data  = itm.data.getcache(DataFrameTask)()
                     disk.set(key, data, tag = version, expire = self.duration)
-                    disk.set(
-                        PREFIX+key,
-                        f"""
-                        statsdate = {time.time()}
-                        trackdate = {track.pathinfo.modification.timestamp() if track else 0}
-                        fit       = {any(isinstance(i, FitToHairpinTask) for i in itm.model)}
-                        title     = {trackname(itm.model[0])}
-                        path      = {track.pathinfo.trackpath if track else itm.model[0].path}
-                        """,
-                        tag     = version,
-                        expire  = self.duration
-                    )
+
+                disk.set(
+                    PREFIX+key,
+                    f"""
+                    statsdate = {time.time()}
+                    trackdate = {track.pathinfo.modification.timestamp() if track else 0}
+                    path      = {track.pathinfo.trackpath if track else itm.model[0].path}
+                    """,
+                    tag     = version,
+                    expire  = self.duration
+                )
 
     def iterkeys(
             self,
@@ -113,9 +110,9 @@ class DiskCacheConfig:
                 },
                 model = keyfrombytes(key[len(PREFIX):])
             )
+            info['good']      = keytobytes(info['model']) == key[len(PREFIX):]
             info['statsdate'] = float(info['statsdate'])
             info['trackdate'] = float(info['trackdate'])
-            info['fit']       = info['fit'] == 'True'
             return info
 
         fcn = _parse if parse else lambda _, val: val
