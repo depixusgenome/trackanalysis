@@ -60,7 +60,8 @@ class JobModel:
     def launch(
             self,
             processors: List[TaskCacheList],
-            emitter:    Optional[JobEventNames] = None
+            emitter:    Optional[JobEventNames] = None,
+            **kwa
     ):
         """
         Runs jobs synchronously or asynchronously depending on configuration
@@ -73,17 +74,24 @@ class JobModel:
         emitter:
             in charge of launching start & end events
         """
-        return _JobRunner(self).dolaunch(processors, _JobEventEmitter(emitter, processors))
+        return _JobRunner(self).dolaunch(
+            processors,
+            _JobEventEmitter(emitter, processors = processors, **kwa)
+        )
 
 class _JobEventEmitter(JobEventNames):
     """Deals with emitting job-related events"""
     _evt: ContextManager
 
-    def __init__(self, ctrl = None, processors: Optional[List[TaskCacheList]] = None):
+    def __init__(
+            self,
+            ctrl = None,
+            **args
+    ):
         super().__init__(ctrl)
-        self.ctrl       = getattr(ctrl, '_ctrl', ctrl)
-        self.idval      = None
-        self.processors = list(processors) if processors else []
+        self.ctrl  = getattr(ctrl, '_ctrl', ctrl)
+        self.idval = None
+        self.args  = args
 
     def __call__(self, idval):
         self.idval = idval
@@ -95,7 +103,7 @@ class _JobEventEmitter(JobEventNames):
             self.ctrl.display.handle(
                 self.eventjobstart,
                 self.ctrl.emitpolicy.outasdict,
-                {'idval': self.idval, 'processors': list(self.processors)}
+                {'idval': self.idval, **self.args}
             )
             self._evt = self.ctrl.display(self.eventname, args = {})
             return self._evt.__enter__()
@@ -108,7 +116,7 @@ class _JobEventEmitter(JobEventNames):
             self.ctrl.display.handle(
                 self.eventjobstop,
                 self.ctrl.emitpolicy.outasdict,
-                {'idval': self.idval, 'processors': list(self.processors)}
+                {'idval': self.idval, **self.args}
             )
             return out
         return None
@@ -169,6 +177,9 @@ class _JobRunner(JobModel):
             store: STORE = procs.data.getcache(DataFrameTask)()
 
             for keys in self.__split(lambda*_: None, procs):
+                if self.config.ncpu <= 0:
+                    continue
+
                 for i in keys:
                     try:
                         store[i] = frame[i]
@@ -217,6 +228,9 @@ class _JobRunner(JobModel):
                     _evtfcn(procs, beads)
             finally:
                 nprocs[0] += 1
+
+        if ncpu <= 0:
+            return
 
         # now iterate throught remaining keys
         LOGS.info("%d jobs running in %d separate processes", len(jobs), ncpu)

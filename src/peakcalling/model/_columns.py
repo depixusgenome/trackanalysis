@@ -23,7 +23,6 @@ class Column:
         "not computed"
         return not self.computed
 
-
 def getcolumn(key: str) -> Column:
     "return the column with the given key"
     return next(i for i in COLS if i.key == key)
@@ -45,7 +44,10 @@ COLS: FrozenSet[Column] = frozenset({
     Column('distance',     'y', None, True,  False, False, 'Δ(binding - blockage) (bp)'),
     Column('closest',      'x', None, True,  False, False, 'binding (bp)'),
     Column('orientation',  'x', None, True,  False, False, 'strand'),
+    Column('binnedz',      'x', None, False, False, True,  'z (µm)'),
+    Column('binnedbp',     'x', None, True,  False, True,  'z (bp)'),
     Column('peakposition', 'y', None, False, False, False, 'z (µm)'),
+    Column('baseposition', 'y', None, True,  False, False, 'z (bp)'),
     Column('hfsigma',      'y', 'stretch', False, True,  False, 'σ[HF] (bp)'),
     Column('nblockages',   'y', None,      False, True,  False, 'blockage count'),
     Column('bead',         'y', None,      False, True,  False, 'count (%)'),

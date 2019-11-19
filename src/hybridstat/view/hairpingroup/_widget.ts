@@ -23,7 +23,7 @@ export class DpxDiscardedBeadsView extends WidgetView {
 
     render(): void {
         super.render()
-        const dbal  :string   = 'data-balloon="'
+        const dbal  :string   = 'aria-label="'
         const pos   :string   = '" data-balloon-length="medium" data-balloon-pos="right"'
         const ttips :string[] = [
             dbal+'Force beads to fit a specifi hairpin'+pos,

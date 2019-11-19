@@ -1,8 +1,29 @@
 # CycleApp
 
+## cycles_v7.2
+
+* 2019-11-08 10:20:20 +0000  (tag: cycles_v7.2)
+
+### Statistics Tab
+
+A new *Settings* button allows changing the analysis settings for all tracks in
+one go. For example, one can set the oligos used for each track, the minimum
+event length, etc.
+
+It's now possible to aggregate values as a function of binding or blockage
+positions. The aggregation bin width can be set using the *Plotting* button.
+
+The *Plotting* button allows masking the data outside a given range of blockage
+of or binding position. This is done prior to computing available statistics
+but *after* fitting hairpin sequences to the bead data: it does not affect the
+analyses, only the displays and aggregated values.
+
+The *Storage* dialog now displays analyses with and without hairpin sequences
+in two distinct tabs.
+
 ## cycles_v7.1
 
-* 2019-11-08 10:20:20 +0000  (tag: cycles_v7.1)
+* 2019-11-08 10:19:27 +0100  (tag: cycles_v7.1)
 
 ### Cleaning Tab
 

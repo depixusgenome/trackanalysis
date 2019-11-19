@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "View module showing one or more FoVs"
 from   abc       import abstractmethod
+from   copy      import copy
 from   functools import partial
 from   typing    import Dict, List, Iterator, Tuple, Union, Set
 
@@ -14,7 +15,9 @@ from   bokeh.plotting import figure, Figure
 
 from   view.colors   import tohex
 from   view.threaded import ThreadedDisplay
-from   ._model       import BeadsScatterPlotModel, Processors, COLS, BeadsPlotTheme
+from   ..model       import (
+    BeadsScatterPlotModel, Processors, COLS, BeadsPlotTheme, Slice
+)
 from   ._threader    import BasePlotter, PlotThreader
 from   ._widgets     import JobsStatusBar, JobsHairpinSelect
 
@@ -29,14 +32,19 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
 
     def __init__(self, widgets = True, **_):
         super().__init__(**_)
-        self._widgets   = (JobsStatusBar(), JobsHairpinSelect()) if widgets else ()
-        self._plottheme = BeadsPlotTheme("peakcalling.view.beads.plot.theme")
+        self._widgets     = (JobsStatusBar(), JobsHairpinSelect()) if widgets else ()
+        self._plottheme   = BeadsPlotTheme("peakcalling.view.beads.plot.theme")
+        self._defaultdata = self.__defaultdata()
 
     _reset = None   # added in _Threader.setup
 
     def gettheme(self):
         "get the model theme"
         return self._model.theme
+
+    def getdisplay(self):
+        "get the model display"
+        return self._model.display
 
     def swapmodels(self, ctrl):
         "swap with models in the controller"
@@ -89,15 +97,9 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
         )
 
     def _addtodoc_data(self):
-        strycols = ('hairpin', 'status', 'orientation')
-        self._defaultdata  = dict(
-            {i: [''] for i in  strycols},
-            color = ['green'],
-            **{i: [0.] for i in set(self._model.theme.datacolumns) - set(strycols)},
-            x = [('track1', '0')]
-        )
-        self._expdata  = ColumnDataSource(self._defaultdata)
-        self._theodata = ColumnDataSource(dict(
+        self._defaultdata = self.__defaultdata()
+        self._expdata     = ColumnDataSource(self._defaultdata)
+        self._theodata    = ColumnDataSource(dict(
             {i: [''] for i in  ('hairpin', 'status', 'color')},
             bindingposition = [0],
             x               = [('track1', '0')]
@@ -119,6 +121,15 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
         self.attrs(self._model.theme.events).addto(fig, source = self._expdata)
         self.attrs(self._model.theme.bindings).addto(fig, source = self._theodata)
         self._fig = fig
+
+    def __defaultdata(self):
+        strycols = ('hairpin', 'status', 'orientation')
+        return dict(
+            {i: [''] for i in  strycols},
+            color = ['green'],
+            **{i: [0.] for i in set(self._model.theme.datacolumns) - set(strycols)},
+            x = [('track1', '0')]
+        )
 
 class _Plot(BasePlotter[BeadsScatterPlot]):
     parent: BeadsScatterPlot
@@ -191,20 +202,20 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
             yield info
 
     def __simplify_factors(self, exp, theo, factors):
-        cnv = self._model.theme.tracknameconversion(i[-2] for i in self._factors)
+        cols = (exp['x'], theo['x'], factors)
+        cnv  = self._model.theme.tracknameconversion(i[-2] for i in self._factors)
         if not cnv:
+            if len(factors) > 1 and len(factors[0]) == 2:
+                for col in cols:
+                    # pylint: disable=unnecessary-comprehension
+                    col[:] = [(i, '', j) for i, j in col]
             return
 
-        if len(factors[0]) == 2:
-            exp['x'][:]  = [(cnv.get(str(i), i), j) for i, j in exp['x']]
-            theo['x'][:] = [(cnv.get(str(i), i), j) for i, j in theo['x']]
-            factors[:]   = [(cnv.get(str(i), i), j) for i, j in factors]
-            return
-
-        exp['x'][:]  = [(i, cnv.get(str(j), j), k) for i, j, k in exp['x']]
-        theo['x'][:] = [(i, cnv.get(str(j), j), k) for i, j, k in theo['x']]
-        factors[:]   = [(i, cnv.get(str(j), j), k) for i, j, k in factors]
-        return
+        for col in cols:
+            col[:] = (
+                [(cnv.get(str(i), i), '', j) for i, j    in col] if len(factors[0]) == 2 else
+                [(i, cnv.get(str(j), j), k)  for i, j, k in col]
+            )
 
     def __set_tags(self, frame):
         def _tag(name):
@@ -226,7 +237,7 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
         colors = tohex(self._model.theme.colors)
         order  = self._model.theme.order
         frame  = (
-            pd.concat(lst)
+            pd.concat(lst, sort = False, ignore_index = True)
             .assign(
                 color = lambda itm: itm.status.apply(colors.get),
                 order = lambda itm: itm.status.apply(order.get)
@@ -253,7 +264,10 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
         if self._data.shape[0]:
             assert ('track1', '0') not in self._data.x.tolist()
         assert ('track1', '0') not in frame.x.tolist()
-        self._data    = pd.concat([self._data,  frame]) if self._factors else frame
+        self._data    = (
+            pd.concat([self._data,  frame], sort = False, ignore_index = True)
+            if self._factors else frame
+        )
         self._factors = list(self._sortfactors(self._data).x)
         return self._factors
 
@@ -345,7 +359,8 @@ class _HairpinPlot(_Plot):
 
         hpin: Dict[Tuple[int, str], np.ndarray] = {}
         ids:  Set[int]                          = set(expdata.trackid.unique())
-        for iproc, proc in enumerate(self._procs.values()):
+        for proc in self._procs.values():
+            iproc = hash(proc.model[0])
             if iproc in ids:
                 for task in proc.model:
                     hpin.update(
@@ -381,7 +396,13 @@ class _HairpinPlot(_Plot):
         )
 
         data.rename(columns = {'closest': 'bindingposition'}, inplace = True)
-        return data
+
+        cnf = copy(self._model.display)
+        cnf.ranges = dict(cnf.ranges)
+        for i in ('baseposition', 'closest'):
+            if cnf.ranges.get(('peaks', i), Slice()) != Slice():
+                cnf.ranges[('bindingposition',)] = cnf.ranges.pop(('peaks', i))
+        return cnf.filter(data)
 
 class _PeaksPlot(_Plot):
     @staticmethod

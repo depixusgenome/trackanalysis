@@ -5,9 +5,13 @@
 import asyncio
 from time                           import sleep, time
 from multiprocessing                import current_process
+import numpy  as np
+import pandas as pd
 
-from peakcalling.view._model._jobs  import _JobRunner as JobRunner, JobModel
-from peakcalling.view._model._tasks import TasksModel, _RootCache
+from cleaning.processor             import FixedBeadDetectionTask
+from peakcalling.model._jobs        import _JobRunner as JobRunner, JobModel
+from peakcalling.model._tasks       import TasksModel, _RootCache
+from peakcalling.model              import BeadsScatterPlotStatus
 from taskcontrol.taskcontrol        import ProcessorController
 from taskcontrol.processor.track    import TrackReaderProcessor
 from taskmodel.track                import TrackReaderTask
@@ -155,6 +159,8 @@ class _Hairpin:
         if not self._res:
             self.oligos = None
             self.fit   = {}
+        else:
+            self.fit   = {1:1}
         return self
 
 def test_adapt_procs_ref():
@@ -205,20 +211,20 @@ def test_adapt_procs_ref():
 def test_adapt_procs_fittohp():
     "test processors adaptor remove ref"
 
-    procs = [ProcessorController() for i in range(3)]
+    procs = [ProcessorController() for i in range(2)]
     procs[0].add(TrackReaderTask(utpath("big_legacy")), TrackReaderProcessor)
     procs[0].add(_Ref(), _DummyProc)
     procs[0].add(_Hairpin(resolve = True), _DummyProc)
     procs[1].add(TrackReaderTask(utpath("big_legacy")), TrackReaderProcessor)
-    procs[2].add(TrackReaderTask(utpath("big_legacy")), TrackReaderProcessor)
-    procs[2].add(_Hairpin(resolve = True), _DummyProc)
 
     mdl = TasksModel()
-    mdl.config.defaulttaskindex = lambda *_: appendtask
+    mdl.config.defaulttaskindex = lambda _1, tsk, *_2: (
+        1 if isinstance(tsk, FixedBeadDetectionTask) else appendtask
+    )
     mdl.state.sequences = 'a'
     for i in (mdl.config.sdi, mdl.config.picotwist):
         i['fittoreference'] = _Ref()
-        i['fittohairpin']   = _Hairpin(resolve = True)
+        i['fittohairpin']   = _Hairpin(resolve = False)
         i['dataframe']      = DataFrameTask()
 
     for i in (_Ref, _Hairpin, DataFrameTask):
@@ -230,41 +236,14 @@ def test_adapt_procs_fittohp():
     mdl.dataframes.fits.measures = {'peaks': {'all': True, 'events': True}}
 
     lst = mdl.processors
-    assert len(lst) == len(procs)
-    for i in procs:
+    assert len(lst) == 1
+    for i in procs[:1]:
         assert len(lst[i.model[0]].model) == 4
         assert i.model is not lst[i.model[0]].model
         assert lst[i.model[0]].model[2].__class__.__name__ == '_Hairpin'
         assert lst[i.model[0]].model[-1].__class__.__name__ == 'DataFrameTask'
         assert lst[i.model[0]].model[-1].measures == {'peaks': {'all': True, 'events': True}}
         assert lst[i.model[0]].model[2].__class__.__name__ == '_Hairpin'
-        if i.model[0] in (procs[0].model[0], procs[2].model[0]):
-            assert lst[i.model[0]].model[2].sequences is None
-        else:
-            assert lst[i.model[0]].model[2].sequences == 'a'
-
-    mdl.state.reference = procs[1].model[0]
-
-    lst = mdl.processors
-    assert len(lst) == len(procs)
-    for i in procs:
-        assert len(lst[i.model[0]].model) == 4 + (i.model[0] is not mdl.state.reference)
-        assert i.model is not lst[i.model[0]].model
-        assert lst[i.model[0]].model[-1].__class__.__name__ == 'DataFrameTask'
-        assert lst[i.model[0]].model[-1].measures == {'peaks': {'all': True, 'events': True}}
-        assert lst[i.model[0]].model[-2].__class__.__name__ == '_Hairpin'
-        if i.model[0] in (procs[0].model[0], procs[2].model[0]):
-            assert lst[i.model[0]].model[-2].sequences is None
-        else:
-            assert lst[i.model[0]].model[-2].sequences == 'a'
-        if i.model[0] is not mdl.state.reference:
-            assert lst[i.model[0]].model[2].__class__.__name__ == '_Ref'
-            assert lst[i.model[0]].model[2].defaultdata is lst[mdl.state.reference].data
-
-    for i in (mdl.config.sdi, mdl.config.picotwist):
-        i['fittohairpin']   = _Hairpin(resolve = False)
-    lst = mdl.processors
-    assert len(lst) == 2
 
 def test_lru():
     tasks = [TrackReaderTask(utpath("big_legacy")), _Ref()]
@@ -296,6 +275,49 @@ def test_lru():
     del lru[tasks2]
     assert tasks2  not in lru
 
+def test_dffilter():
+    "test BeadsScatterPlotStatus.filter"
+    mdl   = BeadsScatterPlotStatus()
+    frame = pd.DataFrame(dict(
+        a = np.arange(10),
+        b = np.arange(10),
+        c = np.arange(10),
+        d = [
+            pd.DataFrame(dict(a = np.arange(i, 10+i), b = np.arange(i, 10+i)))
+            for i in range(10)
+        ]
+    ))
+
+    assert mdl.filter(frame) is frame
+
+    mdl.ranges[('aa',)] = slice(5, None)
+    assert mdl.filter(frame) is frame
+
+    mdl.ranges[('d', 'aa')] = slice(5, None)
+    assert mdl.filter(frame) is frame
+
+    mdl.ranges[('a',)] = slice(5, None)
+    assert mdl.filter(frame).equals(frame[5:])
+
+    out = frame[:0]
+    assert mdl.filter(out) is out
+
+    mdl.ranges[('d','a')] = [6, 7]
+    out = mdl.filter(frame)
+    assert out[['a', 'b', 'c']].equals(frame[5:][['a', 'b', 'c']])
+    assert out['d'].values[0].equals(frame['d'].values[5].loc[[1, 2],:])
+    assert out['d'].values[1].equals(frame['d'].values[6].loc[[0, 1],:])
+    assert out['d'].values[2].equals(frame['d'].values[7].loc[[0],:])
+    assert out['d'].values[3].shape == (0, 2)
+    assert out['d'].values[4].shape == (0, 2)
+
+    mdl   = BeadsScatterPlotStatus()
+    mdl.ranges[('a',)] = slice(None, 5)
+    assert mdl.filter(frame).equals(frame[:6])
+
+    mdl.ranges[('a',)] = slice(5, 5)
+    assert mdl.filter(frame).equals(frame.loc[5:5,:])
+
 
 if __name__ == '__main__':
-    test_adapt_procs_ref()
+    test_adapt_procs_fittohp()

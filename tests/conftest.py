@@ -11,15 +11,18 @@ pytest.register_assert_rewrite("tests.testingcore")
 from tests.testingcore             import utpath         # noqa
 from tests.testutils.modulecleanup import modulecleanup  # noqa
 from tests.testutils               import needsdisplay   # noqa
-from tests.testutils.recording     import record, pytest_addoption  # noqa
+from tests.testutils.recording     import (
+    record, pytest_addoption, pytest_collection_modifyitems as _modifyitems
+)
 
-def pytest_collection_modifyitems(items):
+def pytest_collection_modifyitems(items, config):
     "sort tests such that integration tests come last and scripting last of all"
     items.sort(key = lambda x: (
         int(x.name != 'test_hybridstat_view[]')
         + 2*int('integration' not in x.keywords.keys())*2
         + 4*int('scripting' in Path(str(x.fspath)).parts if x.fspath else 0)
     ))
+    _modifyitems(items, config)
 
 @pytest.fixture(params = [pytest.param("", marks = needsdisplay)])
 def bokehaction(monkeypatch):

@@ -156,9 +156,28 @@ The xlsx file will contain four sheets:
 * *Tracks* provides with explicit information on how the data was produced, the
   software version, etc ... It's for bookkeeping rather than perusal.
 
+Configuring Computations
+========================
 
-The Advanced Menu
-=================
+It's possible to set a number of settings for all currently loaded tracks.
+These settings are available in other tabs and only repeated here for the sake
+of simplicity. Note that hairpin sequences can be defined either using a file path or
+through a python dictionnary. The format is then:
+
+.. code-block::
+
+   {
+      hairpin1: aaaatc,
+      hairpin2: aaaatcggg,
+      hairpin3: cccaaaatcggg,
+   }
+
+For those settings not available here, it's always possible to go back to other
+tabs and change the settings for each track independently. Another option is to
+define the default settings prior to loading all tracks.
+
+Configurring Plots
+==================
 
 .. figure:: ../_images/fovstats_advanced.png
 
@@ -204,19 +223,58 @@ This tab allows defining:
 * whether the track should be displayed at all.
 * the beads which should *not* be displayed for a given track.
 
-Blockage Status & Bead Status
------------------------------
+Blockage Status & Z
+-------------------
 
-This tab allows redefining the labels for blockage or bead status. Note that
-the same label can be re-used multiple times: one can regroup any number of
-status together.
+In this tab:
 
+1. **z (µm) bin width** allows selecting the bin size when aggregating data by
+   bead z-values. The central value for each bin is then displayed on the
+   *x-axis*.
+2. The next line allow filtering the blockage data depending on **z (µm)**
+   This filter is applied *prior* to computing statistics.
+3. The next lines allow allows redefining the labels for blockage status.
+
+.. note::
+   The same label can be applied to multiple blockage states, thus regrouping
+   them into a single category.
+
+.. warning::
+   As opposed to the **z (bp)** entries in the **Hairpins** tab, **z (µm)**
+   entries *do not* account for variability in bead magnetization. In other
+   words, one should be better off using the entries in the **Hairpins** tab
+   should it be available.
+
+Bead Status
+-----------
+
+This tab allows redefining the labels for bead status.
+
+.. note::
+   The same label can be applied to multiple bead states, thus regrouping
+   them into a single category.
 
 Hairpins
 --------
 
-This tab allows selecting which hairpins to display.
+In this tab:
 
+1. **z (bp) bin width** allows selecting the bin size when aggregating data by
+   bead z-values. The central value for each bin is then displayed on the
+   *x-axis*. 
+2. **binding (bp): Δ|blockage - binding| <** allows setting the maximum
+   distance from a blockage to a binding positions for the former to be defined
+   as an *identified* (true positive) rather than an *un-identified* (false
+   positive) position.
+3. The next two lines allow filtering the blockage data depending on **z (bp)**
+   or **binding (bp)**. This filter is applied *prior* to computing statistics.
+4. The next lines allow selecting which hairpins to display.
+
+.. note::
+   As opposed to the **z (µm)** entries in the **Blockage** tab, **z (bp)**
+   entries *do* account for variability in bead magnetization. In other
+   words, one should be better off using the entries in the **Hairpins** tab
+   should it be available.
 
 Binding Orientation
 -------------------
@@ -224,12 +282,24 @@ Binding Orientation
 This tab allows selecting which binding orientations display.
 
 Disk Cache
-----------
+==========
 
-This tab allows setting the disk cache management settings. Disk cache is used
+This allows exploring and setting the disk cache management settings. Disk cache is used
 for permanently storing computations for a given field of view *and* settings
 (fixed beads, ...). Thus computations from a previous day can be recalled
 rather than recomputed, which would be slower.
+
+With/Without Hairpins
+---------------------
+
+These tabs contain a list of currently stored computations. The use of two tabs
+allows distinguishing which computations were done with hairpins available and
+which were'nt. The lists display a checkbox on the *left* and another on the
+right.  The *left* allows choosing which computations to view. The checkbox on
+the *right* allows deleting the files.
+
+Cache Settings
+--------------
 
 The storage is managed using the following criteria:
 

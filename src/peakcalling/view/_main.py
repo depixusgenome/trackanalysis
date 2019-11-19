@@ -8,10 +8,10 @@ from view.base       import BokehView, stretchout
 from view.threaded   import DisplayState
 from utils.logconfig import getLogger
 from modaldialog     import dialogisrunning
+from ..model         import BasePlotConfig
 from ._beadsplot     import BeadsScatterPlot
-from ._model         import BasePlotConfig
 from ._statsplot     import FoVStatsPlot
-from ._widgets       import JobsStatusBar, PeakcallingPlotWidget, StorageExplorer, CSVExporter
+from ._widgets       import MasterWidget
 from ._threader      import ismain
 
 LOGS = getLogger(__name__)
@@ -47,10 +47,7 @@ class FoVPeakCallingView(BokehView):
         self._items = [
             BeadsScatterPlot(widgets = False),
             FoVStatsPlot(widgets = False),
-            PeakcallingPlotWidget(),
-            StorageExplorer(),
-            JobsStatusBar(),
-            CSVExporter(),
+            MasterWidget()
         ]
 
     @property
@@ -85,9 +82,8 @@ class FoVPeakCallingView(BokehView):
     def observe(self, ctrl):
         """observe the controller"""
         self._ctrl = ctrl
-        self._items[0].observe(ctrl)
-        self._items[1].observe(ctrl)
-        self._items[4].observe(ctrl, getattr(self._items[0], '_model').tasks)
+        for i in self._items:
+            i.observe(ctrl)
 
         attrs = set(BasePlotConfig().__dict__)
 
@@ -100,6 +96,14 @@ class FoVPeakCallingView(BokehView):
                         i: deepcopy(getattr(self._items[1].gettheme(), i))
                         for i in set(old) & attrs
                     }
+                )
+
+        @ctrl.display.observe(self._items[1].getdisplay())
+        def _ondisplay(old, **_):
+            if 'ranges' in old:
+                ctrl.display.update(
+                    self._items[0].getdisplay(),
+                    ranges = self._items[1].getdisplay().ranges
                 )
 
     def isactive(self, *_1, **_2) -> bool:
@@ -115,13 +119,13 @@ class FoVPeakCallingView(BokehView):
             @calllater.append
             def _call():
                 if not dialogisrunning(doc):
-                    self._items[3].run(ctrl, doc)
+                    self._items[2].cache.run(ctrl, doc)
 
         return ("tasks", "opentrack")
 
     def addtodoc(self, ctrl, doc):
         "sets the plot up"
-        itms   = [i.addtodoc(ctrl, doc)[0] for i in self._items[:-1]]
+        itms   = sum((i.addtodoc(ctrl, doc) for i in self._items[:-1]), [])
         itms.extend(self._items[-1].addtodoc(self._items[1], ctrl, doc))
 
         mode   = self.defaultsizingmode()
@@ -136,23 +140,13 @@ class FoVPeakCallingView(BokehView):
             )
         )
         itms[1].update(
-            plot_width  = sizes['width'] - brds - max(i.width for i in itms[2:]),
+            plot_width  = sizes['width']  - brds - itms[2].width,
             plot_height = sizes['height'] - brds - itms[0].plot_height
         )
         return stretchout(layouts.column(
             [
                 itms[0],
-                layouts.row(
-                    [
-                        itms[1],
-                        layouts.widgetbox(
-                            itms[2:],
-                            width  = max(i.width    for i in itms[2:]),
-                            height = sum(i.height   for i in itms[2:])
-                        )
-                    ],
-                    **dict(sizes,  height = itms[1].plot_height, **mode)
-                ),
+                layouts.row(itms[1:], **dict(sizes,  height = itms[1].plot_height, **mode))
             ],
             **sizes, **mode
         ))

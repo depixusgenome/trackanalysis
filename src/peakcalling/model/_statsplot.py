@@ -3,6 +3,7 @@
 "stats plot status"
 from dataclasses    import dataclass, field
 from typing         import Dict, List, Any, Tuple, Union
+import numpy as np
 
 from model.plots    import PlotAttrs, defaultfigsize
 from taskmodel      import RootTask
@@ -20,17 +21,43 @@ class FoVStatsPlotStatus(BeadsScatterPlotStatus):
     name:     str                 = NAME
     tracktag: Dict[RootTask, str] = field(default_factory = dict)
 
-@dataclass
+@dataclass(eq = True)
 class AxisConfig:
     "info on x axis parameter"
     name:        str
     sortbyvalue: bool = True
     norm:        bool = True
 
+@dataclass(eq = True)
+class BinnedZ:
+    "allows binning z values"
+    width:     float = .1
+    step:      float = .1
+    precision: int   = 2
+
+    def reset(self, default = .1):
+        "updates self to something meaningful"
+        if self.width <= 0.:
+            self.width = default
+
+        if (
+                self.width == self.step
+                and np.abs(np.round(self.width, self.precision) - self.width) < 1e-5
+        ):
+            return
+
+        self.step      = self.width
+        self.precision = 0
+        while np.abs(np.round(self.width, self.precision) - self.width) >= 1e-5:
+            self.precision += 1
+        self.width = self.step = np.round(self.width, self.precision)
+
 @dataclass  # pylint: disable=too-many-instance-attributes
 class FoVStatsPlotConfig(BasePlotConfig):
     "Information about the current fovs displayed"
     name:      str              = NAME
+    binnedz:   BinnedZ          = field(default_factory = BinnedZ)
+    binnedbp:  BinnedZ          = field(default_factory = lambda: BinnedZ(10, 10, 0))
     xinfo:     List[AxisConfig] = field(
         default_factory = lambda: [AxisConfig('track'), AxisConfig('beadstatus')]
     )

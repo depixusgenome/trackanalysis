@@ -5,6 +5,7 @@ from dataclasses   import dataclass, field
 from typing        import Dict, Any, Set, Tuple, Union, Optional, Iterable, List
 
 import numpy as np
+import pandas as pd
 
 from cleaning.names import NAMES as _ExceptionNames
 from model.plots          import PlotAttrs, defaultfigsize, PlotTheme
@@ -15,6 +16,7 @@ from view.threaded        import DisplayModel
 from ._control            import TasksModelController
 from ._columns            import getcolumn, INVISIBLE
 
+DFFilter  = Dict[Tuple[str, ...], Union[list, 'Slice']]
 NAME: str = 'peakcalling.view.beads'
 
 
@@ -39,12 +41,10 @@ class BeadsPlotTheme(PlotTheme):
         if np.isnan(vmax):
             vmax = vmin + 1.
 
-        rng = max(1e-5, (vmax-vmin))
+        rng = max(5e-5, (vmax-vmin))
         rng = rng*self.overshoot*.5
-        if vmax != 0.:
-            vmin -= rng
-        if vmax != 100.:
-            vmax += rng
+        vmin -= rng if vmin != 0.   else 5e-5
+        vmax += rng if vmax != 100. else 5e-5
 
         info = dict(
             max_interval = rng*(1.+self.boundsovershoot),
@@ -123,6 +123,12 @@ class BasePlotConfig:
         return {i: i[:i.find('-')+1]+j for i, j  in out.items()}
 
 @dataclass
+class Slice:
+    "like slice but read/write"
+    start: Union[float, int, None] = None
+    stop:  Union[float, int, None] = None
+
+@dataclass
 class BeadsScatterPlotStatus:
     """beads plot status"""
     name:         str                      = NAME
@@ -130,6 +136,34 @@ class BeadsScatterPlotStatus:
     orientations: Set[str]                 = field(default_factory = set)
     beads:        Dict[RootTask, Set[int]] = field(default_factory = dict)
     roots:        Set[RootTask]            = field(default_factory = set)
+    ranges:       DFFilter                 = field(default_factory = dict)
+
+    def filter(self, dframe) -> pd.DataFrame:
+        "filter the dataframe"
+        if dframe.shape[0] == 0:
+            return dframe
+
+        found = False
+        for col, rng in self.ranges.items():
+            if rng == Slice():
+                continue
+
+            dframe, cur, found = self.__filter_get(dframe, col, found)
+            if cur is None:
+                continue
+
+            for i in cur.values if isinstance(cur, pd.Series) else (cur,):
+                try:
+                    if isinstance(cur.index, pd.MultiIndex):
+                        i['_dummy_'] = np.arange(i.shape[0])
+                        i.set_index('_dummy_', append = True, inplace = True)
+
+                    i.drop(index = self.__filter_inds(i, col[-1], rng), inplace = True)
+                finally:
+                    if isinstance(i.index, pd.MultiIndex):
+                        i.reset_index('_dummy_', drop = True, inplace = True)
+
+        return dframe
 
     def masked(
             self,
@@ -145,6 +179,45 @@ class BeadsScatterPlotStatus:
             or hairpin in self.hairpins
             or bead    in self.beads.get(root, ())
         )
+
+    @staticmethod
+    def __filter_get(
+            dframe: pd.DataFrame, col: Tuple[str,...], found: bool
+    ) -> Tuple[pd.DataFrame, Optional[pd.DataFrame], bool]:
+
+        cur = dframe
+        for i in col[:-1]:
+            if i not in cur:
+                return dframe, None, found
+            cur = cur[i]
+
+        if (
+                (len(col) == 1 and col[-1] not in cur)
+                or (len(col) == 2 and col[-1] not in cur.values[0])
+        ):
+            return dframe, None, found
+
+        dframe = dframe.copy(True)
+        cur    = dframe
+        for i in col[:-1]:
+            cur[i].values[:] = [i.copy(True) for i in cur[i].values]
+            cur              = cur[i]
+
+        return dframe, cur, found
+
+    @staticmethod
+    def __filter_inds(cur: pd.DataFrame, col: str, rng: Union[list, Slice]) -> np.ndarray:
+        if isinstance(rng, (list, np.ndarray)):
+            inds = ~np.isin(cur[col], rng)
+
+        elif rng.start is not None:
+            inds = cur[col] < rng.start
+            if rng.stop is not None:
+                inds |= cur[col] > rng.stop
+        else:
+            assert rng.stop is not None
+            inds = cur[col] > rng.stop
+        return cur.index[inds]
 
 @dataclass  # pylint: disable=too-many-instance-attributes
 class BeadsScatterPlotConfig(BasePlotConfig):

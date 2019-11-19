@@ -3,7 +3,7 @@
 # pylint: disable=missing-docstring,protected-access
 "testing peakcalling DiskCache"
 from pathlib import Path
-from peakcalling.view._model._diskcache  import DiskCacheConfig, VERSION, VERSION_KEY, DiskCache
+from peakcalling.model._diskcache   import DiskCacheConfig, VERSION, VERSION_KEY, DiskCache
 from taskcontrol.taskcontrol        import create
 from taskmodel.track                import UndersamplingTask, TrackReaderTask
 from taskmodel.dataframe            import DataFrameTask

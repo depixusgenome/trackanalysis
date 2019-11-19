@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a dataframe"
+from   copy       import copy
 from   typing     import Dict, List, Tuple, Callable, Iterable, cast
 from   functools  import partial
 import pandas     as     pd
@@ -145,6 +146,26 @@ class PeaksDataFrameFactory(  # pylint: disable=too-many-instance-attributes
         )
         if any(j is not None for j in meas.values()):
             raise ValueError(f'Unrecognized measures {meas}')
+
+    def dictionary(     # pylint: disable=arguments-differ
+            self, frame, info, **kwa
+    ) -> Dict[str, np.ndarray]:
+        "creates a dataframe"
+        if kwa:
+            cpy = copy(self)
+            for i, j in kwa.items():
+                setattr(
+                    cpy,
+                    next(
+                        k+i for k in ('', '_', '_PeaksDataFrameFactory__')
+                        if hasattr(cpy, k+i)
+                    ),
+                    j
+                )
+        else:
+            cpy = self
+
+        return getattr(cpy, '_run')(frame, *info)
 
     def discardcolumns(self, *args) -> 'PeaksDataFrameFactory':
         "discard some columns"
