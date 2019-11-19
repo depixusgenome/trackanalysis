@@ -133,7 +133,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, PeaksPlotModel]):
 
             self._hover .reset(cache, self._ctrl, self._model)
             self._ticker.reset(cache)
-            self._widgets.reset(cache, tmp is None)
+            self._widgets.reset(cache, self._model.track is None)
 
             inds = dicos['']['z'][[0,-1]] if len(dicos['']['z']) else np.array([0, 1])
             cache[self._fig.y_range] = self.newbounds('y', inds)

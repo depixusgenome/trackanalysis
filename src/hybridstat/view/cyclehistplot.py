@@ -469,16 +469,13 @@ class CycleHistPlotCreator(TaskPlotCreator[PeaksPlotModelAccess, None]):
         self._widgets.advanced.ismain(_)
 
     def _reset(self, cache:CACHE_TYPE):
-        done = 0
         try:
             self._hist.delegatereset(cache)
-            done += 1
         finally:
             try:
                 self._cycle.delegatereset(cache)
-                done += 1
             finally:
-                self._widgets.reset(cache, done != 2)
+                self._widgets.reset(cache, self._model.track is None)
 
     def __resize(self, ctrl, sizer, bottom, doresize):
         borders            = ctrl.theme.get('theme', "borders")
