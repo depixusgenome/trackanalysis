@@ -5,6 +5,7 @@
 from   typing                   import Tuple
 from   bokeh.models             import GlyphRenderer
 import pytest
+import re
 import pandas as pd
 import numpy  as np
 from   numpy.testing            import assert_equal, assert_allclose
@@ -12,8 +13,10 @@ from   numpy.testing            import assert_equal, assert_allclose
 from   tests.testutils          import integrationmark
 from   tests.testingcore        import path as utpath
 
-from   cleaning.processor       import (DataCleaningTask, DataCleaningException,
-                                        DataCleaningProcessor, BeadSubtractionTask,
+from   cleaning.processor       import (DataCleaningTask, RampDataCleaningTask,
+                                        DataCleaningException,
+                                        DataCleaningProcessor, RampDataCleaningProcessor,
+                                        BeadSubtractionTask,
                                         BeadSubtractionProcessor, ClippingTask)
 from   cleaning.beadsubtraction import (SubtractAverageSignal, SubtractMedianSignal,
                                         FixedBeadDetection)
@@ -110,6 +113,76 @@ def test_phasejump():
     assert_equal(out.values, [2*num_jumps, 0, 0])
     assert len(out.min) == 0
     assert_equal(out.max, [0])
+
+def test_extentoutliersrule():
+    "test the ExtentOutliersRule"
+    from cleaning.rampcleaningrules import ExtentOutliersRule
+    num_ph1 = 100
+    num_ph3 = 100
+
+    ncyc1 = 100
+    ncyc2 = 40
+    ncyc3 = 2
+
+    cycles = (ncyc1 * [num_ph1 * [0] + num_ph3 * [1.]] +
+              ncyc2 * [num_ph1 * [0] + num_ph3 * [2.]] +
+              ncyc3 * [num_ph1 * [0] + num_ph3 * [3.]])
+    num_cycles = ncyc1 + ncyc2 + ncyc3
+    cycle_length = num_ph1 + num_ph3
+
+    cyc_start = [i*cycle_length for i in range(num_cycles)]
+    cyc_end   = [(i+1)*cycle_length for i in range(num_cycles)]
+    zdata = np.hstack(cycles).astype('f4')
+
+    np.random.seed(6841654)
+    noisy_data = (zdata + 0.2 * (0.5-np.random.random_sample(zdata.shape))).astype('f4')
+    extentoutliers = ExtentOutliersRule()
+
+    out_clean = extentoutliers(zdata, cyc_start, cyc_end)
+    out_noisy = extentoutliers(noisy_data, cyc_start, cyc_end)
+
+    assert out_clean.name == out_noisy.name == 'extentoutliers'
+
+    assert set(out_clean.min) == set(range(100))
+    assert len(out_clean.max) == 2
+    # Δz-consensus is 1.0, therefore:
+    assert np.sum(out_clean.values == 0.5) == 100
+    assert np.sum(out_clean.values == 1.0) == 40
+    assert np.sum(out_clean.values == 1.5) == 2
+
+    assert set(range(100)) == set(out_noisy.min)
+    assert len(out_noisy.max) == 2
+    assert len(out_noisy.values) == num_cycles
+
+def test_rampdatacleaning():
+    "test RampDataCleaningTask in scripting context"
+    filepath = "Ramp-fov5-PBS_AfterDNApol1.pk"
+    beadid = 0  # the only bead in the pk-file
+
+    proc_pass = create(
+        TrackReaderTask(path=utpath(filepath)),
+        RampDataCleaningTask(minpopulation=20,
+                             extentoutlierspercentile=90,
+                             minextentoutliers=90))
+    proc_fail = create(
+        TrackReaderTask(path=utpath(filepath)),
+        RampDataCleaningTask(minpopulation=100,
+                             extentoutlierspercentile=95,
+                             minextentoutliers=90,
+                             maxhfsigma=.0002))
+
+    data_pass = next(iter(proc_pass.run()))
+
+    num_datapoints = data_pass[beadid].shape[0]
+    num_valid_point = np.sum(np.isfinite(data_pass[beadid]))
+
+    assert num_valid_point / data_pass.nframes == pytest.approx(10 / 22, rel=1e-4)  # 10/22 cyc pass
+
+    data_fail = next(iter(proc_fail.run()))
+    with pytest.raises(DataCleaningException,
+                       match=re.escape('22 cycles: σ[HF] > 0.0002\n' +
+                                       '12 cycles: Δz-outlier < 90% of Δz-consensus')):
+        data_fail[beadid]
 
 def test_constantvalues():
     "test constant values"
@@ -387,12 +460,8 @@ def test_message_creation():
     proc  = create(TrackReaderTask(path = utpath("big_legacy")),
                    DataCleaningTask())
     data  = next(iter(proc.run()))
-    try:
+    with pytest.raises(DataCleaningException):
         data[5]
-    except DataCleaningException:
-        pass
-    else:
-        assert False
 
 def test_cleaning_dataframe():
     "test cleanin creation"

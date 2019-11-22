@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "cleaning the raw data after bead subraction"
+from    collections  import namedtuple
 from    dataclasses  import dataclass
 from    itertools    import repeat
 from    functools    import partial
 from    typing       import (
-    Any, Dict, Iterator, List, Optional, Tuple, Type, ClassVar, cast
+    Any, Dict, Iterator, List, Optional, Tuple, Type, ClassVar, cast, TypeVar
 )
 
 import  numpy             as     np
@@ -18,9 +19,11 @@ from    ..names                 import NAMES
 from    .._core                 import (   # pylint: disable=import-error
     DataCleaning, Partial, AberrantValuesRule
 )
+from    ..rampcleaningrules     import ExtentOutliersRule
 
-class DataCleaningTask(Task, zattributes = DataCleaning.zscaledattributes()):
-    "Task for removing incorrect points or cycles or even the whole bead"
+
+class DataCleaningTaskBase(Task, zattributes = DataCleaning.zscaledattributes()):
+    "Base-Task for removing incorrect points or cycles or even the whole bead"
     __doc__          = getattr(DataCleaning, '__doc__', None)
 
     hfsigmaphases:     Tuple[int, int] = (PHASE.initial, PHASE.measure)
@@ -59,6 +62,54 @@ class DataCleaningTask(Task, zattributes = DataCleaning.zscaledattributes()):
             bad = np.union1d(bad, stat.max)
         return bad
 
+class RampDataCleaning(DataCleaning):
+    "Removing aberrant points and cycles in Ramps"
+
+    def __init__(self, **kwa):
+        self.extentoutliers: ExtentOutliersRule = kwa.get('extentoutliers', ExtentOutliersRule())
+        super().__init__(**kwa)
+
+    def configure(self, **kwa):
+        "Configure the contained Rules"
+        super().configure(kwa)
+        self.extentoutliers.configure(**kwa)
+
+class DataCleaningTask(DataCleaningTaskBase):
+    "Task for removing incorrect points or cycles or even the whole bead"
+
+class RampDataCleaningTask(DataCleaningTaskBase):
+    "Task for removing incorrect points or cycles or even the whole bead in Ramp-experiments"
+    extentoutliersphases:     Tuple[int, int] = (PHASE.initial, PHASE.measure)
+
+    locals().update(ExtentOutliersRule().config())
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        """
+        Parameters
+        ----------
+        Following parameters configure the contained rules:
+
+        **extentoutliers**
+        extentoutlierspercentile : float
+            the percentile to consider as consensus
+        minextentoutliers : float
+            the minimum accepted extent, relative to the consensus
+        maxextentoutliers : float
+            the maximum accepted extent, relative to the consensus
+        """
+        super().__init__(**kwa)
+
+    PRE_CORRECTION_CYCLES:  ClassVar[Tuple[str, ...]] =  DataCleaningTaskBase.PRE_CORRECTION_CYCLES
+    POST_CORRECTION_CYCLES: ClassVar[Tuple[str, ...]] = (DataCleaningTaskBase.POST_CORRECTION_CYCLES
+                                                         + ('extentoutliers',))
+
+    @property
+    def core(self) -> RampDataCleaning:
+        tmp = RampDataCleaning()
+        tmp.configure(**self.__dict__)
+        return tmp
+
 class DataCleaningErrorMessage:
     "creates the error message upon request"
     def __init__(self, stats, cnf:Dict[str,Any],  # pylint: disable=too-many-arguments
@@ -90,26 +141,29 @@ class DataCleaningErrorMessage:
         if not self.stats:
             pop = self.config.get('minpopulation', dflt.minpopulation)
             return [(None, 'population', '< %d' % pop)]
-
         stats = {i.name: i  for i in self.stats}
-        get1  = lambda i, j: len(getattr(stats[i], j))                  # noqa: E731
-        get2  = lambda i, j: self.config.get(j+i, getattr(dflt, j+i))   # noqa: E731
-        msg   = (('saturation', '> %.0f%%', 'max'),
-                 ('population', '< %.0f%%', 'min'),
-                 ('hfsigma',    '< %.4f',   'min'),
-                 ('hfsigma',    '> %.4f',   'max'),
-                 ('extent',     '< %.2f',   'min'),
-                 ('extent',     '> %.2f',   'max'),
-                 ('pingpong',   '> %.1f',   'max'),
-                 ('phasejump',  '> %.1f',   'max'))
+        getcount = lambda prefix, name: len(getattr(stats[name], prefix))
+        getcnf   = lambda prefix, name: self.config.get(prefix+name, getattr(dflt, prefix+name))
 
-        vals       = [[get1(i[0], i[-1]), i[0], i[1] % get2(i[0], i[-1])] for i in msg
-                      if i[0] in stats.keys()]  # only generate messages for valis rules
-        if vals[0][0]:
-            cnt        = stats['saturation'].values
-            cnt        = cnt[np.isfinite(cnt)]
-            vals[0][0] = (cnt > get2('maxdisttozero', "")).sum()
-        return [cast(Tuple[Optional[int], str, str], tuple(i)) for i in vals if i[0]]
+        param      = namedtuple('param', ['name', 'format', 'prefix'])
+        parameters = (param('saturation',     '> %.0f%%', 'max'),
+                      param('population',     '< %.0f%%', 'min'),
+                      param('hfsigma',        '< %.4f',   'min'),
+                      param('hfsigma',        '> %.4f',   'max'),
+                      param('extent',         '< %.2f',   'min'),
+                      param('extent',         '> %.2f',   'max'),
+                      param('pingpong',       '> %.1f',   'max'),
+                      param('phasejump',      '> %.1f',   'max'),
+                      param('extentoutliers', '< %.0f%% of Δz-consensus', 'min'))
+
+        errmsg = [[getcount(i.prefix, i.name), i.name, i.format % getcnf(i.prefix, i.name)]
+                  for i in parameters
+                  if i.name in stats.keys()]  # only generate messages for valid rules
+        if errmsg[0][0]:
+            cnt          = stats['saturation'].values
+            cnt          = cnt[np.isfinite(cnt)]
+            errmsg[0][0] = (cnt > getcnf("", 'maxdisttozero')).sum()
+        return [cast(Tuple[Optional[int], str, str], tuple(i)) for i in errmsg if i[0]]
 
     def getmessage(self, percentage = False):
         "returns the message"
@@ -167,12 +221,14 @@ class CleaningCacheData:
         info[1][self.mask] = np.NaN
         return None
 
-class DataCleaningProcessor(Processor[DataCleaningTask]):
+CleaningTaskType = TypeVar('CleaningTaskType', bound = DataCleaningTaskBase)
+class DataCleaningProcessorBase(Processor[CleaningTaskType]):
     "Processor for cleaning the data"
-    __DFLT = DataCleaningTask()
+    tasktype: Type[DataCleaningTaskBase]  # type: ignore
+
     @classmethod
     def __get(cls, name, cnf):
-        return cnf.get(name, getattr(cls.__DFLT, name))
+        return cnf.get(name, getattr(cls.tasktype, name))
 
     @classmethod
     def exc(cls, val, cnf, info, frame):
@@ -190,10 +246,10 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
     @classmethod
     def __precorrectiontest(cls, frame, bead, cnf) -> Iterator[Partial]:
         phases = frame.track.phase.select
-        sel    = DataCleaningTask(**cnf).core
+        sel    = cls.tasktype(**cnf).core
         pha    = cycs = None
         rules = (
-            name for name in DataCleaningTask.PRE_CORRECTION_CYCLES
+            name for name in cls.tasktype.PRE_CORRECTION_CYCLES
             if cls._doesapply(name, frame)
         )
         for name in rules:
@@ -205,10 +261,10 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
     @classmethod
     def __postcorrectiontest(cls, frame, bead, cnf) -> Iterator[Partial]:
         phases = frame.track.phase.select
-        sel    = DataCleaningTask(**cnf).core
+        sel    = cls.tasktype(**cnf).core
         pha    = cycs = None
         rules = (
-            name for name in DataCleaningTask.POST_CORRECTION_CYCLES
+            name for name in cls.tasktype.POST_CORRECTION_CYCLES
             if cls._doesapply(name, frame)
         )
         for name in rules:
@@ -223,7 +279,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
 
     @classmethod
     def __removebadcycles(cls, frame, cnf, val, arr):
-        bad = DataCleaningTask.badcycles(val)
+        bad = cls.tasktype.badcycles(val)
         if len(bad):
             for _, cyc in frame.track.view(
                     "cycles",
@@ -232,8 +288,8 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
             ):
                 cyc[:] = np.NaN
 
-            minpop  = 1.-cls.__get('minpopulation', cnf)*1e-2
-            return np.isnan(arr).sum() > len(arr) * minpop
+            maxnanrate  = 1.-cls.__get('minpopulation', cnf)*1e-2
+            return np.isnan(arr).sum() > len(arr) * maxnanrate
         return False
 
     @classmethod
@@ -275,3 +331,9 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
         "updates the frames"
         cache = args.data.setcachedefault(self, dict())
         return args.apply(partial(self.apply, cache = cache, **self.config()))
+
+class DataCleaningProcessor(DataCleaningProcessorBase[DataCleaningTask]):
+    "Processor for cleaning the data"
+
+class RampDataCleaningProcessor(DataCleaningProcessorBase[RampDataCleaningTask]):
+    "Processor for cleaning the data"

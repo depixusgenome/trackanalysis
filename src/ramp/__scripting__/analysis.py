@@ -32,7 +32,7 @@ class RampAnalysis:
     """
     Analyze ramps
     """
-    cleaning:      Dict[str, float] = dict(
+    rampcleaning: Dict[str, float] = dict(
         minextent     = 0.,
         maxextent     = 10.,
         maxsaturation = 100.
@@ -48,8 +48,8 @@ class RampAnalysis:
         "return the beads view"
         return (
             track.apply(
-                Tasks.cleaning (**self.cleaning, instrument = track.instrument['type']),
-                Tasks.alignment(**self.cleaning, instrument = track.instrument['type']),
+                Tasks.rampcleaning(**self.rampcleaning, instrument = track.instrument['type']),
+                Tasks.alignment(**self.rampcleaning, instrument = track.instrument['type']),
                 *tasks,
             ) if isinstance(track, Track) else
             cast(Beads, track)
@@ -86,8 +86,8 @@ class RampAnalysis:
         )
         dframe.__dict__['tasklist'] = [
             Tasks.trackreader(path = track.path),
-            Tasks.cleaning(**self.cleaning, instrument = track.instrument['type']),
-            Tasks.alignment(**self.cleaning, instrument = track.instrument['type']),
+            Tasks.rampcleaning(**self.rampcleaning, instrument = track.instrument['type']),
+            Tasks.alignment(**self.rampcleaning, instrument = track.instrument['type']),
             RampStatsTask(**dict(self.dataframetask, **kwa))
         ]
         if 'tasklist' not in getattr(dframe, '_metadata'):

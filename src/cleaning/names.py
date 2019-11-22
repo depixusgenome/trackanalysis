@@ -4,15 +4,16 @@
 from typing import Dict
 
 NAMES: Dict[str, str] = dict(
-    aberrant   = 'outlier',
-    saturation = 'non-closing',
-    population = '% good',
-    hfsigma    = 'σ[HF]',
-    extent     = 'Δz',
-    pingpong   = '∑|dz|',
-    phasejump  = 'SDI phase-jumps',
-    clipping   = 'z ∉ range(φ₁ → φ₃)',
-    alignment  = 'alignment',
-    fixed      = 'fixed',
-    io         = 'I/O error'
+    aberrant       = 'outlier',
+    saturation     = 'non-closing',
+    population     = '% good',
+    hfsigma        = 'σ[HF]',
+    extent         = 'Δz',
+    pingpong       = '∑|dz|',
+    phasejump      = 'SDI phase-jumps',
+    clipping       = 'z ∉ range(φ₁ → φ₃)',
+    alignment      = 'alignment',
+    fixed          = 'fixed',
+    extentoutliers = 'Δz-outlier',
+    io             = 'I/O error'
 )

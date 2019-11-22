@@ -38,8 +38,9 @@ for name in ('cleaning.processor', 'cordrift', 'eventdetection.processor',
              'peakfinding.processor', 'peakcalling.processor'):
     __import__(name+'.__config__')
 
-_CNV = dict([('cleaning', 'datacleaning'), ('alignment', 'extremumalignment'),
-             ('minbiasalignment', 'minbiaspeakalignment'), ('cycles', 'cyclecreator'),
+_CNV = dict([('cleaning', 'datacleaning'), ('rampcleaning', 'rampdatacleaning'),
+             ('alignment', 'extremumalignment'), ('minbiasalignment', 'minbiaspeakalignment'),
+             ('cycles', 'cyclecreator'),
              ('subtraction', 'beadsubtraction'), ('selection', 'dataselection'),
              ('peakalignment', 'peakcorrelationalignment')])
 
@@ -66,6 +67,9 @@ class _DOCHelper(Enum):
     cleaning       = (
         "aberrant values and cycles are discarded using the",
         "the rules defined in the `cleaning.processor.DataCleaningTask` task.")
+    rampcleaning   = (
+        "aberrant values and cycles are discarded using the",
+        "the rules defined in the `cleaning.processor.RampDataCleaningTask` task.")
     selection      = ("allows selecting/discarding specific beads and or cycles",)
     alignment      = (
         "the cycles are aligned using the algorithm defined",
