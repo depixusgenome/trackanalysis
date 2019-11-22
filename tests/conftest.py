@@ -17,11 +17,17 @@ from tests.testutils.recording     import (
 
 def pytest_collection_modifyitems(items, config):
     "sort tests such that integration tests come last and scripting last of all"
-    items.sort(key = lambda x: (
-        int(x.name != 'test_hybridstat_view[]')
-        + 2*int('integration' not in x.keywords.keys())*2
-        + 4*int('scripting' in Path(str(x.fspath)).parts if x.fspath else 0)
-    ))
+    def _sorter(itm):
+        test_type = (int(itm.name != 'test_hybridstat_view[]')
+                     + 2*int('integration' not in itm.keywords.keys())
+                     + 4*int('scripting' in Path(str(itm.fspath)).parts if itm.fspath else 0))
+        filepath = Path(itm.location[0])
+        # take filepath relative to second parent if file has at least 2 parents
+        if len(filepath.parents) >= 2:
+            filepath = filepath.relative_to(filepath.parents[1])
+        linenumber = itm.location[1]
+        return (test_type, filepath, linenumber)
+    items.sort(key = _sorter)
     _modifyitems(items, config)
 
 @pytest.fixture(params = [pytest.param("", marks = needsdisplay)])

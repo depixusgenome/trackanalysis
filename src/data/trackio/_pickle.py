@@ -11,9 +11,13 @@ from    concurrent.futures import ThreadPoolExecutor
 from    copy               import copy as shallowcopy
 from    pathlib            import Path
 import  pickle
+from    utils.logconfig     import getLogger
 from    ._base             import TrackIO, PATHTYPE, PATHTYPES, DictType, TrackIOError
+
 if TYPE_CHECKING:
     from    ._base         import Track
+
+LOGS     = getLogger(__name__)
 
 class PickleIO(TrackIO):
     "checks and opens pickled paths"
@@ -26,6 +30,18 @@ class PickleIO(TrackIO):
     @staticmethod
     def open(path:PATHTYPE, **_) -> Dict[Union[str, int], Any]:
         "opens a track file"
+        try:
+            with open(path, 'rb') as stream:
+                return pickle.load(stream)
+        except Exception as exc:  # pylint: disable=broad-except
+            LOGS.warning(
+                "Encountered %s while unpickling <%s>, falling back to legacy mode.",
+                path, type(exc).__name__)
+            LOGS.exception(exc)
+            return PickleIO._openlagacy(path=path)
+
+    @staticmethod
+    def _openlagacy(path: PATHTYPE) -> Dict[Union[str, int], Any]:
         out   = None
         names = {
             "cleaning.processor": None,
@@ -54,7 +70,6 @@ class PickleIO(TrackIO):
                     mdl = import_module(i)
                     if j:
                         sys.modules[j] = mdl
-
 
                 with open(path, 'rb') as stream:
                     out = pickle.load(stream)
@@ -95,7 +110,7 @@ def _savetrack(args):
             raise TrackIOError(f"Could not save {args[2].path} [{args[2].key}]") from exc
     else:
         PickleIO.save(args[1], args[2])
-    new = type(args[2]).__new__(type(args[2])) # type: ignore
+    new = type(args[2]).__new__(type(args[2]))  # type: ignore
     new.__dict__.update(shallowcopy(args[2].__dict__))
     setattr(new, '_path', args[1])
     return args[0], new
@@ -105,11 +120,11 @@ def savetrack(path: PATHTYPE, track: 'Track') -> 'Track':
     "saves a track"
 
 @overload
-def savetrack(path  : PATHTYPE, track : DictType) -> DictType: # type: ignore
+def savetrack(path: PATHTYPE, track: DictType) -> DictType:  # type: ignore
     "saves a tracksdict"
 
-def savetrack(path  : PATHTYPE, track : Union['Track', Dict[str,'Track']]
-             ) -> Union['Track', Dict[str,'Track']]:
+def savetrack(path: PATHTYPE, track: Union['Track', Dict[str,'Track']]
+              ) -> Union['Track', Dict[str,'Track']]:
     "Saves a track"
     if isinstance(track, (str, Path)):
         path, track = track, path
