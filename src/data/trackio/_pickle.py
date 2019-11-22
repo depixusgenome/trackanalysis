@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=arguments-differ
 "Loading and save tracks in  .pk format"
+import  os
 import  sys
 from    importlib          import import_module
 from    typing             import (
@@ -29,19 +30,30 @@ class PickleIO(TrackIO):
 
     @staticmethod
     def open(path:PATHTYPE, **_) -> Dict[Union[str, int], Any]:
-        "opens a track file"
+        "opens a pickled track file"
         try:
             with open(path, 'rb') as stream:
                 return pickle.load(stream)
         except Exception as exc:  # pylint: disable=broad-except
+            # Old pickled Tracks can possibly no longer be unpickled with today's code,
+            # and need to be unpickled in legacy mode.
+            # Unpickling legacy Tracks may however load modules in unexpected ways,
+            # which in turn may lead to problems when running unit tests.
+            # The legacy-unpickling is thus prohibited when running from pytest.
+
+            # check if run from pytest unit-test
+            # Note: `"pytest" in sys.modules` may be True when running in regular scripting mode
+            if "PYTEST_CURRENT_TEST" in os.environ:
+                raise Exception(f'Failed to unpickle {path}: ' +
+                                'Legacy unpickling is not supported in tests.') from exc
+
             LOGS.warning(
-                "Encountered %s while unpickling <%s>, falling back to legacy mode.",
-                path, type(exc).__name__)
-            LOGS.exception(exc)
-            return PickleIO._openlagacy(path=path)
+                "Encountered '%s' while unpickling <%s>, falling back to legacy mode...",
+                type(exc).__name__, path)
+            return PickleIO.__openlegacy(path=path)
 
     @staticmethod
-    def _openlagacy(path: PATHTYPE) -> Dict[Union[str, int], Any]:
+    def __openlegacy(path: PATHTYPE) -> Dict[Union[str, int], Any]:
         out   = None
         names = {
             "cleaning.processor": None,

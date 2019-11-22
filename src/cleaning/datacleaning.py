@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Removing aberrant points and cycles"
-from    importlib               import import_module
-# pylint: disable=import-error
-from    ._core                  import DataCleaning   # pylint: disable=unused-import
+from importlib import import_module
+
 
 # next lines are needed to open legacy .pk files...
 locals().update({

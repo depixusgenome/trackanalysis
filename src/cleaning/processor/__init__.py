@@ -3,6 +3,7 @@
 "all cleaning related tasks"
 from ._clipping         import ClippingTask, ClippingProcessor
 from ._datacleaning     import (DataCleaningTask, DataCleaningException,
+                                RampDataCleaningTask, RampDataCleaningProcessor,
                                 DataCleaningProcessor, DataCleaningErrorMessage)
 from ._beadsubtraction  import (
     BeadSubtractionTask, BeadSubtractionProcessor,
