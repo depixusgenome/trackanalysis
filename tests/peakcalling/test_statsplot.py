@@ -116,7 +116,7 @@ def test_statsplot_info_simple(diskcaching, tmp_path):
 
         if not tpe:
             vals.insert(4, 'no blockages')
-        assert factors == list(zip(repeat(""), repeat(""), vals))
+        assert set(factors) == set(zip(repeat(""), repeat(""), vals))
 
     def _check(tpe):
         mdl.tasks.jobs.launch(list(mdl.tasks.processors.values()))
