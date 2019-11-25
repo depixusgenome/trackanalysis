@@ -52,6 +52,7 @@ export class DpxToolbarView extends WidgetView {
         super.connect_signals()
         this.connect(this.model.properties.bead.change,      () => this.on_change_bead())
         this.connect(this.model.properties.discarded.change, () => this.on_change_discarded())
+        this.connect(this.model.properties.accepted.change,  () => this.on_change_discarded())
         this.connect(this.model.properties.message.change,   () => this.on_change_message())
         this.connect(this.model.properties.frozen.change,    () => this.on_change_frozen())
         this.connect(this.model.properties.filelist.change,  () => this.render())
