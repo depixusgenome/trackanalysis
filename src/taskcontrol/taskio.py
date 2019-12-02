@@ -242,7 +242,7 @@ def openmodels(
                 trk.path = mdl[0].path
                 models.append((
                     isarch,
-                    (type(mdl[0])(trk, copy = mdl[0].copy),) + mdl[1:]
+                    (type(mdl[0])(trk, copy = mdl[0].copy),) + tuple(mdl[1:])
                 ))
         if len(models) == 0:
             raise IOError(f"Couldn't open: {task}", 'warning')

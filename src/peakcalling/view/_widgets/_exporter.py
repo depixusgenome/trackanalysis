@@ -40,20 +40,26 @@ class SaveFileDialog(FileDialog):
             self.defaultextension = sav.suffix[1:] if sav.suffix != '' else None
             return str(sav)
 
-        self.store     = self.access[1]
+        self.__store   = self.access[1]
         self.access    = _defaultpath, None
         self.filetypes = "xlsx:*.xlsx"
         self.title     = "Export plot data to excel"
 
+    def store(self, *_):
+        "store the path"
+        return self.__store(*_)
+
 class CSVExporter:
     "exports all to csv"
     @classmethod
-    def addtodoc(cls, mainview, ctrl, doc) -> List[Div]:
+    def addtodoc(cls, mainviews, ctrl, doc) -> List[Div]:
         "creates the widget"
         dlg = SaveFileDialog(ctrl)
         div = Div(text = "", width = 0, height = 0)
 
-        figure = mainview.getfigure()
+        mainview = mainviews[0] if isinstance(mainviews, (list, tuple)) else mainviews
+        figure   = mainview.getfigure()
+
         figure.tools = (
             figure.tools
             + [
@@ -66,6 +72,10 @@ class CSVExporter:
                 )
             ]
         )
+
+        if isinstance(mainviews, (list, tuple)):
+            for i in mainviews[1:]:
+                i.getfigure().tools = i.getfigure().tools + [figure.tools[-1]]
 
         def _cb(attr, old, new):
             if new != "":

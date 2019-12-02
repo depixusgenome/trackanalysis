@@ -3,10 +3,14 @@
 "Creates a histogram from available events"
 from itertools import product
 from typing import Iterable, List, Union
+import warnings
 
 import numpy as np
 import scipy.stats
-from sklearn.mixture import GaussianMixture
+
+with warnings.catch_warnings():
+    warnings.filterwarnings('ignore', category = DeprecationWarning)
+    from sklearn.mixture import GaussianMixture
 
 from utils import initdefaults
 

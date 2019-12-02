@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "stats plot status"
 from dataclasses    import dataclass, field
-from typing         import Dict, List, Any, Tuple, Union
+from typing         import Dict, List, Any, Tuple, Union, Optional
 import numpy as np
 
 from model.plots    import PlotAttrs, defaultfigsize
@@ -13,13 +13,15 @@ from ._columns      import INVISIBLE, COLS
 from ._beadsplot    import BeadsScatterPlotStatus, BasePlotConfig
 from ._control      import TasksModelController
 
-NAME:      str            = 'peakcalling.view.stats'
+YAxisNorm      = Optional[Tuple[str, List[str]]]
+NAME:      str = 'peakcalling.view.stats'
 
 @dataclass
 class FoVStatsPlotStatus(BeadsScatterPlotStatus):
     "Information about the current fovs displayed"
-    name:     str                 = NAME
-    tracktag: Dict[RootTask, str] = field(default_factory = dict)
+    name:      str                 = NAME
+    tracktag:  Dict[RootTask, str] = field(default_factory = dict)
+    reference: Optional[RootTask]  = None
 
 @dataclass(eq = True)
 class AxisConfig:
@@ -55,19 +57,22 @@ class BinnedZ:
 @dataclass  # pylint: disable=too-many-instance-attributes
 class FoVStatsPlotConfig(BasePlotConfig):
     "Information about the current fovs displayed"
-    name:      str              = NAME
-    binnedz:   BinnedZ          = field(default_factory = BinnedZ)
-    binnedbp:  BinnedZ          = field(default_factory = lambda: BinnedZ(10, 10, 0))
-    xinfo:     List[AxisConfig] = field(
+    name:      str                = NAME
+    linear:    bool               = True
+    refagg:    str                = 'median'
+    yaxisnorm: YAxisNorm          = field(default_factory = lambda: ("status", ["", "truepos"]))
+    binnedz:   BinnedZ            = field(default_factory = BinnedZ)
+    binnedbp:  BinnedZ            = field(default_factory = lambda: BinnedZ(10, 10, 0))
+    xinfo:     List[AxisConfig]   = field(
         default_factory = lambda: [AxisConfig('track'), AxisConfig('beadstatus')]
     )
-    yaxis:     str              = 'bead'
-    xaxistag:  Dict[str, str]   = field(
+    yaxis:     str                = 'bead'
+    xaxistag:  Dict[str, str]     = field(
         default_factory = lambda: {
             i.key: str(i.label) for i in COLS if (i.axis == 'x') and i.label
         }
     )
-    yaxistag: Dict[str, str]   = field(
+    yaxistag: Dict[str, str]      = field(
         default_factory = lambda: {
             i.key: str(i.label) for i in COLS if (i.axis == 'y') and i.label
         }
@@ -77,6 +82,7 @@ class FoVStatsPlotConfig(BasePlotConfig):
     )
 
     uselabelcolors:   bool           = True
+    defaultcolors:    str            = 'Blues'
     orientationcolor: Dict[str, str] = field(
         default_factory = lambda: {"+": "lightgreen", "-": "dpxblue"}
     )
@@ -105,11 +111,14 @@ class FoVStatsPlotConfig(BasePlotConfig):
     figargs: Dict[str, Any] = field(default_factory = lambda: dict(
         toolbar_sticky   = False,
         toolbar_location = 'above',
-        tools            = ['pan,wheel_zoom,box_zoom,save,reset'],
+        tools            = ['pan,wheel_zoom,box_zoom,save,reset,hover'],
         plot_width       = 900,
         plot_height      = 400,
         sizing_mode      = defaultfigsize()[-1],
     ))
+    tooltipcolumns: List[Tuple[str,str]] = field(default_factory = lambda: [
+        ("x", "@xv"), ("y", "@yv"),
+    ])
     box:      PlotAttrs       = field(
         default_factory = lambda: PlotAttrs(
             '', 'rect',

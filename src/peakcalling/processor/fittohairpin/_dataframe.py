@@ -220,9 +220,10 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
             res:   FitBead,
             fits:  Dict[Optional[str], HairpinFitter]
     ) -> Dict[str, np.ndarray]:
+        hpsize = max(40, *(len(name) for name in frame.config.fit if name is not None))
         size = len(res.distances)
         return {
-            'hpin':       np.array(list(res.distances),                    dtype = '<U20'),
+            'hpin':       np.array(list(res.distances),                    dtype = f'<U{hpsize}'),
             'cost':       np.array([i[0] for i in res.distances.values()], dtype = 'f4'),
             'stretch':    np.array([i[1] for i in res.distances.values()], dtype = 'f4'),
             'bias':       np.array([i[2] for i in res.distances.values()], dtype = 'f4'),
@@ -346,12 +347,13 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
                     )
                     for i, j in data.items()
                 },
-                eventcount   = 0,
-                closest      = miss,
-                orientation  = symb,
-                status       = 'falseneg',
-                peakposition = miss/dist[1] + dist[2],
-                baseposition = miss
+                eventcount        = 0,
+                hybridisationrate = 0.,
+                closest           = miss,
+                orientation       = symb,
+                status            = 'falseneg',
+                peakposition      = miss/dist[1] + dist[2],
+                baseposition      = miss
             ))
             data = pd.concat([data, dfmi], sort = False, ignore_index = True)
         return data
@@ -377,11 +379,12 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
         out.setdefault(tpe+'nonaffected', []).append(good.size - good.sum())
         out.setdefault(tpe+'duplicates',  []).append(good.size - np.unique(ids).size)
         out.setdefault(tpe+'truepos',     []).append(np.unique(ids).size)
-        out.setdefault(tpe+'residuals',   []).append(
-            self.__aggregator(
-                np.abs(arrs[tpe == 'exp'][ids]-arrs[tpe != 'exp'][good]) ** 2
-            )
-        )
+
+        tmp = np.abs(arrs[tpe == 'exp'][ids]-arrs[tpe != 'exp'][good]) ** 2
+        if np.all(np.isnan(tmp)):
+            out.setdefault(tpe+'residuals',   []).append(np.NaN)
+        else:
+            out.setdefault(tpe+'residuals',   []).append(self.__aggregator(tmp))
 
     def __tp_fp_complex(  # py
             self,

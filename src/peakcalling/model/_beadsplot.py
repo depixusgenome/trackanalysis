@@ -28,18 +28,13 @@ class BeadsPlotTheme(PlotTheme):
 
     def newbounds(self, curr, arr, force):
         "Sets the range boundaries"
-        if len(arr) == 0:
+        if len(arr) == 0 or np.all(np.isnan(arr)):
             return dict(start        = 0., end          = 1.,
                         max_interval = 1., min_interval = 1.,
                         reset_start  = 0., reset_end    = 1.)
 
         vmin = np.nanmin(arr)
-        if np.isnan(vmin):
-            vmin = 0.
-
         vmax = np.nanmax(arr)
-        if np.isnan(vmax):
-            vmax = vmin + 1.
 
         rng = max(5e-5, (vmax-vmin))
         rng = rng*self.overshoot*.5

@@ -12,7 +12,7 @@ from   eventdetection.processor import ExtremumAlignmentTask, EventDetectionTask
 from   peakfinding.processor    import PeakSelectorTask
 from   peakcalling.processor    import FitToHairpinTask
 from   peakcalling.model        import Slice
-from   peakcalling.view._beadsplot import (     # pylint: disable=protected-access
+from   peakcalling.view.beadsplot import (     # pylint: disable=protected-access
     BeadsScatterPlot, _HairpinPlot, _PeaksPlot
 )
 from   taskmodel.track          import TrackReaderTask, DataSelectionTask

@@ -75,7 +75,7 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict):  # type: ignore
     def getmethod(self):
         "Returns the method used by the dynamic map"
         if None not in (self._sequence, self._oligos):
-            out = _AutoHP(self) if self._fit is True else _ManualHP(self)
+            out = _AutoHP(self) if self._fit else _ManualHP(self)
             if getattr(out, '_singlestrand') is None:
                 setattr(out, '_singlestrand', True)
             return out.run
@@ -84,7 +84,7 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict):  # type: ignore
 
     def getredim(self):
         "Returns the keys used by the dynamic map"
-        if None not in (self._sequence, self._oligos) and self._fit is not True:
+        if None not in (self._sequence, self._oligos) and not self._fit:
             return _ManualHP(self).getredim()
         return super().getredim()
 
@@ -126,11 +126,12 @@ class _AutoHP(OligoMappingDisplay):
         "creates the display"
         if self.__pins is None:
             self.__pins = self._hpins()
-            cnf         = dict(sequence = self._sequence,
-                               oligos   = self._oligos,
-                               fit      = self._fit)
-            if self._fit is True:
-                cnf.pop('fit')
+            if isinstance(self._fit, dict):
+                cnf = dict(sequence = self._sequence, oligos = self._oligos, **dict(self._fit))
+            elif self._fit is not True:
+                cnf = dict(sequence = self._sequence, oligos = self._oligos, fit = self._fit)
+            else:
+                cnf = dict(sequence = self._sequence, oligos = self._oligos)
             self.__fits = self._items.new(FitToHairpinDict, config = cnf)
             if 'rescaling' in getattr(getattr(self._items, 'track', None), 'instrument', ()):
                 self.__fits.config = self.__fits.config.rescale(
@@ -139,8 +140,13 @@ class _AutoHP(OligoMappingDisplay):
 
         cache = self.__cache
         if bead not in cache:
-            cache[bead] = min(self.__fits[bead].distances.items(), key = lambda i: i[1][0])
+            try:
+                cache[bead] = min(self.__fits[bead].distances.items(), key = lambda i: i[1][0])
+            except Exception as exc:  # pylint: disable=broad-except
+                cache[bead] = None, exc
         key, dist = cache[bead]
+        if isinstance(dist, Exception):
+            return hv.Overlay([hv.Curve(([0], [0])), hv.Text(0, 1, str(dist))])
 
         tmp = self(stretch = dist.stretch, bias = dist.bias)
         crv = tmp.elements(self._items[[bead]], group = key)  # pylint: disable=no-member

@@ -124,10 +124,10 @@ class AlignmentModalDescriptor:
     def __set__(self,inst,value):
         value     = int(value)
         alignment = getattr(inst, '_model').alignment
-        if value == 0:
-            alignment.remove()
-        else:
+        if value:
             alignment.update(phase = self.__ORDER[value])
+        else:
+            alignment.update(disabled = True)
 
 class EventDetectionWidget(BaseWidget[CheckboxGroup]):
     "Allows displaying only events"

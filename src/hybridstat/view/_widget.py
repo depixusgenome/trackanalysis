@@ -773,6 +773,7 @@ def advanced(**kwa):
         ## Peaks
 
         ### Events in Peaks
+        Phase with events                       %(eventdetection.phase)D
         Min frame count per hybridisation       %(eventdetection.events.select.minlength)D
         Min hybridisations per peak             %(peakselection.finder.grouper.mincount)D
         Re-align cycles using peaks             %(peakselection.align)b

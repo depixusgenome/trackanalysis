@@ -6,7 +6,7 @@ from bokeh        import layouts
 from bokeh.models import Widget
 from ...model     import TasksModelController
 from ._jobsstatus import JobsStatusBar
-from ._config     import PeakcallingPlotWidget
+from ._plot       import PeakcallingPlotWidget
 from ._explorer   import StorageExplorer
 from ._exporter   import CSVExporter
 from ._tasks      import TaskExplorer

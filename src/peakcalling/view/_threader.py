@@ -5,8 +5,8 @@ In charge of thread safety & deciding whether to reset or update the plots
 """
 from   abc                     import abstractmethod, ABC
 from   copy                    import copy
-from   itertools               import repeat
-from   functools               import partial
+from   itertools               import repeat, chain
+from   functools               import partial, wraps
 from   threading               import Lock
 from   typing                  import (
     TypeVar, Generic, Dict, Tuple, Optional, Iterator, Any, Set, Union, ClassVar,
@@ -15,6 +15,7 @@ from   typing                  import (
 import numpy   as np
 import pandas  as pd
 
+from   view.plots.ploterror    import PlotError
 from   taskcontrol.taskcontrol import ProcessorController
 from   taskmodel.application   import setupio
 from   taskmodel.dataframe     import DataFrameTask
@@ -89,7 +90,7 @@ class BasePlotter(Generic[Parent]):
         tracktag = getattr(model.display, 'tracktag', None)
         roots    = [id(i) for i in model.tasks.roots]
         for proc in self._procs.values():
-            iproc: int             = hash(proc.model[0])
+            iproc: int             = id(proc.model[0])
             cache: Optional[STORE] = proc.data.getcache(DataFrameTask)()
             if not cache or (len(self._procs) > 1 and model.display.masked(root = proc)):
                 continue
@@ -129,12 +130,25 @@ class BasePlotter(Generic[Parent]):
 
     def reset(self, cache):
         "resets the data"
-        for i, j in (self._reset if self._isdefault() else self._update)():
-            if isinstance(j, dict):
-                cache[i].update(j)
-            else:
-                assert i not in cache
-                cache[i] = j
+        err = getattr(self.parent, '_errors', None)
+        itr = (self._reset if self._isdefault() else self._update)()
+
+        def _display(first, *_):
+            for i, j in itr if first is None else chain(first, itr):
+                if i is None:
+                    continue
+                if isinstance(i, Exception) and err is not None:
+                    err.reset(cache, i, False)
+                elif isinstance(j, dict):
+                    cache[i].update(j)
+                else:
+                    assert i not in cache
+                    cache[i] = j
+
+        if callable(err):
+            err(cache, lambda: [next(itr, (None, None))], _display)
+        else:
+            _display(cache)
 
     @staticmethod
     def getdata() -> Dict[str, pd.DataFrame]:
@@ -161,6 +175,7 @@ class BasePlotter(Generic[Parent]):
     @abstractmethod
     def _isdefault(self) -> bool:
         "whether the plot should be started anew or updated"
+        return False
 
 class PlotThreader(ABC):
     """
@@ -236,7 +251,6 @@ class PlotThreader(ABC):
     @classmethod
     def setup(cls, other):
         "sets-up the threader on this class"
-
         def __init__(self, *args, _old_ = other.__init__, **kwa):
             _old_(self, *args, **kwa)
             setattr(self, '_threader', cls(self))
@@ -244,6 +258,11 @@ class PlotThreader(ABC):
         def _reset(self, _, cache):
             "resets the plot"
             getattr(self, '_threader').reset(cache)
+
+        def _addtodoc(self, ctrl, doc, _old_ = getattr(other, '_addtodoc')):
+            outp = _old_(self, ctrl, doc)
+            setattr(self, '_errors', PlotError(getattr(self, '_fig')))
+            return outp
 
         def observe(self, ctrl, _old_ = getattr(other, 'observe', None)):
             """observe the controller"""
@@ -282,10 +301,13 @@ class PlotThreader(ABC):
             def _onupdate(**_):
                 threader.update(ctrl, **_)
 
-        other.__init__ = __init__
-        setattr(other, '_reset', _reset)
-        other.observe  = observe
-        other.ismain   = staticmethod(ismain)
+        for fcn in (__init__, _reset, _addtodoc, observe):
+            name = fcn.__name__
+            if hasattr(other, name):
+                fcn = wraps(getattr(other, name))(fcn)
+            setattr(other, name, fcn)
+
+        other.ismain = staticmethod(ismain)
         return other
 
 

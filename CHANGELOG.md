@@ -1,8 +1,56 @@
 # CycleApp
 
+## cycles_v7.3
+
+* 2019-11-28 14:07:44 +0100  (tag: cycles_v7.3)
+
+### Statistics Tab
+
+#### Linear X-Axis
+
+It's now possible to view some statistics using a linear x-axis rather than a
+categorical one. This is selected by default when available although that
+behaviour can be changed using the *Plotting* menu.
+
+#### *Identified* versus *Identified and Un-identified*
+
+When looking at counts, a new normalization is possible. The options are now as follows:
+
+* by default, every value is normalized over the sum total of all values in the
+ plot. The sum of all values in the plot is 100%.
+* if a specific x-axis variable is defined as the normalization, the sum is
+ over all values categories in that x-axis variable separately for each
+ sub-set of categories from remaining x-axis variables. For example, counts
+ by track and hairpins normalized over tracks will show the repartition of
+ hairpins per track. Normalized over tracks, it will show, for each hairpin
+ independently the variability in molecule attaching to the surface.
+* when sequences and oligos are available, then are displayed the percentage
+ for *identified* blockages versus *identified* and *missing*.
+
+
+#### New X-Axis Variables
+
+There are now 2 similar x-axis variables:
+
+* *closest binding (bp)* is the binding to which a blockage is affected. There
+  can be more than one blockage affected to any given binding.
+* *binding (bp)* is the binding to which the closest blockage is paired. There
+  can be no more than one blockage paired to a binding.
+
+For both, we defined the *distance*, i.e. the theoretical minus the experimental
+positions and *delta*, i.e. the absolute value of the *distance*.
+
+#### Reference Track
+
+It's possible to define a *reference track*. In such a case, we expect other
+tracks to refer the the same field of view. The y-axis values for beads or
+binding positions are then subtracted from the reference track, for all
+remaining tracks separately.
+
 ## cycles_v7.2
 
-* 2019-11-08 10:20:20 +0000  (tag: cycles_v7.2)
+* 2019-11-19 14:07:44 +0100  (tag: cycles_v7.2.1)
+* 2019-11-19 11:33:08 +0000  (tag: cycles_v7.2)
 
 ### Statistics Tab
 

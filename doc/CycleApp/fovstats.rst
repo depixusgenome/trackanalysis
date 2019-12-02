@@ -69,14 +69,24 @@ Statistics Plot
 The information displayed is either counts are whisker boxes on a given y-axis
 parameter as a function of up to 3 x-axis parameters.
 
+The X-Axis
+^^^^^^^^^^
+
 For the x-axis, these parameters are:
 
 * *hairpin* is the hairpin to which the bead was affected.
-* *binding (bp)* is the binding to which a blockage is affected.
+* *closest binding (bp)* is the binding to which a blockage is affected. There
+  can be more than one blockage affected to any given binding.
+* *binding (bp)* is the binding to which the closest blockage is paired. There
+  can be no more than one blockage paired to a binding.
 * *strand* is the orientation of the binding to which a blockage is affected.
 * *track group* is defined by the user on a per track basis.
 * *track* is the file to which a hairpin belongs. The exact file denomination
   can be redefined throught the *advanced* menu.
+* *φ₅ saturation* is the percentage of blockage events in a blockage position
+  which reaches the end of phase 5 without dropping to the baseline. If the
+  values are too high (> 10%), average durations and hybridisation rates for
+  blockage positions belows will be biased to lower values.
 * *blockage status* is the status of the blockage. It can be:
 
    * *< baseline* if the blockage is below the detected baseline,
@@ -100,11 +110,25 @@ For the x-axis, these parameters are:
    * as well as any of the data cleaning messages one already knows from the
      *Cleaning* tab.
 
+The Y-Axis, per Bead
+^^^^^^^^^^^^^^^^^^^^
+
 For the y-axis, the parameters on a per bead base are:
 
-* *count (%)* is for displaying a total number of beads or blockages per
-  x-axis category rather that statistics on a given bead or blockage
-  characteristic.
+* *count (%)* is either a number of beads or a number of blockages depending on
+  the selected x-axis variables. These numbers are normalized differently
+  depending on the choice of normalization:
+ 
+   * by default, every value is normalized over the sum total of all values in the plot.
+   * if a specific x-axis variable is defined as the normalization, the sum is
+     over all values categories in that x-axis variable separately for each
+     sub-set of categories from remaining x-axis variables. For example, counts
+     by track and hairpins normalized over tracks will show the repartition of
+     hairpins per track. Normalized over tracks, it will show, for each hairpin
+     independently the variability in molecule attaching to the surface.
+   * when sequences and oligos are available, then are displayed the percentage
+     for *identified* blockages versus *identified* and *missing*.
+
 * *σ[HF] (bp)* is the high frequency noise per bead. Another parameter is
   available for a high frequency noise per blockage.
 * *blockage count* is the number of blockages per bead, excluding those at
@@ -127,6 +151,9 @@ For the y-axis, the parameters on a per bead base are:
   *missing* blockages have a *z (µm)* value. We use the *missing* status use
   *stretch* and *bias* to estimate it back from the *binding (bp)* position.
 
+The Y-Axis, per Blockage
+^^^^^^^^^^^^^^^^^^^^^^^^
+
 For the y-axis, the parameters on a per blockage base are:
 
 * *σ[HF] per blockage (bp)* is the high frequency noise measured using frames
@@ -138,7 +165,22 @@ For the y-axis, the parameters on a per blockage base are:
 * *binding duration (s)* is the average duration of events within a blockage
   position.
 * *Δ(binding - blockage) (bp)* is the distance to the closest binding
-  position. Only *identified* blockages are considered.
+  position. Only blockages uniquely paired to a binding a considered.
+* *|Δ(binding - blockage)| (bp)* is the absolute distance to the closest binding
+  position. Only blockages uniquely paired to a binding a considered.
+* *Δ(closest binding - blockage) (bp)* is the distance to the closest binding
+  position. A binding can be affected to multiple bindings.
+* *|Δ(closest binding - blockage)| (bp)* is the absolute distance to the
+  closest binding position. A binding can be affected to multiple bindings.
+
+The Reference Track
+^^^^^^^^^^^^^^^^^^^
+
+When varying experimental conditions on a single field of view, it can be
+useful to compare values bead per bead or blockage per blockage. In order to do
+so, one can define a reference track. In such a case, for each bead (bead
+blockage position), the y-axis value for the reference track is subtracted from
+the same y-axis variable for the same bead (bead blockage position).
 
 Exporting to xlsx
 =================
@@ -197,8 +239,26 @@ One can select here:
   that depending on selected x-axis categories, some y-axis options will be
   disabled.
 * *Count normalisation* is displayed only if *Counts (%)* is selected for the
-  Y-axis. In such a case, the percentage is defined using either *all*
-  categories or those of a given x-axis category.
+  Y-axis. In such a case, the percentage is defined using:
+
+   * *all* categories. Every value is normalized over the sum total of all
+     values in the plot. The sum of all values in the plot is 100%.
+   * a specific x-axis category. For example, should *hairpin* and *binding
+     (bp)* be selected as x-axis variables, with *hairpin* as the
+     normalisation, then for each hairpin the sum of displayed percentages
+     equals 100%.
+   * a specific x-axis variable. The the sum is over all values categories in
+     that x-axis variable separately for each sub-set of categories from
+     remaining x-axis variables. For example, counts by track and hairpins
+     normalized over tracks will show the repartition of hairpins per track:
+     for each track, the sum of values over all hairpins is 100%. Normalized
+     over tracks, it will show, for each hairpin independently the variability
+     in molecule attaching to the surface: for each hairpin, the sum of values
+     over all tracks is 100%.
+   * *blockage status* is specific to when sequences and oligos were provided.
+     In such a case, the percentage is that of *identified* blockages over
+     *identified* and *missing*.
+
 * *Track denomination* defines how tracks are labeled:
 
   * *full* uses the track file name in full, prefixed with the order in which
@@ -219,6 +279,8 @@ Tracks
 
 This tab allows defining:
 
+* the track to use as reference. If such a tracks is defined, that track's
+  y-axis values are subtracted from others'.
 * the group to which a track may belong.
 * whether the track should be displayed at all.
 * the beads which should *not* be displayed for a given track.

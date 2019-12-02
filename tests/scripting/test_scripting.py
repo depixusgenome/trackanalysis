@@ -16,6 +16,7 @@ def test_track(scriptingcleaner):
     from data                  import Cycles, Beads
     from eventdetection.data   import Events
     from peakfinding.processor import PeaksDict
+    from taskmodel             import InstrumentType
     from tests.testingcore     import path as utpath
 
     track = Track(path = utpath("big_legacy"))
@@ -60,6 +61,13 @@ def test_track(scriptingcleaner):
 
     assert track.op[:,:5].ncycles == 5
     assert set(track.op[[1,2]].beads.keys()) == {1,2}
+
+    assert InstrumentType(utpath("big_legacy")) == InstrumentType.picotwist
+    assert InstrumentType(utpath("sdi_track.pk")) == InstrumentType.sdi
+    assert Tasks.peakselector(instrument = utpath("big_legacy")).rawfactor == 2.
+    assert track.peaks.tasklist[-1].rawfactor == 2.
+    assert Tasks.peakselector(instrument = utpath("sdi_track.pk")).rawfactor == 1.
+    assert Track(path = utpath("sdi_track.pk")).peaks.tasklist[-1].rawfactor == 1.
 
 @integrationmark
 def test_track_dataframe(scriptingcleaner):

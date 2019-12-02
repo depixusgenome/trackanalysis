@@ -9,6 +9,6 @@ from ._beadsplot import (
     BasePlotConfig, BeadsScatterPlotStatus, BeadsScatterPlotConfig, BeadsScatterPlotModel,
     BeadsPlotTheme, Slice
 )
-from ._statsplot import FoVStatsPlotModel, AxisConfig, BinnedZ
+from ._statsplot import FoVStatsPlotModel, AxisConfig, BinnedZ, FoVStatsPlotConfig
 from ._tasks     import Processors, TasksDict, keytobytes, keyfrombytes, TasksModel
 from ._diskcache import DiskCacheConfig

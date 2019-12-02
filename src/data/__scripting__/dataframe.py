@@ -104,27 +104,21 @@ def adddataframe(*classes):
         if assign is not None:
             transform.insert(0, lambda x: x.assign(**assign))
 
-        data = SafeDataFrameProcessor.apply(
-            shallowcopy(self),
-            transform = transform,
-            measures  = kwa,
-            merge     = merge
-        )
-        if data is None:
-            return None
-
         lst = [
             *self.tasklist,
             DataFrameTask(
                 transform = transform,
                 measures  = kwa,
-                merge     = merge
+                merge     = merge,
             )
         ]
-        data.__dict__['tasklist'] = lst
-        if 'tasklist' not in getattr(data, '_metadata'):
-            getattr(data, '_metadata').append('tasklist')
-        return data
+        return SafeDataFrameProcessor.apply(
+            shallowcopy(self),
+            transform = transform,
+            measures  = kwa,
+            merge     = merge,
+            buffers   = lst
+        )
 
     dataframe.__doc__ = SafeDataFrameProcessor.factory(classes[0]).__doc__+doc
     classes[0].dataframe = dataframe

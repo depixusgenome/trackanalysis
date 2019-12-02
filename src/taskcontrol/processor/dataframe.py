@@ -11,6 +11,7 @@ import  numpy                   as     np
 from    data.track              import Track
 from    data.trackops           import trackname
 from    data.views              import TrackView
+from    taskmodel               import Task
 from    taskmodel.dataframe     import DataFrameTask
 from    utils.inspection        import parametercount
 from    .base                   import Processor, ProcessorException
@@ -22,7 +23,8 @@ class DataFrameFactory(Generic[Frame]):
         self.task      = task
         transf         = list(self.task.transform)  if self.task.transform else []
         self.transform = [(parametercount(i), i) for i in transf]
-        self.tasklist  = list(buffers.model)
+        self.tasklist  = list(getattr(buffers, 'model', buffers))
+        assert all(isinstance(i, Task) for i in self.tasklist)
 
     @staticmethod
     def adddoc(newcls):

@@ -244,9 +244,9 @@ class _FitStore(_TaskStore[FitToHairpinTask]):
         self.task = copy(self.task)
         if isinstance(self.task.oligos, (list, tuple)):
             self.task.oligos = ', '.join(sorted(self.task.oligos))
-        if self.task.sequences == mdl.state.sequences and mdl.state.path:
+        if self.task.sequences == mdl.state.sequences and mdl.state.seqpath:
             # use the path for displaying rather than the true sequence
-            self.task.sequences = mdl.state.path
+            self.task.sequences = mdl.state.seqpath
 
         # remove items such that a resolve can renew the data
         self.task.fit   = {i: j for i, j in self.task.fit.items()   if i is None}

@@ -122,30 +122,6 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
             return True
         return False
 
-    def observe(self, ctrl):
-        "observe the controller"
-        super().observe(ctrl)
-
-        @ctrl.tasks.observe
-        @ctrl.tasks.hashwith(self._tasksdisplay)
-        def _onopentrack(calllater, isarchive, model, **_):
-            if isarchive or not model or not hasattr(model[0], 'path'):
-                return
-
-            ols = splitoligos("kmer", path = model[0].path)
-            if not ols:
-                return
-
-            if hasattr(self.roottask, 'path') and self.oligos:
-                ols  = sorted(
-                    set(self.oligos)
-                    .difference(splitoligos("kmer", path = self.roottask.path))
-                    .union(ols)
-                )
-
-            if ols:
-                calllater.append(lambda: self.setnewprobes(ols))
-
     @property
     def sequencemodel(self):
         "return the sequence model"
@@ -201,12 +177,27 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
         except IOError:
             return True
 
-        if len(seqs) > 0:
-            self._updatetheme(self._seqconfig, path = path, sequences = seqs)
-            self._updatedisplay(self._seqdisplay, hpins = {})
-            self.reset()
-            return False
-        return True
+        if not len(seqs):
+            return True
+
+        them = dict(path = path, sequences = seqs)
+        disp = dict(hpins = {})
+        if not self.oligos and self.roottask:
+            ols = splitoligos("kmer", path = self.roottask.path)
+            if ols:
+                if ols != self._seqdisplay.probes.get(self.roottask, None):
+                    disp['probes'] = {**self._seqdisplay.probes, self.roottask: ols}
+
+                hist            = self._seqconfig.history[:self._seqconfig.maxlength]
+                them['history'] = [ols] + [i for i in hist if i != ols]
+                if ols != self._seqdisplay.probes:
+                    them['probes'] = ols
+
+        # update the display first, otherwise the FitToHairpinTask doesn't get created!
+        # see hybridstat.test_peaksview.test_peaksplot_view
+        self._updatedisplay(self._seqdisplay, **disp)
+        self._updatetheme(self._seqconfig, **them)
+        return False
 
     def setnewsequencekey(self, new):
         "sets new probes"
