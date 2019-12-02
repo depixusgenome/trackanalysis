@@ -251,14 +251,18 @@ class MessagesView:
             return
 
         templ = self._theme.types
-        if isinstance(text, Exception):
+        for exc, tpe in ((RuntimeWarning, 'warning'), (Exception, 'error')):
+            if not isinstance(text, exc):
+                continue
+
             args = getattr(text, 'args', tuple())
-            if len(args) == 1:
-                args = args[0], 'error'
-            elif len(args) != 2:
-                args = text,    'error'
-            elif args[1] not in templ:
-                args = str(args), 'error'
+            args = (
+                (args[0],   tpe) if len(args) == 1 else
+                (text,      tpe) if len(args) != 2 else
+                (str(args), tpe) if args[1] not in templ else
+                args
+            )
+            break
         else:
             args = text
 

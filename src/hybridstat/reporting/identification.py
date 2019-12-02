@@ -5,7 +5,12 @@ Extracts information from a report
 """
 from typing                 import Optional, Sequence, Tuple, List, Dict, Callable
 from pathlib                import Path
-from openpyxl               import load_workbook
+import warnings
+
+with warnings.catch_warnings():
+    warnings.filterwarnings('ignore', category = DeprecationWarning)
+    from openpyxl               import load_workbook
+
 from excelreports.creation  import writecolumns
 
 IdType  = Tuple[int,str,Optional[float],Optional[float]]

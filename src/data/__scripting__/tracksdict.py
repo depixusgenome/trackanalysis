@@ -307,7 +307,7 @@ class TracksDict(_TracksDict):
             [
                 Tasks.trackreader(path = j.path, key = j.key),
                 *Tasks.defaulttasklist(j, tasks[0], j.cleaned)[:-1],
-                *(Tasks.create(i) for i in tasks),
+                *(Tasks.create(i, instrument = j.path) for i in tasks),
                 Tasks.dataframe(merge = True, measures = kwa, transform = transform)
             ]
             for j in self.values()

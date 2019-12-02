@@ -13,7 +13,7 @@ from   peakfinding.peaksarray      import (
     Output as PeakFindingOutput, PeakListArray, PeaksArray
 )
 from   peakfinding.processor       import SingleStrandProcessor, BaselinePeakProcessor
-from   taskmodel                       import Level
+from   taskmodel                       import Level, PHASE
 from   taskcontrol.processor.taskview  import TaskViewProcessor
 from   utils                           import updatecopy, asobjarray, isint
 from   ...tohairpin                    import (
@@ -80,10 +80,17 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, int]):  # pylint: disable=too-
 
         # discard fits that have a hairpin size either too small or too big
         if hpin is None and self.config.pullphaseratio is not None:
-            extent = self.beadextension(key)
-            if extent is not None:
-                extent *= self.config.pullphaseratio
-                fits    = {i: j for i, j in fits.items() if j.withinrange(extent)}
+            data = self
+            meas = PHASE.measure if self.track is None else self.track.phase['measure']
+            while hasattr(data, 'data'):
+                if hasattr(data, 'events') and getattr(data, 'first', None) == meas:
+                    #  only works if the phase with events is phase 5
+                    extent = self.beadextension(key)
+                    if extent is not None:
+                        extent *= self.config.pullphaseratio
+                        fits    = {i: j for i, j in fits.items() if j.withinrange(extent)}
+                    break
+                data = getattr(data, 'data', None)
 
         if any(i.hassinglestrand for i in fits.values()):
             strand = self.__singlestrand(key, inp) is not None if strand is None else strand

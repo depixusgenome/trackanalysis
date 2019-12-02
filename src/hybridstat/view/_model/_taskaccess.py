@@ -137,7 +137,7 @@ class FitToReferenceAccess(TaskAccess, tasktype = FitToReferenceTask):
 
         @ctrl.tasks.observe("closetrack")
         @ctrl.display.hashwith(self.__store)
-        def _ontask(task, **_):
+        def _onclosetask(task, **_):
             if task is self.reference:
                 info = FitToReferenceStore(reference = None).__dict__
                 info.pop('name')
@@ -366,14 +366,14 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         @ctrl.display.observe(self._tasksmodel.peaksmodel.display)
         @ctrl.theme.observe(self.__defaults)
         @ctrl.display.hashwith(self._tasksdisplay)
-        def _observe(old = None, **_):
+        def _observe(old, **_):
             if keys.intersection(old):
                 task = self.default(self._tasksmodel)
                 self.update(**(task.config() if task else {'disabled': True}))
 
         @ctrl.tasks.observe("addtask", "updatetask", "removetask")
         @ctrl.display.hashwith(self._tasksdisplay)
-        def _ondataselection(task = None, cache = None, **_):
+        def _ondataselection(task, cache, **_):
             if isinstance(task, DataSelectionTask):
                 for proc, elem in cache:
                     if isinstance(proc.task, self.tasktype) and elem:
@@ -383,7 +383,7 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
 
         @ctrl.display.observe
         @ctrl.display.hashwith(self.__store)
-        def _onopenanafile(model = None, **_):
+        def _onopenanafile(model, **_):
             tasklist = model.get('tasks', [[None]])[0]
             task     = next((i for i in tasklist if isinstance(i, FitToHairpinTask)),
                             None)

@@ -126,6 +126,11 @@ class Probability:
         return self.minduration < 1. + val
 
     @property
+    def saturation(self) -> float:
+        "Percentage of events which reach the end of phase 5"
+        return min(100., 100*self.ntoolong/max(1, self.nevents))
+
+    @property
     def probability(self) -> float:
         "Off probability"
         if self.nevents <= self.ntoolong:

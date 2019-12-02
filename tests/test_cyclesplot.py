@@ -75,33 +75,26 @@ def test_cyclesplot(bokehaction):  # pylint: disable=too-many-statements
     assert curr.bead == 1
 
     cnf  = server.savedconfig
-    # the filename oligo should already be set
-    assert cnf['config.sequence']['probes'] == ['ctgt']
-    assert cnf['config.sequence']['history'] == [['ctgt']]
-    _check(server, 'Cycles:Oligos', 'ctgt')
+    # the filename oligo should *not* already be set
+    assert 'config.sequence' not in cnf
+    _check(server, 'Cycles:Oligos', '')
 
     server.change('Cycles:Oligos', 'value', ' TGGC  , aatt')
     _check(server, 'Cycles:Oligos', 'aatt, tggc')
 
     cnf  = server.savedconfig
     assert cnf['config.sequence']['probes'] == ['aatt', 'tggc']
-    assert cnf['config.sequence']['history'] == [['aatt', 'tggc'], ['ctgt']]
+    assert cnf['config.sequence']['history'] == [['aatt', 'tggc']]
 
     server.change('Cycles:Oligos', 'value', '')
     _check(server, 'Cycles:Oligos', '')
     cnf  = server.savedconfig
     assert not cnf['config.sequence'].get('probes', None)
-    assert cnf['config.sequence']['history'] == [['aatt', 'tggc'], ['ctgt']]
+    assert cnf['config.sequence']['history'] == [['aatt', 'tggc']]
 
     server.load('hairpins.fasta', rendered = False, andpress = False)
     server.change('Cycles:Sequence', 'value', '←')
-    _check(
-        server, '',
-        lambda: (
-            server.widget['Cycles:Peaks'].source.data['bases']
-            == approx([0, 1000], abs = 1.)
-        )
-    )
+    _check(server, 'Cycles:Oligos', 'ctgt')
 
     server.change('Cycles:Oligos',   'value', 'TgGC ')
     _check(
@@ -159,4 +152,4 @@ def test_cyclesplot2(bokehaction):
 
 if __name__ == '__main__':
     from tests.testingcore.bokehtesting import BokehAction  # noqa  # pylint: disable=ungrouped-imports
-    test_cyclesplot2(BokehAction(None))
+    test_cyclesplot(BokehAction(None))

@@ -55,9 +55,12 @@ class StorageExplorerModel:
         self.cachesize:     int  = mdl.diskcache.maxsize  // 1000000  # size in Mb
         self.ncpu:          int  = mdl.jobs.config.ncpu
         self.cachereset:    bool = False
-        self.withfit:       bool = any(
-            any(isinstance(j, FitToHairpinTask) for j in i.model) for i in procs.values()
-        )
+        if procs:
+            self.withfit:       bool = any(
+                any(isinstance(j, FitToHairpinTask) for j in i.model) for i in procs.values()
+            )
+        else:
+            self.withfit = True
 
         if self.cachesize > 0:
             existing   = [keytobytes(i.model) for i in procs.values()]
@@ -179,7 +182,7 @@ class StorageExplorer(ModalDialogButton[StorageExplorerConfig, StorageExplorerMo
                 str(i) for i in getattr(_get(BeadSubtractionTask), 'beads', [])
             ),
             "Blockage min duration: %d"   % _get(EventDetectionTask).events.select.minlength,
-            "Alignment: %s"               % ALIGN_LABELS[_get(ExtremumAlignmentTask).phase],
+            "Alignment: %s"  % ALIGN_LABELS[getattr(_get(ExtremumAlignmentTask), 'phase', None)],
             'Peak min blockage count: %d' % _get(PeakSelectorTask).finder.grouper.mincount,
         )
         return _tooltip(ttip) + Path(info.path).stem + "</div>"

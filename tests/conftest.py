@@ -2,7 +2,17 @@
 # -*- coding: utf-8 -*-
 "Imported by pytest: adds 2 fixtures"
 from   pathlib import Path
+import warnings
+from   importlib import import_module
 import pytest
+
+with warnings.catch_warnings():
+    # for _msg_ in (".*html argument of XMLParser.*", ".*Using or importing the ABCs.*"):
+    warnings.filterwarnings('ignore', category = DeprecationWarning)
+    try:
+        import_module("defusedxml.lxml")
+    except ModuleNotFoundError:
+        pass
 
 pytest.register_assert_rewrite("tests.testconfig")
 pytest.register_assert_rewrite("tests.testingcore")

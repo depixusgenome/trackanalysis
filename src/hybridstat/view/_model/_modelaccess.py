@@ -8,6 +8,7 @@ import numpy                    as     np
 from cleaning.view              import DataCleaningModelAccess
 from peakcalling.tohairpin      import Distance
 from tasksequences.modelaccess  import SequencePlotModelAccess
+from tasksequences              import splitoligos
 from utils                      import NoArgs
 
 from .._peakinfo                import PeakInfoModelAccess
@@ -79,6 +80,38 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
             )
 
             self.identification.rescale(ctrl, self, coeff)
+
+        @ctrl.tasks.observe
+        @ctrl.tasks.hashwith(self._tasksdisplay)
+        def _onopeningtracks(controller, models, **_):
+            if not self.sequences(...):
+                return
+
+            path = self.sequencepath
+            cls  = self.identification.tasktype
+            for isarchive, proc in models:
+                model = proc.model
+                if isarchive or not model or not getattr(model[0], 'path', None):
+                    continue
+
+                ols = splitoligos("kmer", path = model[0].path)
+                if not ols:
+                    continue
+
+                if hasattr(self.roottask, 'path') and self.oligos:
+                    ols  = sorted(
+                        set(self.oligos)
+                        .difference(splitoligos("kmer", path = self.roottask.path))
+                        .union(ols)
+                    )
+                    if not ols:
+                        continue
+
+                proc.add(
+                    cls(sequence = path, oligos = ols),
+                    controller.processortype(cls),
+                    index = self._tasksconfig.defaulttaskindex(proc.model, cls)
+                )
 
     def getfitparameters(self, key = NoArgs, bead = NoArgs) -> Tuple[float, float]:
         "return the stretch  & bias for the current bead"

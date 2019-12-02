@@ -10,16 +10,17 @@ We add some methods and change the default behaviour:
 """
 from   copy                 import copy  as shallowcopy, deepcopy
 from   functools            import partial
-from   typing               import cast
+from   pathlib              import Path
+from   typing               import Type, cast
 
 import numpy                as     np
 
-from   taskmodel               import PHASE, Task
+from   taskmodel               import PHASE, Task, InstrumentType
 from   taskmodel.__scripting__ import Tasks
-from   utils.decoration        import addproperty, extend
+from   utils.decoration        import addproperty, extend, addto
 from   utils.attrdefaults      import addattributes
 
-from   ..trackio               import savetrack
+from   ..trackio               import savetrack, instrumenttype
 from   ..views                 import TrackView, Cycles, Beads
 from   ..track                 import Track, LazyProperty, isellipsis
 from   ..trackops              import (selectbeads, dropbeads, selectcycles,
@@ -204,8 +205,8 @@ class _TrackMixin:
         if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
             beads = tuple(beads[0])
         if len(beads) == 0:
-            beads = tuple(self.beads.keys()) # type: ignore
-        fcn = lambda i: renamebeads(selectbeads(cast(self, Task), i), (i, 0)) # type: ignore
+            beads = tuple(self.beads.keys())  # type: ignore
+        fcn = lambda i: renamebeads(selectbeads(cast(self, Task), i), (i, 0))  # type: ignore
         return TracksDict({i: fcn(i) for i in beads})
 
     dataframe = dataframe
@@ -224,6 +225,13 @@ class _TrackMixin:
                 return dropbeads(self, *(i for i in value if i != '~'))
 
         return selectbeads(self, value)
+
+@addto(InstrumentType, classmethod)
+def _missing_(cls: Type[InstrumentType], value):
+    value = getattr(value, 'path', value)
+    if Path(value).exists():
+        return cls(instrumenttype(value))
+    raise ValueError("%r is not a valid %s" % (value, cls.__name__))
 
 
 addattributes(Track, protected = dict(cleaned = False))

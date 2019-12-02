@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "View for seeing both cycles and peaks"
 from copy                   import deepcopy
-from typing                 import Dict, List, Tuple, TypeVar, Optional, cast
+from typing                 import Dict, List, Tuple, TypeVar, Optional, Any, cast
 
 import numpy as np
 
@@ -20,7 +20,6 @@ from peakfinding.histogram     import interpolator
 from taskview.plots            import (
     PlotError, PlotView, TaskPlotCreator, PlotModelType, CACHE_TYPE
 )
-from taskmodel                 import PHASE
 from tasksequences.modelaccess import SequenceAnaIO
 from utils                     import initdefaults
 from ._model                   import (PeaksPlotModelAccess, PeaksPlotTheme,
@@ -36,18 +35,23 @@ TModelAccess = TypeVar('TModelAccess', bound = PeaksPlotModelAccess)
 
 class CyclePlotTheme(PlotTheme):
     "cycles & peaks plot theme: cycles"
-    name      = "cyclehist.plot.cycle"
-    figsize   = (300, 497, 'fixed')
-    phasezoom = PHASE.measure, 20
-    fiterror  = PeaksPlotTheme.fiterror
-    xlabel    = PlotTheme.xtoplabel
-    ylabel    = PlotTheme.yrightlabel
-    ntitles   = 5
-    format    = '0.0a'
-    frames    = PlotAttrs('~gray', '-', 1., alpha=.25)
-    points    = PlotAttrs(deepcopy(PeaksPlotTheme.count.color), 'o', 1, alpha=.5)
-    toolbar   = dict(PlotTheme.toolbar)
-    toolbar['items'] = 'pan,box_zoom,wheel_zoom,reset,save'
+    name:      str                  = "cyclehist.plot.cycle"
+    figsize:   Tuple[int, int, str] = (300, 497, 'fixed')
+    phasezoom: int                  = 20
+    fiterror:  str                  = PeaksPlotTheme.fiterror
+    xlabel:    str                  = PlotTheme.xtoplabel
+    ylabel:    str                  = PlotTheme.yrightlabel
+    ntitles:   int                  = 5
+    format:    str                  = '0.0a'
+    frames:    PlotAttrs            = PlotAttrs(
+        '~gray', '-', 1., alpha = .25
+    )
+    points:    PlotAttrs            = PlotAttrs(
+        deepcopy(PeaksPlotTheme.count.color), 'o', 1, alpha = .5
+    )
+    toolbar:   Dict[str, Any]       = dict(
+        PlotTheme.toolbar, items = 'pan,box_zoom,wheel_zoom,reset,save'
+    )
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -162,8 +166,9 @@ class CyclePlotCreator(TaskPlotCreator[PeaksPlotModelAccess, CyclePlotModel]):
         self._errors(cache, _data, _display)
 
     def __setbounds(self, cache, data):
-        if (self._theme.phasezoom and self._theme.phasezoom[0] and len(data['z']) > 0):
-            pha, delta = self._theme.phasezoom
+        if self._theme.phasezoom and len(data['z']) > 0:
+            pha        = self._model.eventdetection.task.phase
+            delta      = self._theme.phasezoom
             trk        = self._model.track
             tx1        = trk.phase.duration(..., range(0,pha)).mean()   - delta
             tx2        = trk.phase.duration(..., range(0,pha+1)).mean() + delta

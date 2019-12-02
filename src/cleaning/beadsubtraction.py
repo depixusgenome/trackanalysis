@@ -257,9 +257,22 @@ class FixedBeadDetection(
         extfast, extslow = self.__exts(beads)
 
         def _append(vals, itms):
-            itms[0].append(np.nanmean(vals))
-            itms[1].append(np.nanstd(vals))
-            itms[2].append(np.nanpercentile(vals, self.threshold))
+            vals = np.asarray(vals)
+            good = vals[np.isfinite(vals)]
+            if len(good) == 0:
+                for i in itms[:3]:
+                    i.append(np.NaN)
+            elif len(good) == 1:
+                itms[0].append(good[0])
+                itms[1].append(np.NaN)
+                itms[2].append(np.NaN)
+            else:
+                itms[0].append(np.mean(good))
+                try:
+                    itms[1].append(np.std(good))
+                except FloatingPointError:
+                    itms[1].append(np.NaN)
+                itms[2].append(np.percentile(good, self.threshold))
 
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore',

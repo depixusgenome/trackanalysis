@@ -122,6 +122,7 @@ def _fovstatspeaks(bokehaction, cache_dir, request):
     "creates a server with 2 fovs"
     from   taskcontrol.beadscontrol import DataSelectionBeadController
     server, fig = _server(bokehaction, cache_dir, request)('FoVStatsPlot', evt = True)
+    server.ctrl.theme.model("peakcalling.view.stats").linear = False
 
     def _cmd():
         bdctrl = DataSelectionBeadController(server.ctrl)

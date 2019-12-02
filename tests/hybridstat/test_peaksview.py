@@ -7,24 +7,12 @@ from typing    import cast
 from tempfile  import mktemp, gettempdir
 from pathlib   import Path
 from importlib import import_module
-import warnings
 import asyncio
 import numpy as np
 import selenium.common.exceptions
-from tests.testutils                     import integrationmark           # noqa: E402
-with warnings.catch_warnings():
-    for _msg_ in (".*html argument of XMLParser.*", ".*Using or importing the ABCs.*"):
-        warnings.filterwarnings(
-            'ignore',
-            category = DeprecationWarning,
-            message  = _msg_
-        )
-
-    from bokeh.plotting           import Figure             # noqa: E402
-    from bokeh.models             import Tabs, FactorRange  # noqa: E402
-
-    # import openpyxl to deal with deprecation warning
-    import openpyxl  # noqa: E402,F401
+from bokeh.plotting           import Figure
+from bokeh.models             import Tabs, FactorRange
+from tests.testutils          import integrationmark
 
 FILTERS = [
     (FutureWarning,      ".*elementwise comparison failed;.*"),
@@ -142,12 +130,7 @@ def _t_e_s_t_peaks(server, bkact):
     server.change('Cycles:Oligos', 'value', '')
     server.load('hairpins.fasta', rendered = False, andpress= False)
     server.change('Cycles:Sequence', 'value', '←')
-    assert all(np.isnan(src.data['distance']))
-    assert all(i.strip() == '' for i in src.data['orient'])
-    assert filt.frozen
 
-    server.change('Cycles:Oligos', 'value', 'ctgt', rendered = True)
-    server.wait()
     assert server.widget['Cycles:Oligos'].value == 'ctgt'
     assert not all(np.isnan(src.data['distance']))
     assert not all(i.strip() == '' for i in src.data['orient'])

@@ -188,11 +188,12 @@ class TasksDict:
 _MEASURES: Dict[str, Any] = dict(
     blockageresolution = 'resolution',
     blockagehfsigma    = 'peakhfsigma',
+    saturation         = 'saturation',
 )
 
 
 @dataclass
-class TasksMeasures:
+class DataFrameConfig:
     """info missing from TasksConfig"""
     name:  str           = "peakcalling.view.dataframe"
     peaks: DataFrameTask = field(default_factory = lambda: DataFrameTask(
@@ -201,6 +202,13 @@ class TasksMeasures:
     fits:  DataFrameTask = field(default_factory = lambda: DataFrameTask(
         measures = dict(peaks = dict(**_MEASURES, all = True, falseneg = True))
     ))
+
+    @staticmethod
+    def __config__(cmap):
+        "simplify a config map"
+        for i in {'peaks', 'fit'} & set(cmap.maps[0]):
+            if cmap.maps[1][i].__dict__ == cmap.maps[0][i].__dict__:
+                del cmap.maps[0][i]
 
 class TaskState:        # pylint: disable=too-many-instance-attributes
     "Deals with oligos, sequences & reference track"
@@ -264,7 +272,7 @@ class TasksModel:
     tasks:      TasksDict
     state:      TaskState
     config:     TasksConfig
-    dataframes: TasksMeasures
+    dataframes: DataFrameConfig
 
     def __init__(self, mdl: Optional['TasksModel'] = None):
         for  i, j in getattr(TasksModel, '__annotations__').items():
@@ -274,8 +282,9 @@ class TasksModel:
         "swap models with those in the controller"
         self.state      = ctrl.display.swapmodels(self.state)
         self.tasks      = ctrl.display.swapmodels(self.tasks)
+        # keep dataframes in the display as changing it might break the code
+        self.dataframes = ctrl.display.swapmodels(self.dataframes)
         self.config     = ctrl.theme.swapmodels(self.config)
-        self.dataframes = ctrl.theme.swapmodels(self.dataframes)
 
         for i in self.__dict__.values():
             if callable(getattr(i, 'swapmodels', None)):
@@ -306,7 +315,7 @@ class _Adaptor:
     tasks:      TasksDict
     state:      TaskState
     config:     TasksConfig
-    dataframes: TasksMeasures
+    dataframes: DataFrameConfig
     _copies:    Processors
 
     def __init__(self, mdl: TasksModel):

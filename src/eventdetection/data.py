@@ -76,12 +76,12 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
                 and hasattr(self.events, "computeall")):
             prec   = None if self.precision in (0., None) else self.precision
             data   = self.data[ibead]
-            meas   = self.track.phase.select(..., PHASE.measure)
+            meas   = self.track.phase.select(..., self.first)
             ints   = self.events.computeall(
                 data,
                 self.getprecision(prec, self.track, ibead),
                 meas,
-                self.track.phase.select(..., PHASE.measure+1)
+                self.track.phase.select(..., self.last+1)
             )
 
             itr = (
