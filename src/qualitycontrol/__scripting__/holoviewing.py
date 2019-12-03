@@ -82,8 +82,8 @@ class TrackQualityControlDisplay(ItemsDisplay, qc = Track):
         length = np.nanmean(np.diff(self._items.phases[:,0]))
         vca    = self._items.secondaries.vcap
         frame  = pd.DataFrame({'cycle': vca['index']/length,
-                               'zmag' : vca['zmag'],
-                               'vcap' : vca['vcap']})
+                               'zmag':  vca['zmag'],
+                               'vcap':  vca['vcap']})
         return hv.Scatter(frame, 'zmag', ['vcap', 'cycle'])
 
     def beadextent(self):
@@ -106,8 +106,8 @@ class TrackQualityControlDisplay(ItemsDisplay, qc = Track):
     def display(self, **_):
         "Displays qc items"
         return (self.beadextent()
-                +self.temperatures()
-                +self.vcap()).columns(1)
+                + self.temperatures()
+                + self.vcap()).cols(1)
 
 class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
     """
@@ -186,17 +186,17 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
         return (hv.DynamicMap(self._beadextent, kdims = ['bead'])
                 .redim.values(bead = list(beads if beads else self.tracks.commonbeads())))
 
-    def display(self, *beads, **kwa): # pylint: disable=arguments-differ
+    def display(self, *beads, **kwa):  # pylint: disable=arguments-differ
         """
         Displays a selection of QC plots:"""
-        return self(**kwa)._display(beads) # pylint:disable=no-member,protected-access
+        return self(**kwa)._display(beads)  # pylint:disable=no-member,protected-access
 
     # pylint: disable=no-member
-    display.__doc__ += '\n\n'+'\n'.join(f'    * `{i.__name__}`:{i.__doc__}' # type: ignore
+    display.__doc__ += '\n\n'+'\n'.join(f'    * `{i.__name__}`:{i.__doc__}'  # type: ignore
                                         for i in (tsample, vcap, beadextent))
     __doc__          = display.__doc__.replace('        ', '    ')
 
-    def _beadextent(self, bead): # pylint: disable=too-many-locals
+    def _beadextent(self, bead):  # pylint: disable=too-many-locals
         act  = lambda _, info: (info[0], np.nanmedian(info[1]))
         extr = lambda i, j: {k[0][1]: k[1] for k in (i.cleancycles[bead, ...]
                                                      .withphases(j)
@@ -224,8 +224,8 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
         miss = list(set(ovr) - set(data.track.unique()))
         data = pd.concat([data, pd.DataFrame({'track': miss, 'extents': [0]*len(miss)})])
         return (hv.BoxWhisker(data, "track", dim)
-                +hv.NdOverlay(ovr).options(show_grid = True)
-               ).cols(1)
+                + hv.NdOverlay(ovr).options(show_grid = True)
+                ).cols(1)
 
     def _display(self, beads):
         stable = [self.tsample(), self.vcap()]
@@ -234,5 +234,6 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
             return (stable[0] + stable[1] + ext.BoxWhisker.I + ext.NdOverlay.I).cols(1)
         return (hv.DynamicMap(_fcn, kdims = ['bead'])
                 .redim.values(bead = list(beads if beads else self.tracks.commonbeads())))
+
 
 __all__: List[str] = []
