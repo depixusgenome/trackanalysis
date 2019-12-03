@@ -34,8 +34,15 @@ class JobConfig:
 class JobDisplay:
     "Pool live info"
     def __init__(self):
-        self.name:  str = "peakcalling.precomputations"
-        self.calls: int = 1
+        self.name:   str  = "peakcalling.precomputations"
+        self.calls:  int  = 1
+        self.active: bool = True
+        self.last:   int  = 1
+
+    @property
+    def needsrefresh(self) -> bool:
+        "return whether to refresh"
+        return self.active and self.last < self.calls
 
 class JobEventNames:
     """Deals with emitting job-related events"""
@@ -79,6 +86,9 @@ class JobModel:
             _JobEventEmitter(emitter, processors = processors, **kwa)
         )
 
+class _JobCanceled(StopIteration):
+    pass
+
 class _JobEventEmitter(JobEventNames):
     """Deals with emitting job-related events"""
     _evt: ContextManager
@@ -89,9 +99,9 @@ class _JobEventEmitter(JobEventNames):
             **args
     ):
         super().__init__(ctrl)
-        self.ctrl  = getattr(ctrl, '_ctrl', ctrl)
-        self.idval = None
-        self.args  = args
+        self.ctrl   = getattr(ctrl, '_ctrl', ctrl)
+        self.idval  = None
+        self.args   = args
 
     def __call__(self, idval):
         self.idval = idval
@@ -109,16 +119,18 @@ class _JobEventEmitter(JobEventNames):
             return self._evt.__enter__()
         return lambda *_, **__: None
 
-    def __exit__(self, *_, **__):
+    def __exit__(self, extype, *_, **__):
         if hasattr(self, '_evt'):
             out = self._evt.__exit__()
             del self._evt
-            self.ctrl.display.handle(
-                self.eventjobstop,
-                self.ctrl.emitpolicy.outasdict,
-                {'idval': self.idval, **self.args}
-            )
-            return out
+            if extype is not _JobCanceled:
+                self.ctrl.display.handle(
+                    self.eventjobstop,
+                    self.ctrl.emitpolicy.outasdict,
+                    {'idval': self.idval, **self.args}
+                )
+                return out
+            return True
         return None
 
 class _JobRunner(JobModel):
@@ -139,12 +151,15 @@ class _JobRunner(JobModel):
         emitter:
             in charge of launching start & end events
         """
+        idval = self.display.calls
+
         if self.config.multiprocess:
-            idval = self.display.calls
 
             async def _run():
                 with emitter(idval) as emitup:
                     await self.run(processors,  emitup, idval)
+                    if idval != self.display.calls:
+                        raise _JobCanceled()
                     await asyncio.sleep(self.config.stoptime)
 
             asyncio.create_task(_run())
@@ -152,6 +167,8 @@ class _JobRunner(JobModel):
             LOGS.info("Starting SYNCH jobs")
             with emitter:
                 self.syncrun(processors)
+                if idval != self.display.calls:
+                    raise _JobCanceled()
             LOGS.info("SYNCH jobs done")
 
     def syncrun(self, processors: List[TaskCacheList]):

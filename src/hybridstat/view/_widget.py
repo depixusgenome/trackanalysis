@@ -547,11 +547,13 @@ class PeakIDPathWidget:
         @mainview.actionifactive(ctrl)
         def _onchangetext_cb(attr, old, new):
             path = self.__widget.value.strip()
+            info = dict(self.__peaks.peaksmodel.display.constraintspath)
             if path == '':
-                ctrl.display.update(self.__peaks.peaksmodel.display, constraintspath = None)
-                return
+                info.pop(self.__peaks.roottask)
+            else:
+                info[self.__peaks.roottask] = str(Path(path).resolve())
 
-            if not Path(path).exists():
+            if path and not Path(path).exists():
                 if not path.endswith(".xlsx"):
                     raise IOError(*self.__theme.tableerror)
 
@@ -563,11 +565,9 @@ class PeakIDPathWidget:
                               (f'Bias ({dim})',         [self.__peaks.bias])])
                 startfile(path)
 
-            ctrl.display.update(
-                self.__peaks.peaksmodel.display,
-                constraintspath = str(Path(path).resolve())
-            )
-            self._doresetmodel(ctrl)
+            ctrl.display.update(self.__peaks.peaksmodel.display, constraintspath = info)
+            if path:
+                self._doresetmodel(ctrl)
 
         self.__widget.on_change('clicks', _onclick_cb)
         self.__widget.on_change('value',  _onchangetext_cb)

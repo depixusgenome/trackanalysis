@@ -3,9 +3,10 @@
 "Access to oligos and sequences"
 from pathlib                 import Path
 from tempfile                import mkstemp
-from typing                  import Any, Sequence, List, Optional, Dict, Union, cast
+from typing                  import Sequence, List, Optional, Dict, Union, cast
 
 from taskcontrol.modelaccess import TaskPlotModelAccess
+from taskmodel               import RootTask
 from taskmodel.application   import TasksDisplay
 from utils                   import dataclass, field
 from .                       import (read as _readsequence, peaks as _sequencepeaks,
@@ -24,11 +25,63 @@ class SequenceConfig:
 @dataclass
 class SequenceDisplay:
     """
-    configuration for probrs
+    configuration for probes
     """
-    name:   str                              = "sequence"
-    hpins:  Dict[int, str]                   = field(default_factory = dict)
-    probes: Dict[Any, Union[str, List[str]]] = field(default_factory = dict)
+    name:      str                                   = "sequence"
+    hpins:     Dict[int, str]                        = field(default_factory = dict)
+    probes:    Dict[RootTask, Union[str, List[str]]] = field(default_factory = dict)
+    paths:     Dict[RootTask, str]                   = field(default_factory = dict)
+    sequences: Dict[RootTask, Dict[str, str]]        = field(default_factory = dict)
+
+    def observe(self, ctrl):
+        "observe the controller"
+        @ctrl.tasks.observe
+        @ctrl.display.hashwith(id(self))
+        def _onopeningtracks(models, calllater, **_):
+            "action to be performed on opening a file"
+
+            @calllater.append
+            def _call():
+                mdl   = {i: dict(getattr(self, i)) for i in ('sequences', 'probes', 'paths')}
+                lens  = {i: len(j) for i, j in mdl.items()}
+
+                for _, proc in models:
+                    root = proc.model[0]
+                    if root in mdl['sequences']:
+                        continue
+
+                    task = next((i for i in proc.model if hasattr(i, 'sequences')), None)
+                    if task is None:
+                        continue
+
+                    if task.oligos and task.oligos not in ('kmer', '3mer', '4mer'):
+                        mdl['probes'][root] = (
+                            [task.oligos] if isinstance(task.oligos, str) else task.oligos
+                        )
+
+                    if isinstance(task.sequences, dict):
+                        mdl['sequences'][root] = task.sequences
+                        mdl['paths'][root]     = mkstemp(
+                            ".fasta", __name__.replace(".","_")+"_"
+                        )[1]
+
+                        with open(mdl['paths'][root], "w") as stream:
+                            for i, j in mdl['sequences'][root].items():
+                                print(f"> {i}", file = stream)
+                                print(j, file = stream)
+
+                    elif (
+                            isinstance(task.sequences, (Path, str))
+                            and Path(task.sequences).exists()
+                    ):
+                        out = dict(_readsequence(task.sequences))
+                        if out:
+                            mdl['paths'][root]     = task.sequences
+                            mdl['sequences'][root] = out
+
+                info = {i: j for i, j in mdl.items() if len(j) > lens[i]}
+                if info:
+                    ctrl.display.update(self, **info)
 
 @dataclass
 class SequenceModel:
@@ -45,7 +98,17 @@ class SequenceModel:
 
     @property
     def _defaultkey(self):
-        return next(iter(self.config.sequences.keys()), None)
+        return next(iter(self.currentsequences.keys()), None)
+
+    @property
+    def currentsequences(self) -> Dict[str, str]:
+        "get current sequences"
+        return self.display.sequences.get(self.tasks.roottask, self.config.sequences)
+
+    @property
+    def currentpath(self) -> Optional[str]:
+        "get current sequence key"
+        return self.display.paths.get(self.tasks.roottask, self.config.path)
 
     @property
     def currentkey(self) -> Optional[str]:
@@ -59,35 +122,6 @@ class SequenceModel:
 
 class SequenceAnaIO:
     "stuff for loading/saving ana files"
-    @staticmethod
-    def onopenanafile(controller = None, model = None, **_):
-        "action to be performed on opening a file"
-        root = model.get('tasks', [[None]])[0][0]
-        if root is None:
-            return
-        seq  = model.get('sequence', {})
-        if 'path' in seq and not Path(seq['path']).exists():
-            seq.pop("path")
-
-        if 'sequences' in seq and 'path' not in seq:
-            seq['path'] = mkstemp()[1]
-            with open(seq['path'], "w") as stream:
-                for i, j in seq['sequences'].items():
-                    print(f"> {i}", file = stream)
-                    print(j, file = stream)
-
-        elif 'path' in seq and 'sequences' not in seq:
-            try:
-                seq['sequences'] = dict(_readsequence(seq['path']))
-            except IOError:
-                seq.pop('path')
-
-        if seq:
-            def _fcn(model = None,  **_2):
-                if model[0] is root:
-                    controller.theme.update("sequence", **seq)
-            controller.tasks.oneshot("opentrack", _fcn)
-
     @staticmethod
     def onsaveanafile(controller = None, model = None, **_):
         "action to be performed on saving a file"
@@ -104,7 +138,6 @@ class SequenceAnaIO:
     @classmethod
     def observe(cls, controller):
         "observe io events"
-        controller.display.observe("openanafile", cls.onopenanafile)
         controller.display.observe("saveanafile", cls.onsaveanafile)
 
 class SequencePlotModelAccess(TaskPlotModelAccess):
@@ -130,7 +163,7 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
     @property
     def sequencepath(self) -> Optional[str]:
         "return the seqence path"
-        return self._seqconfig.path
+        return self.sequencemodel.currentpath
 
     @property
     def sequencekey(self) -> Optional[str]:
@@ -149,7 +182,7 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
 
     def sequences(self, sequence = ...):
         "returns current sequences"
-        seqs = self._seqconfig.sequences
+        seqs = self.sequencemodel.currentsequences
         if sequence is Ellipsis:
             return dict(seqs)
         # pylint: disable=no-member
@@ -180,8 +213,16 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
         if not len(seqs):
             return True
 
-        them = dict(path = path, sequences = seqs)
-        disp = dict(hpins = {})
+        them = dict(path  = path, sequences = seqs)
+        disp = dict(
+            hpins     = {},
+            paths     = dict(self._seqdisplay.paths),
+            sequences = dict(self._seqdisplay.sequences),
+        )
+
+        disp['sequences'][self.roottask] = seqs
+        disp['paths'][self.roottask] = path
+
         if not self.oligos and self.roottask:
             ols = splitoligos("kmer", path = self.roottask.path)
             if ols:

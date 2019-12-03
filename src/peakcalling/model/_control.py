@@ -60,13 +60,22 @@ class TasksModelController(JobEventNames):
 
         @ctrl.display.observe(self._jobs.display)
         @ctrl.display.hashwith(self._jobs.display)
-        def _onchange(**_):
-            self._jobs.launch(
-                list(self._tasks.processors.values()),
-                self,
-                roots   = list(self.roots),
-                missing = self._tasks.missingprocessors
-            )
+        def _onchange(old, _evts_ = frozenset(('calls', 'active')), **_):
+            if _evts_.intersection(old) and self._jobs.display.needsrefresh:
+                self._jobs.launch(
+                    list(self._tasks.processors.values()),
+                    self,
+                    roots   = list(self.roots),
+                    missing = self._tasks.missingprocessors
+                )
+
+        @ctrl.display.observe(self.eventjobstart)
+        @ctrl.display.hashwith(self._jobs.display)
+        def _onjobstart(idval, **_):
+            if idval is not None:
+                ctrl.display.update(
+                    self._jobs.display, last = max(self._jobs.display.last, idval)
+                )
 
     def addto(self, ctrl):
         "add to the controller"

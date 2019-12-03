@@ -129,8 +129,18 @@ def statsbox(
         info:         pd.DataFrame
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     "compute the boxplot distribution of `yaxis` as a function of `xaxis`"
+    ttip   = [
+        'trackid', 'track', 'bead',
+        *(i for i in ('closest', 'baseposition') if i in info)
+    ]
     keys   = dict(level = list(range(len(xaxis))))
-    data   = info.set_index(xaxis)[yaxis].rename('y').to_frame().dropna()
+    data   = (
+        info
+        .set_index(xaxis, drop = False)
+        [[yaxis, *(i for i in ttip if i != yaxis)]]
+        .rename(columns = {yaxis: 'y'})
+        [lambda x: ~x.y.isna()]
+    )
     stats  = data.groupby(**keys).y.agg(['median', boxbottom, boxtop])
     spread = spreadfactor*(stats.boxtop - stats.boxbottom)
 
@@ -157,13 +167,12 @@ def statsbox(
         repl                 = comp(stats[col], limit)
         stats.loc[repl, col] = limit[repl]
 
-    points = pd.concat(
-        [
-            data[['y']][data.y <= data.bottomlimit],
-            data[['y']][data.y >= data.toplimit],
-        ],
-        sort         = False,
-    ).join(stats['x'].to_frame())
+    points = (
+        data[['y', *ttip]]
+        .assign(outlier = ((data.y <= data.bottomlimit) | (data.y >= data.toplimit)))
+        .loc[stats.index]
+        .join(stats[['x']])
+    )
 
     stats.loc[stats['boxheight'] <= threshold, 'median']    = np.NaN
     stats.loc[stats['boxheight'] <= threshold, 'boxheight'] = threshold

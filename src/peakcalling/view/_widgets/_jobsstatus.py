@@ -91,6 +91,11 @@ class JobsStatusBar:
         ctrl.display.observe(model.eventname,     self._onevent)
         ctrl.display.observe(model.eventjobstop,  self._onstop)
 
+    @staticmethod
+    def reset(*_):
+        "nothing to do"
+        return
+
     def _reset(self):
         if hasattr(self, '_doc'):
             txt = self._text()
@@ -208,6 +213,11 @@ class JobsHairpinSelect:
         def _onmodel(old, **_):
             if 'hairpins' in old:
                 _reset()
+
+    @staticmethod
+    def reset(*_):
+        "nothing to do"
+        return
 
     def _options(self, model) -> Dict[str, Union[str, bool, List[str]]]:
         keys: Set[str]  = hairpinnames(model)

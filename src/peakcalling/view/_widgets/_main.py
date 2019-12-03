@@ -32,6 +32,12 @@ class MasterWidget:
                 i.swapmodels(ctrl)
         self._ctrl.swapmodels(ctrl)
 
+    def reset(self, *_):
+        "reset all"
+        for i, j in self.__dict__.items():
+            if i[0] != '_' and callable(getattr(j, 'reset', None)):
+                j.reset(*_)
+
     def observe(self, ctrl):
         """observe the controller"""
         for i in self._widgets:

@@ -22,8 +22,8 @@ class StatsPlotWarning(RuntimeWarning):
     "used to warn the user"
 
 class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
-    parent:    FoVStatsPlot
-
+    parent:     FoVStatsPlot
+    _frame:     Dict[str, list]
     _stats:     ColumnDataSource  = BasePlotter.attr()
     _points:    ColumnDataSource  = BasePlotter.attr()
     _defaults:  Dict[str, list]   = BasePlotter.attr()
@@ -32,6 +32,14 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
     _topaxis:   CategoricalAxis   = BasePlotter.attr()
     _plottheme: BeadsPlotTheme    = BasePlotter.attr()
     _LINEAR:    ClassVar[FrozenSet[str]] = frozenset(['binnedz'])
+
+    def getpointsframe(self) -> Dict[str, list]:
+        "return data per bead & track"
+        return getattr(self, '_frame', {})
+
+    def getfigure(self) -> Figure:
+        "return the figure"
+        return self._fig
 
     def _iswrongaxis(self, xaxis = None) -> bool:
         if xaxis is None:
@@ -44,6 +52,7 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
 
     def _reset(self):
         "resets the data"
+        self._frame = {}
         if self._iswrongaxis():
             yield (self._fig, dict(visible = False))
             return
@@ -67,10 +76,7 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
                 yield (StatsPlotWarning("No statistics available for this plot!"), "")
 
         stats["xv"] = np.copy(stats["x"])
-        if np.all(np.isnan(stats['median'])):
-            stats["yv"] = np.copy(stats['boxheight'])
-        else:
-            stats["yv"] = np.copy(stats['median'])
+        stats["yv"] = stats['boxheight' if np.all(np.isnan(stats['median'])) else 'median']
 
         yield (self._fig, dict(visible = True))
         if isinstance(self._fig.x_range, Range1d):
@@ -80,16 +86,23 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
                 (xaxis if info.shape[0] else []), stats, points, idsort
             )
 
-        tpe     = len(stats['beadcount']) and '/' in stats['beadcount'][0]
+        tpe  = len(stats['beadcount']) and '/' in stats['beadcount'][0]
         yield (self._topaxis,      dict(axis_label = self._model.theme.toplabel[tpe]))
         yield (self._stats,        dict(data       = stats))
-        yield (self._points,       dict(data       = points))
+
+        self._frame = points
+        if 'outlier' in points:
+            good   = points['outlier']
+            points = {i: np.asarray(j)[good] for i, j in points.items()}
+
+        yield (self._points, dict(data = points))
 
         label = self._model.theme.yaxistag[yaxis]
-        if ref and '(' in label:
-            label = f'Δ({label[:label.rfind("(")].strip()}) {label[label.rfind("("):]}'
-        elif ref:
-            label = f'Δ({label})'
+        label = (
+            label         if not ref else
+            f'Δ({label})' if ' (' not in label else
+            f'Δ({label[:label.rfind(" (")].strip()}) {label[label.rfind(" ("):]}'
+        )
         yield (self._fig.yaxis[0], dict(axis_label = label))
 
         yield (self._fig.y_range, self.__reset_yrange(stats, points))
@@ -152,8 +165,7 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
             (
                 dfpk
                 .groupby(list({'track', 'bead', *optpk}))
-                [yaxis]
-                .sum()
+                .agg({yaxis: 'sum', 'trackid': 'first'})
                 .reset_index()
             )
         )
@@ -238,7 +250,7 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
             else:
                 ynorm = None
             stats  = statscount(xaxis, xnorm, yaxis, ynorm, info)
-            points = pd.DataFrame({'x': [], 'y': []})
+            points = pd.DataFrame(columns = ('x', 'y', 'bead', 'track'))
         else:
             if self._model.display.reference in self._procs:
                 info = removereference(

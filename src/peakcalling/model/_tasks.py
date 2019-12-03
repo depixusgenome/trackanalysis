@@ -215,8 +215,8 @@ class TaskState:        # pylint: disable=too-many-instance-attributes
     def __init__(self):
         self.name:          str                               = 'peakcalling.view.state'
         self.reference:     Optional[RootTask]                = None
-        self.seqpath:       Optional[str]                     = None
-        self.sequences:     Dict[str, str]                    = {}
+        self.sequencepaths: Dict[RootTask, str]               = {}
+        self.sequences:     Dict[RootTask, Dict[str, str]]    = {}
         self.probes:        Dict[RootTask, List[str]]         = {}
         self.processors:    Dict[Type[Task], Type[Processor]] = register()
         self.defaultprobes: List[str]                         = ['kmer']
@@ -227,32 +227,27 @@ class TaskState:        # pylint: disable=too-many-instance-attributes
         self.reference = ctrl.display.get(
             "hybridstat.fittoreference", "reference", defaultvalue = None
         )
-        self.probes     = ctrl.display.get("sequence", "probes",  defaultvalue = {})
-        self.seqpath    = ctrl.theme.get("sequence", "path",      defaultvalue = None)
-        self.sequences  = ctrl.theme.get("sequence", "sequences", defaultvalue = {})
-        self.processors = ctrl.tasks.processortype(...)
+        self.probes        = ctrl.display.get("sequence", "probes", defaultvalue = {})
+        self.sequencepaths = ctrl.display.get("sequence", "path",   defaultvalue = {})
+        self.sequences     = ctrl.display.get("sequence", "sequences", defaultvalue = {})
+        self.processors    = ctrl.tasks.processortype(...)
         if ctrl.theme.model("fixedbeads") is not None:
             self.fixed  = ctrl.theme.model("fixedbeads")
 
     def observe(self, ctrl):
         "updates models as needed"
-
-        @ctrl.theme.observe("sequence")
-        @ctrl.theme.hashwith(self)
-        def _onsequences(model, old, **_):
-            itms = {}
-            if 'sequences' in old:
-                itms['sequences'] = model.sequences
-            if 'path' in old:
-                itms['seqpath'] = model.path
-            if itms:
-                ctrl.display.update(self, **itms)
-
         @ctrl.display.observe("sequence")
         @ctrl.display.hashwith(self)
         def _onprobes(model, old, **_):
+            info = {}
             if 'probes' in old:
-                ctrl.display.update(self, probes = model.probes)
+                info['probes'] = model.probes
+            if 'paths' in old:
+                info['sequencepaths'] = model.paths
+            if 'sequences' in old:
+                info['sequences'] = model.sequences
+            if info:
+                ctrl.display.update(self, **info)
 
         @ctrl.display.observe("hybridstat.fittoreference")
         @ctrl.display.hashwith(self)

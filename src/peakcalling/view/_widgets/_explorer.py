@@ -196,7 +196,10 @@ class StorageExplorer(ModalDialogButton[StorageExplorerConfig, StorageExplorerMo
                 _tooltip(
                     (
                         "Oligos: "   + ', '.join(task.oligos),
-                        "Hairpins: " + ', '.join(task.sequences),
+                        "Hairpins: " + (
+                            ', '.join(task.sequences) if isinstance(task.sequences, dict) else
+                            str(task.sequences)
+                        )
                     ),
                     classtype = "i"
                 )

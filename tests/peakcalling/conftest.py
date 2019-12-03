@@ -88,7 +88,8 @@ def _server(bokehaction, cache_dir, request):
                 runtime = 'selenium'
             )
 
-            server.ctrl.theme.model("peakcalling.diskcache").path = str(cache_dir)
+            if cache_dir:   # pylint: disable=using-constant-test
+                server.ctrl.theme.update("peakcalling.diskcache", path = str(cache_dir))
 
             for i in ('beads', 'stats'):
                 if f'peakcalling.view.{i}' in server.ctrl.theme:
@@ -101,19 +102,21 @@ def _server(bokehaction, cache_dir, request):
             fig = getattr(getattr(server.view.views[0], '_mainview'), '_fig')
             server.load('big_legacy', rendered = evt)
 
-            server.addhp = lambda: self.addhp(server)
+            server.addhp = lambda **kwa: self.addhp(server, **kwa)
             return server, fig
 
         @staticmethod
-        def addhp(server):
+        def addhp(server, rendered = _EVT, **kwa):
             "add the hairpin"
             from   peakcalling.processor    import FitToHairpinTask
+            kwa.setdefault('sequences', utpath("hairpins.fasta"))
+            kwa.setdefault('oligos',    "kmer")
             server.cmd(
                 lambda: server.ctrl.tasks.addtask(
                     next(next(server.ctrl.tasks.tasklist(...))),
-                    FitToHairpinTask(sequences = utpath("hairpins.fasta"), oligos = "kmer")
+                    FitToHairpinTask(**kwa)
                 ),
-                rendered = _EVT
+                rendered = rendered
             )
 
     return _ServerFactory()

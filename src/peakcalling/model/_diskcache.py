@@ -243,5 +243,5 @@ class DiskCacheController:
         @ctrl.theme.observe(self.config)
         @ctrl.theme.hashwith(self.config)
         def _onconfig(old, **_):
-            if self.config.maxsize < old.get('maxsize', 0):
+            if self.config.maxsize < old.get('maxsize', 0) or 'path' in old:
                 self.config.clear()

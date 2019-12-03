@@ -3,7 +3,7 @@
 "the model for all FoVs"
 
 from ._control   import TasksModelController
-from ._jobs      import STORE, JobModel
+from ._jobs      import STORE, JobModel, JobDisplay
 from ._columns   import COLS, INVISIBLE, getcolumn
 from ._beadsplot import (
     BasePlotConfig, BeadsScatterPlotStatus, BeadsScatterPlotConfig, BeadsScatterPlotModel,

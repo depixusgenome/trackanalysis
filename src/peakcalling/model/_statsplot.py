@@ -108,7 +108,7 @@ class FoVStatsPlotConfig(BasePlotConfig):
     spread:   float           = 1.5
     toplabel: Tuple[str, str] = ('Bead count', 'Bead / Blockage count')
     toptick:  Tuple[str, str] = ('{}', '{}/{}')
-    figargs: Dict[str, Any] = field(default_factory = lambda: dict(
+    figargs:  Dict[str, Any] = field(default_factory = lambda: dict(
         toolbar_sticky   = False,
         toolbar_location = 'above',
         tools            = ['pan,wheel_zoom,box_zoom,save,reset,hover'],
@@ -116,7 +116,12 @@ class FoVStatsPlotConfig(BasePlotConfig):
         plot_height      = 400,
         sizing_mode      = defaultfigsize()[-1],
     ))
-    tooltipcolumns: List[Tuple[str,str]] = field(default_factory = lambda: [
+    pointstips: List[Tuple[str,str]] = field(default_factory = lambda: [
+        ("track", "@track"),
+        ("bead",  "@bead"),
+        ("y",     "$y"),
+    ])
+    boxtips:  List[Tuple[str,str]] = field(default_factory = lambda: [
         ("x", "@xv"), ("y", "@yv"),
     ])
     box:      PlotAttrs       = field(

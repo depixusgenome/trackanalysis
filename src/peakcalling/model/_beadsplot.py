@@ -18,6 +18,11 @@ from ._columns            import getcolumn, INVISIBLE
 
 DFFilter  = Dict[Tuple[str, ...], Union[list, 'Slice']]
 NAME: str = 'peakcalling.view.beads'
+_DFLT     = dict(
+    start        = 0., end          = 1.,
+    max_interval = 1., min_interval = 1.,
+    reset_start  = 0., reset_end    = 1.
+)
 
 
 class BeadsPlotTheme(PlotTheme):
@@ -28,10 +33,15 @@ class BeadsPlotTheme(PlotTheme):
 
     def newbounds(self, curr, arr, force):
         "Sets the range boundaries"
-        if len(arr) == 0 or np.all(np.isnan(arr)):
-            return dict(start        = 0., end          = 1.,
-                        max_interval = 1., min_interval = 1.,
-                        reset_start  = 0., reset_end    = 1.)
+        if len(arr) == 0:
+            return _DFLT
+        try:
+            out = np.isnan(np.asarray(arr, dtype = np.float_))
+        except TypeError:
+            out = np.isnan([float(i) for i in arr])
+
+        if np.all(out):
+            return _DFLT
 
         vmin = np.nanmin(arr)
         vmax = np.nanmax(arr)
