@@ -13,7 +13,7 @@ from   bokeh.plotting          import figure, Figure
 
 from   view.threaded           import ThreadedDisplay
 from   ...model                import FoVStatsPlotModel, BeadsPlotTheme, COLS
-from   .._widgets              import MasterWidget
+from   .._widgets              import MasterWidget, StatsPlotSelector
 from   .._threader             import BasePlotter, PlotThreader
 from   ._xlsx                  import XlsxReport
 
@@ -39,7 +39,7 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
     def __init__(self, widgets = True, **_):
         super().__init__(**_)
         self._plottheme = BeadsPlotTheme("peakcalling.view.beads.plot.theme")
-        self._widgets   = () if not widgets else (MasterWidget(),)
+        self._widgets   = (() if not widgets else (MasterWidget(),)) + (StatsPlotSelector(),)
         self._defaults  = dict(
             {i: np.array(['']) for i in  _XCOLS | self._DATAXCOLS},
             **{f'{j}': np.array([0.]) for j in self._DATAYCOLS},
@@ -51,6 +51,15 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
     def gettheme(self):
         "get the model theme"
         return self._model.theme
+
+    def getpointsframe(self) -> Dict[str, list]:
+        "return data per bead & track"
+        plot = getattr(getattr(self, '_threader'), 'plot', None)
+        return plot.getpointsframe() if plot else {}
+
+    def getfigure(self) -> Figure:
+        "return the figure"
+        return self._fig
 
     def getdisplay(self):
         "get the model display"
@@ -96,10 +105,6 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
             if theme.intersection(old):
                 getattr(self, '_threader').renew(ctrl, 'reset', True)
 
-    def getfigure(self) -> Figure:
-        "return the figure"
-        return self._fig
-
     def export(self, path) -> bool:
         "return the figure"
         return XlsxReport.export(self, path)
@@ -108,10 +113,11 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
         "sets the plot up"
         self._addtodoc_data()
         self._addtodoc_fig()
-        if not self._widgets:
+        self._widgets[-1].addtodoc((self,), ctrl, doc)
+        if len(self._widgets) == 1:
             return [self._fig]
 
-        itms      = [i.addtodoc(self, ctrl, doc)[0] for i in self._widgets]
+        itms      = [i.addtodoc(self, ctrl, doc)[0] for i in self._widgets[:-1]]
         mode      = {'sizing_mode': ctrl.theme.get('main', 'sizingmode', 'fixed')}
         brds      = ctrl.theme.get("main", "borders", 5)
         width     = sum(i.width  for i in itms) + brds
@@ -156,7 +162,8 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
 
         self.attrs(self._model.theme.points).addto(
             self._fig, source = self._points,
-        )
+        ).glyph.name = 'points'
+
         for i in ('vertices', 'box', 'median'):
             self.attrs(getattr(self._model.theme, i)).addto(
                 self._fig, source = self._stats,
@@ -173,8 +180,13 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
         self._fig.add_layout(self._topaxis, 'above')
 
         hover           = fig.select(HoverTool)[0]
-        hover.tooltips  = self._model.theme.tooltipcolumns
+        hover.tooltips  = self._model.theme.boxtips
         hover.renderers = [next(i for i in self._fig.renderers if i.glyph.name == 'box')]
+
+        fig.tools       = fig.tools + [HoverTool(
+            tooltips  = self._model.theme.pointstips,
+            renderers = [next(i for i in self._fig.renderers if i.glyph.name == 'points')]
+        )]
 
     def _createplot(self, beadstatus: bool) -> BasePlotter:
         "runs the display"

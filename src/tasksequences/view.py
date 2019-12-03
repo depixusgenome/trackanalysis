@@ -349,7 +349,7 @@ class SequencePathWidget:
         return self._widget
 
     def _data(self) -> dict:
-        lst   = sorted(self._model.sequencemodel.config.sequences.keys())
+        lst   = sorted(self._model.sequences(...))
         key   = self._model.sequencemodel.currentkey
         val   = key if key in lst else None
         label = self._theme.missingkey if val is None else key

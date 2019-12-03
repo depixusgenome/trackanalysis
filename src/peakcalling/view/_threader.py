@@ -145,6 +145,9 @@ class BasePlotter(Generic[Parent]):
                     assert i not in cache
                     cache[i] = j
 
+            for widget in getattr(self.parent, '_widgets'):
+                widget.reset(self, cache)
+
         if callable(err):
             err(cache, lambda: [next(itr, (None, None))], _display)
         else:

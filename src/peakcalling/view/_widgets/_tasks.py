@@ -2,17 +2,20 @@
 # -*- coding: utf-8 -*-
 "Allow setting task info for all jobs"
 from copy                   import copy, deepcopy
-from typing                 import Optional, Generic, TypeVar, cast
+from typing                 import Optional, Generic, TypeVar, List, Tuple, Dict, cast
+from pathlib                import Path
 
 from cleaning.names                      import NAMES
 from cleaning.processor.__config__       import BeadSubtractionTask, DataCleaningTask
-from eventdetection.view                 import ALIGN_LABELS
-from eventdetection.processor.__config__ import EventDetectionTask, ExtremumAlignmentTask
-from peakfinding.processor.__config__    import PeakSelectorTask
 from data.trackops                       import trackname
 from data.trackio                        import TrackIOError
-from taskmodel                           import Task
+from eventdetection.view                 import ALIGN_LABELS
+from eventdetection.processor.__config__ import EventDetectionTask, ExtremumAlignmentTask
 from modaldialog.button                  import ModalDialogButton, DialogButtonConfig
+from peakfinding.processor.__config__    import PeakSelectorTask
+from sequences                           import read as _read
+from taskmodel                           import Task, RootTask
+from taskmodel.application               import TasksDisplay
 from utils.inspection                    import diffobj, templateattribute
 from ...processor                        import FitToHairpinTask
 from ...model                            import TasksModel
@@ -28,6 +31,7 @@ class TaskExplorerConfig(DialogButtonConfig):
 class TaskExplorerModel:
     "current info"
     def __init__(self, mdl: TasksModel):
+        self.mdl   = mdl
         self.items = [
             _Store(i, j, mdl) for i, j in enumerate(mdl.tasks.tasks.values())
         ]
@@ -39,8 +43,29 @@ class TaskExplorerModel:
             *(j.line(*args, **kwa) for i, j in enumerate(self.items))
         ))
 
-    def diff(self, roots, changed):
+    def diff(self, cur: RootTask, roots: List[RootTask], changed: 'TaskExplorerModel'):
         "yield the changes"
+        info   = {}
+        for name in ('probes', 'sequences'):
+            itms = dict(getattr(self.mdl.state, name))
+            itms.update({i: j for i, j in (getattr(k, name)(roots) for k in changed.items) if j})
+            if itms != getattr(self.mdl.state, name):
+                info[name] = itms
+
+        itms = dict(self.mdl.state.sequencepaths)
+        itms.update({i: j for i, j in (k.sequencepath(roots) for k in changed.items) if j})
+        if itms != self.mdl.state.sequencepaths:
+            info['paths'] = itms
+
+        if info:
+            yield ('control', ('display', 'sequence'), info)
+
+            info = {i: j[cur] for i, j in info.items() if cur in j}
+            if 'paths' in info:
+                info['path'] = info.pop('paths')
+            if info:
+                yield ('control', ('theme', 'sequence'), info)
+
         for i, j in zip(self.items, changed.items):
             yield from i.diff(roots, j)
 
@@ -49,9 +74,15 @@ class TaskExplorer(ModalDialogButton[TaskExplorerConfig, TaskExplorerModel]):
     def __init__(self):
         super().__init__()
         self._model = TasksModel()
+        self._curr  = TasksDisplay()
+
+    def swapmodels(self, ctrl):
+        "swap with models in the controller"
+        super().swapmodels(ctrl)
+        self._curr = ctrl.display.swapmodels(self._curr)
 
     def _diff(self, current: TaskExplorerModel, changed: TaskExplorerModel):
-        return list(current.diff(list(self._model.roots), changed))
+        return list(current.diff(self._curr.roottask, list(self._model.roots), changed))
 
     def _body(self, current: TaskExplorerModel) -> str:
         return  f"""
@@ -64,12 +95,16 @@ class TaskExplorer(ModalDialogButton[TaskExplorerConfig, TaskExplorerModel]):
 
     def _action(self, ctrl, diff):
         for root, task, other in diff:
-            if isinstance(other, dict):
+            if root == 'control':
+                getattr(ctrl, task[0]).update(task[1], **other)
+            elif isinstance(other, dict) and other:
                 ctrl.tasks.updatetask(root, ctrl.tasks.task(root, type(task)), **other)
-            elif other:
+            elif other is True:
                 ctrl.tasks.addtask(root, task, index = 'auto')
-            else:
+            elif other is False:
                 ctrl.tasks.removetask(root, ctrl.tasks.task(root, type(task)))
+            else:
+                assert other is None or isinstance(other, dict)
 
 class _TaskStore(Generic[TASK]):
     task: Optional[TASK]
@@ -186,10 +221,9 @@ class _CleanStore(_TaskStore[DataCleaningTask]):
 
     def _diff(self, _, changed):
         "yield the changes"
-        return (
-            changed.task,
-            diffobj(changed.task.config(), self.task.config()) if self.has else True
-        )
+        if not self.has:
+            return (changed.task, True)
+        return (changed.task, diffobj(changed.task.config(), self.task.config()) or None)
 
 class _EvtStore(_TaskStore[EventDetectionTask]):
     task: EventDetectionTask
@@ -241,12 +275,21 @@ class _FitStore(_TaskStore[FitToHairpinTask]):
 
     def __init__(self, procs, mdl):
         super().__init__(procs, mdl)
-        self.task = copy(self.task)
+        self.task = deepcopy(self.task)
+        if not self.has:
+            self.task.oligos = mdl.state.probes.get(procs.model[0], [])
+
         if isinstance(self.task.oligos, (list, tuple)):
             self.task.oligos = ', '.join(sorted(self.task.oligos))
-        if self.task.sequences == mdl.state.sequences and mdl.state.seqpath:
-            # use the path for displaying rather than the true sequence
-            self.task.sequences = mdl.state.seqpath
+
+        paths = mdl.state.sequencepaths
+        root  = procs.model[0]
+        if (
+                isinstance(self.task.sequences, dict)
+                and root in paths
+                and self.task.sequences == mdl.state.sequences.get(root, {})
+        ):
+            self.task.sequences = paths[root]
 
         # remove items such that a resolve can renew the data
         self.task.fit   = {i: j for i, j in self.task.fit.items()   if i is None}
@@ -260,23 +303,59 @@ class _FitStore(_TaskStore[FitToHairpinTask]):
             {current.table('Oligos', 'fit.task.oligos', '400s')}
         """
 
-    def _diff(self, root, changed):
-        "yield the changes"
-        txt = changed.task.sequences
-        if '{' in txt:
+    def sequences(self, root) -> Tuple[RootTask, Dict[str, str]]:
+        "return the sequences for this root task"
+        path = self.sequencepath(root)[1]
+        return (root, dict(_read(path)) if path else {})
+
+    def sequencepath(self, root) -> Tuple[RootTask, str]:
+        "return the sequence path for this root task"
+        seq = self.task.sequences
+        if isinstance(seq, (str, Path)) and seq and Path(seq).exists():
+            return (root, str(seq))
+        return (root, "")
+
+    def probes(self, root) -> Tuple[RootTask, List[str]]:
+        "return the probe for this root task"
+        oligos = self.resolvedtask(root).oligos
+        oligos = (
+            [oligos] if isinstance(oligos, str) else
+            []       if oligos is None else
+            list(oligos)
+        )
+        return (root, oligos)
+
+    def resolvedtask(self, root) -> FitToHairpinTask:
+        "return the resolved for this root task"
+        txt = self.task.sequences
+        if isinstance(txt, str) and '{' in txt:
             itr = (
                 (k.replace("'", "").replace('"', '').strip() for k in i.split(':'))
                 for i in txt[txt.find('{')+1:txt.rfind('}')].split(',')
             )
-            changed.task.sequences = {i: j for i, j in itr if j}
-        if not changed.task.oligos:
-            changed.task.oligos = None
-        if not changed.task.sequences:
-            changed.task.sequences = None
+            self.task.sequences = {i: j for i, j in itr if j}
+        elif isinstance(txt, (Path, str)) and not Path(txt).exists():
+            self.task.sequences = None
 
-        left  = self.task.resolve(root.path)
-        right = changed.task.resolve(root.path)
+        if not self.task.oligos:
+            self.task.oligos = None
+        if not self.task.sequences:
+            self.task.sequences = None
 
+        if self.task.sequences and self.task.oligos:
+            cpy       = copy(self.task)
+            cpy.fit   = {i: j for i, j in self.task.fit.items() if i is None}
+            cpy.match = {i: j for i, j in self.task.match.items() if i is None}
+            return cpy.resolve(root.path)
+        return self.task
+
+    def _diff(self, root, changed):
+        "yield the changes"
+        left, right = self.task, changed.task
+        if (left.sequences == right.sequences) and (left.oligos == right.oligos):
+            return None, None
+
+        right, left = changed.resolvedtask(root), self.resolvedtask(root)
         if (left.sequences == right.sequences) and (left.oligos == right.oligos):
             return None, None
 
@@ -285,13 +364,14 @@ class _FitStore(_TaskStore[FitToHairpinTask]):
             (
                 False if not (set(right.fit) - {None}) else
                 True  if not self.has                  else
-                {i: getattr(right, i) for i in ('sequences', 'oligos')}
+                {i: getattr(right, i) for i in ('sequences', 'oligos', 'fit', 'match')}
             )
         )
 
 class _Store:
     ind:  Optional[int]
     name: str
+    fit:  _FitStore
     _TASKS = _SubStore, _CleanStore, _EvtStore, _AlignStore, _PeakStore, _FitStore
 
     def __init__(self, ind, procs, mdl):
@@ -311,6 +391,18 @@ class _Store:
                     attr += '{ disabled=true }'
                 line += f'  %(items[{self.ind}].{attr}){val}'
         return line
+
+    def sequences(self, roots) -> Tuple[RootTask, Dict[str, str]]:
+        "return the sequences for this root task"
+        return self.fit.sequences(roots[self.ind])
+
+    def sequencepath(self, roots) -> Tuple[RootTask, str]:
+        "return the sequence path for this root task"
+        return self.fit.sequencepath(roots[self.ind])
+
+    def probes(self, roots) -> Tuple[RootTask, List[str]]:
+        "return the probe for this root task"
+        return self.fit.probes(roots[self.ind])
 
     def diff(self, roots, changed):
         "yield the changes"

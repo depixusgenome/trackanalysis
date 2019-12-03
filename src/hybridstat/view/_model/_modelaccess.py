@@ -57,7 +57,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         @ctrl.theme.observe(self._tasksconfig)
         @ctrl.display.observe(self._tasksdisplay)
         @ctrl.theme.hashwith(self._tasksdisplay)
-        def _ontasks(old = None, **_):
+        def _ontasks(old, **_):
             if 'rescaling' not in old and "taskcache" not in old:
                 return
 
@@ -84,6 +84,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         @ctrl.tasks.observe
         @ctrl.tasks.hashwith(self._tasksdisplay)
         def _onopeningtracks(controller, models, **_):
+            "tries to add a FitToHairpinTask if sequences & oligos are available"
             if not self.sequences(...):
                 return
 
@@ -97,16 +98,6 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
                 ols = splitoligos("kmer", path = model[0].path)
                 if not ols:
                     continue
-
-                if hasattr(self.roottask, 'path') and self.oligos:
-                    ols  = sorted(
-                        set(self.oligos)
-                        .difference(splitoligos("kmer", path = self.roottask.path))
-                        .union(ols)
-                    )
-                    if not ols:
-                        continue
-
                 proc.add(
                     cls(sequence = path, oligos = ols),
                     controller.processortype(cls),
@@ -165,7 +156,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
     @property
     def constraintspath(self):
         "return the path to constraints"
-        return self.peaksmodel.display.constraintspath
+        return self.peaksmodel.display.constraintspath.get(self.roottask, None)
 
     @property
     def useparams(self):

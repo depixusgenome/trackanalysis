@@ -4,7 +4,7 @@
 from   abc       import abstractmethod
 from   copy      import copy
 from   functools import partial
-from   typing    import Dict, List, Iterator, Tuple, Union, Set
+from   typing    import Dict, List, Iterator, Tuple, Union, Set, Optional
 
 import pandas as pd
 import numpy  as np
@@ -15,11 +15,12 @@ from   bokeh.plotting import figure, Figure
 
 from   view.colors   import tohex
 from   view.threaded import ThreadedDisplay
+from   taskmodel     import RootTask
 from   ..model       import (
     BeadsScatterPlotModel, Processors, COLS, BeadsPlotTheme, Slice
 )
 from   ._threader    import BasePlotter, PlotThreader
-from   ._widgets     import JobsStatusBar, JobsHairpinSelect
+from   ._widgets     import JobsStatusBar, JobsHairpinSelect, BeadsPlotSelector
 
 class BeadsScatterPlotWarning(RuntimeWarning):
     "used to warn the user"
@@ -35,6 +36,7 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
     def __init__(self, widgets = True, **_):
         super().__init__(**_)
         self._widgets     = (JobsStatusBar(), JobsHairpinSelect()) if widgets else ()
+        self._widgets    += (BeadsPlotSelector(),)
         self._plottheme   = BeadsPlotTheme("peakcalling.view.beads.plot.theme")
         self._defaultdata = self.__defaultdata()
 
@@ -47,6 +49,16 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
     def getdisplay(self):
         "get the model display"
         return self._model.display
+
+    def getfigure(self) -> Figure:
+        "get the model display"
+        return self._fig
+
+    @property
+    def nfactors(self) -> int:
+        "return the number of beads"
+        plot = getattr(getattr(self, '_threader'), 'plot', None)
+        return plot.nfactors if plot else 1
 
     def swapmodels(self, ctrl):
         "swap with models in the controller"
@@ -69,14 +81,31 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
             _HairpinPlot if BasePlotter.ishairpin(procs) else _PeaksPlot
         )(self, procs)
 
+    def hitpoint(self, xval: float) -> Optional[Tuple[RootTask, int]]:
+        "get the track & bead"
+        return  getattr(
+            getattr(getattr(self, '_threader'), 'plot', None),
+            'hitpoint',
+            lambda _: None
+        )(xval)
+
+    def hitposition(self, root, bead) -> Optional[float]:
+        "get the track & bead position"
+        return  getattr(
+            getattr(getattr(self, '_threader'), 'plot', None),
+            'hitposition',
+            lambda *_: None
+        )(root, bead)
+
     def _addtodoc(self, ctrl, doc):
         "sets the plot up"
         self._addtodoc_data()
         self._addtodoc_fig()
-        if not self._widgets:
+        self._widgets[-1].addtodoc((self,), ctrl, doc)
+        if len(self._widgets) == 1:
             return [self._fig]
 
-        itms      = [i.addtodoc(ctrl, doc)[0] for i in self._widgets]
+        itms      = [i.addtodoc(ctrl, doc)[0] for i in self._widgets[:-1]]
         mode      = {'sizing_mode': ctrl.theme.get('main', 'sizingmode', 'fixed')}
         brds      = ctrl.theme.get("main", "borders", 5)
         width     = sum(i.width  for i in itms) + brds
@@ -148,12 +177,83 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
     _plottheme:   BeadsPlotTheme        = BasePlotter.attr()
     _fig:         Figure                = BasePlotter.attr()
 
+    def getfigure(self) -> Figure:
+        "get the model display"
+        return self._fig
+
+    @property
+    def nfactors(self) -> int:
+        "return the number of beads"
+        return max(1, len(self._factors))
+
+    def hitpoint(self, xval: float) -> Optional[Tuple[RootTask, int]]:
+        "get the track & bead"
+        if self._isdefault():
+            return None
+
+        curf  = self._factors
+        lastv = 0.
+        last  = self._factors[0]
+        for xlabel in copy(self._factors):
+            nextv = lastv + 1.
+            if xlabel[0] != last[0]:
+                nextv += self._fig.x_range.group_padding
+            elif len(xlabel) > 2 and xlabel[1] != last[1]:
+                nextv += self._fig.x_range.subgroup_padding
+
+            last = xlabel
+            if lastv <= xval < nextv:
+                break
+            lastv = nextv
+
+        ind  = int(last[-2][:last[-2].find('-')])
+        try:
+            out  = list(self._procs)[ind], int(last[-1])
+        except IndexError:
+            return None
+        return out if curf is self._factors and out[0] is not None else None
+
+    def hitposition(self, root, bead) -> Optional[float]:
+        "get the track & bead position"
+        if self._isdefault():
+            return None
+
+        lastv = 0.
+        last  = self._factors[0]
+        for xlabel in copy(self._factors):
+            nextv = lastv + 1.
+            if xlabel[0] != last[0]:
+                nextv += self._fig.x_range.group_padding
+            elif len(xlabel) > 2 and xlabel[1] != last[1]:
+                nextv += self._fig.x_range.subgroup_padding
+
+            ind  = int(xlabel[-2][:xlabel[-2].find('-')])
+            try:
+                out = list(self._procs)[ind], int(xlabel[-1])
+            except IndexError:
+                pass
+            else:
+                if out[0] is root and out[1] == bead:
+                    return nextv - .5
+
+            last, lastv = xlabel, nextv
+
+        ind  = int(last[-2][:last[-2].find('-')])
+        try:
+            out = list(self._procs)[ind], int(last[-1])
+        except IndexError:
+            pass
+        else:
+            if out[0] is root and out[1] == bead:
+                return nextv - .5
+        return None
+
     def _reset(self):
         "resets the data"
         data, status = self.__compute_expdata()
         if status:
             exp     = self._defaultdata
-            factors = exp['x']
+            factors = list(exp['x'])
             theo    = {i: j[:0] for i, j in self._theodata.data.items()}
             yield BeadsScatterPlotWarning("No beads available for this plot!"), ""
         else:
@@ -271,7 +371,7 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
             if self._factors else frame
         )
         self._factors = list(self._sortfactors(self._data).x)
-        return self._factors
+        return list(self._factors)
 
     @abstractmethod
     def _yaxis(self) -> str:

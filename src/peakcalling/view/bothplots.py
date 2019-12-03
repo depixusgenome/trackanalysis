@@ -8,7 +8,7 @@ from view.base       import BokehView, stretchout
 from view.threaded   import DisplayState
 from utils.logconfig import getLogger
 from modaldialog     import dialogisrunning
-from ..model         import BasePlotConfig
+from ..model         import BasePlotConfig, JobDisplay
 from .beadsplot      import BeadsScatterPlot
 from .statsplot      import FoVStatsPlot, FoVStatsLinearPlot
 from ._widgets       import MasterWidget
@@ -70,6 +70,8 @@ class FoVPeakCallingView(BokehView):
         self.state = DisplayState.active if val else DisplayState.disabled
         if val and (old is DisplayState.outofdate) and hasattr(self, '_ctrl'):
             self.reset(self._ctrl)
+        if hasattr(self, '_ctrl'):
+            self._ctrl.display.update(JobDisplay().name, active = bool(val))
 
     def reset(self, *_):
         "resets"

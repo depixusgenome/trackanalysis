@@ -1,20 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "test peakcalling views widgets"
+import os
+import pytest
 from tests.testutils   import integrationmark
 from tests.testingcore import path as utpath
+from sequences         import read as _read
+from peakcalling.processor import FitToHairpinTask
 
+_SKIP = os.environ.get("TEAMCITY_PROJECT_NAME", None) is not None
+
+
+@pytest.mark.skipif(_SKIP, reason = "not working in pytest batch mode")
 @integrationmark
 def test_diskcache_view(pkviewserver):
     "test the view"
-    server, fig = pkviewserver(evt = True)
-    size = len(fig.renderers[0].data_source.data['boxheight'])
-    assert size > 0
-    if size < 6:
-        server.cmd(lambda: None, rendered = pkviewserver.EVT)
-        size = len(fig.renderers[0].data_source.data['boxheight'])
+    server, fig = pkviewserver(evt = pkviewserver.EVT)
+    size        = len(fig.renderers[0].data_source.data['boxheight'])
 
-    modal = server.selenium.modal("//span[@class='icon-dpx-download2']", True)
+    with server.ctrl.theme.model('peakcalling.diskcache').newcache() as cache:
+        for _ in range(5):
+            if any(i.startswith(b'data_') for i in cache.iterkeys()) > 1:
+                break
+            server.wait()
+
+    modal       = server.selenium.modal("//span[@class='icon-dpx-download2']", True)
     with modal:
         modal["//input[@name='items[0].loaded']"].click()
     server.wait()
@@ -78,7 +88,51 @@ def test_taskdialog_view(pkviewserver):
 
     for i in server.ctrl.tasks.tasklist(...):
         proc = server.ctrl.tasks.processors(next(i))
-        assert proc.model[-1].sequences == utpath("hairpins.fasta")
+        assert proc.model[-1].sequences == dict(_read(utpath("hairpins.fasta")))
         assert [i.lower() for i in proc.model[-1].oligos] == ['ctgt']
         assert proc.model[3].events.select.minlength == 10
         assert not any(i.__class__.__name__ == 'ExtremumAlignmentTask' for i in proc.model)
+
+@integrationmark
+def test_taskdialog_fit_view(pkviewserver):
+    "test the view"
+    server = pkviewserver()[0]
+    server.ctrl.theme.model("peakcalling.view.stats").linear = False
+    server.addhp(sequences = utpath("hp6.fasta"), oligos = ["aacc"], rendered = True)
+    assert set(server.task(FitToHairpinTask).sequences) == {'full', 'oligo', 'target'}
+    assert server.task(FitToHairpinTask).oligos == ['aacc']
+    assert set(server.task(FitToHairpinTask).fit) == {'full', 'oligo', 'target'}
+
+    modal = server.selenium.modal("//span[@class='icon-dpx-cog']", True)
+    with modal:
+        modal.tab("Hairpins")
+        modal[f"//input[@name='items[0].fit.task.sequences']"] = str(utpath("hairpins.fasta"))
+        modal.tab("Oligos")
+        modal[f"//input[@name='items[0].fit.task.oligos']"] = "kmer"
+    server.wait()
+    assert set(server.task(FitToHairpinTask).sequences) == {'015', *(f'GF{i}' for i in range(1, 5))}
+    assert server.task(FitToHairpinTask).oligos == ['ctgt']
+    assert set(server.task(FitToHairpinTask).fit) == {'015', *(f'GF{i}' for i in range(1, 5))}
+
+    with modal:
+        assert (
+            modal[f"//input[@name='items[0].fit.task.sequences']"].get_attribute('value')
+            == str(utpath("hairpins.fasta"))
+        )
+        assert (
+            modal[f"//input[@name='items[0].fit.task.oligos']"].get_attribute('value')
+            == "ctgt"
+        )
+
+
+if __name__ == '__main__':
+    from pathlib import Path
+    # test_statsplot_info_pkcount(Path("/tmp/dd"))
+    from importlib import import_module
+    from tests.testingcore.bokehtesting import BokehAction
+    with BokehAction(None) as bka:
+        test_diskcache_view(
+            getattr(
+                import_module("tests.peakcalling.conftest"), '_server'
+            )(bka, Path("/tmp/disk_dir"), "")
+        )

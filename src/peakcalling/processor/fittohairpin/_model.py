@@ -13,6 +13,7 @@ from   peakfinding.peaksarray      import Output as PeakFindingOutput, PeakListA
 from   peakfinding.processor       import PeaksDict, SingleStrandTask, BaselinePeakTask
 from   sequences                   import splitoligos, read as _read
 from   taskmodel                   import Task, Level
+from   utils.logconfig             import getLogger
 from   utils                       import (
     StreamUnion, initdefaults, updatecopy, DefaultValue
 )
@@ -20,6 +21,8 @@ from   ...tohairpin                import (
     HairpinFitter, PeakGridFit, Distance, PeakMatching, PEAKS_TYPE
 )
 from   ..._base                    import Range
+
+LOGS = getLogger("__name__")
 
 class DistanceConstraint(NamedTuple):
     hairpin:     Optional[str]
@@ -174,7 +177,8 @@ class FitToHairpinTask(Task, zattributes = ('fit', 'constraints', 'singlestrand'
         )
         try:
             other = self.read(cpy.sequences, cpy.oligos, fit = self.fit, match = self.match)
-        except FileNotFoundError:
+        except FileNotFoundError as exc:
+            LOGS.warning("%s", exc)
             return cpy
 
         if other:
@@ -182,6 +186,8 @@ class FitToHairpinTask(Task, zattributes = ('fit', 'constraints', 'singlestrand'
                 left.update({i:j for i, j in right.items() if i not in left})
                 for i  in set(right) & set(left):
                     right[i].peaks = left[i].peaks
+            cpy.sequences = other.sequences
+            cpy.oligos    = other.oligos
         return cpy
 
     @classmethod

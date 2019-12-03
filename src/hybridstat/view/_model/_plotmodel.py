@@ -9,6 +9,7 @@ from model.plots                import PlotModel, PlotTheme, PlotAttrs, PlotDisp
 from peakcalling.tohairpin      import Distance
 from view.colors                import tohex
 from view.plots.base            import themed
+from taskmodel                  import RootTask
 from tasksequences              import StretchFactor
 from utils                      import initdefaults
 
@@ -57,7 +58,7 @@ class PeaksPlotDisplay(PlotDisplay):
     singlestrand:    Optional[float]       = None
     precompute:      int                   = False
     estimatedbias:   float                 = 0.
-    constraintspath: Any                   = None
+    constraintspath: Dict[RootTask, Any]   = dict()
     useparams:       bool                  = True
 
     @initdefaults(frozenset(locals()))

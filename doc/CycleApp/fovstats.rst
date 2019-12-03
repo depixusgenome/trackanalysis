@@ -62,12 +62,39 @@ A number of filters can be applied to beads, blockages or bindings. Using the
 *advanced* menu, one can select which tracks to display, which hairpins, beads
 as well as the binding strand (or orientation).
 
+Selecting and Displaying a Specific Bead
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The current bead is highlighted by a vertical gray line. Clicking on the plot
+over another bead will set that track and bead as the current ones.
 
 Statistics Plot
 ---------------
 
 The information displayed is either counts are whisker boxes on a given y-axis
 parameter as a function of up to 3 x-axis parameters.
+
+Whisker Plots
+^^^^^^^^^^^^^
+
+Whisker plots display the following information:
+
+* The median is the line inside each box: 1/2 of data are above, 1/2 below. 
+* The lower edge of the box is the first quartile: 3/4 of data are *above* that line.
+* The upper edge of the box is the third quartile: 3/4 of data are *below* that line.
+* Thus the height of the box is one interquartile range (IQC).
+* The bottom whisker is the last datum below the first quartile and no further
+  away from it than 1.5 IQC. Data below is defined as outliers.
+* The top whisker is the last datum above the third quartile and no further
+  away from it than 1.5 IQC. Data above is defined as outliers.
+* Outliers are marked as gray circles.
+
+Selecting and Displaying a Specific Bead
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When whisker boxes are displayed, it's possible to click on outliers (gray
+circles) to select the corresponding track and bead. The exact data for that
+specific bead is displayed as orange crosses.
 
 The X-Axis
 ^^^^^^^^^^

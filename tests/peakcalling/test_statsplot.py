@@ -691,8 +691,8 @@ if __name__ == '__main__':
     from importlib import import_module
     from tests.testingcore.bokehtesting import BokehAction
     with BokehAction(None) as bka:
-        test_statsplot_view_hpins4(
+        test_statsplot_view_hpins7(
             getattr(
-                import_module("tests.peakcalling.conftest"), '_fovstatshairpin'
+                import_module("tests.peakcalling.conftest"), '_server'
             )(bka, Path("/tmp/disk_dir"), "")
         )

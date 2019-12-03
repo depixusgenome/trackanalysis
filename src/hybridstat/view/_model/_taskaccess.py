@@ -19,9 +19,10 @@ from peakcalling.processor.fittoreference   import FitData
 from peakcalling.processor.fittohairpin     import Constraints, DistanceConstraint, FitBead
 from taskcontrol.modelaccess    import TaskAccess
 from taskmodel                  import RootTask, DataSelectionTask
+from utils.logconfig            import getLogger
 from utils                      import updatecopy, NoArgs
 
-from ...reporting.batch         import fittohairpintask
+from ...reporting.batch         import readconstraints
 from ._processors               import runrefbead
 
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
@@ -30,6 +31,7 @@ from peakfinding.processor.__config__    import (PeakSelectorTask, SingleStrandT
                                                  BaselinePeakFilterTask)
 from peakcalling.processor.__config__    import FitToHairpinTask, FitToReferenceTask
 
+LOGS   = getLogger(__name__)
 _DUMMY = type('_DummyDict', (),
               dict(get          = lambda *_: None,
                    __contains__ = lambda _: False,
@@ -360,9 +362,11 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
 
     def observe(self, ctrl):
         "observes the global model"
-        keys = {'probes', 'path', 'constraintspath', 'useparams', 'fit', 'match'}
+        keys = frozenset((
+            'probes', 'paths', 'sequences', 'constraintspath', 'useparams', 'fit', 'match'
+        ))
 
-        @ctrl.theme.observe(self._tasksmodel.sequencemodel.config)
+        @ctrl.display.observe(self._tasksmodel.sequencemodel.display)
         @ctrl.display.observe(self._tasksmodel.peaksmodel.display)
         @ctrl.theme.observe(self.__defaults)
         @ctrl.display.hashwith(self._tasksdisplay)
@@ -428,18 +432,29 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
     def default(self, mdl):
         "returns the default identification task"
         ols = mdl.oligos
-        if ols is None or len(ols) == 0 or len(mdl.sequences(...)) == 0:
+        if ols is None or len(ols) == 0 or len(mdl.sequences(...)) == 0 or self.roottask is None:
             return None
 
         dist = self.__defaults.fit
         pid  = self.__defaults.match
         cstr = self.__defaults.constraints
+
         try:
-            task = fittohairpintask(mdl.sequencepath,    ols,
-                                    mdl.constraintspath, mdl.useparams,
-                                    constraints = cstr, fit = dist, match = pid)
-        except FileNotFoundError:
+            task = FitToHairpinTask.read(mdl.sequencepath, ols,  fit = dist, match = pid)
+        except FileNotFoundError as exc:
+            LOGS.warning("%s", exc)
             return None
+
+        if len(task.fit) == 0:
+            LOGS.warning("File not found or empty: %s", mdl.sequencepath)
+            return None
+
+        try:
+            task = readconstraints(task, mdl.constraintspath, mdl.useparams, cstr)
+        except FileNotFoundError as exc:
+            LOGS.warning("%s", exc)
+            return None
+
         task.constraints.update(self.__store.constraints.get(self.roottask, {}))
         return task
 
