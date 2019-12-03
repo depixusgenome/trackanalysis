@@ -194,9 +194,12 @@ class FitToReferenceDict(  # pylint: disable=too-many-ancestors
         return super()._keys([i for i in seq if i in available], True)
 
     def _getrefdata(self, key):
+        "retrieve data depending on the state of the reference"
         ref = self.config.fitdata.get(key, self.config.defaultdata)
         if not isinstance(ref, (FitData, bool)):
             view  = next(_runprocessors(ref))
+            while not isinstance(view, (PeaksDict, Events)) and hasattr(view, 'data'):
+                view = view.data
             if isinstance(view, PeaksDict):
                 return FitData(self.config.fitalg.frompeaks(view[key]), (1., 0.))
             if isinstance(view, Events):
