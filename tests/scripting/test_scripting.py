@@ -168,7 +168,7 @@ def customf(*args,**kwa):
     return 2
 
 @integrationmark
-def test_tracksdict_custom_dataframe(scriptingcleaner):# 
+def test_tracksdict_custom_dataframe(scriptingcleaner):
     "test that we can apply custom function to dataframe"
     from scripting          import TracksDict
     from tests.testingcore  import path as utpath
@@ -194,6 +194,7 @@ def test_tracksdict_cleaning_dataframe(scriptingcleaner):
     tracks = TracksDict(utpath("100bp_4mer")+"/*.pk")
 
     dframe = tracks.dataframe(status = True)
+
     assert 'trackcount' in dframe.columns
     assert 'modification' in dframe.columns
     assert hasattr(dframe, 'tasklist')
@@ -203,6 +204,8 @@ def test_tracksdict_cleaning_dataframe(scriptingcleaner):
     assert 'fixed' in dframe.columns
     assert not all(i is None for i in dframe['good'])
     assert not all(i is None for i in dframe['fixed'])
+
+    assert not tracks.tasks
 
 @integrationmark
 def test_tracksdict_ramps_dataframe(scriptingcleaner):
