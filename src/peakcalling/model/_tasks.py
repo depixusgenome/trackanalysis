@@ -359,7 +359,7 @@ class _Adaptor:
             )
             if remove:
                 if ind is not None:
-                    procs.remove(ind)
+                    procs.remove(tpe)
                 continue
 
             if ind is None:
@@ -367,7 +367,7 @@ class _Adaptor:
                     track = TasksDisplay(taskcache = procs).track
                     dflts = getattr(self.config, track.instrument['type'].name)
                 except TrackIOError:
-                    procs.remove(ind)
+                    procs.remove(tpe)
                     continue
 
                 task  = deepcopy(dflts[taskname])
@@ -380,7 +380,7 @@ class _Adaptor:
                 self._copies.pop(root)
 
             elif ind is not None:
-                procs.remove(ind)
+                procs.remove(tpe)
 
             self.__add(procs, task)
 

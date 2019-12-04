@@ -29,18 +29,21 @@ class TaskCacheList:
         self.model: List[Task] = []
         self.copy              = copy
 
+    def __contains__(self, itm):
+        return self.task(itm) in self.model
+
     def task(self, task:Union[Type[Task],int], noemission = False) -> Optional[Task]:
         "returns a task"
-        tsk = None
         if isinstance(task, Task):
-            tsk = task
+            return task
 
-        elif isinstance(task, int):
-            tsk = self.model[task]
+        if isinstance(task, int):
+            return self.model[task]
 
-        elif isinstance(task, type):
+        tsk = None
+        if isinstance(task, type):
             try:
-                tsk = next(i for i in self.model if isinstance(i, task))
+                tsk = next((i for i in self.model if isinstance(i, task)), None)
             except StopIteration:
                 pass
 
@@ -62,10 +65,12 @@ class TaskCacheList:
 
     def remove(self, task):
         "removes a task from the list"
-        task = self.task(task)
-
-        self.model.remove(task)
-        return self.data .remove(task)
+        tsk = self.task(task)
+        if tsk in self.model:
+            ind = self.model.index(tsk)
+            self.model.pop(ind)
+            return self.data.remove(ind)
+        return None
 
     def update(self, tsk):
         "clears data starting at *tsk*"

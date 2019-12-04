@@ -150,6 +150,13 @@ class BaseTaskController(Controller):  # pylint: disable=too-many-public-methods
     def __repr__(self):
         return "TaskControl"
 
+    def __contains__(self, itm):
+        if isinstance(itm, RootTask):
+            return itm in self._items
+
+        root, task = itm
+        return root in self._items and task in self._items[root]
+
     @property
     def tasks(self):
         "return self"

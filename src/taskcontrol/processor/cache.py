@@ -17,6 +17,7 @@ class CacheItem:
     "Holds cache and its version"
     __slots__ = ('_proc', '_cache')
     _VERSION  = _version()
+
     def __init__(self,
                  proc:  Union['CacheItem', Processor],
                  cache: Tuple[int, Any] = (0, None)) -> None:
@@ -66,7 +67,10 @@ class CacheItem:
     cache   = property(lambda self: self.getcache(), setcache)
     proc    = property(lambda self: self._proc)
 
+
 RepType = Tuple[int, Processor, Processor]
+
+
 class CacheReplacement:
     """
     Context for replacing processors but keeping their cache
@@ -108,11 +112,12 @@ class CacheReplacement:
 class Cache(Iterable[Processor]):
     "Contains the track and task-created data"
     __slots__ = ('_items',)
+
     def __init__(self, order: Iterable[Union[CacheItem, Processor, Task]] = None) -> None:
         if order is None:
             self._items: List[CacheItem] = []
         else:
-            order       = list(order) # make sure order is not an iterator
+            order       = list(order)  # make sure order is not an iterator
             procs       = register() if any(isinstance(i, Task) for i in order) else {}
             self._items = [i            if isinstance(i, CacheItem) else
                            CacheItem(i) if isinstance(i, Processor) else

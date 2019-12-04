@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updating list of jobs to run"
+import asyncio
 from typing      import Iterator, TYPE_CHECKING, cast
 
 from taskmodel   import RootTask
@@ -62,12 +63,20 @@ class TasksModelController(JobEventNames):
         @ctrl.display.hashwith(self._jobs.display)
         def _onchange(old, _evts_ = frozenset(('calls', 'active')), **_):
             if _evts_.intersection(old) and self._jobs.display.needsrefresh:
-                self._jobs.launch(
-                    list(self._tasks.processors.values()),
-                    self,
-                    roots   = list(self.roots),
-                    missing = self._tasks.missingprocessors
-                )
+
+                async def _launch(_id_ = self._jobs.display.calls):
+                    if _id_ != self._jobs.display.calls:
+                        return
+
+                    self._jobs.launch(
+                        list(self._tasks.processors.values()),
+                        self,
+                        roots   = list(self.roots),
+                        missing = self._tasks.missingprocessors
+                    )
+                # launch after the current task is done: this makes sure
+                # all updates are done
+                asyncio.create_task(_launch())
 
         @ctrl.display.observe(self.eventjobstart)
         @ctrl.display.hashwith(self._jobs.display)
