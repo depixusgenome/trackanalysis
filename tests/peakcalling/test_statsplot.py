@@ -411,6 +411,33 @@ def test_statsplot_info_binned(diskcaching):
     assert 'start' in cache[fov._fig.x_range]
     assert cache[_Fig.renderers[0].glyph]['width'] == 5.
 
+def test_statsplot_info_zmum_vsbp(diskcaching):
+    "test the view"
+    fov, mdl = _Fig.create(withhp = True)
+    mdl.tasks.jobs.launch(list(mdl.tasks.processors.values()))
+    mdl.theme.__dict__.update(
+        xinfo = [AxisConfig("closest"), AxisConfig("binnedz")],
+        yaxis = "baseposition"
+    )
+
+    cache = dict(_HairpinPlot(fov, mdl.tasks.processors)._reset())
+    _check_validity(cache, "z (bp)")
+    assert cache['x_range']['factors'] == [
+        ('38.0', '', '0.03'), ('46.0', '', '-0.07'), ('46.0', '', '0.03'),
+        ('151.0', '', '0.13'), ('157.0', '', '0.03'), ('157.0', '', '0.13'),
+        ('222.0', '', '0.13'), ('258.0', '', '0.13'), ('258.0', '', '0.23'),
+        ('274.0', '', '0.13'), ('274.0', '', '0.23'), ('294.0', '', '0.13'),
+        ('294.0', '', '0.23'), ('347.0', '', '0.23'), ('357.0', '', '0.23'),
+        ('357.0', '', '0.33'), ('379.0', '', '0.33'), ('393.0', '', '0.23'),
+        ('393.0', '', '0.33'), ('503.0', '', '0.33'), ('503.0', '', '0.43'),
+        ('540.0', '', '0.43'), ('569.0', '', '0.43'), ('576.0', '', '0.43'),
+        ('576.0', '', '0.53'), ('631.0', '', '0.53'), ('659.0', '', '0.53'),
+        ('704.0', '', '0.53'), ('704.0', '', '0.63'), ('738.0', '', '0.53'),
+        ('738.0', '', '0.63'), ('754.0', '', '0.63'), ('784.0', '', '0.63'),
+        ('784.0', '', '0.73'), ('791.0', '', '0.63'), ('795.0', '', '0.53'),
+        ('795.0', '', '0.63'), ('800.0', '', '0.73')
+    ]
+
 @integrationmark
 def test_statsplot_view_simple(pkviewserver):
     "test the view"
@@ -687,7 +714,7 @@ def test_statsplot_view_hpins7(pkviewserver):
 
 if __name__ == '__main__':
     from pathlib import Path
-    # test_statsplot_info_pkcount(Path("/tmp/dd"))
+    test_statsplot_info_zmum_vsbp(Path("/tmp/dd"))
     from importlib import import_module
     from tests.testingcore.bokehtesting import BokehAction
     with BokehAction(None) as bka:

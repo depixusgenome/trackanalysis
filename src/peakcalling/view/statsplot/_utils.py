@@ -133,15 +133,21 @@ def statsbox(
         'trackid', 'track', 'bead',
         *(i for i in ('closest', 'baseposition') if i in info)
     ]
-    keys   = dict(level = list(range(len(xaxis))))
+
+    def _rename(name, _done_ = np.zeros(1, dtype = 'bool')):
+        if name == yaxis and not _done_:
+            _done_[0] = True
+            return 'y'
+        return name
+
     data   = (
         info
         .set_index(xaxis, drop = False)
-        [[yaxis, *(i for i in ttip if i != yaxis)]]
-        .rename(columns = {yaxis: 'y'})
+        [[yaxis, *ttip]]
+        .rename(columns = _rename)
         [lambda x: ~x.y.isna()]
     )
-    stats  = data.groupby(**keys).y.agg(['median', boxbottom, boxtop])
+    stats  = data.groupby(level = xaxis).y.agg(['median', boxbottom, boxtop])
     spread = spreadfactor*(stats.boxtop - stats.boxbottom)
 
     data   = (
@@ -157,7 +163,7 @@ def statsbox(
     for col in ('bottom', 'top'):
         comp       = np.greater if col == 'bottom' else np.less
         stats[col] = getattr(
-            data[comp(data.y, getattr(data, f'{col}limit'))].groupby(**keys).y,
+            data[comp(data.y, getattr(data, f'{col}limit'))].groupby(level = xaxis).y,
             ('min' if col == 'bottom' else 'max')
         )()
 
