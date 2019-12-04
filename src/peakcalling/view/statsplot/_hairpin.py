@@ -11,18 +11,28 @@ from   ._plot                  import _WhiskerBoxPlot
 from   ._utils                 import binnedz as _binnedz, concat as _concat, _IDS
 
 class _HairpinPlot(_WhiskerBoxPlot):
-    _bead:    pd.DataFrame
-    _peak:    pd.DataFrame
-    _RENAMES: ClassVar[Dict[str, str]] = {'hpin': 'hairpin'}
-    _BEADOUT: ClassVar[FrozenSet[str]] = frozenset({'closest', 'status'})
-    _LINEAR:  ClassVar[FrozenSet[str]] = frozenset(['binnedbp', 'binnedz', 'closest', 'exclusive'])
+    _bead:      pd.DataFrame
+    _peak:      pd.DataFrame
+    _RENAMES:   ClassVar[Dict[str, str]] = {'hpin': 'hairpin'}
+    _BEADOUT:   ClassVar[FrozenSet[str]] = frozenset({'closest', 'status'})
+    _LINEAR:    ClassVar[FrozenSet[str]] = frozenset([
+        'binnedbp', 'binnedz', 'closest', 'exclusive'
+    ])
+    _EXCLUSIVE: ClassVar[FrozenSet[str]] = frozenset([
+        'distance', 'delta', 'closest', 'exclusive', 'excldistance', 'excldelta'
+    ])
+
+    _STATUSSTATS: ClassVar[FrozenSet[str]] = frozenset([
+        *(f'f{i}perbp' for i in 'pn'),
+        *(j+i for i in ('tp', 'fn') for j in ('', 'top', 'bottom'))
+    ])
 
     def _select(self) -> Tuple[List[str], str, pd.DataFrame]:
         xaxis = self._model.theme.xaxis
         yaxis = self._model.theme.yaxis
         return self._find_df(xaxis, yaxis)
 
-    def compute(self):
+    def compute(self, doall: bool):
         "compute base dataframes"
         perpeakdf:   List[pd.DataFrame] = [self._peak] if hasattr(self, '_peak') else []
         perbeaddf:   List[pd.DataFrame] = [self._bead] if hasattr(self, '_bead') else []
@@ -63,48 +73,60 @@ class _HairpinPlot(_WhiskerBoxPlot):
         if not hasattr(self, '_peak'):
             return
 
-        _binnedz(self._model.theme.binnedz, self._peak)
-        _binnedz(
-            self._model.theme.binnedbp, self._peak, 'baseposition', 'binnedbp'
+        cols = frozenset(
+            {i.key for i in COLS} if doall else
+            {*self._model.theme.xaxis, self._model.theme.yaxis}
         )
+        if 'binnedz' in cols:
+            _binnedz(self._model.theme.binnedz, self._peak)
+        if 'binnedbp' in cols:
+            _binnedz(
+                self._model.theme.binnedbp, self._peak, 'baseposition', 'binnedbp'
+            )
 
-        self.__compute_exclusive()
-        self.__compute_statusstats()
+        self.__compute_exclusive(cols)
+        self.__compute_statusstats(cols)
         self._bead = self._compute_tags(self._bead)
         self._peak = self._compute_tags(self._peak)
 
-    def __compute_exclusive(self):
-        if not hasattr(self, '_peak'):
+    def __compute_exclusive(self, req: FrozenSet[str]):
+        if not hasattr(self, '_peak') or not self._EXCLUSIVE.intersection(req):
             return
 
         self._peak['distance'] = self._peak['closest'] - self._peak['baseposition']
         self._peak['delta']    = self._peak['distance'].abs()
 
-        cols = ['trackid', 'bead', 'closest', 'baseposition']
-        self._peak.set_index(cols, inplace = True)
-        self._peak['exclusive'] = (
-            self._peak
-            .groupby(level = cols[:-1])
-            .apply(lambda x: x.reset_index()[[*cols[-2:], 'delta']].nsmallest(1, "delta"))
-            .reset_index(level = 3, drop = True)
-            .set_index(cols[-1], append = True)
-            [cols[-2]]
-        )
-        self._peak.reset_index(inplace = True)
+        if any(i.startswith('excl') for i in req):
+            cols = ['trackid', 'bead', 'closest', 'baseposition']
+            self._peak.set_index(cols, inplace = True)
+            self._peak['exclusive'] = (
+                self._peak
+                .groupby(level = cols[:-1])
+                .apply(lambda x: x.reset_index()[[*cols[-2:], 'delta']].nsmallest(1, "delta"))
+                .reset_index(level = 3, drop = True)
+                .set_index(cols[-1], append = True)
+                [cols[-2]]
+            )
+            self._peak.reset_index(inplace = True)
 
-        self._peak['excldistance'] = self._peak['exclusive'] - self._peak['baseposition']
-        self._peak['excldelta']    = self._peak['excldistance'].abs()
+        if 'excldistance' in req:
+            self._peak['excldistance'] = self._peak['exclusive'] - self._peak['baseposition']
+        if 'excldelta' in req:
+            self._peak['excldelta']    = self._peak['excldistance'].abs()
 
         # warning: remove the false negatives from following columns only after
         # computing exclusive. Otherwise the latter will not include false negatives
         # as it should
-        self._peak.loc[
-            self._peak.status == 'falseneg',
-            ['distance', 'delta', 'excldistance', 'excldelta']
-        ] = np.NaN
+        cols = [
+            i
+            for i in ('distance', 'delta', 'excldistance', 'excldelta')
+            if i in self._peak
+        ]
+        if cols:
+            self._peak.loc[self._peak.status == 'falseneg', cols] = np.NaN
 
-    def __compute_statusstats(self):
-        if not hasattr(self, '_bead'):
+    def __compute_statusstats(self, req: FrozenSet[str]):
+        if not hasattr(self, '_bead') or not self._STATUSSTATS.intersection(req):
             return
 
         self._peak = self._peak.assign(**dict.fromkeys(

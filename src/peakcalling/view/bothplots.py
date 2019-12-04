@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Main view"
-from copy            import deepcopy
-from typing          import Any
+from copy            import copy
+from functools       import partial
+from typing          import Any, FrozenSet
 from bokeh           import layouts
 from view.base       import BokehView, stretchout
 from view.threaded   import DisplayState
 from utils.logconfig import getLogger
 from modaldialog     import dialogisrunning
-from ..model         import BasePlotConfig, JobDisplay
+from ..model         import BasePlotConfig, BeadsScatterPlotStatus, JobDisplay
 from .beadsplot      import BeadsScatterPlot
 from .statsplot      import FoVStatsPlot, FoVStatsLinearPlot
 from ._widgets       import MasterWidget
@@ -88,26 +89,19 @@ class FoVPeakCallingView(BokehView):
         for i in self._items:
             i.observe(ctrl)
 
-        attrs = set(BasePlotConfig().__dict__)
+        def _onplotmenu(attrs: FrozenSet[str], tpe: str, old, **_):
+            inter = attrs.intersection(old)
+            if not inter:
+                return
 
-        @ctrl.theme.observe(self._items[1].gettheme())
-        def _onconfig(old, **_):
-            if set(old) & attrs:
-                ctrl.theme.update(
-                    self._items[0].gettheme(),
-                    **{
-                        i: deepcopy(getattr(self._items[1].gettheme(), i))
-                        for i in set(old) & attrs
-                    }
-                )
+            mdls = [getattr(i, f'get{tpe}')() for i in self._items[:2]]
+            getattr(ctrl, tpe).update(mdls[0], **{i: copy(getattr(mdls[1], i)) for i in inter})
 
-        @ctrl.display.observe(self._items[1].getdisplay())
-        def _ondisplay(old, **_):
-            if 'ranges' in old:
-                ctrl.display.update(
-                    self._items[0].getdisplay(),
-                    ranges = self._items[1].getdisplay().ranges
-                )
+        for tpe, cls in (('display', BeadsScatterPlotStatus), ('theme', BasePlotConfig)):
+            getattr(ctrl, tpe).observe(
+                getattr(self._items[1], f'get{tpe}')(),
+                partial(_onplotmenu, frozenset(cls().__dict__), tpe)
+            )
 
     def isactive(self, *_1, **_2) -> bool:
         "whether the state is set to active"

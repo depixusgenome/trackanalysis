@@ -180,12 +180,14 @@ class FoVStatsPlot(  # pylint: disable=too-many-instance-attributes
         self._fig.add_layout(self._topaxis, 'above')
 
         hover           = fig.select(HoverTool)[0]
+        hover.toggleable = False
         hover.tooltips  = self._model.theme.boxtips
         hover.renderers = [next(i for i in self._fig.renderers if i.glyph.name == 'box')]
 
         fig.tools       = fig.tools + [HoverTool(
             tooltips  = self._model.theme.pointstips,
-            renderers = [next(i for i in self._fig.renderers if i.glyph.name == 'points')]
+            renderers = [next(i for i in self._fig.renderers if i.glyph.name == 'points')],
+            toggleable = False
         )]
 
     def _createplot(self, beadstatus: bool) -> BasePlotter:

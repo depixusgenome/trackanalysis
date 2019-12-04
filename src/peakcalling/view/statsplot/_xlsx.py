@@ -69,7 +69,7 @@ class XlsxReport:
     def _export_plot(
             mdl, plot, processors, sheetnames
     ) -> List[Tuple[pd.DataFrame, Dict[str, Any]]]:
-        plot.compute()
+        plot.compute(True)
         tracks   = {id(i.model[0]): trackname(i.model[0]) for i in processors}
         trackids = {id(j.model[0]): i for i, j  in enumerate(processors)}
         cnv      = dict(mdl.theme.xaxistag, **mdl.theme.yaxistag)
