@@ -4,7 +4,7 @@
 from   abc       import abstractmethod
 from   copy      import copy
 from   functools import partial
-from   typing    import Dict, List, Iterator, Tuple, Union, Set, Optional
+from   typing    import Dict, List, Iterator, Tuple, Union, Set, Optional, cast
 
 import pandas as pd
 import numpy  as np
@@ -170,6 +170,7 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
         super().__init__(mdl, procs)
         self._data:    pd.DataFrame         = pd.DataFrame({})
         self._factors: List[Tuple[str,...]] = []
+        self._xv:      Tuple[np.ndarray, np.ndarray] = (np.empty(0), np.empty(0))
 
     _expdata:     ColumnDataSource      = BasePlotter.attr()
     _defaultdata: Dict[str, list]       = BasePlotter.attr()
@@ -262,7 +263,7 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
             theo    = self._from_df(self._compute_theodata(data))
             exp     = self._from_df(self.__set_tags(data))
 
-        self.__simplify_factors(exp, theo, factors)
+        self.__simplify_factors(exp, theo, factors, True)
         yield (self._fig.y_range, self.__yrange(data, theo, True))
         yield (self._expdata,      dict(data       = exp))
         yield (self._theodata,     dict(data       = theo))
@@ -280,15 +281,23 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
         if status:
             return
 
-        yield (self._fig.x_range, dict(factors = self._xfactors(data)))
-        yield (
-            '_expdata',
-            partial(self._expdata.stream, self._from_df(self.__set_tags(data)))
-        )
-        theo    = self._compute_theodata(data)
-        if theo.shape[0]:
-            yield ('_theodata',   partial(self._theodata.stream, self._from_df(theo)))
+        factors = self._xfactors(data)
+        theo    = self._from_df(self._compute_theodata(data))
+        exp     = self._from_df(self.__set_tags(data))
+        cnv     = self.__simplify_factors(exp, theo, factors, False)
         yield (self._fig.y_range, self.__yrange(data, theo, False))
+
+        def _call(name: str, old: np.ndarray, new: Dict[str, np.ndarray]):
+            src = getattr(self, name)
+            if len(next(iter(new.values()), ())):
+                src.stream(new)
+            if len(old):
+                src.patch({'x': ((slice(len(old)), old),)})
+
+        yield ('_expdata',  partial(_call, '_expdata',  cnv[0], exp))
+        yield ('_theodata', partial(_call, '_theodata', cnv[1], theo))
+
+        yield (self._fig.x_range, dict(factors = factors))
 
     def __yrange(self, data, theo, force: bool) -> Dict[str, float]:
         vals = np.concatenate([
@@ -304,21 +313,47 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
             info['x'] = [(info.track.values[0], str(info.bead.values[0]))]*len(info)
             yield info
 
-    def __simplify_factors(self, exp, theo, factors):
-        cols = (exp['x'], theo['x'], factors)
-        cnv  = self._model.theme.tracknameconversion(i[-2] for i in self._factors)
+    def __simplify_factors(
+            self, exp, theo, factors, reset: bool
+    ) -> Tuple[list, ...]:
+        xvals    = ([], []) if reset else self._xv
+        self._xv = cast(
+            Tuple[np.ndarray, np.ndarray],
+            tuple(
+                np.copy(j) if len(i) == 0 else
+                i          if len(j) == 0 else
+                np.concatenate([i, j])
+                for i, j in zip(xvals, (exp['x'], theo['x']))
+            )
+        )
+
+        cols   = (exp['x'], theo['x'], factors)
+        cnv    = self._model.theme.tracknameconversion(i[-2] for i in self._factors)
+
+        if not cnv and len(factors) > 1 and len(factors[0]) == 2:
+            # pylint: disable=unnecessary-comprehension
+            for col in cols:
+                col[:] = [(i, '', j) for i, j in col]
+            return tuple([(i, '', j) for i, j in col] for col in xvals)
+
         if not cnv:
-            if len(factors) > 1 and len(factors[0]) == 2:
-                for col in cols:
-                    # pylint: disable=unnecessary-comprehension
-                    col[:] = [(i, '', j) for i, j in col]
-            return
+            return (np.empty(0), np.empty(0))
 
         for col in cols:
             col[:] = (
-                [(cnv.get(str(i), i), '', j) for i, j    in col] if len(factors[0]) == 2 else
+                [(cnv.get(str(i), i), '', j) for i, j    in col]
+                if len(col) and len(col[0]) == 2 else
                 [(i, cnv.get(str(j), j), k)  for i, j, k in col]
             )
+
+        return tuple(
+            (
+                [(cnv.get(str(i), i), '', j) for i, j    in col]
+                if len(col) and len(col[0]) == 2 else
+                [(i, cnv.get(str(j), j), k)  for i, j, k in col]
+            )
+            for col in xvals
+        )
 
     def __set_tags(self, frame):
         def _tag(name):
