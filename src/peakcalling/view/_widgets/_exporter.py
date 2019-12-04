@@ -78,7 +78,7 @@ class CSVExporter:
                 i.getfigure().tools = i.getfigure().tools + [figure.tools[-1]]
 
         def _cb(attr, old, new):
-            if new != "":
+            if new == " " and div.text == ' ':
                 div.text = ""
                 asyncio.create_task(cls._run(dlg, mainview, ctrl, doc))
 

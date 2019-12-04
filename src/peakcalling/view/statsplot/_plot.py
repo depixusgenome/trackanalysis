@@ -57,7 +57,7 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
             yield (self._fig, dict(visible = False))
             return
 
-        self.compute()
+        self.compute(False)
         xaxis, yaxis, info = self._select()
         if self._iswrongaxis(xaxis):
             yield (self._fig, dict(visible = False))
@@ -175,7 +175,7 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
         pass
 
     @abstractmethod
-    def compute(self):
+    def compute(self, doall: bool):
         "compute base dataframes"
 
     def __reset_yrange(self, stats: pd.DataFrame, points: pd.DataFrame):
@@ -306,13 +306,17 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
                 dframe['x'] = np.full(len(dframe['x']), np.NaN, dtype = 'f4')
 
         factors = list(stats['x'])
+        width   = (
+            self._model.theme.binnedz.width if ('binnedz' in xaxis) else
+            self._model.theme.binnedbp.width
+        )
         yield (
             self._fig.x_range,
             self._plottheme.newbounds(
                 self._fig.x_range,
                 np.concatenate([
-                    stats['x'] - self._model.theme.median.width*.5,
-                    stats['x'] + self._model.theme.median.width*.5
+                    stats['x'] - width*.5,
+                    stats['x'] + width*.5
                 ]),
                 True
             )
@@ -333,10 +337,6 @@ class _WhiskerBoxPlot(BasePlotter[FoVStatsPlot]):
                 )
             )
 
-        width = (
-            self._model.theme.binnedz.width if xaxis[0] == 'binnedz' else
-            self._model.theme.binnedbp.width
-        )
         for rend in self._fig.renderers:
             if hasattr(rend.glyph, 'width') and rend.glyph.name:
                 mdl = getattr(self._model.theme, rend.glyph.name)

@@ -26,7 +26,7 @@ class _PeaksPlot(_WhiskerBoxPlot):
             yaxis = 'hybridisationrate'
         return self._find_df(xaxis, yaxis)
 
-    def compute(self):
+    def compute(self, _: bool):
         "compute base dataframes"
         cols: List[str] = list({
             i.key for i in COLS if i.raw and not i.fit and i.key != 'nblockages'

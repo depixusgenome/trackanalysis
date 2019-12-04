@@ -144,9 +144,10 @@ class BeadsScatterPlot(ThreadedDisplay[BeadsScatterPlotModel]):
             y_range = Range1d()
         )
 
-        hover           = fig.select(HoverTool)[0]
-        hover.tooltips  = self._model.theme.tooltipcolumns
-        hover.renderers = [
+        hover            = fig.select(HoverTool)[0]
+        hover.tooltips   = self._model.theme.tooltipcolumns
+        hover.toggleable = False
+        hover.renderers  = [
             self.attrs(self._model.theme.blockages).addto(fig, source = self._expdata)
         ]
         self.attrs(self._model.theme.events).addto(fig, source = self._expdata)

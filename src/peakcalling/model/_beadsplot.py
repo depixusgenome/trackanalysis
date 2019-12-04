@@ -51,6 +51,7 @@ class BeadsPlotTheme(PlotTheme):
         vmin -= rng if vmin != 0.   else 5e-5
         vmax += rng if vmax != 100. else 5e-5
 
+        rng = max(5e-5, (vmax-vmin))
         info = dict(
             max_interval = rng*(1.+self.boundsovershoot),
             min_interval = rng*self.overshoot,

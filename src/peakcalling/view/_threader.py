@@ -57,7 +57,7 @@ class BasePlotter(Generic[Parent]):
     def selectbest(hpin: Set[str], orientation: Set[str], info: pd.DataFrame) -> pd.DataFrame:
         "select the best hairpin for a given bead"
         info = info.nsmallest(1, "cost")
-        if len(hpin) > 1 and info.hpin.values[0] in hpin:
+        if len(hpin) >= 1 and info.hpin.values[0] in hpin:
             return info.iloc[:0]
 
         for i in orientation:

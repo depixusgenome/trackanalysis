@@ -20,7 +20,7 @@ class _BeadStatusPlot(_WhiskerBoxPlot):
         xaxis = [i for i in self._model.theme.xaxis if i in self._XAXIS]
         return self._find_df(xaxis, self._YAXIS)
 
-    def compute(self):
+    def compute(self, _: bool):
         "compute base dataframes"
         out: List[pd.DataFrame] = [self._bead] if hasattr(self, '_bead') else []
 
@@ -29,7 +29,7 @@ class _BeadStatusPlot(_WhiskerBoxPlot):
             data = pd.DataFrame({
                 'track': [trackname(proc.model[0])],
                 self._NAME: (
-                    info.errkey() if isinstance(info, Exception) else
+                    info.errkey() if hasattr(info, 'errkey') else
                     'bug'         if not isinstance(info, pd.DataFrame) else
                     'ok'          if info.shape[0] else
                     'empty'
