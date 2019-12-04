@@ -5,6 +5,7 @@ from   dataclasses                  import dataclass
 from   typing                       import (
     List, Tuple, Optional, Callable, Union, Dict, Any, cast
 )
+import os
 import warnings
 
 import numpy                        as     np
@@ -19,6 +20,45 @@ from   ._core                       import (  # pylint: disable=import-error
     reducesignals, phasebaseline, dztotalcount,
     AberrantValuesRule, HFSigmaRule, ExtentRule
 )
+
+IS_TEAMCITY = 'TEAMCITY_PROJECT_NAME' in os.environ
+if IS_TEAMCITY:
+    # The code below is for debugging purposes only.
+    # bug occurs sporadically: nonsensical input data in
+    # function FixedBeadDetection.dataframe._append
+    # (e.g. when runnning the unittest test_scripting.test_tracksdict_cleaning_dataframe)
+
+    # pylint: disable=import-outside-toplevel
+    import sys
+    import traceback
+
+    def _full_stack():
+        "print full stack trace (from https://stackoverflow.com/a/47247159/10979234)"
+        exc = sys.exc_info()[0]
+        stack = traceback.extract_stack()[:-1]  # last one would be _full_stack()
+        if exc is not None:  # i.e. an exception is present
+            # remove call of _full_stack, the printed exception
+            # will contain the caught exception caller instead
+            del stack[-1]
+        trc = 'Traceback (most recent call last):\n'
+        stackstr = trc + ''.join(traceback.format_list(stack))
+        if exc is not None:
+            # pylint: disable=bad-str-strip-call
+            stackstr += '  ' + traceback.format_exc().lstrip(trc)
+        return stackstr
+
+    def _log_error(vals, good, track):
+        from pathlib import Path
+        from pickle import dump
+        from time import strftime, localtime
+        home = Path.home()
+        now = strftime("%Y_%m_%d_%H_%M_%S", localtime())
+        np.save(home / ('vals_raw_failed_' + now + '.npy'), vals)
+        np.save(home / ('vals_good_failed_' + now + '.npy'), good)
+        with open(home / ('track_' + now + '.pk'), 'wb') as picklefile:
+            dump(track, picklefile)
+        with open(home / ('trace_' + now + '.log'), 'w') as logfile:
+            logfile.write(_full_stack())
 
 class SubtractAverageSignal:
     """
@@ -270,12 +310,15 @@ class FixedBeadDetection(
                 itms[0].append(np.mean(good))
                 try:
                     itms[1].append(np.std(good))
-                except FloatingPointError:
+                except FloatingPointError as fperr:
                     itms[1].append(np.NaN)
+                    if IS_TEAMCITY:
+                        _log_error(vals=vals, good=good, track=beads.track)
+                        raise fperr
                 itms[2].append(np.percentile(good, self.threshold))
 
         with warnings.catch_warnings():
-            warnings.filterwarnings('ignore',
+            warnings.filterwarnings(action   = 'ignore',
                                     category = RuntimeWarning,
                                     message  = '.*slice.*')
             for _, data in beads:
