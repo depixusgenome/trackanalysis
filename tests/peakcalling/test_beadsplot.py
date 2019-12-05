@@ -170,6 +170,7 @@ def test_beadsplot_info_filter(diskcaching):
 def test_beadsplot_view(pkviewserver):
     "test the view"
     server, fig = pkviewserver()
+    server.wait()
 
     assert fig.x_range.factors == list(zip(
         repeat('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec'),
@@ -203,6 +204,7 @@ def test_beadsplot_view(pkviewserver):
         ),
         rendered = True
     )
+    server.wait()
 
     assert fig.x_range.factors == [
         (j, i, k)
