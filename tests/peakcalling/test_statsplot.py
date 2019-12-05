@@ -665,7 +665,10 @@ def test_statsplot_view_hpins6(fovstatshairpin):
                 f"arguments[0].removeAttribute('checked')",
                 modal[f"//input[@name='hairpinsel[{i}]']"]
             )
-    server.wait()
+    for i in range(5):
+        if fig.yaxis[0].axis_label == "missing (% bindings)":
+            break
+        server.wait()
     _check_validity(fig, "missing (% bindings)")
     assert fig.x_range.factors == list(zip(['GF1', 'GF4'], repeat(""), repeat("")))
 
@@ -674,6 +677,10 @@ def test_statsplot_view_hpins6(fovstatshairpin):
         modal.select("//select[@name='xinfo[1].name']", "xxx")
         modal.select("//select[@name='yaxis']", "fnperbp")
 
+    for i in range(5):
+        if fig.yaxis[0].axis_label == "missing (pb-1)":
+            break
+        server.wait()
     _check_validity(fig, 'missing (bp⁻¹)')
     assert fig.x_range.factors == list(zip(['+', '\u2063-'], repeat(""), repeat("")))
 
