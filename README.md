@@ -24,7 +24,7 @@ Obtaining the code is done through git
 ```shell
 # copy the directory to your computer: needed only once
 git clone https:://gitlab.picoseq.org/analysis/trackanalysis.git
-cd daqclient
+cd trackanalysis
 
 # get the latest code
 git pull
