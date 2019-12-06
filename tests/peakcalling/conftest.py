@@ -63,6 +63,7 @@ def _server(bokehaction, cache_dir, request):
             )
         ) else 'FoVStatsPlot'
         EVT     = _EVT
+        CDIR    = cache_dir
 
         def __call__(self, viewname: str = "", evt: Union[str, bool] = _EVT):
             if not viewname:
@@ -88,8 +89,8 @@ def _server(bokehaction, cache_dir, request):
                 runtime = 'selenium'
             )
 
-            if cache_dir:   # pylint: disable=using-constant-test
-                server.ctrl.theme.update("peakcalling.diskcache", path = str(cache_dir))
+            if self.CDIR:   # pylint: disable=using-constant-test
+                server.ctrl.theme.update("peakcalling.diskcache", path = str(self.CDIR))
 
             for i in ('beads', 'stats'):
                 if f'peakcalling.view.{i}' in server.ctrl.theme:
