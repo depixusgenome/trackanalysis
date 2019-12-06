@@ -18,7 +18,7 @@ from taskmodel.dataframe    import DataFrameTask
 from taskmodel.processors   import TaskCacheList
 from utils.logconfig        import getLogger
 
-LOGS  = getLogger(__name__)
+LOGS  = getLogger(__name__.replace("_", ""))
 STORE = Dict[int, Union[Exception, pd.DataFrame]]
 
 class JobConfig:
@@ -110,6 +110,7 @@ class _JobEventEmitter(JobEventNames):
     def __enter__(self):
         "emits a *job starting* event"
         if self.ctrl:
+            LOGS.debug("Starting job %d", self.idval)
             self.ctrl.display.handle(
                 self.eventjobstart,
                 self.ctrl.emitpolicy.outasdict,
@@ -123,7 +124,11 @@ class _JobEventEmitter(JobEventNames):
         if hasattr(self, '_evt'):
             out = self._evt.__exit__()
             del self._evt
+            if extype is _JobCanceled:
+                LOGS.debug("Cancelled job %d", self.idval)
+
             if extype is not _JobCanceled:
+                LOGS.debug("Done job %d", self.idval)
                 self.ctrl.display.handle(
                     self.eventjobstop,
                     self.ctrl.emitpolicy.outasdict,
@@ -227,6 +232,7 @@ class _JobRunner(JobModel):
         nprocs: List[int] = [ncpu]
 
         def _evtfcn(procs: TaskCacheList, beads: List[int]):
+            LOGS.debug("-> Processed track %d, beads %s", processors.index(procs), beads)
             try:
                 events(dict(idval = idcall, taskcache = procs, beads = beads))
             except Exception as exc:  # pylint: disable=broad-except
@@ -240,6 +246,7 @@ class _JobRunner(JobModel):
         ]
 
         async def _watchjob(procs: TaskCacheList, keys: Set[int]):
+            LOGS.debug("Processing track %d, beads %s", processors.index(procs), keys)
             try:
                 async for beads in self.__startjob(procs, keys, idcall):
                     _evtfcn(procs, beads)

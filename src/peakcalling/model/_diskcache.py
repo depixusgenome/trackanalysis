@@ -11,14 +11,18 @@ from diskcache            import Cache as DiskCache
 import version as _version
 from taskmodel.processors import TaskCacheList
 from taskmodel.dataframe  import DataFrameTask
+from utils.logconfig      import getLogger
 from ._jobs               import JobEventNames
 from ._tasks              import keytobytes, keyfrombytes
+
+LOGS  = getLogger(__name__.replace("_", ""))
 
 # database version
 # WARNING: changing this number will have cycleapp delete the current database
 # One should setup a database updater for each version
 VERSION     = 1
 VERSION_KEY = b"VERSION"
+CACHE_NAME  = "statistics disk cache"
 
 def appversion() -> int:
     "app version"
@@ -71,8 +75,16 @@ class DiskCacheConfig:
 
         with self.newcache(cache) as disk:
             if disk.get(VERSION_KEY) != VERSION:
+                LOGS.info(
+                    "%s version is incorrect (%s when expecting %d) at %s",
+                    CACHE_NAME,
+                    disk.get(VERSION_KEY),
+                    VERSION,
+                    self.path
+                )
                 return
 
+            LOGS.debug("Inserting new %s entries at %s", CACHE_NAME, self.path)
             for itm in (items,) if isinstance(items, TaskCacheList) else items:
                 key   = keytobytes(itm.model)
                 cur   = disk.get(key, tag = True)
@@ -81,6 +93,9 @@ class DiskCacheConfig:
                     data  = itm.data.getcache(DataFrameTask)()
                     disk.set(key, data, tag = version, expire = self.duration)
 
+                LOGS.debug(
+                    "Inserting new entry %s at %s (%s)", itm.model[0].path, self.path, key
+                )
                 disk.set(
                     PREFIX+key,
                     f"""
@@ -165,6 +180,7 @@ class DiskCacheConfig:
                 return
 
             for itm in (items,) if isinstance(items, TaskCacheList) else items:
+                LOGS.debug("Updating %s entry at %s", itm.model[0].path, self.path)
                 data = itm.data.getcache(DataFrameTask)()
                 cur  = self.get(itm, version, disk) if isinstance(data, dict) else None
                 if isinstance(cur, dict):
@@ -188,6 +204,10 @@ class DiskCacheConfig:
                 if not complete:
                     for i in processors:
                         key = keytobytes(i)
+
+                        LOGS.debug(
+                            "Discarding %s entry at %s (%s)", i.model[0].path, self.path, key
+                        )
                         try:
                             del cache[key]
                             del cache[PREFIX+key]
@@ -198,9 +218,11 @@ class DiskCacheConfig:
                     cache.cull()
 
         if complete:
+            LOGS.info("Removing the %s at %s", CACHE_NAME, self.path)
             rmtree(self.path, ignore_errors = True)
 
         if self.maxsize > 0 and not Path(self.path).exists():
+            LOGS.info("Creating a new %s at %s", CACHE_NAME, self.path)
             with self.newcache() as cache:
                 cache.set(VERSION_KEY, VERSION)
 

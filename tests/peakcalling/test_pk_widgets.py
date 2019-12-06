@@ -1,28 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "test peakcalling views widgets"
-import os
-import pytest
 from tests.testutils   import integrationmark
 from tests.testingcore import path as utpath
 from sequences         import read as _read
 from peakcalling.processor import FitToHairpinTask
 
-_SKIP = os.environ.get("TEAMCITY_PROJECT_NAME", None) is not None
 
-
-@pytest.mark.skipif(_SKIP, reason = "not working in pytest batch mode")
 @integrationmark
 def test_diskcache_view(pkviewserver):
     "test the view"
+    # reconstructing a new disk cache because selenium can't deal with too big an html file ?
+    pkviewserver.CDIR = str(pkviewserver.CDIR)+"_new"
     server, fig = pkviewserver(evt = pkviewserver.EVT)
     size        = len(fig.renderers[0].data_source.data['boxheight'])
 
+    # pylint: disable=protected-access
+    cnf = server.view.views[0]._mainview._widgets[0].cache._model.diskcache
+    assert cnf.path == server.ctrl.theme.model('peakcalling.diskcache').path
+
     with server.ctrl.theme.model('peakcalling.diskcache').newcache() as cache:
         for _ in range(5):
-            if any(i.startswith(b'data_') for i in cache.iterkeys()) > 1:
+            if any(i.startswith(b'data_') for i in cache.iterkeys()):
                 break
             server.wait()
+        assert any(i.startswith(b'data_') for i in cache.iterkeys())
 
     modal       = server.selenium.modal("//span[@class='icon-dpx-download2']", True)
     with modal:

@@ -5,7 +5,8 @@ import sys
 from   pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 # pylint: disable=wrong-import-position
-from app.cmdline import defaultclick, defaultmain, defaultinit, click, INITIAL_ORDERS
+from app.cmdline        import defaultclick, defaultmain, defaultinit, click, INITIAL_ORDERS
+from utils.logconfig    import addloggers
 
 def _filtr(app, viewcls):
     if 'app.' not in app:
@@ -40,7 +41,9 @@ def _files(directory, files, bead):
             ctrl.display.update("tasks", bead = bead)
         INITIAL_ORDERS.append(_setbead)
 
+
 DEFAULT_VIEW = "hybridstat.view.HybridStatView"
+
 
 @defaultclick("TrackAnalysis", defaultview = DEFAULT_VIEW)
 @click.option('-b', "--bead",
@@ -53,8 +56,10 @@ DEFAULT_VIEW = "hybridstat.view.HybridStatView"
               help       = 'track path, gr path and match')
 @click.argument('files', nargs = -1, type = click.Path())
 def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
-         gui, config, wall, port, raiseerr, nothreading):
+         gui, config, wall, port, log, raiseerr, nothreading):
     "Launches an view"
+    if log:
+        addloggers(log)
     if any(view.endswith(i) for i in (".trk", ".ana", ".xlsx", ".pk")) or "/" in view:
         files = (view,)+files
         view  = DEFAULT_VIEW
@@ -62,6 +67,7 @@ def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
     defaultinit(config, wall, raiseerr, nothreading)
     _files(tracks, files, bead)
     return defaultmain(_filtr, view, gui, port, "taskapp.toolbar")
+
 
 if __name__ == '__main__':
     main()   # pylint: disable=no-value-for-parameter

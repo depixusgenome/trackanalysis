@@ -51,6 +51,8 @@ def pytest_collection_modifyitems(items, config):
     _modifyitems(items, config)
 
 def pytest_addoption(parser):
+    parser.addoption("--dpx-log", action="store", default="",
+                     help='specify module log levels as "mod.submod:level;mod2:level2')
     parser.addoption("--randomize", action="store_true", default=False,
                      help="Randomize the order of the tests within each test-type.")
     parser.addoption("--seed", action="store", default=None,
@@ -58,6 +60,10 @@ def pytest_addoption(parser):
     _adoption(parser)
 
 def pytest_configure(config):
+    if config.getoption("--dpx-log"):
+        from utils.logconfig import addloggers
+        addloggers(config.getoption("--dpx-log"))
+
     if config.getoption("--randomize"):
         if config.getoption("--seed") is not None:
             if not config.getoption("--randomize"):
