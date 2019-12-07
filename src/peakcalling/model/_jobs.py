@@ -110,7 +110,7 @@ class _JobEventEmitter(JobEventNames):
     def __enter__(self):
         "emits a *job starting* event"
         if self.ctrl:
-            LOGS.debug("Starting job %d", self.idval)
+            LOGS.debug("Starting job %s", self.idval)
             self.ctrl.display.handle(
                 self.eventjobstart,
                 self.ctrl.emitpolicy.outasdict,
@@ -125,10 +125,10 @@ class _JobEventEmitter(JobEventNames):
             out = self._evt.__exit__()
             del self._evt
             if extype is _JobCanceled:
-                LOGS.debug("Cancelled job %d", self.idval)
+                LOGS.debug("Cancelled job %s", self.idval)
 
             if extype is not _JobCanceled:
-                LOGS.debug("Done job %d", self.idval)
+                LOGS.debug("Done job %s", self.idval)
                 self.ctrl.display.handle(
                     self.eventjobstop,
                     self.ctrl.emitpolicy.outasdict,
@@ -169,12 +169,17 @@ class _JobRunner(JobModel):
 
             asyncio.create_task(_run())
         else:
-            LOGS.info("Starting SYNCH jobs")
-            with emitter:
-                self.syncrun(processors)
-                if idval != self.display.calls:
-                    raise _JobCanceled()
-            LOGS.info("SYNCH jobs done")
+
+            async def _runsynch():
+                LOGS.info("Starting SYNCH jobs")
+                with emitter(idval):
+                    if idval == self.display.calls:
+                        self.syncrun(processors)
+                    if idval != self.display.calls:
+                        raise _JobCanceled()
+                LOGS.info("SYNCH jobs done")
+
+            asyncio.create_task(_runsynch())
 
     def syncrun(self, processors: List[TaskCacheList]):
         """

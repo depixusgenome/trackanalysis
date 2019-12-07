@@ -9,18 +9,22 @@ from   typing    import Dict, List, Iterator, Tuple, Union, Set, Optional, cast
 import pandas as pd
 import numpy  as np
 
-from   bokeh          import layouts
-from   bokeh.models   import ColumnDataSource, FactorRange, HoverTool, Range1d
-from   bokeh.plotting import figure, Figure
+from   bokeh           import layouts
+from   bokeh.models    import ColumnDataSource, FactorRange, HoverTool, Range1d
+from   bokeh.plotting  import figure, Figure
 
-from   view.colors   import tohex
-from   view.threaded import ThreadedDisplay
-from   taskmodel     import RootTask
-from   ..model       import (
+from   view.colors     import tohex
+from   view.threaded   import ThreadedDisplay
+from   taskmodel       import RootTask
+from   utils.logconfig import getLogger
+from   ..model         import (
     BeadsScatterPlotModel, Processors, COLS, BeadsPlotTheme, Slice
 )
-from   ._threader    import BasePlotter, PlotThreader
-from   ._widgets     import JobsStatusBar, JobsHairpinSelect, BeadsPlotSelector
+from   ._threader import BasePlotter, PlotThreader
+from   ._widgets  import JobsStatusBar, JobsHairpinSelect, BeadsPlotSelector
+
+LOGS = getLogger(__name__)
+
 
 class BeadsScatterPlotWarning(RuntimeWarning):
     "used to warn the user"
@@ -254,11 +258,13 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
         "resets the data"
         data, status = self.__compute_expdata()
         if status:
+            LOGS.debug("Resetting to defaults")
             exp     = self._defaultdata
             factors = list(exp['x'])
             theo    = {i: j[:0] for i, j in self._theodata.data.items()}
             yield BeadsScatterPlotWarning("No beads available for this plot!"), ""
         else:
+            LOGS.debug("Resetting")
             factors = self._xfactors(data)
             theo    = self._from_df(self._compute_theodata(data))
             exp     = self._from_df(self.__set_tags(data))
@@ -281,6 +287,7 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
         if status:
             return
 
+        LOGS.debug("Updating")
         factors = self._xfactors(data)
         theo    = self._from_df(self._compute_theodata(data))
         exp     = self._from_df(self.__set_tags(data))

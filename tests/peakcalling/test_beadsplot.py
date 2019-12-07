@@ -169,17 +169,22 @@ def test_beadsplot_info_filter(diskcaching):
 @integrationmark
 def test_beadsplot_view(pkviewserver):
     "test the view"
+    from utils.logconfig import addloggers
+    addloggers(','.join("peakcalling.model."+i for i in ('jobs', 'tasks', 'diskcache')))
+    addloggers("view.threaded")
     server, fig = pkviewserver()
     server.wait()
 
-    assert fig.x_range.factors == list(zip(
-        repeat('0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec'),
-        repeat(''),
-        [
-            '0', '1', '2', '3', '4', '7', '8', '12', '13', '14', '17', '18', '23',
-            '24', '25', '27', '33', '34', '35', '37'
-        ]
-    ))
+    assert set(i[0] for i in fig.x_range.factors) == {
+        '0-test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec'
+    }
+    assert set(i[1] for i in fig.x_range.factors) == {''}
+
+    itms = {
+        '0', '1', '2', '3', '4', '7', '8', '12', '13', '14', '17', '18', '23',
+        '24', '25', '27', '33', '34', '35', '37'
+    }
+    assert set(i[2] for i in fig.x_range.factors) & itms == itms
 
     server.addhp()
 
@@ -216,3 +221,15 @@ def test_beadsplot_view(pkviewserver):
             ]
         )
     ]
+
+
+if __name__ == '__main__':
+    from pathlib import Path
+    from importlib import import_module
+    from tests.testingcore.bokehtesting import BokehAction
+    with BokehAction(None) as bka:
+        test_beadsplot_view(
+            getattr(
+                import_module("tests.peakcalling.conftest"), '_server'
+            )(bka, Path("/tmp/disk_dir"), "beadsplot")
+        )

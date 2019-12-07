@@ -4,14 +4,19 @@
 import asyncio
 from typing      import Iterator, TYPE_CHECKING, cast
 
-from taskmodel   import RootTask
-from ._jobs      import JobModel, JobEventNames
-from ._tasks     import TasksModel, Processors
-from ._diskcache import DiskCacheController, DiskCache
+from taskmodel       import RootTask
+from utils.logconfig import getLogger
+from ._jobs          import JobModel, JobEventNames
+from ._tasks         import TasksModel, Processors
+from ._diskcache     import DiskCacheController, DiskCache
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
     from taskapp.maincontrol  import SuperController  # noqa
+
+
+LOGS = getLogger(__name__)
+
 
 class TasksModelController(JobEventNames):
     """
@@ -62,21 +67,29 @@ class TasksModelController(JobEventNames):
         @ctrl.display.observe(self._jobs.display)
         @ctrl.display.hashwith(self._jobs.display)
         def _onchange(old, _evts_ = frozenset(('calls', 'active')), **_):
-            if _evts_.intersection(old) and self._jobs.display.needsrefresh:
+            if not _evts_.intersection(old):
+                return
 
-                async def _launch(_id_ = self._jobs.display.calls):
-                    if _id_ != self._jobs.display.calls:
-                        return
+            if not self._jobs.display.needsrefresh:
+                LOGS.debug("no refresh needed")
+                return
 
-                    self._jobs.launch(
-                        list(self._tasks.processors.values()),
-                        self,
-                        roots   = list(self.roots),
-                        missing = self._tasks.missingprocessors
-                    )
-                # launch after the current task is done: this makes sure
-                # all updates are done
-                asyncio.create_task(_launch())
+            async def _launch(_id_ = self._jobs.display.calls):
+                if _id_ != self._jobs.display.calls:
+                    return
+
+                LOGS.debug("launching")
+                self._jobs.launch(
+                    list(self._tasks.processors.values()),
+                    self,
+                    roots   = list(self.roots),
+                    missing = self._tasks.missingprocessors
+                )
+
+            LOGS.debug("refresh needed")
+            # launch after the current task is done: this makes sure
+            # all updates are done
+            asyncio.create_task(_launch())
 
         @ctrl.display.observe(self.eventjobstart)
         @ctrl.display.hashwith(self._jobs.display)
