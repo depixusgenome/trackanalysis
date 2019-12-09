@@ -96,8 +96,8 @@ def _server(bokehaction, cache_dir, request):
                 if f'peakcalling.view.{i}' in server.ctrl.theme:
                     server.ctrl.theme.model(f'peakcalling.view.{i}').tracknames = "full"
 
-            server.ctrl.theme.model("peakcalling.precomputations").multiprocess = (
-                'TEAMCITY_PROJECT_NAME' not in os.environ
+            server.ctrl.theme.model("peakcalling.precomputations").ncpu = (
+                4 if 'TEAMCITY_PROJECT_NAME' not in os.environ else 1
             )
 
             fig = getattr(getattr(server.view.views[0], '_mainview'), '_fig')

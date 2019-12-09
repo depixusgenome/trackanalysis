@@ -161,25 +161,30 @@ class _JobRunner(JobModel):
         if self.config.multiprocess:
 
             async def _run():
+                if idval != self.display.calls:
+                    return
+
                 with emitter(idval) as emitup:
-                    await self.run(processors,  emitup, idval)
+                    if self.config.ncpu > 1:
+                        await self.run(processors,  emitup, idval)
+                    else:
+                        self.syncrun(processors)
+
                     if idval != self.display.calls:
                         raise _JobCanceled()
-                    await asyncio.sleep(self.config.stoptime)
+
+                    if self.config.ncpu > 1:
+                        await asyncio.sleep(self.config.stoptime)
 
             asyncio.create_task(_run())
-        else:
+            return
 
-            async def _runsynch():
-                LOGS.info("Starting SYNCH jobs")
-                with emitter(idval):
-                    if idval == self.display.calls:
-                        self.syncrun(processors)
-                    if idval != self.display.calls:
-                        raise _JobCanceled()
-                LOGS.info("SYNCH jobs done")
-
-            asyncio.create_task(_runsynch())
+        LOGS.info("Starting SYNCH jobs")
+        with emitter(idval):
+            self.syncrun(processors)
+            if idval != self.display.calls:
+                raise _JobCanceled()
+        LOGS.info("SYNCH jobs done")
 
     def syncrun(self, processors: List[TaskCacheList]):
         """
