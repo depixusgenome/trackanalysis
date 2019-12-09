@@ -5,6 +5,7 @@ from datetime                   import datetime
 from pathlib                    import Path
 from typing                     import Tuple, Optional, Type, ClassVar, cast
 
+from bokeh.io                   import curdoc
 from cleaning.processor         import FixedBeadDetectionTask, BeadSubtractionTask
 from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
 from eventdetection.view        import ALIGN_LABELS
@@ -111,6 +112,13 @@ class StorageExplorer(ModalDialogButton[StorageExplorerConfig, StorageExplorerMo
     def __init__(self):
         super().__init__()
         self._model = TasksModelController()
+
+    def runifnothingloaded(self, ctrl, doc):
+        "run if no processors are available"
+        if len(self._model.tasks.processors) == 0:
+            if doc is None:
+                doc = curdoc()
+            self.run(ctrl, doc)
 
     def _body(self, current: StorageExplorerModel) -> str:
         unkn    = f'<div {self.__STYLE}>?</div>'

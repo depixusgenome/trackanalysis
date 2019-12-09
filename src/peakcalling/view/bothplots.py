@@ -8,7 +8,6 @@ from bokeh           import layouts
 from view.base       import BokehView, stretchout
 from view.threaded   import DisplayState
 from utils.logconfig import getLogger
-from modaldialog     import dialogisrunning
 from ..model         import BasePlotConfig, BeadsScatterPlotStatus, JobDisplay
 from .beadsplot      import BeadsScatterPlot
 from .statsplot      import FoVStatsPlot, FoVStatsLinearPlot
@@ -64,6 +63,7 @@ class FoVPeakCallingView(BokehView):
         for i in self._items:
             if hasattr(i, 'swapmodels'):
                 i.swapmodels(ctrl)
+        ctrl.display.update(JobDisplay().name, active = False)
 
     def activate(self, val):
         "activates the component: resets can occur"
@@ -71,6 +71,7 @@ class FoVPeakCallingView(BokehView):
         self.state = DisplayState.active if val else DisplayState.disabled
         if val and (old is DisplayState.outofdate) and hasattr(self, '_ctrl'):
             self.reset(self._ctrl)
+
         if hasattr(self, '_ctrl'):
             self._ctrl.display.update(JobDisplay().name, active = bool(val))
 
@@ -103,22 +104,14 @@ class FoVPeakCallingView(BokehView):
                 partial(_onplotmenu, frozenset(cls().__dict__), tpe)
             )
 
+        @ctrl.display.observe(JobDisplay().name)
+        def _onjobactive(model, old, **_):
+            if model.active and 'active' in old:
+                self._items[3].cache.runifnothingloaded(ctrl, None)
+
     def isactive(self, *_1, **_2) -> bool:
         "whether the state is set to active"
         return self.state == DisplayState.active
-
-    def addtodoc_oneshot(self, ctrl, doc):
-        "when to display this tab"
-
-        @ctrl.display.observe
-        def _onscriptsdone(calllater, **_):
-
-            @calllater.append
-            def _call():
-                if not dialogisrunning(doc):
-                    self._items[3].cache.run(ctrl, doc)
-
-        return ("tasks", "opentrack")
 
     def addtodoc(self, ctrl, doc):
         "sets the plot up"
