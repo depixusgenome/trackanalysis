@@ -206,7 +206,7 @@ class DiskCacheConfig:
                         key = keytobytes(i)
 
                         LOGS.debug(
-                            "Discarding %s entry at %s (%s)", i.model[0].path, self.path, key
+                            "Discarding %s entry at %s (%s)", i[0].path, self.path, key
                         )
                         try:
                             del cache[key]

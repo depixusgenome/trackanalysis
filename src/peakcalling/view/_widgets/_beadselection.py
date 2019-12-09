@@ -36,7 +36,7 @@ class BeadSelector(Generic[Config]):
         return []
 
     def _update(self, ctrl, args):
-        if None in args or len(args) != 2:
+        if args is None or None in args or len(args) != 2:
             return
 
         root, bead = args
