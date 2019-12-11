@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "IO for peaksplot"
-from typing                               import Optional, Tuple, Union, List
+from typing                               import Optional, List
 from pathlib                              import Path
 from copy                                 import deepcopy
 from concurrent.futures                   import ProcessPoolExecutor, ThreadPoolExecutor
@@ -14,9 +14,7 @@ from peakcalling.processor.fittoreference import (
     FitToReferenceTask, FitToReferenceDict, TaskViewProcessor
 )
 from taskcontrol.taskcontrol              import create as _createdata
-from taskcontrol.taskio                   import (
-    ConfigTrackIO, ConfigGrFilesIO, ConfigMuWellsFilesIO, TaskIO
-)
+from taskcontrol.taskio                   import TaskIO
 from utils.logconfig                      import getLogger
 from utils.gui                            import startfile
 from view.base                            import spawn, threadmethod
@@ -26,33 +24,6 @@ from ..reporting.processor                import HybridstatExcelTask
 from ._model                              import PeaksPlotModelAccess
 
 LOGS = getLogger(__name__)
-
-class _PeaksIOMixin:
-    def __init__(self, ctrl):
-        type(self).__bases__[1].__init__(self, ctrl)  # type: ignore
-        self.__ctrl = ctrl
-
-    def open(self, path:Union[str, Tuple[str,...]], model:tuple):
-        "opens a track file and adds a alignment"
-        # pylint: disable=no-member
-        items = type(self).__bases__[1].open(self, path, model)  # type: ignore
-
-        if items is not None:
-            acc = PeaksPlotModelAccess()
-            acc.swapmodels(self.__ctrl)
-            task = acc.defaultidenfication
-            if task is not None:
-                items[0] += (task,)
-        return items
-
-class PeaksConfigTrackIO(_PeaksIOMixin, ConfigTrackIO):  # type: ignore
-    "selects the default tasks"
-
-class PeaksConfigMuWellsFilesIO(_PeaksIOMixin, ConfigMuWellsFilesIO):  # type: ignore
-    "selects the default tasks"
-
-class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO):  # type: ignore
-    "selects the default tasks"
 
 class _SafeTask(FitToReferenceTask):
     "safe fit to ref"
@@ -229,9 +200,4 @@ def setupio(cls):
         cls.ismain   = ismain       # type: ignore
         return cls
 
-    name = lambda i: __name__ + '.'+i  # noqa
-    return dict(ioopen = (slice(None, -2),
-                          name('PeaksConfigGRFilesIO'),
-                          name('PeaksConfigMuWellsFilesIO'),
-                          name('PeaksConfigTrackIO')),
-                iosave = (..., name('ConfigXlsxIO')))
+    return dict(iosave = (..., f'{__name__}.ConfigXlsxIO'))

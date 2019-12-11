@@ -502,7 +502,7 @@ class _HairpinPlot(_Plot):
         ):
             return pd.DataFrame({i: j[:0] for i, j in self._theodata.data.items()})
 
-        hpin: Dict[Tuple[int, str], np.ndarray] = {}
+        hpin: Dict[Tuple[str, int], np.ndarray] = {}
         ids:  Set[int]                          = set(expdata.trackid.unique())
         for proc in self._procs.values():
             iproc = id(proc.model[0])

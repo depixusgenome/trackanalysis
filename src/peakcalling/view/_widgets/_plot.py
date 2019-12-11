@@ -444,7 +444,7 @@ class PeakcallingPlotWidget(ModalDialogButton[PeakcallingPlotConfig, Peakcalling
 
     @staticmethod
     def _body_hairpins(current):
-        if len(current.hairpins) < 2:
+        if len(current.hairpins) < 1:
             return ""
 
         def _lab(name):

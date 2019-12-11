@@ -10,6 +10,7 @@ from peakcalling.tohairpin      import Distance
 from tasksequences.modelaccess  import SequencePlotModelAccess
 from tasksequences              import splitoligos
 from utils                      import NoArgs
+from utils.logconfig            import getLogger
 
 from .._peakinfo                import PeakInfoModelAccess
 from ._processors               import runbead
@@ -22,6 +23,9 @@ from ._taskaccess               import (
 
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from peakfinding.processor.__config__    import PeakSelectorTask
+
+LOGS = getLogger(__name__.replace('_', ''))
+
 
 # pylint: disable=too-many-instance-attributes
 class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
@@ -54,55 +58,16 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
 
         self.pool.observe(ctrl)
 
-        @ctrl.theme.observe(self._tasksconfig)
         @ctrl.display.observe(self._tasksdisplay)
+        @ctrl.theme.observe(self._tasksconfig)
         @ctrl.theme.hashwith(self._tasksdisplay)
         def _ontasks(old, **_):
-            if 'rescaling' not in old and "taskcache" not in old:
-                return
-
-            root  = self._tasksdisplay.roottask
-            if root is None:
-                return
-
-            model = self._tasksconfig
-            instr = self.instrument
-            coeff = float(model.rescaling[instr]) if instr in model.rescaling else 1.
-            if abs(coeff - self.peaksmodel.config.rescaling) < 1e-5:
-                return
-
-            cur    = coeff
-            coeff /= self.peaksmodel.config.rescaling
-            ctrl.theme.update(
-                self.peaksmodel.config,
-                rescaling         = cur,
-                estimatedstretch  = self.peaksmodel.config.estimatedstretch/coeff
-            )
-
-            self.identification.rescale(ctrl, self, coeff)
+            self._ontasks_rescale(ctrl, old)
 
         @ctrl.tasks.observe
         @ctrl.tasks.hashwith(self._tasksdisplay)
         def _onopeningtracks(controller, models, **_):
-            "tries to add a FitToHairpinTask if sequences & oligos are available"
-            if not self.sequences(...):
-                return
-
-            path = self.sequencepath
-            cls  = self.identification.tasktype
-            for isarchive, proc in models:
-                model = proc.model
-                if isarchive or not model or not getattr(model[0], 'path', None):
-                    continue
-
-                ols = splitoligos("kmer", path = model[0].path)
-                if not ols:
-                    continue
-                proc.add(
-                    cls(sequence = path, oligos = ols),
-                    controller.processortype(cls),
-                    index = self._tasksconfig.defaulttaskindex(proc.model, cls)
-                )
+            self._onopeningtracks_addfit(controller, models)
 
     def getfitparameters(self, key = NoArgs, bead = NoArgs) -> Tuple[float, float]:
         "return the stretch  & bias for the current bead"
@@ -230,3 +195,66 @@ class PeaksPlotModelAccess(SequencePlotModelAccess, DataCleaningModelAccess):
         maxv = np.finfo('f4').max
         dist = self.peaksmodel.display.distances
         return all(i[0] == maxv or not np.isfinite(i[0]) for i in dist.values())
+
+    def _onopeningtracks_addfit(self, controller, models):
+        "tries to add a FitToHairpinTask if sequences & oligos are available"
+        if not self.sequences(...):
+            LOGS.debug("No fits defined: none added")
+            return
+
+        path = self.sequencepath
+        cls  = self.identification.tasktype
+        for isarchive, proc in models:
+            model    = proc.model
+            rootpath = getattr(model[0], 'path', None) if model else None
+            if isarchive:
+                LOGS.debug("No automated fit for archive %s", rootpath)
+                continue
+
+            if not rootpath:
+                LOGS.debug("No path found for %s", model[0])
+                continue
+
+            task = self.identification.default(
+                self,
+                oligos       = splitoligos("kmer", path = rootpath) or None,
+                sequencepath = path,
+                constraints  = False
+            )
+            if task is None or not set(task.fit) - {None}:
+                LOGS.debug("No oligo in %s: no fit added", rootpath)
+                continue
+
+            LOGS.debug(
+                "Adding fit to %s:\n\toligos: %s\n\tsequence: %s",
+                rootpath, task.oligos, path
+            )
+            proc.add(
+                task,
+                controller.processortype(cls),
+                index = self._tasksconfig.defaulttaskindex(proc.model, cls)
+            )
+
+    def _ontasks_rescale(self, ctrl, old, **_):
+        if 'rescaling' not in old and "taskcache" not in old:
+            return
+
+        root  = self._tasksdisplay.roottask
+        if root is None:
+            return
+
+        model = self._tasksconfig
+        instr = self.instrument
+        coeff = float(model.rescaling[instr]) if instr in model.rescaling else 1.
+        if abs(coeff - self.peaksmodel.config.rescaling) < 1e-5:
+            return
+
+        cur    = coeff
+        coeff /= self.peaksmodel.config.rescaling
+        ctrl.theme.update(
+            self.peaksmodel.config,
+            rescaling         = cur,
+            estimatedstretch  = self.peaksmodel.config.estimatedstretch/coeff
+        )
+
+        self.identification.rescale(ctrl, self, coeff)
