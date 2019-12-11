@@ -149,6 +149,7 @@ class FitToHairpinTask(Task, zattributes = ('fit', 'constraints', 'singlestrand'
             self.match = {None: self.match}
         if ('sequences' in kwa or 'sequence' in kwa) and 'oligos' in kwa:
             self.__dict__.update(self.resolve(None).__dict__)
+        self._sorted()
 
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
@@ -164,7 +165,7 @@ class FitToHairpinTask(Task, zattributes = ('fit', 'constraints', 'singlestrand'
         ):
             return self
 
-        oligos = list(splitoligos(self.oligos, path = path))
+        oligos = splitoligos(self.oligos, path = path)
         if len(oligos) == 0 and self.oligos:
             return self
 
@@ -188,6 +189,8 @@ class FitToHairpinTask(Task, zattributes = ('fit', 'constraints', 'singlestrand'
                     right[i].peaks = left[i].peaks
             cpy.sequences = other.sequences
             cpy.oligos    = other.oligos
+
+        getattr(cpy, '_sorted')()
         return cpy
 
     @classmethod
@@ -239,6 +242,27 @@ class FitToHairpinTask(Task, zattributes = ('fit', 'constraints', 'singlestrand'
                 None
             )
         )
+
+    def _sorted(self):
+        "sort everything such that comparing tasks is more robust"
+        if isinstance(self.oligos, (tuple, set, frozenset, list)):
+            self.oligos = sorted(self.oligos) if self.oligos else None
+
+        def _sortdict(mdl):
+            if not isinstance(mdl, dict):
+                return mdl
+            return {
+                i: mdl[i]
+                for i in ([None, *sorted(set(mdl) - {None})] if None in mdl else sorted(mdl))
+            }
+
+        for itm in list(self.constraints.items()):
+            self.constraints[itm[0]] = DistanceConstraint(
+                itm[1].hairpin, _sortdict(itm[1].constraints)
+            )
+
+        for i in ('sequences', 'fit', 'match', 'constraints'):
+            setattr(self, i, _sortdict(getattr(self, i)))
 
 
 PeakEvents      = Iterable[PeakFindingOutput]

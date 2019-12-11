@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
-from   copy                     import deepcopy
-from   typing                   import (
+from copy     import deepcopy
+from pathlib  import Path
+from typing   import (
     Set, Optional, Dict, Tuple, Any, Sequence, ClassVar, Type,
     Iterator, cast
 )
@@ -31,7 +32,7 @@ from peakfinding.processor.__config__    import (PeakSelectorTask, SingleStrandT
                                                  BaselinePeakFilterTask)
 from peakcalling.processor.__config__    import FitToHairpinTask, FitToReferenceTask
 
-LOGS   = getLogger(__name__)
+LOGS   = getLogger(__name__.replace("_", ""))
 _DUMMY = type('_DummyDict', (),
               dict(get          = lambda *_: None,
                    __contains__ = lambda _: False,
@@ -429,33 +430,49 @@ class FitToHairpinAccess(TaskAccess, tasktype = FitToHairpinTask):
         attr = getattr(task, name)
         return attr if key is NoArgs else attr[key]
 
-    def default(self, mdl):
+    def default(self, mdl, oligos = None, sequencepath = None, constraints = True):
         "returns the default identification task"
-        ols = mdl.oligos
-        if ols is None or len(ols) == 0 or len(mdl.sequences(...)) == 0 or self.roottask is None:
+        ols  = mdl.oligos       if oligos       is None else oligos
+        path = mdl.sequencepath if sequencepath is None else sequencepath
+        if (
+                not ols
+                or (constraints and (self.roottask is None))
+                or not isinstance(path, (str, Path)) or not Path(path).exists()
+        ):
+            LOGS.debug(
+                "No default fit: oligos (%s), constraints (%s), path (%s)",
+                ols is None or len(ols) == 0,
+                (constraints and (self.roottask is None)),
+                path
+            )
             return None
 
         dist = self.__defaults.fit
         pid  = self.__defaults.match
-        cstr = self.__defaults.constraints
+        cstr = (
+            self.__defaults.constraints if constraints is True  else
+            None                        if constraints is False else
+            constraints
+        )
 
         try:
-            task = FitToHairpinTask.read(mdl.sequencepath, ols,  fit = dist, match = pid)
+            task = FitToHairpinTask.read(path, ols,  fit = dist, match = pid)
         except FileNotFoundError as exc:
             LOGS.warning("%s", exc)
             return None
 
-        if len(task.fit) == 0:
-            LOGS.warning("File not found or empty: %s", mdl.sequencepath)
+        if not set(task.fit) - {None}:
+            LOGS.warning("File not found or empty: %s", path)
             return None
 
-        try:
-            task = readconstraints(task, mdl.constraintspath, mdl.useparams, cstr)
-        except FileNotFoundError as exc:
-            LOGS.warning("%s", exc)
-            return None
+        if constraints is not False:
+            try:
+                task = readconstraints(task, mdl.constraintspath, mdl.useparams, cstr)
+            except FileNotFoundError as exc:
+                LOGS.warning("%s", exc)
+                return None
 
-        task.constraints.update(self.__store.constraints.get(self.roottask, {}))
+            task.constraints.update(self.__store.constraints.get(self.roottask, {}))
         return task
 
     def rescale(self, ctrl, mdl, value):

@@ -12,6 +12,14 @@ from utils                   import dataclass, field
 from .                       import (read as _readsequence, peaks as _sequencepeaks,
                                      splitoligos)
 
+def _writesequence(sequences):
+    path = mkstemp(".fasta", __name__.replace(".","_")+"_")[1]
+    with open(path, "w") as stream:
+        for i, j in sequences.items():
+            print(f"> {i}", file = stream)
+            print(j, file = stream)
+    return path
+
 @dataclass
 class SequenceConfig:
     "data for a DNA sequence"
@@ -21,6 +29,25 @@ class SequenceConfig:
     probes:    List[str]                       = field(default_factory = list)
     history:   List[Union[str, Sequence[str]]] = field(default_factory = list)
     maxlength: int                             = 10
+
+    def observe(self, ctrl):
+        "observe the controller"
+
+        @ctrl.display.observe
+        @ctrl.display.hashwith(id(self))
+        def _onapplicationstarted(**_):
+            "action to be performed on opening a file"
+            if not self.sequences:
+                return
+
+            if self.path and Path(self.path).exists():
+                out = dict(_readsequence(self.path))
+                if out:
+                    ctrl.theme.update(self, sequences = out)
+                    return
+
+            ctrl.theme.update(self, path = _writesequence(self.sequences))
+
 
 @dataclass
 class SequenceDisplay:
@@ -61,14 +88,7 @@ class SequenceDisplay:
 
                     if isinstance(task.sequences, dict):
                         mdl['sequences'][root] = task.sequences
-                        mdl['paths'][root]     = mkstemp(
-                            ".fasta", __name__.replace(".","_")+"_"
-                        )[1]
-
-                        with open(mdl['paths'][root], "w") as stream:
-                            for i, j in mdl['sequences'][root].items():
-                                print(f"> {i}", file = stream)
-                                print(j, file = stream)
+                        mdl['paths'][root]     = _writesequence(task.sequences)
 
                     elif (
                             isinstance(task.sequences, (Path, str))

@@ -177,6 +177,13 @@ class DiskCacheConfig:
 
         with self.newcache(cache) as disk:
             if disk.get(VERSION_KEY) != VERSION:
+                LOGS.info(
+                    "%s version is incorrect (%s when expecting %d) at %s",
+                    CACHE_NAME,
+                    disk.get(VERSION_KEY),
+                    VERSION,
+                    self.path
+                )
                 return
 
             for itm in (items,) if isinstance(items, TaskCacheList) else items:

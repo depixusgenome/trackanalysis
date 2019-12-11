@@ -3,9 +3,15 @@
 "Provides access to currently cached jobs"
 from datetime                   import datetime
 from pathlib                    import Path
-from typing                     import Tuple, Optional, Type, ClassVar, cast
+from typing                     import (
+    Tuple, Optional, Type, ClassVar, Iterator, List, cast
+)
+import time
+
+import numpy as np
 
 from bokeh.io                   import curdoc
+
 from cleaning.processor         import FixedBeadDetectionTask, BeadSubtractionTask
 from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
 from eventdetection.view        import ALIGN_LABELS
@@ -33,7 +39,9 @@ class StorageExplorerConfig(DialogButtonConfig):
         self.machines = [
             "sirius", "helicon", "vega", "sdi_beta_1", "rosalind", "george", "francis"
         ]
-        self.date     = "%Y-%m-%d %H:%M"
+        self.date        = "%Y-%m-%d %H:%M"
+        self.splits      = [7*86400, 14*86400]
+        self.splitlabels = ['≤ 1 week', '≥ 1 week', '≥ 2 weeks']
 
 class _Store:       # pylint: disable=too-many-instance-attributes
     def __init__(self, existing, roots, key, val):
@@ -125,6 +133,7 @@ class StorageExplorer(ModalDialogButton[StorageExplorerConfig, StorageExplorerMo
         out     = f"""
             # Disk Cache
         """
+        titles  = "  ".join("<b "+self.__STYLE+">"+i+"</b>" for i in self.__TITLES)
         if current.cachesize > 0:
             for withfit in (current.withfit, not current.withfit):
                 items   = [(i, j) for i, j in enumerate(current.items) if j.fit is withfit]
@@ -134,22 +143,27 @@ class StorageExplorer(ModalDialogButton[StorageExplorerConfig, StorageExplorerMo
                 out    += f"""
                     ## With{"" if withfit else "out"} Hairpins
 
-                    {"  ".join("<b "+self.__STYLE+">"+i+"</b>" for i in self.__TITLES)}
                 """
-                for ind, info in items:
-                    out  += (
-                        "       "
-                        + "  ".join((
-                            f"%(items[{ind}].loaded)b",
-                            datetime.fromtimestamp(info.statsdate).strftime(self._theme.date),
-                            self.__body_path(info),
-                            str(next((i for i in self._theme.machines if i in info.path), unkn)),
-                            datetime.fromtimestamp(info.trackdate).strftime(self._theme.date),
-                            self.__body_fit(info),
-                            self.__DISCARD.format(ind = ind)
-                        ))
-                        + "\n"
-                    )
+                for btn, elems in self.__body_split(items):
+                    out += btn.strip() + "\n" + titles + "\n"
+                    for ind, info in elems:
+                        out  += (
+                            "       "
+                            + "  ".join((
+                                f"%(items[{ind}].loaded)b",
+                                datetime.fromtimestamp(info.statsdate).strftime(self._theme.date),
+                                self.__body_path(info),
+                                str(next(
+                                    (i for i in self._theme.machines if i in info.path),
+                                    unkn
+                                )),
+                                datetime.fromtimestamp(info.trackdate).strftime(self._theme.date),
+                                self.__body_fit(info),
+                                self.__DISCARD.format(ind = ind)
+                            ))
+                            + "\n"
+                        )
+                    out += "\n"
 
         out += """
             ## Cache Settings
@@ -177,6 +191,25 @@ class StorageExplorer(ModalDialogButton[StorageExplorerConfig, StorageExplorerMo
 
         # do this last as it might delete the cache
         self._model.updatediskcache(ctrl, **diff[1])
+
+    def __body_split(
+            self, items: List[Tuple[int, _Store]]
+    ) -> Iterator[Tuple[str, List[Tuple[int, _Store]]]]:
+        grps: List[List[Tuple[int, _Store]]] = [[] for _ in self._theme.splitlabels]
+        dates                                = np.array([*self._theme.splits])[::-1]
+        now                                  = time.time()
+        for i, j  in zip(items, np.searchsorted(dates, [now-i[1].statsdate for i in items])):
+            grps[j].append(i)
+
+        if sum(len(i) > 0 for i in grps) == 1:
+            yield ('', items)
+            return
+
+        first = True
+        for k, j in zip(self._theme.splitlabels, grps):
+            if len(j):
+                yield (("▼ " if first else "▶ ") + k, j)
+                first = False
 
     @classmethod
     def __body_path(cls, info):

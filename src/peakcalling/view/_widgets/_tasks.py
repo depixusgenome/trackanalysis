@@ -16,6 +16,7 @@ from peakfinding.processor.__config__    import PeakSelectorTask
 from sequences                           import read as _read, splitoligos
 from taskmodel                           import Task, RootTask
 from taskmodel.application               import TasksDisplay
+from tasksequences.modelaccess           import SequenceModel
 from utils.inspection                    import diffobj, templateattribute
 from ...processor                        import FitToHairpinTask
 from ...model                            import TasksModel
@@ -83,6 +84,11 @@ class TaskExplorer(ModalDialogButton[TaskExplorerConfig, TaskExplorerModel]):
         "swap with models in the controller"
         super().swapmodels(ctrl)
         self._curr = ctrl.display.swapmodels(self._curr)
+
+        # We'll need an available SequenceModel when updating the controller
+        # but we don't need to access it to display the view.
+        # Thus we add it to the controller but don't keep any link to it.
+        SequenceModel().swapmodels(ctrl)
 
     def _diff(self, current: TaskExplorerModel, changed: TaskExplorerModel):
         return list(current.diff(self._model, self._curr.roottask, changed))

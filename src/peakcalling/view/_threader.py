@@ -322,11 +322,5 @@ def ismain(ctrl):
             'datacleaning', 'extremumalignment', 'clipping',
             'eventdetection', 'peakselector', 'singlestrand',
             'baselinepeakfilter'
-        ),
-        ioopen = (
-            slice(None, -2),
-            'hybridstat.view._io.PeaksConfigGRFilesIO',
-            'hybridstat.view._io.PeaksConfigMuWellsFilesIO',
-            'hybridstat.view._io.PeaksConfigTrackIO',
         )
     )

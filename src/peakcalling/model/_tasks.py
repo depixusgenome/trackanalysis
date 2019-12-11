@@ -22,8 +22,10 @@ from taskcontrol.processor.base    import register
 from taskmodel.application         import TasksConfig, TasksDisplay
 from taskmodel.dataframe           import DataFrameTask
 from taskmodel                     import RootTask, Task
+from utils.logconfig               import getLogger
 from ..processor.__config__        import FitToReferenceTask, FitToHairpinTask
 
+LOGS       = getLogger(__name__.replace('_', ''))
 OptProc    = Optional[ProcessorController]
 ProcOrRoot = Union[RootTask, ProcessorController]
 Cache      = Dict[int, Union[Exception, pd.DataFrame]]
@@ -415,8 +417,18 @@ class _Adaptor:
         task: FitToHairpinTask
         for procs, task in itr:
             # if cannot resolve task: remove
-            task = task.resolve(procs.model[0].path)
-            itr.send(task if self.__resolved(task) else False)
+            task: Union[bool, FitToHairpinTask] = task.resolve(procs.model[0].path)
+            if not self.__resolved(task):
+                task = False
+
+            LOGS.debug("%s has %s defined fit", id(procs), len(getattr(task, 'fit', ())))
+            if task is not False:
+                LOGS.debug(
+                    "Fitting [%s]:\n%s",
+                    task.oligos,
+                    {i: getattr(j, 'peaks', None) for i, j in task.fit.items()}
+                )
+            itr.send(task)
 
     def __dataframe(self):
         task  = self.dataframes.fits if self.__hasfits() else self.dataframes.peaks
