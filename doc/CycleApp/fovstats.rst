@@ -27,15 +27,16 @@ The top display shows all beads attached to selected tracks and hairpins.
 
 The beads are grouped as follows:
 
-1. By hairpins when those have been defined. The order of the hairpin is
-   defined using the median quality score of beads, with the best hairpin on
-   the left, the worst on the right.
-2. By track: if hairpins are defined, the order is again defined using the
-   median quality score in the group. Note that the track denomination can be
-   changed using the *advanced* menu. In the situation where there is a single
-   track, the chosen denomination might remove the track category.
-3. By bead number: if hairpins are defined, the order is again defined using the
-   quality score.
+1. By hairpins when those have been defined. The order of the hairpin is either
+   lexical or defined using the median quality score of beads, with the best
+   hairpin on the left, the worst on the right.
+2. By track: if hairpins are defined, the order is either in the order the
+   tracks were loaded or defined using the median quality score in the group.
+   Note that the track denomination can be changed using the *advanced* menu.
+   In the situation where there is a single track, the chosen denomination
+   might remove the track category.
+3. By bead number: if hairpins are defined, the order is either by bead number
+   or defined using the quality score.
 
 There are two sets of points:
 
@@ -61,6 +62,7 @@ There are two sets of points:
 A number of filters can be applied to beads, blockages or bindings. Using the
 *advanced* menu, one can select which tracks to display, which hairpins, beads
 as well as the binding strand (or orientation).
+
 
 Selecting and Displaying a Specific Bead
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -255,8 +257,8 @@ Configurring Plots
 A number of tabs are presented. Some only appear if hairpin sequences are
 available.
 
-Axes
-----
+Bottom Plot Axes
+----------------
 
 One can select here:
 
@@ -301,6 +303,12 @@ One can select here:
   defined.
 * *Stretch factor* is the stretch to use if no hairpins are available.
 
+Top Plot
+--------
+
+This tab allows defining the order of hairpins tracks and beads.
+
+
 Tracks
 ------
 
@@ -310,7 +318,9 @@ This tab allows defining:
   y-axis values are subtracted from others'.
 * the group to which a track may belong.
 * whether the track should be displayed at all.
-* the beads which should *not* be displayed for a given track.
+* the beads which should *not* be displayed for a given track. It's possible to
+  select the *only* beads to be displayed by prepending a '!' or a '~' to the
+  list of beads (i.e. '~ 4' will only display bead 4). 
 
 Blockage Status & Z
 -------------------

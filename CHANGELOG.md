@@ -1,8 +1,23 @@
 # CycleApp
 
+## cycles_v7.4
+
+* 2019-12-16 15:30:22 +0100  (tag: cycles_v7.4)
+
+### Statistics Tab
+
+When fitting beads to sequences, one can now sort the top plot x-axis
+categories lexically instead of by fit quality. See the *Plotting → Top Plot* menu.
+
+The *bead id* is now part of available x-axis variables.
+
+Previously, one could discard beads from the display using entries in *Plotting
+→ Tracks*. It's now possible to select the beads to display: simply prepend the
+list of beads with '!' or '~'.
+
 ## cycles_v7.3
 
-* 2019-12-11 16:03:24 +0100  (tag: cycles_v7.3.5)
+* 2019-12-11 15:30:22 +0100  (tag: cycles_v7.3.5)
 * 2019-12-10 07:53:49 +0100  (tag: cycles_v7.3.4)
 * 2019-12-05 12:03:24 +0100  (tag: cycles_v7.3.3)
 * 2019-12-04 12:11:49 +0100  (tag: cycles_v7.3.2)

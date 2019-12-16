@@ -8,10 +8,11 @@ from bokeh.palettes      import all_palettes as _PALETTES  # pylint: disable=no-
 
 from data.trackops       import trackname
 from modaldialog.button  import ModalDialogButton, DialogButtonConfig
+from modaldialog.options import NotTuple
 from taskmodel           import RootTask
 from ...model            import (
-    AxisConfig, FoVStatsPlotModel, getcolumn, BinnedZ, COLS, Slice, INVISIBLE,
-    FoVStatsPlotConfig
+    AxisConfig, BeadsScatterPlotModel, FoVStatsPlotModel, getcolumn, BinnedZ,
+    COLS, Slice, INVISIBLE, FoVStatsPlotConfig, NotSet
 )
 from ._jobsstatus        import hairpinnames
 
@@ -34,43 +35,51 @@ class PeakcallingPlotModel:     # pylint: disable=too-many-instance-attributes
     "configure xaxis choice"
     def __init__(
             self,
-            mdl: FoVStatsPlotModel,
+            beads: BeadsScatterPlotModel,
+            stats: FoVStatsPlotModel,
             cnf: Optional[PeakcallingPlotConfig] = None
     ):
         if cnf is None:
             cnf = PeakcallingPlotConfig()
 
-        self.defaultcolors:  str     = mdl.theme.defaultcolors
-        self.binnedz:        BinnedZ = deepcopy(mdl.theme.binnedz)
-        self.binnedbp:       BinnedZ = deepcopy(mdl.theme.binnedbp)
-        self.closest:        int     = mdl.theme.closest
-        self.stretch:        float   = round(mdl.theme.stretch, 2)
-        self.uselabelcolors: bool    = mdl.theme.uselabelcolors
-        self.tracknames:     str     = mdl.theme.tracknames
-        self.yaxis:          str     = mdl.theme.yaxis
+        self.hsort:          bool    = 'hairpin' in beads.theme.sorting
+        self.tsort:          bool    = 'track' in beads.theme.sorting
+        self.bsort:          bool    = 'bead' in beads.theme.sorting
+        self.defaultcolors:  str     = stats.theme.defaultcolors
+        self.binnedz:        BinnedZ = deepcopy(stats.theme.binnedz)
+        self.binnedbp:       BinnedZ = deepcopy(stats.theme.binnedbp)
+        self.closest:        int     = stats.theme.closest
+        self.stretch:        float   = round(stats.theme.stretch, 2)
+        self.uselabelcolors: bool    = stats.theme.uselabelcolors
+        self.tracknames:     str     = stats.theme.tracknames
+        self.yaxis:          str     = stats.theme.yaxis
         self.xinfo: List[AxisConfig] = [
-            AxisConfig('xxx') if i >= len(mdl.theme.xinfo) else deepcopy(mdl.theme.xinfo[i])
+            AxisConfig('xxx') if i >= len(stats.theme.xinfo) else deepcopy(stats.theme.xinfo[i])
             for i in range(3)
         ]
 
-        procs                            = mdl.tasks.processors
+        procs                            = stats.tasks.processors
         self.roots:      List[RootTask]  = list(procs)
         self.reftrack:   int             = (
-            0 if mdl.display.reference is None else (1 + self.roots.index(mdl.display.reference))
+            0 if stats.display.reference is None else
+            (1 + self.roots.index(stats.display.reference))
         )
-        self.beadmask:   List[List[int]] = [list(mdl.display.beads.get(i, ())) for i in procs]
-        self.tracktag:   List[str]       = [mdl.display.tracktag.get(i, cnf.none) for i in procs]
-        self.tracksel:   List[bool]      = [i not in mdl.display.roots for i in procs]
-        self.statustag:  List[str]       = list(mdl.theme.statustag.values())
-        self.beadstatustag:    List[str]       = list(mdl.theme.beadstatustag.values())
-        self.hairpins:   List[str]       = sorted(hairpinnames(procs))
-        self.hairpinsel: List[bool]      = [i not in mdl.display.hairpins for i in self.hairpins]
-        self.orientationsel: List[bool]  = [
-            i not in mdl.display.orientations
-            for i in mdl.theme.orientationtag.keys()
+        self.beadmask:   List[List[int]] = [
+            NotTuple(i) if isinstance(i, NotSet) else tuple(i)
+            for i in [stats.display.beads.get(j, set()) for j in procs]
         ]
-        self.linear: bool = mdl.theme.linear
-        if mdl.theme.yaxisnorm is not None:
+        self.tracktag:   List[str]       = [stats.display.tracktag.get(i, cnf.none) for i in procs]
+        self.tracksel:   List[bool]      = [i not in stats.display.roots for i in procs]
+        self.statustag:  List[str]       = list(stats.theme.statustag.values())
+        self.beadstatustag:    List[str]       = list(stats.theme.beadstatustag.values())
+        self.hairpins:   List[str]       = sorted(hairpinnames(procs))
+        self.hairpinsel: List[bool]      = [i not in stats.display.hairpins for i in self.hairpins]
+        self.orientationsel: List[bool]  = [
+            i not in stats.display.orientations
+            for i in stats.theme.orientationtag.keys()
+        ]
+        self.linear: bool = stats.theme.linear
+        if stats.theme.yaxisnorm is not None:
             self.xnorm: str  = '4'
         else:
             self.xnorm = next(
@@ -82,28 +91,38 @@ class PeakcallingPlotModel:     # pylint: disable=too-many-instance-attributes
                 '0'
             )
 
-        self.__dict__.update({j: mdl.display.ranges.get(i, Slice()) for i, j in _FILTER_CNV})
+        self.__dict__.update({j: stats.display.ranges.get(i, Slice()) for i, j in _FILTER_CNV})
 
     reset = __init__
 
     def diff(
-            self, right: 'PeakcallingPlotModel', model: FoVStatsPlotModel
+            self,
+            right: 'PeakcallingPlotModel',
+            stats: FoVStatsPlotModel
     ) -> Dict[str, Dict[str, Any]]:
         "return a dictionnary of changed items"
         diff: Dict[str, Dict[str, Any]] = {'display': {}, 'theme': {}}
         for i, j, k in chain(
                 self.__diff_axes(right),
+                self.__diff_top(right),
                 self.__diff_filters(right),
                 self.__diff_reftrack(right),
                 self.__diff_tracks(right),
                 self.__diff_hairpins(right),
-                self.__diff_orientation(right, model),
-                self.__diff_tags("statustag", right, model),
-                self.__diff_tags("beadstatustag",   right, model),
+                self.__diff_orientation(right, stats),
+                self.__diff_tags("statustag", right, stats),
+                self.__diff_tags("beadstatustag",   right, stats),
                 self.__diff_attr(right)
         ):
             diff[i][j] = k
         return diff
+
+    def __diff_top(self, right):
+        itms = ('hairpin', 'track', 'bead')
+        left = {i for i in itms if getattr(self, f'{i[0]}sort')}
+        cur  = {i for i in itms if getattr(right, f'{i[0]}sort')}
+        if cur != left:
+            yield ('theme', 'sorting', cur)
 
     def __diff_attr(self, right):
         for i in ('closest', 'stretch', 'uselabelcolors', 'linear'):
@@ -200,7 +219,11 @@ class PeakcallingPlotModel:     # pylint: disable=too-many-instance-attributes
                 {j for i, j in zip(right.tracksel, right.roots) if not i}
             )
 
-        right.beadmask = [i or [] for i in right.beadmask]
+        right.beadmask = [
+            set() if not j else NotSet(j) if isinstance(j, NotTuple) else set(j)
+            for j in right.beadmask
+        ]
+
         if any(i != j for i, j in zip(self.beadmask, right.beadmask)):
             yield (
                 'display', 'beads',
@@ -351,43 +374,61 @@ class PeakcallingPlotWidget(ModalDialogButton[PeakcallingPlotConfig, Peakcalling
     "Configure the plot"
     def __init__(self):
         super().__init__()
-        self._model   = FoVStatsPlotModel()
+        self._beads = BeadsScatterPlotModel()
+        self._stats = FoVStatsPlotModel()
 
     def _newmodel(self, ctrl) -> PeakcallingPlotModel:
-        return PeakcallingPlotModel(self._model, self._theme)
+        return PeakcallingPlotModel(self._beads, self._stats, self._theme)
 
     def _diff(self, current: PeakcallingPlotModel, changed: PeakcallingPlotModel):
-        return current.diff(changed, self._model)
+        return current.diff(changed, self._stats)
 
     def _action(self, ctrl, diff):
         for i, j in diff.items():
-            getattr(ctrl, i).update(getattr(self._model, i), **j)
+            sorting = j.pop('sorting', None)
+            getattr(ctrl, i).update(getattr(self._stats, i), **j)
+            if sorting is not None:
+                ctrl.theme.update(self._beads.theme, sorting = sorting)
 
     def _body(self, current):
-        return (
+        out = (
             """# Plot Configuration
             """
-            + self._body_axes(current)
+            + self._body_bottomplot(current)
+            + self._body_topplot(current)
             + self._body_tracks(current)
             + self._body_blockage()
             + self._body_tags('Bead', 'beadstatustag')
             + self._body_hairpins(current)
             + self._body_orientations(current)
         ).replace("ㄩ", "#")
+        return out
 
-    def _body_axes(self, current):
+    @staticmethod
+    def _body_topplot(current):
+        if len(current.hairpins) < 1:
+            return ""
+        return f"""
+            ㄩㄩ Top Plot
+
+            Sort hairpins by fit quality   %(hsort)b
+            Sort tracks by fit quality     %(tsort)b
+            Sort beads by fit quality      %(bsort)b
+        """.strip()
+
+    def _body_bottomplot(self, current):
         cols   = {i.key: i for i in COLS if i.label}
         nil    = f'|xxx:{self._theme.none}'
         xaxis  = '|' + '|'.join(
             ':'.join(i)
-            for i in sorted(self._model.theme.xaxistag.items(), key = lambda x: x[1])
+            for i in sorted(self._stats.theme.xaxistag.items(), key = lambda x: x[1])
             if len(current.hairpins) or not cols[i[0]].fit
         ) + '|'
 
         yaxis = '|' + '|'.join(
             ':'.join(i)
             for i in sorted(
-                self._model.theme.yaxistag.items(),
+                self._stats.theme.yaxistag.items(),
                 key = lambda x: '' if x[0] == 'bead' else x[1]
             )
             if len(current.hairpins) or not cols[i[0]].fit
@@ -397,7 +438,7 @@ class PeakcallingPlotWidget(ModalDialogButton[PeakcallingPlotConfig, Peakcalling
         palette     = 'none:none|' + '|'.join(f'{i}:{i}' for i in sorted(_PALETTES))
         htmlpalette = "<a href='view/bokeh_palettes.html' target='_blank'>color palette</a>"
         return f"""
-            ㄩㄩ Axes
+            ㄩㄩ Bottom Plot Axes
 
             <b>X-axis</b>                     <b>sort by value</b>
             %(xinfo[0].name){xaxis}           %(xinfo[0].sortbyvalue)b
@@ -413,7 +454,7 @@ class PeakcallingPlotWidget(ModalDialogButton[PeakcallingPlotConfig, Peakcalling
             Prefer a linear x-axis      %(linear)b
             {"" if current.hairpins else "Stretch factor (µm/bp)    %(stretch).2F"}
             {_JSWidgetVericicator(len(current.hairpins) > 0, xaxis, yaxis)()}
-        """.strip()
+        """
 
     def _body_blockage(self):
         def _lab(name):
@@ -432,7 +473,7 @@ class PeakcallingPlotWidget(ModalDialogButton[PeakcallingPlotConfig, Peakcalling
         )
 
     def _body_tags(self, title: str, attr: str):
-        vals = getattr(self._model.theme, attr).values()
+        vals = getattr(self._stats.theme, attr).values()
         line = f"""
             {{i[1]: <20}}    %({attr}[{{i[0]}}])250s"""
         return (
@@ -478,7 +519,7 @@ class PeakcallingPlotWidget(ModalDialogButton[PeakcallingPlotConfig, Peakcalling
             ** Check which binding orientations to display**"""
             + "".join(
                 line.format(i = i)
-                for i in enumerate(self._model.theme.orientationtag.values())
+                for i in enumerate(self._stats.theme.orientationtag.values())
             )
         )
 
@@ -492,7 +533,7 @@ class PeakcallingPlotWidget(ModalDialogButton[PeakcallingPlotConfig, Peakcalling
             for i, j in enumerate(current.roots)
         )
         line     = """
-            %(tracksel[{i}])b  {i}-{j: <20}  %(tracktag[{i}])250s  %(beadmask[{i}])ocsvd"""
+            %(tracksel[{i}])b  {i}-{j: <20}  %(tracktag[{i}])250s  %(beadmask[{i}])ocsvι"""
         return (
             f"""
             ㄩㄩ Tracks

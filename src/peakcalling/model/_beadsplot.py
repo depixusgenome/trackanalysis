@@ -29,7 +29,7 @@ class BeadsPlotTheme(PlotTheme):
     "plot theme"
     def __init__(self, name):
         super().__init__(name = name)
-        self.boundsdelta = .3
+        self.boundsdelta       = .3
 
     def newbounds(self, curr, arr, force):
         "Sets the range boundaries"
@@ -134,6 +134,10 @@ class Slice:
     start: Union[float, int, None] = None
     stop:  Union[float, int, None] = None
 
+
+class NotSet(set):
+    "the opposite of a set"
+
 @dataclass
 class BeadsScatterPlotStatus:
     """beads plot status"""
@@ -180,11 +184,15 @@ class BeadsScatterPlotStatus:
         "return whether the item is masked"
         if isinstance(root, TaskCacheList):
             root = root.model[0] if root.model else None
-        return (
-            (bead is None and root in self.roots)  # don't test unless specifically required
-            or hairpin in self.hairpins
-            or bead    in self.beads.get(root, ())
-        )
+
+        if bead is None and root in self.roots:  # don't test unless specifically required
+            return True
+
+        if hairpin in self.hairpins:
+            return True
+
+        lst = self.beads.get(root, ())
+        return bead not in lst if isinstance(lst, NotSet) else bead in lst
 
     @staticmethod
     def __filter_get(
@@ -229,6 +237,7 @@ class BeadsScatterPlotStatus:
 class BeadsScatterPlotConfig(BasePlotConfig):
     "Information about the current fovs displayed"
     name:    str            = NAME
+    sorting: Set[str]       = field(default_factory = lambda: {'hairpin', 'track', 'bead'})
     figargs: Dict[str, Any] = field(default_factory = lambda: dict(
         toolbar_sticky   = False,
         toolbar_location = 'above',
