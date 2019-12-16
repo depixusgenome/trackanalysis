@@ -285,7 +285,7 @@ class PlotThreader(ABC):
                 if attrdisp.intersection(old):
                     threader.renew(ctrl, delplot = True)
 
-            attrs = {'xinfo', 'yaxis'}
+            attrs = {'xinfo', 'yaxis', 'sorting'}
             attrs.update(BasePlotConfig().__dict__)
 
             @ctrl.theme.observe(model.theme)

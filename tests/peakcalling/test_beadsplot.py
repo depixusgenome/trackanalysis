@@ -118,6 +118,13 @@ def test_beadsplot_info_simple(diskcaching):
         ('GF1', '', '25'), ('GF1', '', '35'), ('GF1', '', '12')
     ]
 
+    mdl.theme.sorting = {}
+    cache = _change(False)
+    assert cache['x_range']['factors'] == [
+        ('GF1', '', '1'),  ('GF1', '', '7'), ('GF1', '', '12'), ('GF1', '', '14'),
+        ('GF1', '', '25'), ('GF1', '', '33'), ('GF1', '', '35')
+    ]
+
 def test_beadsplot_info_filter(diskcaching):
     "test the view"
     # pylint: disable=protected-access

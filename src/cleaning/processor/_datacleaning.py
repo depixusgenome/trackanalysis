@@ -100,7 +100,7 @@ class RampDataCleaningTask(DataCleaningTaskBase):
         """
         super().__init__(**kwa)
 
-    PRE_CORRECTION_CYCLES:  ClassVar[Tuple[str, ...]] =  DataCleaningTaskBase.PRE_CORRECTION_CYCLES
+    PRE_CORRECTION_CYCLES:  ClassVar[Tuple[str, ...]] = DataCleaningTaskBase.PRE_CORRECTION_CYCLES
     POST_CORRECTION_CYCLES: ClassVar[Tuple[str, ...]] = (DataCleaningTaskBase.POST_CORRECTION_CYCLES
                                                          + ('extentoutliers',))
 
@@ -197,7 +197,8 @@ class DataCleaningException(ProcessorException):
 
     def errkey(self) -> str:
         "return an indicator of the type of error"
-        return max(self.args[0].data())[1]  # pylint: disable=unsubscriptable-object
+        # pylint: disable=unsubscriptable-object
+        return max(self.args[0].data(), default = ('', 'unknown'))[1]
 
 @dataclass
 class CleaningCacheData:
@@ -221,7 +222,10 @@ class CleaningCacheData:
         info[1][self.mask] = np.NaN
         return None
 
+
 CleaningTaskType = TypeVar('CleaningTaskType', bound = DataCleaningTaskBase)
+
+
 class DataCleaningProcessorBase(Processor[CleaningTaskType]):
     "Processor for cleaning the data"
     tasktype: Type[DataCleaningTaskBase]  # type: ignore

@@ -400,7 +400,7 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
 
     def _xfactors(self, frame: pd.DataFrame) -> Union[List[str], List[Tuple[str,...]]]:
         frame = (
-            frame[['trackid', 'bead', 'x', *self._factorcols()]]
+            frame[['track', 'trackid', 'bead', 'x', *self._factorcols()]]
             .groupby(['trackid', 'bead'])
             .first()
             .reset_index()
@@ -425,9 +425,8 @@ class _Plot(BasePlotter[BeadsScatterPlot]):
     def _factorcols() -> List[str]:
         pass
 
-    @staticmethod
     @abstractmethod
-    def _sortfactors(data: pd.DataFrame) -> pd.DataFrame:
+    def _sortfactors(self, data: pd.DataFrame) -> pd.DataFrame:
         pass
 
     @staticmethod
@@ -451,16 +450,25 @@ class _HairpinPlot(_Plot):
     def _yaxis(self) -> str:
         return self._model.theme.yaxis[1]
 
-    @staticmethod
-    def _sortfactors(data: pd.DataFrame) -> pd.DataFrame:
-        cols = ['hairpin', 'trackid']
-        return (
-            data
-            .set_index(cols[0])
-            .join(data.groupby(cols[:1]) .cost.median().rename("hcost").to_frame())
-            .set_index(cols[1], append = True)
-            .join(data.groupby(cols[:2]).cost.median().rename("tcost").to_frame())
-        ).sort_values(['hcost', 'tcost', 'cost'])
+    def _sortfactors(self, data: pd.DataFrame) -> pd.DataFrame:
+        sorts = self._model.theme.sorting
+        cols  = ['hairpin', 'track', 'bead']
+        for i, col in enumerate(cols):
+            if col in sorts:
+                data.set_index(cols[:i+1], inplace = True)
+                out = data.groupby(level = cols[:i+1]).cost.median()
+                # don't use pd.DataFrame.assign as it produces errors: pandas is buggy
+                data[f"{col[0]}cost"] = out
+
+                data.reset_index(inplace = True)
+            else:
+                # create a integer type column as pandas will not always succeed at
+                # sorting multi-indexes of mixed type.
+                itms = data[col].unique()
+                itms.sort()
+                data[f"{col[0]}cost"] = data[col].apply(itms.tolist().index)
+
+        return data.sort_values(['hcost', 'tcost', 'bcost'])
 
     @staticmethod
     def _beadorder() -> List[str]:
@@ -482,7 +490,7 @@ class _HairpinPlot(_Plot):
                 info.peaks.values[0][cols]
                 .assign(
                     hairpin = info.iloc[0]['hpin'],
-                    **{i: info.iloc[0][i] for i in ('trackid', 'bead', 'cost')},
+                    **{i: info.iloc[0][i] for i in ('track', 'trackid', 'bead', 'cost')},
                 )
             )
             out['blockageresolution'] *= info.stretch.values[0]
@@ -557,9 +565,9 @@ class _PeaksPlot(_Plot):
     def _yaxis(self) -> str:
         return self._model.theme.yaxis[0].format(1e3/self._model.theme.stretch)
 
-    @staticmethod
-    def _sortfactors(data: pd.DataFrame) -> Tuple[List[str], List[str]]:
-        return data.sort_values(['trackid', 'bead'])
+    def _sortfactors(self, data: pd.DataFrame) -> Tuple[List[str], List[str]]:
+        data[f"torder"] = data.track.apply(sorted(data.track.unique()).index)
+        return data.sort_values(['torder', 'bead'])
 
     @staticmethod
     def _beadorder() -> List[str]:
@@ -568,7 +576,7 @@ class _PeaksPlot(_Plot):
     def _compute_expdata(self, itr: Iterator[pd.DataFrame]) -> Iterator[pd.DataFrame]:
         stretch = self._model.theme.stretch
         cols    = list({
-            'trackid', 'bead', 'x',
+            'track', 'trackid', 'bead', 'x',
             *(
                 i for i in self._model.theme.datacolumns
                 if (

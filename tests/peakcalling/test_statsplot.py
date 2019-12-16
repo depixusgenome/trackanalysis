@@ -10,7 +10,7 @@ from   cleaning.processor                     import DataCleaningTask, ClippingT
 from   eventdetection.processor               import ExtremumAlignmentTask, EventDetectionTask
 from   peakfinding.processor                  import PeakSelectorTask
 from   peakcalling.processor                  import FitToHairpinTask
-from   peakcalling.model                      import AxisConfig, Slice
+from   peakcalling.model                      import AxisConfig, Slice, BeadsScatterPlotModel
 from   peakcalling.view                       import FoVStatsPlot
 from   peakcalling.view._widgets._plot        import PeakcallingPlotModel
 from   peakcalling.view.statsplot._hairpin    import _HairpinPlot
@@ -274,14 +274,15 @@ def test_statsplot_info_reftrack(diskcaching):
     data  = cache['_stats']['data']
     assert list(data['x']) == [('track 0', '', ''), ('track 1', '', '')]
 
-    wdg1 = PeakcallingPlotModel(mdl)
+    beads = BeadsScatterPlotModel()
+    wdg1  = PeakcallingPlotModel(beads, mdl)
     assert wdg1.reftrack == 0
 
     mdl.display.reference = next(iter(mdl.tasks.roots))
 
-    wdg2 = PeakcallingPlotModel(mdl)
+    wdg2 = PeakcallingPlotModel(beads, mdl)
     assert wdg2.reftrack == 1
-    assert wdg2.diff(PeakcallingPlotModel(mdl), mdl) == dict(theme = {}, display = {})
+    assert wdg2.diff(PeakcallingPlotModel(beads, mdl), mdl) == dict(theme = {}, display = {})
     assert wdg2.diff(wdg1, mdl) == dict(theme = {}, display = dict(reference = None))
     assert wdg1.diff(wdg2, mdl) == dict(
         theme = {}, display = dict(reference = next(iter(mdl.tasks.roots)))

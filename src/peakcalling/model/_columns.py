@@ -58,6 +58,7 @@ COLS: FrozenSet[Column] = frozenset({
         ('nblockages',   'y', None,      False, True,  False, 'blockage count'),
         ('saturation',   'y', None,      False, False, False, 'φ₅ saturation'),
         ('bead',         'y', None,      False, True,  False, 'count (%)'),
+        ('bead',         'x', None,      False, False, True, 'bead id'),
         ('tracktag',     'x', None,      False, True,  False, 'track group'),
         ('track',        'x', None,      False, True,  False, 'track'),
         ('blockageresolution', 'y', 'stretch', False, False, False, 'σ[blockage] (bp)'),
